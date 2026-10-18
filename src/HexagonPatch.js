@@ -691,6 +691,119 @@ function key(q, r)
     return q + "/" + r
 }
 
+function borderKey(q, r, dir)
+{
+    return q + "/" + r + "/" + dir
+}
+
+
+/**
+ * Returns all half edges going out of the vertex of the given half edge that are reachable over twins. That is the
+ * whole ring for inner vertices or the chain between two border edges for border vertices.
+ *
+ * @param {HalfEdge} start  outgoing half edge
+ *
+ * @return {HalfEdge[]} outgoing half edges
+ */
+function getFan(start)
+{
+    const fan = [start]
+    let curr = start
+    while (curr.twin)
+    {
+        curr = curr.twin.next
+        if (curr === start)
+        {
+            return fan
+        }
+        fan.push(curr)
+    }
+
+    // we hit the border, collect the rest in the other direction
+    let prev = start.prev
+    while (prev.twin)
+    {
+        curr = prev.twin
+        fan.push(curr)
+        prev = curr.prev
+    }
+    return fan
+}
+
+
+/**
+ * Returns the border half edge following the given border half edge.
+ *
+ * @param {HalfEdge} he     border half edge
+ *
+ * @return {HalfEdge} next border half edge
+ */
+function nextOnBorder(he)
+{
+    let curr = he.next
+    while (curr.twin)
+    {
+        curr = curr.twin.next
+    }
+    return curr
+}
+
+
+/**
+ * Replaces the vertex "drop" with the vertex "keep" in all half edges going out of "drop"
+ */
+function mergeVertex(keep, drop)
+{
+    if (keep === drop)
+    {
+        return
+    }
+
+    if (__DEV)
+    {
+        if (keep.x !== drop.x || keep.y !== drop.y)
+        {
+            throw new Error("Seam vertices don't match: " + keep + ", " + drop)
+        }
+    }
+
+    getFan(drop.halfEdge).forEach(he => he.vertex = keep)
+}
+
+
+/**
+ * Gives every fan that the given outgoing half edges fall into after disconnecting its own vertex. The fan containing
+ * vertex.halfEdge keeps the vertex, the others get copies.
+ *
+ * @param {Vertex} vertex       vertex
+ * @param {HalfEdge[]} outgoing all half edges that went out of the vertex before disconnecting
+ */
+function splitVertex(vertex, outgoing)
+{
+    const remaining = new Set(outgoing)
+    getFan(vertex.halfEdge).forEach(he => remaining.delete(he))
+
+    while (remaining.size)
+    {
+        const [start] = remaining
+        const copy = new Vertex(vertex.x, vertex.y, vertex.z, start)
+        getFan(start).forEach(he => {
+            he.vertex = copy
+            remaining.delete(he)
+        })
+    }
+}
+
+
+function untwin(he, twin)
+{
+    he.twin = null
+    twin.twin = null
+
+    he.edge.halfEdge = he
+    twin.edge = new Edge(twin)
+}
+
 
 export const PATCH_SIZE = 10;
 const hSize = PATCH_SIZE/2;
@@ -703,6 +816,21 @@ export default class HexagonPatch
     static SIZE = PATCH_SIZE
 
     hexagons = new Map()
+
+    /**
+     * Outer hexagon edges of the patch, keyed by hexagon position and direction. Each entry holds the position of the
+     * neighbor hexagon outside the patch and the two border half edges the edge got subdivided into.
+     *
+     * @type {Map<String, {dir: Number, nq: Number, nr: Number, first: HalfEdge, second: HalfEdge}>}
+     */
+    border = new Map()
+
+    /**
+     * Connected neighbor patches mapped to the seam half edges as flat list of twin pairs.
+     *
+     * @type {Map<HexagonPatch, HalfEdge[]>}
+     */
+    connections = new Map()
 
     constructor(q,r, size = 40)
     {
@@ -755,6 +883,8 @@ export default class HexagonPatch
 
         console.log("Created #" + hexCount + " hexagons")
 
+        const borderEdges = this.findBorderEdges(faces)
+
         const edges = [...findInsideEdges(faces)]
         shuffle(edges)
 
@@ -766,11 +896,143 @@ export default class HexagonPatch
         }
 
         faces = divideIntoQuads(faces)
+
+        // the original border half edges became the first half of the subdivided edge
+        borderEdges.forEach(
+            ({ q, r, dir, nq, nr, halfEdge }) => this.border.set(borderKey(q, r, dir), {
+                dir,
+                nq,
+                nr,
+                first: halfEdge,
+                second: nextOnBorder(halfEdge)
+            })
+        )
+
         relax(faces)
         pixelatePositions(faces)
         faces.forEach(validateFace)
 
         validateFaces(faces)
         return faces;
+    }
+
+
+    /**
+     * Collects the outer half edges of all hexagons whose neighbor lies outside of the patch. Must be called before
+     * the faces are modified since it uses the face indexes of the hexagons.
+     */
+    findBorderEdges(faces)
+    {
+        const borderEdges = []
+        for (let q = this.q - hSize; q < this.q + hSize; q++)
+        {
+            for (let r = this.r - hSize; r < this.r + hSize; r++)
+            {
+                const start = this.getHexagon(q, r)
+                const neighbors = (r & 1) ? oddNeighbors : evenNeighbors
+                for (let dir = 0; dir < neighbors.length; dir++)
+                {
+                    const [qOff, rOff] = neighbors[dir];
+                    const nq = q + qOff
+                    const nr = r + rOff
+                    if (this.getHexagon(nq, nr) === undefined)
+                    {
+                        borderEdges.push({ q, r, dir, nq, nr, halfEdge: faces[start + dir].halfEdge })
+                    }
+                }
+            }
+        }
+        return borderEdges
+    }
+
+
+    /**
+     * Connects the mesh of this patch with the mesh of a neighboring patch along their shared border. The vertices of
+     * the seam are merged and the border half edges become twins.
+     *
+     * @param {HexagonPatch} other  neighboring patch
+     *
+     * @return {Number} number of hexagon edges connected, 0 if the patches don't touch
+     */
+    connect(other)
+    {
+        if (other === this || this.connections.has(other))
+        {
+            return 0
+        }
+
+        const seam = []
+        this.border.forEach(({ dir, nq, nr, first: a0, second: a1 }) => {
+
+            const otherEdge = other.border.get(borderKey(nq, nr, (dir + 3) % 6))
+            if (otherEdge)
+            {
+                // a0: c0 -> m, a1: m -> c1 and b0: c1 -> m, b1: m -> c0 on the other side
+                const { first: b0, second: b1 } = otherEdge
+
+                mergeVertex(a0.vertex, b1.next.vertex)
+                mergeVertex(a1.vertex, b1.vertex)
+                mergeVertex(a1.next.vertex, b0.vertex)
+
+                a0.twinWith(b1)
+                a1.twinWith(b0)
+
+                seam.push(a0, b1, a1, b0)
+            }
+        })
+
+        if (seam.length)
+        {
+            this.connections.set(other, seam)
+            other.connections.set(this, seam)
+        }
+
+        return seam.length / 4
+    }
+
+
+    /**
+     * Separates this patch from a connected neighbor again. Seam vertices still shared with other connected patches
+     * stay merged.
+     *
+     * @param {HexagonPatch} other  connected patch
+     */
+    disconnect(other)
+    {
+        const seam = this.connections.get(other)
+        if (!seam)
+        {
+            return
+        }
+
+        this.connections.delete(other)
+        other.connections.delete(this)
+
+        // collect the fans while the seam vertices are still connected
+        const fans = new Map()
+        for (let i = 0; i < seam.length; i++)
+        {
+            const { vertex } = seam[i]
+            if (!fans.has(vertex))
+            {
+                fans.set(vertex, getFan(vertex.halfEdge))
+            }
+        }
+
+        for (let i = 0; i < seam.length; i += 2)
+        {
+            untwin(seam[i], seam[i + 1])
+        }
+
+        fans.forEach((outgoing, vertex) => splitVertex(vertex, outgoing))
+    }
+
+
+    /**
+     * Separates this patch from all connected neighbors so it no longer shares any half edges or vertices with them.
+     */
+    disconnectAll()
+    {
+        [...this.connections.keys()].forEach(other => this.disconnect(other))
     }
 }
