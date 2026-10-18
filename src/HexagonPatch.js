@@ -154,7 +154,9 @@ function subdivideEdge(he)
     he.next = newEdge
     if (twin)
     {
-        twin.next = new HalfEdge(twin.next, vertex, edge, he.face)
+        // he keeps the old edge together with the new twin half, twin moves to the new edge with newEdge
+        twin.next = new HalfEdge(twin.next, vertex, he.edge, twin.face)
+        twin.edge = edge
 
         he.twinWith(twin.next)
         twin.twinWith(newEdge)
@@ -190,9 +192,9 @@ function divideTriIntoQuads(faces, face)
     const hvab = new HalfEdge(hab, vertex, new Edge(null), fb);
     const hvbc = new HalfEdge(hbc, vertex, new Edge(null), fc);
 
-    const habv = new HalfEdge(hvca, hab.vertex, hvca.edge, fa);
-    const hbcv = new HalfEdge(hvab, hbc.vertex, hvab.edge, fb);
-    const hcav = new HalfEdge(hvbc, hca.vertex, hvbc.edge, fc);
+    const habv = new HalfEdge(hvca, hab.vertex, hvab.edge, fa);
+    const hbcv = new HalfEdge(hvab, hbc.vertex, hvbc.edge, fb);
+    const hcav = new HalfEdge(hvbc, hca.vertex, hvca.edge, fc);
 
     hvab.twinWith(habv)
     hvbc.twinWith(hbcv)
@@ -247,9 +249,9 @@ function subdivideQuad(faces, face)
     const hvcd = new HalfEdge(hcd, vertex, new Edge(null), fd);
     const hvda = new HalfEdge(hda, vertex, new Edge(null), fa);
 
-    const habv = new HalfEdge(hvda, hab.vertex, hvcd.edge, fa);
-    const hbcv = new HalfEdge(hvab, hbc.vertex, hvab.edge, fb);
-    const hcdv = new HalfEdge(hvbc, hcd.vertex, hvbc.edge, fc);
+    const habv = new HalfEdge(hvda, hab.vertex, hvab.edge, fa);
+    const hbcv = new HalfEdge(hvab, hbc.vertex, hvbc.edge, fb);
+    const hcdv = new HalfEdge(hvbc, hcd.vertex, hvcd.edge, fc);
     const hdav = new HalfEdge(hvcd, hda.vertex, hvda.edge, fd);
 
     hvab.twinWith(habv)

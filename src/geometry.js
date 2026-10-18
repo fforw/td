@@ -292,8 +292,10 @@ export class HalfEdge
         this.twin = other
         other.twin = this
 
-        other.edge = this.edge || other.edge
-        other.edge.halfEdge = this
+        const edge = this.edge || other.edge
+        this.edge = edge
+        other.edge = edge
+        edge.halfEdge = this
     }
 
     get prev()
