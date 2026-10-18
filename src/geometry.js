@@ -281,18 +281,17 @@ export class HalfEdge
             let { vertex : v2 } = other
             let { vertex : v3 } = other.next
 
-            if (v0.x !== v3.x || v0.y !== v3.y || v1.x !== v2.x || v1.y !== v2.y)
+            // Twins must share the actual vertex objects. Reassigning vertices here would only fix these two half
+            // edges and leave the other half edges around the vertex pointing to a duplicate.
+            if (v0 !== v3 || v1 !== v2)
             {
-                throw new Error("Half edge coords not twinned " + this + ": " + v0 + ", " + v1 + ", " + v2 + ", " + v3)
+                throw new Error("Half edge vertices not shared " + this + ": " + v0 + ", " + v1 + ", " + v2 + ", " + v3)
             }
         }
 
         this.twin = other
         other.twin = this
 
-        this.vertex = other.next.vertex
-        other.vertex = this.next.vertex
-        
         other.edge = this.edge || other.edge
         other.edge.halfEdge = this
     }

@@ -486,50 +486,8 @@ function getMinimumDistanceToPoint(face, x0, y0)
     return min;
 }
 
-function quickFix(faces)
-{
-    // XXX: we still have odd double points and this removes them until I find out my
-
-    const map = new Map()
-
-    const key = vertex => Math.round(vertex.x) + ":" + Math.round(vertex.y)
-
-    let count = 0;
-    for (let i = 0; i < faces.length; i++)
-    {
-        const face = faces[i];
-        const first = face.halfEdge;
-        let curr = first;
-        do
-        {
-            const { vertex } = curr;
-            const k = key(vertex);
-            const existing = map.get(k);
-            if (existing)
-            {
-                count++;
-                curr.vertex = existing
-                curr.vertex.halfEdge = curr
-            }
-            else
-            {
-
-                map.set(k, vertex)
-            }
-
-            curr = curr.next
-        }  while (curr !== first)
-
-    }
-
-    console.log("Quick-fixed #" + count + " vertices")
-
-}
-
 function pixelatePositions(faces)
 {
-    // XXX: we still have odd double points and this removes them until I find out my
-
     for (let i = 0; i < faces.length; i++)
     {
         const face = faces[i];
@@ -644,6 +602,22 @@ export function createHexagon(q, r, faces, points, patch)
         null,
     ).round());
 
+    const neighbors = (r & 1) ? oddNeighbors : evenNeighbors
+    const neighborFaces = neighbors.map(([qOff, rOff]) => patch.getHexagon(q + qOff, r + rOff))
+
+    // Share the corner vertices with preexisting neighbors. The outer edge of face i runs from verts[i + 1] to
+    // verts[i + 2], the matching face of the neighbor runs along the same edge in the opposite direction.
+    for (let i = 0; i < neighbors.length; i++)
+    {
+        const faceIndex = neighborFaces[i]
+        if (faceIndex !== undefined)
+        {
+            const he = faces[faceIndex + ((i + 3) % 6)].halfEdge
+            verts[i + 1] = he.next.vertex
+            verts[i === 5 ? 1 : i + 2] = he.vertex
+        }
+    }
+
     const v3 = verts[0];
 
     let prevFace
@@ -692,14 +666,10 @@ export function createHexagon(q, r, faces, points, patch)
 
     points.push(... verts)
 
-    const neighbors = (r & 1) ? oddNeighbors : evenNeighbors
-
     // connect hexagon to preexisting hexagons
     for (let i = 0; i < neighbors.length; i++)
     {
-        const [qOff, rOff] = neighbors[i];
-
-        const faceIndex = patch.getHexagon(q + qOff,r + rOff)
+        const faceIndex = neighborFaces[i]
         if (faceIndex !== undefined)
         {
             const he0 = faces[start + i].halfEdge
@@ -794,7 +764,6 @@ export default class HexagonPatch
         }
 
         faces = divideIntoQuads(faces)
-        quickFix(faces)
         relax(faces)
         pixelatePositions(faces)
         faces.forEach(validateFace)
