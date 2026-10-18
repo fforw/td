@@ -123,6 +123,10 @@ function removeEdge(faces, edge)
     const prev = he.prev
     const twinPrev = he.twin.prev
 
+    // the removed half edges might be what their vertices point to
+    he.vertex.halfEdge = he.twin.next
+    he.twin.vertex.halfEdge = he.next
+
     prev.next = he.twin.next
     twinPrev.next = he.next
     resetFacesInLoop(prev, face);
