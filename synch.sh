@@ -1,5 +1,5 @@
 #!/bin/bash
-yarn run build
+pnpm run build
 
 target=/static/demo/$([ "$1" == "" ] &&  basename $(realpath $(dirname $0))|| echo $1)
 
