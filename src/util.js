@@ -27,3 +27,89 @@ export function resetRandom(seed)
 {
     rng = new Prando(seed)
 }
+
+export function countNeighbors(face, predicate)
+{
+    const first = face.halfEdge;
+    let curr = first;
+
+    let count = 0
+    do
+    {
+        const next = curr.next;
+
+        const { twin } = curr
+        if (twin && predicate(twin.face))
+        {
+            count++
+        }
+        curr = next
+    }  while (curr !== first)
+
+    return count
+}
+
+
+export function countNeighborsOfType(face, type)
+{
+    const first = face.halfEdge;
+    let curr = first;
+
+    let count = 0
+    do
+    {
+        const next = curr.next;
+
+        const { twin } = curr
+        if (twin && twin.face.type === type)
+        {
+            count++
+        }
+        curr = next
+    }  while (curr !== first)
+
+    return count
+}
+
+
+export function countNeighborsInSet(face, set)
+{
+    const first = face.halfEdge;
+    let curr = first;
+
+    let count = 0
+    do
+    {
+        const next = curr.next;
+
+        const { twin } = curr
+        if (twin && set.has(twin.face))
+        {
+            count++
+        }
+        curr = next
+    }  while (curr !== first)
+
+    return count
+}
+
+export function countNeighborsNotInSet(face, set)
+{
+    const first = face.halfEdge;
+    let curr = first;
+
+    let count = 0
+    do
+    {
+        const next = curr.next;
+
+        const { twin } = curr
+        if (twin && !set.has(twin.face))
+        {
+            count++
+        }
+        curr = next
+    }  while (curr !== first)
+
+    return count
+}

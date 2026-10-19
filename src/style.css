@@ -15,13 +15,17 @@ body
 }
 
 
-.github
+#footer
 {
     position: absolute;
     bottom: 0px;
     right: 0px;
     background: #000;
+}
+#footer a
+{
     color: #fff;
     font-family: monospace;
     font-size: 0.8rem;
+
 }

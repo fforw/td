@@ -1,4 +1,4 @@
-import { rng } from "./util"
+import { countNeighborsInSet, rng } from "./util"
 import { FaceType } from "./geometry"
 import Vector from "./vector"
 
@@ -114,12 +114,12 @@ export function randomConnections(must = 0)
 }
 
 
-function constructRoad(face, dir)
+function constructRoad(face, dir, insideWall)
 {
     while (face && !touchesBorder(face))
     {
         const oldType = face.type
-        face.type = oldType === FaceType.WALL ? FaceType.GATE : FaceType.PAVED
+        face.type = oldType === FaceType.WALL && countNeighborsInSet(face , insideWall) === 0 ? FaceType.GATE : FaceType.PAVED
 
         let [posX,posY] = face.centroid
 
@@ -226,6 +226,9 @@ export function getNeighbors(face,start = null)
 
 export function filterNeighbors(face,type)
 {
+
+    const isPredicate = typeof type === "function"
+    
     let out = []
     const first = face.halfEdge
     let curr = first
@@ -233,7 +236,7 @@ export function filterNeighbors(face,type)
     {
         const next = curr.next
         const { twin } = curr
-        if (twin && twin.face.type === type)
+        if (twin && (!isPredicate && twin.face.type === type || isPredicate && type(twin.face)))
         {
             out.push(twin.face)
         }
@@ -241,6 +244,7 @@ export function filterNeighbors(face,type)
     } while (curr !== first)
     return out
 }
+
 
 
 function buildMarket(center)
@@ -463,6 +467,10 @@ export default class Castle
      */
     centerFace = null
 
+    wall = []
+
+    insideWall = []
+
     constructor(faces)
     {
         const byDist = faces.sort((a,b) => {
@@ -494,6 +502,8 @@ export default class Castle
         const castle = rings.slice(0,-2)
 
         const wall = castle[castle.length - 1].union(castle[castle.length - 2])
+        this.wall = wall
+        this.insideWall = castle[castle.length - 3].union(castle[castle.length - 4])
         const moat = Array.from(rings[rings.length - 1].union(rings[rings.length - 2]));
 
         const castleSize = castle.reduce((a,b) => a + b.size, 0)
@@ -528,25 +538,25 @@ export default class Castle
         {
             console.log("ROAD NORTH")
             const dir = new Vector(0,-1)
-            constructRoad(center, dir)
+            constructRoad(center, dir, this.insideWall)
         }
         if ((c & 2) !== 0)
         {
             console.log("ROAD EAST")
             const dir = new Vector(1,0)
-            constructRoad(center, dir)
+            constructRoad(center, dir, this.insideWall)
         }
         if ((c & 4) !== 0)
         {
             console.log("ROAD SOUTH")
             const dir = new Vector(0,1)
-            constructRoad(center, dir)
+            constructRoad(center, dir, this.insideWall)
         }
         if ((c & 8) !== 0)
         {
             console.log("ROAD WEST")
             const dir = new Vector(-1,0)
-            constructRoad(center, dir)
+            constructRoad(center, dir, this.insideWall)
         }
 
         buildMarket(center)

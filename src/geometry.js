@@ -113,10 +113,12 @@ export class FaceType
     static PLOT = new FaceType({ color: "#552755", })
     static HOUSE = new FaceType({ color: "#ab2c79", occupied: true })
 
-    static names()
+    static typeNames()
     {
         return _faceTypeNames
     }
+
+    
 
 }
 
@@ -141,11 +143,11 @@ export class FaceType
     }
 )()
 
-console.log("OCCUPIED", _faceTypeNames.filter(n => FaceType[n].occupied))
-
+//console.log("OCCUPIED", _faceTypeNames.filter(n => FaceType[n].occupied))
 
 export class Face
 {
+    id = 0
     /**
      * First half edge of the face interior, part of a closed loop back to the fist edge.
      *
@@ -160,6 +162,12 @@ export class Face
      */
     type = FaceType.DIRT
 
+    /**
+     * Type dependent user data
+     * @type {*}
+     */
+    data = null
+    
     constructor(halfEdge)
     {
         this.halfEdge = halfEdge;

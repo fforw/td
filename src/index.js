@@ -1,9 +1,8 @@
 import domready from "domready"
 import "./style.css"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
-import { randomSeed, resetRandom, rng } from "./util"
+import { countNeighbors, countNeighborsInSet, countNeighborsOfType, randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
-import concaveman from "concaveman"
 import { FaceType } from "./geometry"
 import queryString from "query-string"
 
@@ -173,49 +172,26 @@ function markFaceOnClick(ev)
 
     console.log("CLICKED ON #" + best.id, best.type.name, best)
 
+
+
+
     ctx.fillStyle = "rgba(255,0,255,0.1)"
     renderDebugFace(best)
-
+    
+    ctx.fillStyle = "#fff"
+    ctx.fillRect(cx + best.centroid[0]-1, cy + best.centroid[1]-1, 2, 2)
 }
 
 let theFaces
 
-
-function getSegmentCentroids(segment)
-{
-    const { width, height } = config
-
-    const cx = width >> 1
-    const cy = height >> 1
-
-    const pts = []
-
-    for (let i = 0; i < segment.length; i++)
-    {
-        const [x,y] = segment[i].centroid
-
-        pts.push([
-            cx + x,
-            cy + y
-        ])
-    }
-
-    return pts
-}
-
-
-function sortPairs(a,b)
-{
-    return a[1] - b[1]
-}
-
 function sortCandidatesDesc(a,b)
 {
-    const d = b[2] - a[2]
-    if (d !== 0)
+    const insideWallNeighbors = b[2] - a[2]
+    if (insideWallNeighbors !== 0)
     {
-        return d;
+        return insideWallNeighbors;
     }
+
     return b[1] - a[1]
 }
 
@@ -229,76 +205,12 @@ function distance(ptA, ptB)
 }
 
 
-function simplify(segmentCentroids, centroidX, centroidY)
+function followEnd(pts, face, visited, prev, endId, insideWall)
 {
-    const anglePairs = segmentCentroids.map(p => ([p, Math.atan2(p[1]-centroidY,p[0]-centroidX)]))
-    anglePairs.sort(sortPairs)
-    let prev = null
-    const out = []
 
-    let inserted
-    for (let j = 0; j < anglePairs.length; j++)
-    {
-        const [pt,a] = anglePairs[j]
+    const limit = 32 * 32
 
-        inserted = false
-        if (!prev || distance(pt,prev) > 30)
-        {
-            inserted = true
-            out.push(pt)
-            prev = pt
-        }
-    }
-    if (!inserted)
-    {
-        out.push(anglePairs[anglePairs.length-1][0])
-    }
-    return out;
-}
-
-
-function countType(faces, type)
-{
-    let count = 0
-    for (let i = 0; i < faces.length; i++)
-    {
-        const face = faces[i]
-        if (face.type === type)
-        {
-            count++
-        }
-    }
-    return count
-}
-
-
-function countNeighborsOfType(face, type)
-{
-    const first = face.halfEdge;
-    let curr = first;
-
-    let count = 0
-    do
-    {
-        const next = curr.next;
-
-        const { twin } = curr
-        if (twin && twin.face.type === type)
-        {
-            count++
-        }
-        curr = next
-    }  while (curr !== first)
-
-    return count
-}
-
-
-function followEnd(pts, face, visited, prev, endId)
-{
-    const limit = 25 * 25
-
-    console.log("followEnd", face.id, endId)
+    //console.log("followEnd", face.id, "endId=",endId)
 
     visited.add(face)
 
@@ -312,71 +224,287 @@ function followEnd(pts, face, visited, prev, endId)
         const dy = centroidY - prevY
         d = (dx * dx + dy * dy)
     }
-    if (d >= limit)
+    const aboveLimit = d >= limit
+    if (aboveLimit)
     {
         pts.push(face.centroid)
+    }
+
+    if (pts.length > 2)
+    {
+        let first = face.halfEdge
+        let curr = first
+        do
+        {
+            const next = curr.next
+            const { twin } = curr
+            if (twin)
+            {
+                if (twin.face.type === FaceType.GATE)
+                {
+                    if (!aboveLimit)
+                    {
+                        // don't want to skip our last point
+                        pts.push(face.centroid)
+                    }
+                    pts.push(midPoint(curr.vertex, next.vertex))
+                    return true
+
+                }
+            }
+            
+            curr = next
+        } while (curr !== first)
+
+        first = face.halfEdge
+        curr = first
+        do
+        {
+            const next = curr.next
+            const { twin } = curr
+            if (twin)
+            {
+                if (twin.face.type !== FaceType.WALL)
+                {
+                    const first = twin.face.halfEdge
+
+                    let curr = first
+                    do
+                    {
+                        const next = curr.next
+                        const { twin: nextTwin } = curr
+
+                        if (nextTwin && nextTwin.face.type === FaceType.GATE)
+                        {
+                            if (!aboveLimit)
+                            {
+                                // don't want to skip our last point
+                                pts.push(face.centroid)
+                            }
+                            pts.push(midPoint(curr.vertex, next.vertex))
+                            return true
+                        }
+
+                        curr = next
+                    } while (curr !== first)
+                }
+            }
+            curr = next
+        } while (curr !== first)
     }
 
     const refs = pts.slice(-3)
     prev = refs[0]
 
-    const first = face.halfEdge;
+    let first = face.halfEdge;
     let curr = first;
 
     const candidates = []
+    const rejects = []
     do
     {
         const next = curr.next;
 
         const { twin } = curr
-        if (twin && twin.face.type === FaceType.WALL && !visited.has(twin.face))
+        if (twin && !visited.has(twin.face))
         {
-            const dist = distance(prev, twin.face.centroid)
-            const count = countNeighborsOfType(twin.face, FaceType.WALL)
-            candidates.push([twin.face, dist, count >=2 ? 2 : count])
+            if (twin.face.type === FaceType.WALL)
+            {
+                const dist = distance(prev, twin.face.centroid)
+                const inside = countNeighborsInSet(twin.face, insideWall)
+                candidates.push([twin.face, dist, inside && 1])
+            }
+            else
+            {
+                rejects.push(twin.face)
+            }
         }
+
         curr = next
     }  while (curr !== first)
+
+    for (let i = 0; i < rejects.length; i++)
+    {
+        const reject = rejects[i]
+
+        // we get the neighbors so that the face we're coming from is at 0
+        const neighbors = getNeighbors(reject, face)
+
+        // this makes offset 1 going left
+        const leftNeighbor = neighbors[1]
+        // and offset 3 going right... and we ignore 2 (topologically straight-ahead)
+        const rightNeighbor = neighbors[3]
+
+        const leftInside = countNeighborsInSet(leftNeighbor, insideWall)
+
+        if (leftNeighbor.type === FaceType.WALL && !visited.has(leftNeighbor))
+        {
+            const dist = distance(prev, leftNeighbor.centroid)
+            candidates.push([leftNeighbor, dist, leftInside && 1])
+            break
+        }
+        else
+        {
+            const rightInside = countNeighborsInSet(rightNeighbor, insideWall)
+            if (rightNeighbor.type === FaceType.WALL && !visited.has(rightNeighbor))
+            {
+                const dist = distance(prev, rightNeighbor.centroid)
+                candidates.push([rightNeighbor, dist, rightInside && 1])
+                break
+            }
+        }
+
+    }
 
     if (candidates.length)
     {
         if (candidates.length > 1)
         {
             candidates.sort(sortCandidatesDesc)
-            console.log("BEST CANDIDATE: face #" + candidates[0][0].id, "at", candidates[0][1], "(walls = " + candidates[0][2] + ")")
+            //console.log("BEST: #" + candidates[0][0].id, "CANDIDATES", candidates)
         }
 
-        followEnd(pts, candidates[0][0], visited, face.centroid, endId)
-    }
-    else
-    {
-        const first = face.halfEdge;
-        let curr = first;
-        do
+        let attempt = 0
+
+        while (attempt < candidates.length)
         {
-            const next = curr.next;
-
-            const { twin } = curr
-            if (twin)
+            if (followEnd(pts, candidates[attempt][0], visited, face.centroid, endId, insideWall))
             {
-                const neighbors = getNeighbors(twin.face, face)
-                if (neighbors[1].type === FaceType.WALL && !visited.has(neighbors[1]))
-                {
-
-                    console.log("NO CANDIDATES, JUMP 1")
-                    followEnd(pts, neighbors[1], visited, face.centroid, endId)
-                    break
-                }
-                else if (neighbors[3].type === FaceType.WALL && !visited.has(neighbors[3]))
-                {
-                    console.log("NO CANDIDATES, JUMP 3")
-                    followEnd(pts, neighbors[3], visited, face.centroid, endId)
-                    break
-                }
+                return true
             }
-            curr = next
-        }  while (curr !== first)
+            else
+            {
+                console.log("BACKTRACK")
+                attempt++
+            }
+        }
     }
+    return false
+}
+
+
+function midPoint(vertexA, vertexB)
+{
+    return [
+        (vertexA.x + vertexB.x) >> 1,
+        (vertexA.y + vertexB.y) >> 1,
+        (vertexA.z + vertexB.z) >> 1
+    ]
+}
+
+
+function findHalfEge(first, face)
+{
+    let curr = first
+    do
+    {
+        const { twin } = curr
+        if (twin)
+        {
+            if (twin.face === face)
+            {
+                return curr
+            }
+        }
+        curr = curr.next
+    } while (curr !== first)
+
+    throw new Error("Could not find face #" + face.id + " in halfEdge loop.")
+}
+
+
+function findGate(face)
+{
+    const first = face.halfEdge;
+    let curr = first;
+
+    const out = []
+    const rejects = []
+    do
+    {
+        const next = curr.next;
+
+        const { twin } = curr
+        if (twin)
+        {
+            if (twin.face.type === FaceType.GATE)
+            {
+                out.push([twin.face, midPoint(curr.vertex,next.vertex)])
+            }
+            else
+            {
+                rejects.push(twin.face)
+            }
+        }
+
+        curr = next
+    }  while (curr !== first)
+
+    for (let i = 0; i < rejects.length; i++)
+    {
+        const reject = rejects[i]
+
+
+        const first = reject.halfEdge;
+
+        const he0 = findHalfEge(first,face)
+
+        const he1 = he0.next
+        const he3 = he1.next.next
+
+        if (he1.twin && he1.twin.face.type === FaceType.GATE)
+        {
+            out.push([reject, midPoint(he1.vertex,he1.next.vertex)])
+        }
+        else if (he3.twin && he3.twin.face.type === FaceType.GATE)
+        {
+            out.push([reject, midPoint(he3.vertex,he3.next.vertex)])
+        }
+    }
+
+    return out
+}
+
+let fixed
+
+const SQRT_2 = Math.sqrt(2)
+const TAU_8TH = TAU/8
+
+function squareFace(face)
+{
+    const { centroid } = face
+
+    const first = face.halfEdge
+    let curr = first
+
+    let minDistance = Infinity
+    let vertex
+
+    do
+    {
+        const next = curr.next
+        const { twin } = curr
+        if (twin)
+        {
+            const dx = centroid[0] - curr.vertex.x
+            const dy = centroid[1] - curr.vertex.y
+
+            const d = Math.sqrt(dx * dx + dy * dy)
+            if (d < minDistance)
+            {
+                minDistance = d
+                vertex = curr.vertex
+            }
+        }
+
+        curr = next
+    } while (curr !== first)
+
+    return [
+        centroid,
+        20,//minDistance * 1.9,
+        Math.atan2(vertex.y - centroid[1],vertex.x - centroid[0]) - TAU_8TH
+    ]
 }
 
 
@@ -397,10 +525,30 @@ domready(
 
         const args = queryString.parse(location.search)
 
+
+        const cx = width >> 1
+        const cy = height >> 1
+
         const paint = () => {
 
             //resetRandom(14121970)
-            resetRandom(randomSeed(args.seed && +args.seed))
+            const seed = randomSeed(args.seed && +args.seed)
+
+            if (!fixed)
+            {
+                fixed = document.createElement("a")
+                fixed.href = "index.html?seed=" + seed
+                fixed.appendChild(document.createTextNode("seed"))
+                const footer = document.getElementById("footer")
+                footer.appendChild(document.createTextNode(""))
+                footer.appendChild(fixed)
+            }
+            else
+            {
+                fixed.href = "index.html?seed=" + seed
+            }
+
+            resetRandom(seed)
 
             ctx.fillStyle = "#000";
             ctx.fillRect(0,0, width, height);
@@ -424,7 +572,7 @@ domready(
             const p7 = new HexagonPatch(-PATCH_SIZE,PATCH_SIZE,size)
 
 
-            faces
+            theFaces = faces
                 // .concat(p0.build())
                 // .concat(p1.build())
                 // .concat(p2.build())
@@ -433,14 +581,39 @@ domready(
                 // .concat(p5.build())
                 // .concat(p6.build())
                 // .concat(p7.build())
-                .forEach( f => {
-                ctx.fillStyle = f.type.color
-                renderDebugFace(f)
-            })
 
-            const { segments, centerFace } = c
+            theFaces.forEach(
+                f => {
 
-            console.log("WALL SEGMENTS", segments)
+                    if (f.type === FaceType.HOUSE)
+                    {
+
+                        const [pt, size, angle] = squareFace(f)
+
+                        ctx.strokeStyle = f.type.color
+                        const r = size/2
+                        ctx.beginPath()
+                        ctx.moveTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
+                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/4) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/4) * r)
+                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/2) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/2) * r)
+                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + 3*TAU/4) * r, cy +  pt[1] + Math.sin(angle - TAU_8TH + 3*TAU/4) * r)
+                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
+                        ctx.stroke()
+
+
+                    }
+                    else
+                    {
+                        ctx.fillStyle = f.type.color
+                        renderDebugFace(f)
+                    }
+
+                }
+            )
+
+            const { segments, centerFace, insideWall } = c
+
+            //console.log("WALL SEGMENTS", segments)
 
             const [centroidX, centroidY] = centerFace.centroid
 
@@ -449,63 +622,69 @@ domready(
             for (let i = 0; i < segments.length; i++)
             {
                 const segment = segments[i]
-                const ends = []
+                let ends = []
 
 
                 for (let j = 0; j < segment.length; j++)
                 {
                     const face = segment[j]
-                    const gates = filterNeighbors(face, FaceType.GATE)
+                    const gates = findGate(face)
                     if (gates.length > 0)
                     {
                         ends.push([face, gates[0]])
+                        break;
                     }
                 }
+
+                //ends = filterGates(ends)
 
                 console.log("ENDS", ends)
 
                 const cx = width >> 1
                 const cy = height >> 1
 
+                let segmentCounter = 0
                 for (let j = 0; j < ends.length; j++)
                 {
-                    const [face,prev] = ends[j]
+                    const [face,[prev,pt]] = ends[j]
 
-                    if (!visited.has(face))
+                    if (!visited.has(face) && countNeighborsInSet(face, visited) === 0)
                     {
-                        const points = []
-                        followEnd(points, face, visited, prev.centroid, j)
+                        const points = [ pt ]
+                        followEnd(  // entry
+                            points,
+                            face,
+                            visited,
+                            prev.centroid,
+                            j,
+                            insideWall
+                        )
 
-                        ctx.strokeStyle = `hsla(${Math.round(j * PHI * 360)} 80% 50% / 0.7)`
                         ctx.lineWidth = 10
+                        ctx.strokeStyle = "#432"
+                        ctx.lineJoin = "bevel"
                         ctx.beginPath()
-                        for (let k = 0; k < points.length; k++)
+                        const [x, y] = points[0]
+                        ctx.moveTo(cx + x, cy + y)
+                        const last = points.length - 1
+                        for (let k = 1; k < points.length; k++)
                         {
-                            const [x,y] = points[k]
-
-                            if (k === 0)
-                            {
-                                ctx.moveTo(cx + x, cy + y)
-                            }
-                            else
-                            {
-                                ctx.lineTo(cx + x, cy + y)
-                            }
+                            const scale = k !== last ? 1.02 : 1
+                            const [x, y] = points[k]
+                            ctx.lineTo(cx + x* scale, cy + y* scale)
                         }
                         ctx.stroke()
 
-
                         ctx.fillStyle = "#f0f"
                         ctx.fillRect(cx + points[0][0] - 1, cy + points[0][1] - 1, 2, 2)
-                    }
 
+                    }
 
                     // renderDebugFace(face)
                 }
             }
 
 
-            theFaces = faces
         }
 
         paint()
