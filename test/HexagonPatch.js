@@ -1,12 +1,7 @@
-// plain CommonJS so the sources get loaded through @babel/register. webpack normally defines __DEV, it has to exist
-// before the modules are loaded
-global.__DEV = true
+import { afterAll, assert, beforeAll, describe, it } from "vitest"
 
-const { describe, it, before, after } = require("mocha")
-const assert = require("power-assert")
-
-const { default: HexagonPatch, PATCH_SIZE } = require("../src/HexagonPatch")
-const { resetRandom } = require("../src/util")
+import HexagonPatch, { PATCH_SIZE } from "../src/HexagonPatch"
+import { resetRandom } from "../src/util"
 
 
 function getHalfEdges(faces)
@@ -102,11 +97,11 @@ function createPatch(q, r)
 describe("HexagonPatch connections", function () {
 
     let log
-    before(() => {
+    beforeAll(() => {
         log = console.log
         console.log = () => {}
     })
-    after(() => console.log = log)
+    afterAll(() => console.log = log)
 
     it("connects two neighboring patches into one mesh", function () {
         const a = createPatch(0, 0)

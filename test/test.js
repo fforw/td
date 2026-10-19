@@ -1,5 +1,4 @@
-import { describe, it } from "mocha";
-import assert from "power-assert";
+import { assert, describe, it } from "vitest";
 
 
 describe("Testing", function(){
