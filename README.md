@@ -1,3 +1,4 @@
-# Simple Starter
+# td
 
-Simple JS build starter for simple, client-only demos.
+Castle and road generation on a relaxed hexagon/quad mesh, built on
+simple-starter (TypeScript/vite).
