@@ -1,8 +1,10 @@
 #!/bin/bash
+# Builds the demo and publishes it with medium (https://github.com/fforw/medium):
+# uploads docs/, takes the card screenshot and updates the list page.
+#
+#   ./synch.sh [variant] [--slug <slug>] [--pick]
+set -e
+# medium takes the slug and docs/ from the current directory
+cd "$(dirname "$0")"
 pnpm run build
-
-target=/static/demo/$([ "$1" == "" ] &&  basename $(realpath $(dirname $0))|| echo $1)
-
-echo "Synch to http://fforw.de/$target"
-
-rsync -rvIz --rsh=ssh --delete --exclude=.git --exclude=*.blend ./docs/ newweb:/var/www/$target
+medium deploy "$@"

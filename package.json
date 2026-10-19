@@ -26,5 +26,10 @@
         "test:watch": "vitest"
     },
     "packageManager": "pnpm@12.8.1",
-    "type": "module"
+    "type": "module",
+    "ff-medium": {
+        "category": "",
+        "topics": [],
+        "shot": { "delay": 0, "click": false }
+    }
 }
