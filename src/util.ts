@@ -1,7 +1,8 @@
 import Prando from "prando";
+import type { Face, FaceType } from "./geometry";
 
 
-export function clamp(v)
+export function clamp(v: number): number
 {
     return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -13,7 +14,7 @@ export function clamp(v)
  *
  * @return {number}
  */
-export function randomSeed(override = null)
+export function randomSeed(override: number | null = null): number
 {
     const seed = Math.round(typeof override === "number" ? override : Math.random() * 0xffffffff)
     console.log("SEED", seed)
@@ -23,12 +24,12 @@ export function randomSeed(override = null)
 
 export let rng = new Prando(randomSeed() )
 
-export function resetRandom(seed)
+export function resetRandom(seed: number): void
 {
     rng = new Prando(seed)
 }
 
-export function countNeighbors(face, predicate)
+export function countNeighbors(face: Face, predicate: (face: Face) => boolean): number
 {
     const first = face.halfEdge;
     let curr = first;
@@ -50,7 +51,7 @@ export function countNeighbors(face, predicate)
 }
 
 
-export function countNeighborsOfType(face, type)
+export function countNeighborsOfType(face: Face, type: FaceType): number
 {
     const first = face.halfEdge;
     let curr = first;
@@ -72,7 +73,7 @@ export function countNeighborsOfType(face, type)
 }
 
 
-export function countNeighborsInSet(face, set)
+export function countNeighborsInSet(face: Face, set: Set<Face>): number
 {
     const first = face.halfEdge;
     let curr = first;
@@ -93,7 +94,7 @@ export function countNeighborsInSet(face, set)
     return count
 }
 
-export function countNeighborsNotInSet(face, set)
+export function countNeighborsNotInSet(face: Face, set: Set<Face>): number
 {
     const first = face.halfEdge;
     let curr = first;

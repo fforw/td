@@ -3,6 +3,7 @@ import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import { countNeighbors, countNeighborsInSet, countNeighborsOfType, randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
 import { FaceType } from "./geometry"
+import type { Face, HalfEdge, Point, Vertex } from "./geometry"
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
@@ -13,13 +14,10 @@ const config = {
     height: 0
 };
 
-/**
- * @type CanvasRenderingContext2D
- */
-let ctx;
-let canvas;
+let ctx: CanvasRenderingContext2D;
+let canvas: HTMLCanvasElement;
 
-function drawArrow(x0, y0, x1, y1)
+function drawArrow(x0: number, y0: number, x1: number, y1: number): void
 {
     const { width, height} = config;
 
@@ -58,7 +56,7 @@ function drawArrow(x0, y0, x1, y1)
 }
 
 
-function renderDebugFace(face, drawNext = false, ids = false)
+function renderDebugFace(face: Face, drawNext = false, ids = false): void
 {
     const { width, height} = config;
 
@@ -139,7 +137,7 @@ function renderDebugFace(face, drawNext = false, ids = false)
     }
 }
 
-function markFaceOnClick(ev)
+function markFaceOnClick(ev: MouseEvent): void
 {
     const { width, height} = config
 
@@ -150,10 +148,10 @@ function markFaceOnClick(ev)
     const y = ev.clientY - cy
 
     let min = Infinity
-    let best = null
+    let best: Face | null = null
 
-    theFaces.forEach(f => {
-
+    for (const f of theFaces)
+    {
         const [x2, y2] = f.centroid
 
         const dx = x - x2
@@ -166,7 +164,12 @@ function markFaceOnClick(ev)
             min = d
             best = f
         }
-    })
+    }
+
+    if (!best)
+    {
+        return
+    }
 
     console.log("CLICKED ON #" + best.id, best.type.name, best)
 
@@ -180,9 +183,19 @@ function markFaceOnClick(ev)
     ctx.fillRect(cx + best.centroid[0]-1, cy + best.centroid[1]-1, 2, 2)
 }
 
-let theFaces
+let theFaces: Face[]
 
-function sortCandidatesDesc(a,b)
+/**
+ * Wall face candidate with its distance and whether it borders the inside of the wall (1) or not (0)
+ */
+type Candidate = [Face, number, number]
+
+/**
+ * Face with the gate point next to it
+ */
+type Gate = [Face, Point]
+
+function sortCandidatesDesc(a: Candidate, b: Candidate): number
 {
     const insideWallNeighbors = b[2] - a[2]
     if (insideWallNeighbors !== 0)
@@ -193,7 +206,7 @@ function sortCandidatesDesc(a,b)
     return b[1] - a[1]
 }
 
-function distance(ptA, ptB)
+function distance(ptA: Point, ptB: Point): number
 {
     const [x0,y0] = ptA
     const [x1,y1] = ptB
@@ -203,7 +216,7 @@ function distance(ptA, ptB)
 }
 
 
-function followEnd(pts, face, visited, prev, endId, insideWall)
+function followEnd(pts: Point[], face: Face, visited: Set<Face>, prev: Point, endId: number, insideWall: Set<Face>): boolean
 {
 
     const limit = 32 * 32
@@ -297,8 +310,8 @@ function followEnd(pts, face, visited, prev, endId, insideWall)
     let first = face.halfEdge;
     let curr = first;
 
-    const candidates = []
-    const rejects = []
+    const candidates: Candidate[] = []
+    const rejects: Face[] = []
     do
     {
         const next = curr.next;
@@ -381,7 +394,7 @@ function followEnd(pts, face, visited, prev, endId, insideWall)
 }
 
 
-function midPoint(vertexA, vertexB)
+function midPoint(vertexA: Vertex, vertexB: Vertex): Point
 {
     return [
         (vertexA.x + vertexB.x) >> 1,
@@ -391,7 +404,7 @@ function midPoint(vertexA, vertexB)
 }
 
 
-function findHalfEge(first, face)
+function findHalfEge(first: HalfEdge, face: Face): HalfEdge
 {
     let curr = first
     do
@@ -411,13 +424,13 @@ function findHalfEge(first, face)
 }
 
 
-function findGate(face)
+function findGate(face: Face): Gate[]
 {
     const first = face.halfEdge;
     let curr = first;
 
-    const out = []
-    const rejects = []
+    const out: Gate[] = []
+    const rejects: Face[] = []
     do
     {
         const next = curr.next;
@@ -463,12 +476,12 @@ function findGate(face)
     return out
 }
 
-let fixed
+let fixed: HTMLAnchorElement | undefined
 
 const SQRT_2 = Math.sqrt(2)
 const TAU_8TH = TAU/8
 
-function squareFace(face)
+function squareFace(face: Face): [Point, number, number]
 {
     const { centroid } = face
 
@@ -476,7 +489,7 @@ function squareFace(face)
     let curr = first
 
     let minDistance = Infinity
-    let vertex
+    let vertex: Vertex | undefined
 
     do
     {
@@ -501,14 +514,14 @@ function squareFace(face)
     return [
         centroid,
         20,//minDistance * 1.9,
-        Math.atan2(vertex.y - centroid[1],vertex.x - centroid[0]) - TAU_8TH
+        Math.atan2(vertex!.y - centroid[1],vertex!.x - centroid[0]) - TAU_8TH
     ]
 }
 
 
 // module scripts are deferred, so the DOM is ready at this point
-canvas = document.getElementById("screen");
-ctx = canvas.getContext("2d");
+canvas = document.getElementById("screen") as HTMLCanvasElement;
+ctx = canvas.getContext("2d")!;
 
 const width = (window.innerWidth) | 0;
 const height = (window.innerHeight) | 0;
@@ -535,7 +548,7 @@ const paint = () => {
         fixed = document.createElement("a")
         fixed.href = "index.html?seed=" + seed
         fixed.appendChild(document.createTextNode("seed"))
-        const footer = document.getElementById("footer")
+        const footer = document.getElementById("footer")!
         footer.appendChild(document.createTextNode(""))
         footer.appendChild(fixed)
     }
@@ -613,12 +626,12 @@ const paint = () => {
 
     const [centroidX, centroidY] = centerFace.centroid
 
-    const visited = new Set()
+    const visited = new Set<Face>()
 
     for (let i = 0; i < segments.length; i++)
     {
         const segment = segments[i]
-        let ends = []
+        let ends: [Face, Gate][] = []
 
 
         for (let j = 0; j < segment.length; j++)

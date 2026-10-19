@@ -1,37 +1,40 @@
 let vertexCounter = 1000;
 
+/**
+ * x/y/z coordinates as array
+ */
+export type Point = [number, number, number]
+
 export class Vertex
 {
     /**
      * X coordinate
-     * @type {number}
      */
-    x;
+    x: number;
     /**
      * Y coordinate
-     * @type {number}
      */
-    y;
+    y: number;
 
     /**
      * Z coordinate
-     * @type {number}
      */
-    z;
+    z: number;
 
     /**
-     * Half-edge 
-     * @type {null}
+     * Outgoing half edge, set by the first HalfEdge created for the vertex
      */
-    halfEdge = null;
+    halfEdge: HalfEdge;
 
-    constructor(x, y, z, halfEdge)
+    id: number;
+
+    constructor(x: number, y: number, z: number, halfEdge: HalfEdge | null)
     {
         this.x = x;
         this.y = y;
         this.z = z;
 
-        this.halfEdge = halfEdge;
+        this.halfEdge = halfEdge!;
         this.id = vertexCounter++;
     }
 
@@ -58,19 +61,24 @@ export class Edge
 
     /**
      * One of the two half edges of the edge.
-     *
-     * @type {HalfEdge}
      */
-    halfEdge = null;
-    constructor(halfEdge)
+    halfEdge: HalfEdge;
+    constructor(halfEdge: HalfEdge | null)
     {
-        this.halfEdge = halfEdge;
+        this.halfEdge = halfEdge!;
     }
 
 }
 let faceCounter = 0;
 
-let _faceTypeNames;
+const _faceTypeNames: string[] = [];
+
+interface FaceTypeOptions
+{
+    color?: string
+    terrain?: number
+    occupied?: boolean
+}
 
 export class FaceType
 {
@@ -80,7 +88,7 @@ export class FaceType
     terrain = 1
     occupied = false
 
-    constructor(opts)
+    constructor(opts: FaceTypeOptions)
     {
         const { color, terrain, occupied } = opts;
 
@@ -113,7 +121,7 @@ export class FaceType
     static PLOT = new FaceType({ color: "#552755", })
     static HOUSE = new FaceType({ color: "#ab2c79", occupied: true })
 
-    static typeNames()
+    static typeNames(): string[]
     {
         return _faceTypeNames
     }
@@ -123,25 +131,14 @@ export class FaceType
 }
 
 // INITIALIZE FACE TYPE NAMES
-(
-    () => {
-
-        _faceTypeNames = []
-
-        for (let name in FaceType)
-        {
-            if (FaceType.hasOwnProperty(name))
-            {
-                let ft = FaceType[name]
-                if (ft instanceof FaceType)
-                {
-                    ft.name = name
-                    _faceTypeNames.push(name)
-                }
-            }
-        }
+for (const [name, ft] of Object.entries(FaceType))
+{
+    if (ft instanceof FaceType)
+    {
+        ft.name = name
+        _faceTypeNames.push(name)
     }
-)()
+}
 
 //console.log("OCCUPIED", _faceTypeNames.filter(n => FaceType[n].occupied))
 
@@ -150,31 +147,26 @@ export class Face
     id = 0
     /**
      * First half edge of the face interior, part of a closed loop back to the fist edge.
-     *
-     * @type {HalfEdge}
      */
-    halfEdge = null;
+    halfEdge: HalfEdge;
 
     /**
      * Type of the data
-     *
-     * @type {FaceType}
      */
-    type = FaceType.DIRT
+    type: FaceType = FaceType.DIRT
 
     /**
      * Type dependent user data
-     * @type {*}
      */
-    data = null
+    data: unknown = null
     
-    constructor(halfEdge)
+    constructor(halfEdge: HalfEdge | null)
     {
-        this.halfEdge = halfEdge;
+        this.halfEdge = halfEdge!;
         this.id = faceCounter++;
 
     }
-    get length()
+    get length(): number
     {
         const start = this.halfEdge;
         let curr = start;
@@ -190,9 +182,8 @@ export class Face
 
     /**
      * Returns the face centroid
-     * @return {number[]} x/y/z as array
      */
-    get centroid()
+    get centroid(): Point
     {
         let x = 0;
         let y = 0;
@@ -224,40 +215,37 @@ export class HalfEdge
 {
     /**
      * Next halfEdge in the face
-     * @type {HalfEdge}
      */
-    next = null;
+    next: HalfEdge;
 
     /**
      * Twin halfEdge from another face
-     * @type {HalfEdge}
      */
-    twin = null;
+    twin: HalfEdge | null = null;
     /**
      * Vertex of this half edge
-     * @type {Vertex}
      */
-    vertex = null;
+    vertex: Vertex;
 
     /**
      * The edge the half edge belongs to
-     * @type {Edge}
      */
-    edge = null;
+    edge: Edge;
 
     /**
      * The face the half edge belongs to
-     * @type {Face}
      */
-    face = null;
+    face: Face;
+
+    id: number;
 
 
-    constructor(next, vertex, edge, face)
+    constructor(next: HalfEdge | null, vertex: Vertex, edge: Edge | null, face: Face)
     {
-        this.next = next;
+        this.next = next!;
         this.twin = null;
         this.vertex = vertex;
-        this.edge = edge;
+        this.edge = edge!;
         this.face = face;
 
         if (vertex && !vertex.halfEdge)
@@ -280,7 +268,7 @@ export class HalfEdge
     }
 
 
-    twinWith(other)
+    twinWith(other: HalfEdge): void
     {
         if (__DEV)
         {
@@ -306,9 +294,9 @@ export class HalfEdge
         edge.halfEdge = this
     }
 
-    get prev()
+    get prev(): HalfEdge
     {
-        let curr = this;
+        let curr: HalfEdge = this;
         do
         {
             curr = curr.next

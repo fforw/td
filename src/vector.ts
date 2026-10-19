@@ -2,7 +2,10 @@ const sqrt = Math.sqrt;
 
 class Vector
 {
-    constructor(x,y)
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number)
     {
         this.x = x;
         this.y = y;
@@ -13,7 +16,7 @@ class Vector
      *
      * @returns {Vector} copy
      */
-    copy()
+    copy(): Vector
     {
         return new Vector(this.x,this.y);
     }
@@ -26,12 +29,14 @@ class Vector
      * @returns {Vector} this vector
      */
 
-    add(x,y)
+    add(v: Vector): Vector
+    add(x: number, y: number): Vector
+    add(x: number | Vector, y?: number): Vector
     {
         if (typeof x === "number")
         {
             this.x += x;
-            this.y += y;
+            this.y += y!;
         }
         else
         {
@@ -49,12 +54,14 @@ class Vector
      * @param y     {number?} y coordinate, ignored if x is a vector
      * @returns {Vector} this vector
      */
-    subtract(x,y)
+    subtract(v: Vector): Vector
+    subtract(x: number, y: number): Vector
+    subtract(x: number | Vector, y?: number): Vector
     {
         if (typeof x === "number")
         {
             this.x -= x;
-            this.y -= y;
+            this.y -= y!;
         }
         else
         {
@@ -71,7 +78,7 @@ class Vector
      * @param n     scale
      * @returns {Vector} this vector, scaled
      */
-    scale(n)
+    scale(n: number): Vector
     {
         this.x *= n;
         this.y *= n;
@@ -84,7 +91,7 @@ class Vector
      *
      * @returns {number}    length
      */
-    length()
+    length(): number
     {
         const { x, y } = this;
         return sqrt(x*x+y*y);
@@ -97,7 +104,7 @@ class Vector
      *
      * @returns {Vector}
      */
-    norm(targetLength = 1)
+    norm(targetLength = 1): Vector
     {
         return this.scale(targetLength / this.length());
     }
@@ -107,7 +114,7 @@ class Vector
      *
      * @returns {Vector}
      */
-    rotateClockwise()
+    rotateClockwise(): Vector
     {
         const { x, y } = this;
 
@@ -123,7 +130,7 @@ class Vector
      *
      * @returns {Vector}
      */
-    rotateCounterClockwise()
+    rotateCounterClockwise(): Vector
     {
         const { x, y } = this;
 
@@ -139,14 +146,15 @@ class Vector
      *
      * @param x     {number|Vector} x coordinate or a vector
      * @param y     {number?} y coordinate, ignored if x is a vector
-     * @returns {Vector} this vector
      */
-    set(x,y)
+    set(v: Vector): void
+    set(x: number, y: number): void
+    set(x: number | Vector, y?: number): void
     {
         if (typeof x === "number")
         {
             this.x = x;
-            this.y = y;
+            this.y = y!;
         }
         else
         {

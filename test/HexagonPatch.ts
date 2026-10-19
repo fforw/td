@@ -2,11 +2,18 @@ import { afterAll, assert, beforeAll, describe, it } from "vitest"
 
 import HexagonPatch, { PATCH_SIZE } from "../src/HexagonPatch"
 import { resetRandom } from "../src/util"
+import type { Face, HalfEdge, Vertex } from "../src/geometry"
 
 
-function getHalfEdges(faces)
+/**
+ * Patch together with the faces it built
+ */
+type BuiltPatch = HexagonPatch & { faces: Face[] }
+
+
+function getHalfEdges(faces: Face[]): HalfEdge[]
 {
-    const halfEdges = []
+    const halfEdges: HalfEdge[] = []
     faces.forEach(face => {
         let curr = face.halfEdge
         do
@@ -19,7 +26,7 @@ function getHalfEdges(faces)
 }
 
 
-function getVertices(faces)
+function getVertices(faces: Face[]): Set<Vertex>
 {
     return new Set(getHalfEdges(faces).map(he => he.vertex))
 }
@@ -29,7 +36,7 @@ function getVertices(faces)
  * Checks the half edge invariants of the given faces and returns the Euler characteristic and the number of positions
  * occupied by more than one vertex object.
  */
-function checkMesh(faces)
+function checkMesh(faces: Face[])
 {
     const halfEdges = getHalfEdges(faces)
     const set = new Set(halfEdges)
@@ -52,7 +59,7 @@ function checkMesh(faces)
         }
     })
 
-    const positions = new Map()
+    const positions = new Map<string, number>()
     vertices.forEach(v => {
         assert(set.has(v.halfEdge))
         assert(v.halfEdge.vertex === v)
@@ -70,7 +77,7 @@ function checkMesh(faces)
 }
 
 
-function snapshot(faces)
+function snapshot(faces: Face[]): string
 {
     return faces.map(face => {
         const parts = []
@@ -85,10 +92,10 @@ function snapshot(faces)
 }
 
 
-function createPatch(q, r)
+function createPatch(q: number, r: number): BuiltPatch
 {
     resetRandom(q * 1000 + r)
-    const patch = new HexagonPatch(q, r, 40)
+    const patch = new HexagonPatch(q, r, 40) as BuiltPatch
     patch.faces = patch.build()
     return patch
 }
@@ -96,7 +103,7 @@ function createPatch(q, r)
 
 describe("HexagonPatch connections", function () {
 
-    let log
+    let log: typeof console.log
     beforeAll(() => {
         log = console.log
         console.log = () => {}
@@ -149,7 +156,7 @@ describe("HexagonPatch connections", function () {
         // these three patches meet in a common corner
         const patches = [ createPatch(0, 0), createPatch(PATCH_SIZE, 0), createPatch(0, PATCH_SIZE) ]
         const [a, b, c] = patches
-        const all = () => patches.reduce((faces, p) => faces.concat(p.faces), [])
+        const all = () => patches.reduce((faces: Face[], p) => faces.concat(p.faces), [])
 
         assert(a.connect(b) > 0)
         assert(b.connect(c) > 0)

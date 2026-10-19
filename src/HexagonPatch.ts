@@ -1,9 +1,9 @@
 import { Edge, Face, HalfEdge, Vertex } from "./geometry";
 import { rng } from "./util";
 
-function findInsideEdges(faces)
+function findInsideEdges(faces: Face[]): Set<Edge>
 {
-    const edges = new Set()
+    const edges = new Set<Edge>()
 
     for (let i = 0; i < faces.length; i++)
     {
@@ -26,9 +26,9 @@ function findInsideEdges(faces)
     return edges;
 }
 
-function getEdges(faces)
+function getEdges(faces: Face[]): Set<Edge>
 {
-    const edges = new Set()
+    const edges = new Set<Edge>()
 
     for (let i = 0; i < faces.length; i++)
     {
@@ -53,7 +53,7 @@ function getEdges(faces)
 }
 
 
-function shuffle(a) {
+function shuffle<T>(a: T[]): T[] {
     let j, x, i;
     for (i = a.length - 1; i > 0; i--) {
         j = Math.floor(rng.next() * (i + 1));
@@ -66,7 +66,7 @@ function shuffle(a) {
 
 
 
-function findFaceIndex(faces, other)
+function findFaceIndex(faces: Face[], other: Face): number
 {
     if (!other)
     {
@@ -85,7 +85,7 @@ function findFaceIndex(faces, other)
 }
 
 
-function resetFacesInLoop(prev, face)
+function resetFacesInLoop(prev: HalfEdge, face: Face): void
 {
     let curr = prev;
     do
@@ -96,16 +96,17 @@ function resetFacesInLoop(prev, face)
 }
 
 
-function removeEdge(faces, edge)
+function removeEdge(faces: Face[], edge: Edge): void
 {
-    if (!edge || !edge.halfEdge || !edge.halfEdge.twin)
+    const he = edge && edge.halfEdge
+    const twin = he && he.twin
+    if (!twin)
     {
         throw new Error("Need half edge and twin")
     }
 
-    const he = edge.halfEdge;
     const face = he.face
-    const other = he.twin.face
+    const other = twin.face
     if (face.length !== 3 || other.length !== 3)
     {
         return;
@@ -121,13 +122,13 @@ function removeEdge(faces, edge)
 
 
     const prev = he.prev
-    const twinPrev = he.twin.prev
+    const twinPrev = twin.prev
 
     // the removed half edges might be what their vertices point to
-    he.vertex.halfEdge = he.twin.next
-    he.twin.vertex.halfEdge = he.next
+    he.vertex.halfEdge = twin.next
+    twin.vertex.halfEdge = he.next
 
-    prev.next = he.twin.next
+    prev.next = twin.next
     twinPrev.next = he.next
     resetFacesInLoop(prev, face);
 
@@ -138,7 +139,7 @@ function removeEdge(faces, edge)
 }
 
 
-function subdivideEdge(he)
+function subdivideEdge(he: HalfEdge): HalfEdge
 {
     const { twin } = he
 
@@ -166,7 +167,7 @@ function subdivideEdge(he)
 }
 
 
-function divideTriIntoQuads(faces, face)
+function divideTriIntoQuads(faces: Face[], face: Face): void
 {
     let ha = face.halfEdge
     let hab = face.halfEdge.next
@@ -218,7 +219,7 @@ function divideTriIntoQuads(faces, face)
 }
 
 
-function subdivideQuad(faces, face)
+function subdivideQuad(faces: Face[], face: Face): void
 {
 
     let ha = face.halfEdge
@@ -276,12 +277,12 @@ function subdivideQuad(faces, face)
 
 
 
-function divideIntoQuads(faces)
+function divideIntoQuads(faces: Face[]): Face[]
 {
 
     getEdges(faces).forEach(e => subdivideEdge(e.halfEdge))
 
-    const newFaces = [];
+    const newFaces: Face[] = [];
 
     for (let i = 0; i < faces.length; i++)
     {
@@ -308,7 +309,7 @@ function divideIntoQuads(faces)
 
 
 
-function validateFace(face)
+function validateFace(face: Face): void
 {
     const { halfEdge } = face
     if (!halfEdge)
@@ -337,7 +338,7 @@ function validateFace(face)
 
 }
 
-function setToAverage(v)
+function setToAverage(v: Vertex): void
 {
     const { halfEdge : start } = v;
 
@@ -352,7 +353,7 @@ function setToAverage(v)
     let count = 0;
 
     let curr = start;
-    let twin
+    let twin: HalfEdge | null
     let max = 20;
     do
     {
@@ -399,9 +400,9 @@ function setToAverage(v)
     }
 }
 
-function relax(faces)
+function relax(faces: Face[]): void
 {
-    const set = new Set()
+    const set = new Set<Vertex>()
     for (let i = 0; i < faces.length; i++)
     {
         const face = faces[i];
@@ -432,7 +433,7 @@ function relax(faces)
 }
 
 
-function pDistance(x, y, x1, y1, x2, y2) {
+function pDistance(x: number, y: number, x1: number, y1: number, x2: number, y2: number): number {
 
     var A = x - x1;
     var B = y - y1;
@@ -445,7 +446,7 @@ function pDistance(x, y, x1, y1, x2, y2) {
     if (len_sq != 0) //in case of 0 length line
         param = dot / len_sq;
 
-    var xx, yy;
+    var xx: number, yy: number;
 
     if (param < 0) {
         xx = x1;
@@ -466,7 +467,7 @@ function pDistance(x, y, x1, y1, x2, y2) {
 }
 
 
-function getMinimumDistanceToPoint(face, x0, y0)
+function getMinimumDistanceToPoint(face: Face, x0: number, y0: number): number
 {
     let min = Infinity
     let curr = face.halfEdge;
@@ -488,7 +489,7 @@ function getMinimumDistanceToPoint(face, x0, y0)
     return min;
 }
 
-function pixelatePositions(faces)
+function pixelatePositions(faces: Face[]): void
 {
     for (let i = 0; i < faces.length; i++)
     {
@@ -509,9 +510,9 @@ function pixelatePositions(faces)
     }
 }
 
-function getSetOfIds(faces)
+function getSetOfIds(faces: Face[]): Set<number>
 {
-    const ids = new Set()
+    const ids = new Set<number>()
     for (let i = 0; i < faces.length; i++)
     {
         const face = faces[i];
@@ -521,7 +522,7 @@ function getSetOfIds(faces)
 }
 
 
-function validateFaces(faces)
+function validateFaces(faces: Face[]): void
 {
     const ids = getSetOfIds(faces);
 
@@ -555,16 +556,16 @@ const sin60 = Math.sin(TAU / 6);
 const hFactor = Math.sqrt(3);
 
 const directions = [
-    new Vertex(0,0, null),
-    new Vertex(0,-1, null),
+    new Vertex(0,0, 0, null),
+    new Vertex(0,-1, 0, null),
     new Vertex(sin60, -0.5, 0, null),
     new Vertex(sin60,  0.5, 0, null),
-    new Vertex(0,1, null),
+    new Vertex(0,1, 0, null),
     new Vertex(-sin60, 0.5, 0, null),
     new Vertex(-sin60,  -0.5, 0, null),
 ]
 
-const evenNeighbors = [
+const evenNeighbors: [number, number][] = [
     [0,-1],
     [1,0],
     [0,1],
@@ -573,7 +574,7 @@ const evenNeighbors = [
     [-1,-1]
 ]
 
-const oddNeighbors = [
+const oddNeighbors: [number, number][] = [
     [1,-1],
     [1,0],
     [1,1],
@@ -584,7 +585,7 @@ const oddNeighbors = [
 
 
 
-export function createHexagon(q, r, faces, points, patch)
+export function createHexagon(q: number, r: number, faces: Face[], points: Vertex[], patch: HexagonPatch): void
 {
     const start = faces.length;
     patch.setHexagon(q,r, start)
@@ -622,8 +623,8 @@ export function createHexagon(q, r, faces, points, patch)
 
     const v3 = verts[0];
 
-    let prevFace
-    let firstFace;
+    let prevFace: Face | null = null
+    let firstFace: Face | null = null;
     const last = verts.length - 1;
     for (let i = 1; i < verts.length; i++)
     {
@@ -646,7 +647,7 @@ export function createHexagon(q, r, faces, points, patch)
         he2.next = he0
 
         he0.edge = new Edge(he0)
-        he1.edge = i === last ? firstFace.halfEdge.next.next.edge : new Edge(he1)
+        he1.edge = i === last ? firstFace!.halfEdge.next.next.edge : new Edge(he1)
         he2.edge = prevFace ? prevFace.halfEdge.next.edge : new Edge(he2)
 
         face.halfEdge = he0
@@ -664,7 +665,7 @@ export function createHexagon(q, r, faces, points, patch)
 
     const face = faces[start]
 
-    prevFace.halfEdge.next.twinWith(face.halfEdge.next.next)
+    prevFace!.halfEdge.next.twinWith(face.halfEdge.next.next)
 
     points.push(... verts)
 
@@ -686,14 +687,27 @@ export function createHexagon(q, r, faces, points, patch)
 
 /////////////////////////////////////////
 
-function key(q, r)
+function key(q: number, r: number): string
 {
     return q + "/" + r
 }
 
-function borderKey(q, r, dir)
+function borderKey(q: number, r: number, dir: number): string
 {
     return q + "/" + r + "/" + dir
+}
+
+
+interface BorderEdge
+{
+    /** direction of the edge within its hexagon */
+    dir: number
+    /** position of the neighbor hexagon outside the patch */
+    nq: number
+    nr: number
+    /** the two border half edges the hexagon edge got subdivided into */
+    first: HalfEdge
+    second: HalfEdge
 }
 
 
@@ -701,11 +715,11 @@ function borderKey(q, r, dir)
  * Returns all half edges going out of the vertex of the given half edge that are reachable over twins. That is the
  * whole ring for inner vertices or the chain between two border edges for border vertices.
  *
- * @param {HalfEdge} start  outgoing half edge
+ * @param start  outgoing half edge
  *
- * @return {HalfEdge[]} outgoing half edges
+ * @return outgoing half edges
  */
-function getFan(start)
+function getFan(start: HalfEdge): HalfEdge[]
 {
     const fan = [start]
     let curr = start
@@ -734,11 +748,11 @@ function getFan(start)
 /**
  * Returns the border half edge following the given border half edge.
  *
- * @param {HalfEdge} he     border half edge
+ * @param he     border half edge
  *
- * @return {HalfEdge} next border half edge
+ * @return next border half edge
  */
-function nextOnBorder(he)
+function nextOnBorder(he: HalfEdge): HalfEdge
 {
     let curr = he.next
     while (curr.twin)
@@ -752,7 +766,7 @@ function nextOnBorder(he)
 /**
  * Replaces the vertex "drop" with the vertex "keep" in all half edges going out of "drop"
  */
-function mergeVertex(keep, drop)
+function mergeVertex(keep: Vertex, drop: Vertex): void
 {
     if (keep === drop)
     {
@@ -775,10 +789,10 @@ function mergeVertex(keep, drop)
  * Gives every fan that the given outgoing half edges fall into after disconnecting its own vertex. The fan containing
  * vertex.halfEdge keeps the vertex, the others get copies.
  *
- * @param {Vertex} vertex       vertex
- * @param {HalfEdge[]} outgoing all half edges that went out of the vertex before disconnecting
+ * @param vertex       vertex
+ * @param outgoing all half edges that went out of the vertex before disconnecting
  */
-function splitVertex(vertex, outgoing)
+function splitVertex(vertex: Vertex, outgoing: HalfEdge[]): void
 {
     const remaining = new Set(outgoing)
     getFan(vertex.halfEdge).forEach(he => remaining.delete(he))
@@ -795,7 +809,7 @@ function splitVertex(vertex, outgoing)
 }
 
 
-function untwin(he, twin)
+function untwin(he: HalfEdge, twin: HalfEdge): void
 {
     he.twin = null
     twin.twin = null
@@ -815,24 +829,22 @@ export default class HexagonPatch
 
     static SIZE = PATCH_SIZE
 
-    hexagons = new Map()
+    size: number
+
+    hexagons = new Map<string, number>()
 
     /**
      * Outer hexagon edges of the patch, keyed by hexagon position and direction. Each entry holds the position of the
      * neighbor hexagon outside the patch and the two border half edges the edge got subdivided into.
-     *
-     * @type {Map<String, {dir: Number, nq: Number, nr: Number, first: HalfEdge, second: HalfEdge}>}
      */
-    border = new Map()
+    border = new Map<string, BorderEdge>()
 
     /**
      * Connected neighbor patches mapped to the seam half edges as flat list of twin pairs.
-     *
-     * @type {Map<HexagonPatch, HalfEdge[]>}
      */
-    connections = new Map()
+    connections = new Map<HexagonPatch, HalfEdge[]>()
 
-    constructor(q,r, size = 40)
+    constructor(q: number, r: number, size = 40)
     {
         this.q = q
         this.r = r
@@ -843,12 +855,12 @@ export default class HexagonPatch
     /**
      * Returns the index of the first face in the hexagon at the coordinates q/r or undefined if no such hexagon exists
      * 
-     * @param {Number} q    q-position
-     * @param {Number} r    r-position
+     * @param q    q-position
+     * @param r    r-position
      * 
-     * @return {Number} faceIndex
+     * @return faceIndex
      */
-    getHexagon(q,r)
+    getHexagon(q: number, r: number): number | undefined
     {
         return this.hexagons.get(key(q,r))
     }
@@ -857,19 +869,19 @@ export default class HexagonPatch
     /**
      * Sets the face index for the hexagon at the coordinates q/r
      *
-     * @param {Number} q            q-position
-     * @param {Number} r            r-position
-     * @param {Number} faceIndex    face index
+     * @param q            q-position
+     * @param r            r-position
+     * @param faceIndex    face index
      */
-    setHexagon(q,r,faceIndex)
+    setHexagon(q: number, r: number, faceIndex: number): void
     {
         this.hexagons.set(key(q,r), faceIndex)
     }
 
-    build()
+    build(): Face[]
     {
-        let faces = [];
-        const verts = []
+        let faces: Face[] = [];
+        const verts: Vertex[] = []
 
         let hexCount = 0;
         for (let q = -hSize; q < hSize; q++)
@@ -921,14 +933,14 @@ export default class HexagonPatch
      * Collects the outer half edges of all hexagons whose neighbor lies outside of the patch. Must be called before
      * the faces are modified since it uses the face indexes of the hexagons.
      */
-    findBorderEdges(faces)
+    findBorderEdges(faces: Face[])
     {
         const borderEdges = []
         for (let q = this.q - hSize; q < this.q + hSize; q++)
         {
             for (let r = this.r - hSize; r < this.r + hSize; r++)
             {
-                const start = this.getHexagon(q, r)
+                const start = this.getHexagon(q, r)!
                 const neighbors = (r & 1) ? oddNeighbors : evenNeighbors
                 for (let dir = 0; dir < neighbors.length; dir++)
                 {
@@ -950,18 +962,18 @@ export default class HexagonPatch
      * Connects the mesh of this patch with the mesh of a neighboring patch along their shared border. The vertices of
      * the seam are merged and the border half edges become twins.
      *
-     * @param {HexagonPatch} other  neighboring patch
+     * @param other  neighboring patch
      *
-     * @return {Number} number of hexagon edges connected, 0 if the patches don't touch
+     * @return number of hexagon edges connected, 0 if the patches don't touch
      */
-    connect(other)
+    connect(other: HexagonPatch): number
     {
         if (other === this || this.connections.has(other))
         {
             return 0
         }
 
-        const seam = []
+        const seam: HalfEdge[] = []
         this.border.forEach(({ dir, nq, nr, first: a0, second: a1 }) => {
 
             const otherEdge = other.border.get(borderKey(nq, nr, (dir + 3) % 6))
@@ -995,9 +1007,9 @@ export default class HexagonPatch
      * Separates this patch from a connected neighbor again. Seam vertices still shared with other connected patches
      * stay merged.
      *
-     * @param {HexagonPatch} other  connected patch
+     * @param other  connected patch
      */
-    disconnect(other)
+    disconnect(other: HexagonPatch): void
     {
         const seam = this.connections.get(other)
         if (!seam)
@@ -1009,7 +1021,7 @@ export default class HexagonPatch
         other.connections.delete(this)
 
         // collect the fans while the seam vertices are still connected
-        const fans = new Map()
+        const fans = new Map<Vertex, HalfEdge[]>()
         for (let i = 0; i < seam.length; i++)
         {
             const { vertex } = seam[i]
@@ -1031,7 +1043,7 @@ export default class HexagonPatch
     /**
      * Separates this patch from all connected neighbors so it no longer shares any half edges or vertices with them.
      */
-    disconnectAll()
+    disconnectAll(): void
     {
         [...this.connections.keys()].forEach(other => this.disconnect(other))
     }

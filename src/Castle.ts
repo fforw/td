@@ -1,11 +1,12 @@
 import { countNeighborsInSet, rng } from "./util"
 import { FaceType } from "./geometry"
+import type { Face, Vertex } from "./geometry"
 import Vector from "./vector"
 
 
-function ringSet(content)
+function ringSet(content: Face | Face[]): Set<Face>
 {
-    let set = new Set()
+    let set = new Set<Face>()
 
     if (Array.isArray(content))
     {
@@ -26,12 +27,12 @@ function ringSet(content)
  * Returns a new ring (set of faces) from the given previous ring
  * @param ring  ring to extend
  * @param all   set of all faces currently in the all rings
- * @return {undefined}
+ * @return new outer ring, empty if the outer limits of the mesh were reached
  */
-function extendRing(ring,all)
+function extendRing(ring: Set<Face>, all: Set<Face>): Set<Face>
 {
 
-    const outer = new Set()
+    const outer = new Set<Face>()
 
     for (let face of ring)
     {
@@ -67,7 +68,7 @@ function extendRing(ring,all)
     return outer
 }
 
-function findInRings(rings, f)
+function findInRings(rings: Set<Face>[], f: Face): number
 {
     for (let i = 0; i < rings.length; i++)
     {
@@ -89,7 +90,7 @@ const OUTSIDE = [
     FaceType.SAND
 ]
 
-export function randomConnections(must = 0)
+export function randomConnections(must = 0): number
 {
     if ((must & 15) === 15)
     {
@@ -114,7 +115,7 @@ export function randomConnections(must = 0)
 }
 
 
-function constructRoad(face, dir, insideWall)
+function constructRoad(face: Face | null, dir: Vector, insideWall: Set<Face>): void
 {
     while (face && !touchesBorder(face))
     {
@@ -138,10 +139,10 @@ function constructRoad(face, dir, insideWall)
 
         //console.log("FACE", face)
     }
-    face.type = FaceType.PAVED
+    face!.type = FaceType.PAVED
 }
 
-function touchesBorder(face)
+function touchesBorder(face: Face): boolean
 {
     const first = face.halfEdge
     let curr = first
@@ -158,19 +159,24 @@ function touchesBorder(face)
     return false
 }
 
-export function HIGHEST(a,b)
+/**
+ * A face with an evaluated value
+ */
+type Ranked = [Face, number]
+
+export function HIGHEST(a: Ranked, b: Ranked): number
 {
     return b[1]-a[1]
 }
 
-export function LOWEST(a,b)
+export function LOWEST(a: Ranked, b: Ranked): number
 {
     return a[1]-b[1]
 }
 
-function chooseNext(face, evaluator, order = LOWEST)
+function chooseNext(face: Face, evaluator: (face: Face) => number, order = LOWEST): Face | null
 {
-    const values = []
+    const values: Ranked[] = []
     const first = face.halfEdge
     let curr = first
     do
@@ -195,7 +201,7 @@ function chooseNext(face, evaluator, order = LOWEST)
 }
 
 
-export function getNeighbors(face,start = null)
+export function getNeighbors(face: Face, start: Face | null = null): Face[]
 {
     let out = []
     const first = face.halfEdge
@@ -224,11 +230,8 @@ export function getNeighbors(face,start = null)
     return out
 }
 
-export function filterNeighbors(face,type)
+export function filterNeighbors(face: Face, type: FaceType | ((face: Face) => boolean)): Face[]
 {
-
-    const isPredicate = typeof type === "function"
-    
     let out = []
     const first = face.halfEdge
     let curr = first
@@ -236,7 +239,7 @@ export function filterNeighbors(face,type)
     {
         const next = curr.next
         const { twin } = curr
-        if (twin && (!isPredicate && twin.face.type === type || isPredicate && type(twin.face)))
+        if (twin && (typeof type === "function" ? type(twin.face) : twin.face.type === type))
         {
             out.push(twin.face)
         }
@@ -247,7 +250,7 @@ export function filterNeighbors(face,type)
 
 
 
-function buildMarket(center)
+function buildMarket(center: Face): void
 {
     center.type = FaceType.MARKET
 
@@ -270,7 +273,7 @@ function buildMarket(center)
     } while (curr !== first)
 }
 
-function countFreeNeighbors(face, considerPlotsOccupied = true)
+function countFreeNeighbors(face: Face, considerPlotsOccupied = true): number
 {
     let count = 0
     const first = face.halfEdge
@@ -306,7 +309,7 @@ const DECO = [FaceType.GRASS, FaceType.TREE, FaceType.GRASS, FaceType.TREE2, Fac
 const TREES = [FaceType.TREE, FaceType.TREE2]
 
 
-function followWall(face, all, segnent)
+function followWall(face: Face, all: Set<Face>, segnent: Face[]): Face[]
 {
     if (face.type === FaceType.WALL)
     {
@@ -334,9 +337,9 @@ function followWall(face, all, segnent)
 }
 
 
-function buildWallSegments(faces, wallFaces)
+function buildWallSegments(faces: Face[], wallFaces: Face[]): Face[][]
 {
-    const all = new Set()
+    const all = new Set<Face>()
 
     const segments = []
 
@@ -357,7 +360,7 @@ function buildWallSegments(faces, wallFaces)
 }
 
 
-function getOuterPointsOfSegment(segment)
+function getOuterPointsOfSegment(segment: Face[]): Vertex[]
 {
     const out = []
     for (let i = 0; i < segment.length; i++)
@@ -388,7 +391,7 @@ function getOuterPointsOfSegment(segment)
 }
 
 
-function anyMatch(a, b)
+function anyMatch(a: Vertex[], b: Vertex[]): boolean
 {
     for (let i = 0; i < a.length; i++)
     {
@@ -406,11 +409,11 @@ function anyMatch(a, b)
 }
 
 
-function mergeSegments(segments)
+function mergeSegments(segments: Face[][]): Face[][]
 {
     const allOuterPoints = segments.map(getOuterPointsOfSegment)
 
-    const replacements = new Map()
+    const replacements = new Map<number, number>()
 
     for (let i = 0; i < allOuterPoints.length; i++)
     {
@@ -429,19 +432,19 @@ function mergeSegments(segments)
     if (replacements.size > 0)
     {
         console.log("MERGES", replacements)
-        const out = []
+        const out: (Face[] | null)[] = []
         for (let i = 0; i < segments.length; i++)
         {
             const segment = segments[i]
 
-            let r,e = i
+            let r: number | undefined, e: number | undefined = i
             while (e = replacements.get(e))
             {
                 r = e
             }
             if (r)
             {
-                out[r] = out[r].concat(segment)
+                out[r] = out[r]!.concat(segment)
                 out[i] = null
             }
             else
@@ -459,19 +462,15 @@ function mergeSegments(segments)
 
 export default class Castle
 {
-    segments = []
+    segments: Face[][] = []
 
-    /**
-     *
-     * @type {Face}
-     */
-    centerFace = null
+    centerFace: Face
 
-    wall = []
+    wall: Set<Face>
 
-    insideWall = []
+    insideWall: Set<Face>
 
-    constructor(faces)
+    constructor(faces: Face[])
     {
         const byDist = faces.sort((a,b) => {
             const [x0,y0] = a.centroid
@@ -489,7 +488,7 @@ export default class Castle
 
         let prev = ring0
         let r
-        const all = new Set()
+        const all = new Set<Face>()
 
         while ((r = extendRing(prev, all)) && r.size > 0)
         {
