@@ -371,7 +371,7 @@ function getOuterPointsOfSegment(segment)
         {
             const next = curr.next
             const {twin} = curr
-            if (!twin || twin.type !== FaceType.WALL)
+            if (!twin || twin.face.type !== FaceType.WALL)
             {
                 out.push(
                     curr.vertex,
