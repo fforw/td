@@ -437,12 +437,14 @@ function mergeSegments(segments: Face[][]): Face[][]
         {
             const segment = segments[i]
 
+            // follow the replacements down to the segment that doesn't get merged itself. That can be segment 0,
+            // so compare against undefined instead of testing for truthiness
             let r: number | undefined, e: number | undefined = i
-            while (e = replacements.get(e))
+            while ((e = replacements.get(e)) !== undefined)
             {
                 r = e
             }
-            if (r)
+            if (r !== undefined)
             {
                 out[r] = out[r]!.concat(segment)
                 out[i] = null
