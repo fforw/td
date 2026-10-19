@@ -1,10 +1,8 @@
-import domready from "domready"
 import "./style.css"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import { countNeighbors, countNeighborsInSet, countNeighborsOfType, randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
 import { FaceType } from "./geometry"
-import queryString from "query-string"
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
@@ -508,199 +506,193 @@ function squareFace(face)
 }
 
 
-domready(
-    () => {
+// module scripts are deferred, so the DOM is ready at this point
+canvas = document.getElementById("screen");
+ctx = canvas.getContext("2d");
 
-        canvas = document.getElementById("screen");
-        ctx = canvas.getContext("2d");
+const width = (window.innerWidth) | 0;
+const height = (window.innerHeight) | 0;
 
-        const width = (window.innerWidth) | 0;
-        const height = (window.innerHeight) | 0;
+config.width = width;
+config.height = height;
 
-        config.width = width;
-        config.height = height;
+canvas.width = width;
+canvas.height = height;
 
-        canvas.width = width;
-        canvas.height = height;
+const seedParam = new URLSearchParams(location.search).get("seed")
 
-        const args = queryString.parse(location.search)
 
+const cx = width >> 1
+const cy = height >> 1
+
+const paint = () => {
+
+    //resetRandom(14121970)
+    const seed = randomSeed(seedParam ? +seedParam : null)
+
+    if (!fixed)
+    {
+        fixed = document.createElement("a")
+        fixed.href = "index.html?seed=" + seed
+        fixed.appendChild(document.createTextNode("seed"))
+        const footer = document.getElementById("footer")
+        footer.appendChild(document.createTextNode(""))
+        footer.appendChild(fixed)
+    }
+    else
+    {
+        fixed.href = "index.html?seed=" + seed
+    }
+
+    resetRandom(seed)
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0,0, width, height);
+
+    const size = 40
+
+    const p = new HexagonPatch(0,0,size)
+    const faces = p.build()
+    const c = new Castle(faces)
+
+
+
+    const p0 = new HexagonPatch(PATCH_SIZE,0,size)
+    const p1 = new HexagonPatch(0,PATCH_SIZE,size)
+    const p2 = new HexagonPatch(-PATCH_SIZE,0,size)
+    const p3 = new HexagonPatch(0,-PATCH_SIZE,size)
+
+    const p4 = new HexagonPatch(PATCH_SIZE,PATCH_SIZE,size)
+    const p5 = new HexagonPatch(PATCH_SIZE,-PATCH_SIZE,size)
+    const p6 = new HexagonPatch(-PATCH_SIZE,-PATCH_SIZE,size)
+    const p7 = new HexagonPatch(-PATCH_SIZE,PATCH_SIZE,size)
+
+
+    theFaces = faces
+        // .concat(p0.build())
+        // .concat(p1.build())
+        // .concat(p2.build())
+        // .concat(p3.build())
+        // .concat(p4.build())
+        // .concat(p5.build())
+        // .concat(p6.build())
+        // .concat(p7.build())
+
+    theFaces.forEach(
+        f => {
+
+            if (f.type === FaceType.HOUSE)
+            {
+
+                const [pt, size, angle] = squareFace(f)
+
+                ctx.strokeStyle = f.type.color
+                const r = size/2
+                ctx.beginPath()
+                ctx.moveTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
+                ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/4) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/4) * r)
+                ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/2) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/2) * r)
+                ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + 3*TAU/4) * r, cy +  pt[1] + Math.sin(angle - TAU_8TH + 3*TAU/4) * r)
+                ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
+                ctx.stroke()
+
+
+            }
+            else
+            {
+                ctx.fillStyle = f.type.color
+                renderDebugFace(f)
+            }
+
+        }
+    )
+
+    const { segments, centerFace, insideWall } = c
+
+    //console.log("WALL SEGMENTS", segments)
+
+    const [centroidX, centroidY] = centerFace.centroid
+
+    const visited = new Set()
+
+    for (let i = 0; i < segments.length; i++)
+    {
+        const segment = segments[i]
+        let ends = []
+
+
+        for (let j = 0; j < segment.length; j++)
+        {
+            const face = segment[j]
+            const gates = findGate(face)
+            if (gates.length > 0)
+            {
+                ends.push([face, gates[0]])
+                break;
+            }
+        }
+
+        //ends = filterGates(ends)
+
+        console.log("ENDS", ends)
 
         const cx = width >> 1
         const cy = height >> 1
 
-        const paint = () => {
+        let segmentCounter = 0
+        for (let j = 0; j < ends.length; j++)
+        {
+            const [face,[prev,pt]] = ends[j]
 
-            //resetRandom(14121970)
-            const seed = randomSeed(args.seed && +args.seed)
-
-            if (!fixed)
+            if (!visited.has(face) && countNeighborsInSet(face, visited) === 0)
             {
-                fixed = document.createElement("a")
-                fixed.href = "index.html?seed=" + seed
-                fixed.appendChild(document.createTextNode("seed"))
-                const footer = document.getElementById("footer")
-                footer.appendChild(document.createTextNode(""))
-                footer.appendChild(fixed)
-            }
-            else
-            {
-                fixed.href = "index.html?seed=" + seed
-            }
+                const points = [ pt ]
+                followEnd(  // entry
+                    points,
+                    face,
+                    visited,
+                    prev.centroid,
+                    j,
+                    insideWall
+                )
 
-            resetRandom(seed)
-
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0,0, width, height);
-
-            const size = 40
-
-            const p = new HexagonPatch(0,0,size)
-            const faces = p.build()
-            const c = new Castle(faces)
-
-
-
-            const p0 = new HexagonPatch(PATCH_SIZE,0,size)
-            const p1 = new HexagonPatch(0,PATCH_SIZE,size)
-            const p2 = new HexagonPatch(-PATCH_SIZE,0,size)
-            const p3 = new HexagonPatch(0,-PATCH_SIZE,size)
-
-            const p4 = new HexagonPatch(PATCH_SIZE,PATCH_SIZE,size)
-            const p5 = new HexagonPatch(PATCH_SIZE,-PATCH_SIZE,size)
-            const p6 = new HexagonPatch(-PATCH_SIZE,-PATCH_SIZE,size)
-            const p7 = new HexagonPatch(-PATCH_SIZE,PATCH_SIZE,size)
-
-
-            theFaces = faces
-                // .concat(p0.build())
-                // .concat(p1.build())
-                // .concat(p2.build())
-                // .concat(p3.build())
-                // .concat(p4.build())
-                // .concat(p5.build())
-                // .concat(p6.build())
-                // .concat(p7.build())
-
-            theFaces.forEach(
-                f => {
-
-                    if (f.type === FaceType.HOUSE)
-                    {
-
-                        const [pt, size, angle] = squareFace(f)
-
-                        ctx.strokeStyle = f.type.color
-                        const r = size/2
-                        ctx.beginPath()
-                        ctx.moveTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
-                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/4) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/4) * r)
-                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + TAU/2) * r, cy + pt[1] + Math.sin(angle - TAU_8TH + TAU/2) * r)
-                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH + 3*TAU/4) * r, cy +  pt[1] + Math.sin(angle - TAU_8TH + 3*TAU/4) * r)
-                        ctx.lineTo(cx + pt[0] + Math.cos(angle - TAU_8TH) * r, cy + pt[1] + Math.sin(angle - TAU_8TH) * r)
-                        ctx.stroke()
-
-
-                    }
-                    else
-                    {
-                        ctx.fillStyle = f.type.color
-                        renderDebugFace(f)
-                    }
-
-                }
-            )
-
-            const { segments, centerFace, insideWall } = c
-
-            //console.log("WALL SEGMENTS", segments)
-
-            const [centroidX, centroidY] = centerFace.centroid
-
-            const visited = new Set()
-
-            for (let i = 0; i < segments.length; i++)
-            {
-                const segment = segments[i]
-                let ends = []
-
-
-                for (let j = 0; j < segment.length; j++)
+                ctx.lineWidth = 10
+                ctx.strokeStyle = "#432"
+                ctx.lineJoin = "bevel"
+                ctx.beginPath()
+                const [x, y] = points[0]
+                ctx.moveTo(cx + x, cy + y)
+                const last = points.length - 1
+                for (let k = 1; k < points.length; k++)
                 {
-                    const face = segment[j]
-                    const gates = findGate(face)
-                    if (gates.length > 0)
-                    {
-                        ends.push([face, gates[0]])
-                        break;
-                    }
+                    const scale = k !== last ? 1.02 : 1
+                    const [x, y] = points[k]
+                    ctx.lineTo(cx + x* scale, cy + y* scale)
                 }
+                ctx.stroke()
 
-                //ends = filterGates(ends)
+                ctx.fillStyle = "#f0f"
+                ctx.fillRect(cx + points[0][0] - 1, cy + points[0][1] - 1, 2, 2)
 
-                console.log("ENDS", ends)
-
-                const cx = width >> 1
-                const cy = height >> 1
-
-                let segmentCounter = 0
-                for (let j = 0; j < ends.length; j++)
-                {
-                    const [face,[prev,pt]] = ends[j]
-
-                    if (!visited.has(face) && countNeighborsInSet(face, visited) === 0)
-                    {
-                        const points = [ pt ]
-                        followEnd(  // entry
-                            points,
-                            face,
-                            visited,
-                            prev.centroid,
-                            j,
-                            insideWall
-                        )
-
-                        ctx.lineWidth = 10
-                        ctx.strokeStyle = "#432"
-                        ctx.lineJoin = "bevel"
-                        ctx.beginPath()
-                        const [x, y] = points[0]
-                        ctx.moveTo(cx + x, cy + y)
-                        const last = points.length - 1
-                        for (let k = 1; k < points.length; k++)
-                        {
-                            const scale = k !== last ? 1.02 : 1
-                            const [x, y] = points[k]
-                            ctx.lineTo(cx + x* scale, cy + y* scale)
-                        }
-                        ctx.stroke()
-
-                        ctx.fillStyle = "#f0f"
-                        ctx.fillRect(cx + points[0][0] - 1, cy + points[0][1] - 1, 2, 2)
-
-                    }
-
-                    // renderDebugFace(face)
-                }
             }
 
-
+            // renderDebugFace(face)
         }
-
-        paint()
-
-        canvas.addEventListener("click", ev => {
-            if (ev.ctrlKey)
-            {
-                markFaceOnClick(ev)
-                return
-            }
-
-            paint()
-
-
-        }, true)
-
-
     }
-);
+
+
+}
+
+paint()
+
+canvas.addEventListener("click", ev => {
+    if (ev.ctrlKey)
+    {
+        markFaceOnClick(ev)
+        return
+    }
+
+    paint()
+
+
+}, true)
