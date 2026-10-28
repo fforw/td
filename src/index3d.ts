@@ -101,6 +101,9 @@ const GATE_CLEARANCE = 2
 const GATE_MIN_WIDTH = 1
 const GATE_MAX_WIDTH = 2.2
 
+const MARKET_FOUNTAIN_SCALE = 0.3
+const MARKET_STALL_SCALE = 0.55
+
 /**
  * A gate where a road crosses the wall
  */
@@ -298,7 +301,7 @@ function createMarketDecoration(face: Face, centerFace: Face): THREE.Object3D | 
     if (face === centerFace)
     {
         const fountain = model("fountain")
-        fountain.scale.setScalar(0.5)
+        fountain.scale.setScalar(MARKET_FOUNTAIN_SCALE)
         fountain.position.copy(toWorld(face.centroid))
         return fountain
     }
@@ -310,6 +313,7 @@ function createMarketDecoration(face: Face, centerFace: Face): THREE.Object3D | 
 
     const stall = model(pick(face, ["stall", "stallRed", "stallGreen"] as ModelName[], 2))
     const pos = toWorld(face.centroid)
+    stall.scale.setScalar(MARKET_STALL_SCALE)
     stall.position.copy(pos)
     // face the fountain
     const center = toWorld(centerFace.centroid)
