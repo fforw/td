@@ -28,8 +28,8 @@
     "packageManager": "pnpm@12.8.1",
     "type": "module",
     "ff-medium": {
-        "category": "",
-        "topics": [],
+        "category": "games",
+        "topics": ["TownScaper", "Tower Defense"],
         "shot": { "delay": 0, "click": false }
     }
 }
