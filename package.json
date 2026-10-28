@@ -5,11 +5,13 @@
     "license": "Apache-2.0",
     "dependencies": {
         "prando": "^6.0.1",
-        "simplex-noise": "^4.0.3"
+        "simplex-noise": "^4.0.3",
+        "three": "^0.186.1"
     },
     "devDependencies": {
         "@power-assert/runtime": "^0.3.2",
         "@types/node": "^26.6.5",
+        "@types/three": "^0.186.0",
         "rollup-plugin-power-assert": "^0.2.2",
         "typescript": "^7.0.2",
         "vite": "^8.3.4",
@@ -29,7 +31,13 @@
     "type": "module",
     "ff-medium": {
         "category": "games",
-        "topics": ["TownScaper", "Tower Defense"],
-        "shot": { "delay": 0, "click": false }
+        "topics": [
+            "TownScaper",
+            "Tower Defense"
+        ],
+        "shot": {
+            "delay": 0,
+            "click": false
+        }
     }
 }
