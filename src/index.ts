@@ -513,7 +513,7 @@ function squareFace(face: Face): [Point, number, number]
 
     return [
         centroid,
-        20,//minDistance * 1.9,
+        minDistance * 2,
         Math.atan2(vertex!.y - centroid[1],vertex!.x - centroid[0]) - TAU_8TH
     ]
 }
