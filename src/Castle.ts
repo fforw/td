@@ -461,6 +461,12 @@ function mergeSegments(segments: Face[][]): Face[][]
     return segments
 }
 
+interface CastleOptions
+{
+    patchPadding?: number
+}
+
+
 
 export default class Castle
 {
@@ -472,8 +478,10 @@ export default class Castle
 
     insideWall: Set<Face>
 
-    constructor(faces: Face[])
+    constructor(faces: Face[], opts : CastleOptions = {})
     {
+        const { patchPadding = 4 } = opts
+
         const byDist = faces.sort((a,b) => {
             const [x0,y0] = a.centroid
             const [x1,y1] = b.centroid
@@ -500,12 +508,12 @@ export default class Castle
             prev = r
         }
 
-        const castle = rings.slice(0,-2)
+        const castle = rings.slice(0,-patchPadding)
 
         const wall = castle[castle.length - 1].union(castle[castle.length - 2])
         this.wall = wall
         this.insideWall = castle[castle.length - 3].union(castle[castle.length - 4])
-        const moat = Array.from(rings[rings.length - 1].union(rings[rings.length - 2]));
+        const moat = Array.from(rings[rings.length - patchPadding + 1].union(rings[rings.length - patchPadding]));
 
         const castleSize = castle.reduce((a,b) => a + b.size, 0)
         const usable = castleSize - wall.size
