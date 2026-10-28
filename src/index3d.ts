@@ -102,6 +102,11 @@ const GATE_MIN_WIDTH = 1
 const GATE_MAX_WIDTH = 2.2
 
 const MARKET_FOUNTAIN_SCALE = 0.3
+
+/**
+ * Height of the face grid lines above the ground
+ */
+const GRID_HEIGHT = 0.005
 const MARKET_STALL_SCALE = 0.36
 
 /**
@@ -229,7 +234,7 @@ function createGround(faces: Face[]): THREE.Group
             }
             colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
 
-            edges.push(x0, 0.005, z0, x1, 0.005, z1)
+            edges.push(x0, GRID_HEIGHT, z0, x1, GRID_HEIGHT, z1)
 
             curr = next
         } while (curr !== first)
@@ -306,7 +311,8 @@ function createMarketDecoration(face: Face, centerFace: Face): THREE.Object3D | 
     {
         const fountain = model("fountain")
         fountain.scale.setScalar(MARKET_FOUNTAIN_SCALE)
-        fountain.position.copy(toWorld(face.centroid))
+        // the pool floor of the fountain is at the model's base, lift it above the ground and the grid lines
+        fountain.position.copy(toWorld(face.centroid, GRID_HEIGHT * 2))
         return fountain
     }
 
