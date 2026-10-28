@@ -4,7 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import HexagonPatch from "./HexagonPatch"
 import { randomSeed, resetRandom } from "./util"
-import Castle from "./Castle"
+import Castle, { filterNeighbors, getNeighbors } from "./Castle"
 import { FaceType } from "./geometry"
 import type { Face, Point } from "./geometry"
 import { squareFace, wallPaths } from "./plan"
@@ -28,6 +28,7 @@ const MODELS = {
     wall: "castle/wall.glb",
     tower: "castle/tower-square.glb",
     towerRoof: "castle/tower-square-top-roof.glb",
+    gateway: "castle/wall-doorway.glb",
     gateTower: "castle/tower-hexagon-base.glb",
     gateTowerRoof: "castle/tower-hexagon-roof.glb",
 
@@ -84,6 +85,41 @@ const TOWER_MIN_TURN = 0.4
  * Minimum distance between towers in world units
  */
 const TOWER_MIN_DISTANCE = 2.5
+
+const GATE_HEIGHT = WALL_HEIGHT * 1.15
+
+/**
+ * Thickness of the gateway arch, measured along the road
+ */
+const GATE_THICKNESS = 0.9
+
+/**
+ * Depth of the area around a gate in which walls are cut away, measured along the road
+ */
+const GATE_CLEARANCE = 2
+
+const GATE_MIN_WIDTH = 1
+const GATE_MAX_WIDTH = 2.2
+
+/**
+ * A gate where a road crosses the wall
+ */
+interface Gate
+{
+    center: THREE.Vector3
+    /**
+     * Unit vector along the road, pointing outwards
+     */
+    road: THREE.Vector3
+    /**
+     * Unit vector along the wall
+     */
+    side: THREE.Vector3
+    /**
+     * Width of the gate along the wall
+     */
+    width: number
+}
 
 const templates = new Map<ModelName, THREE.Object3D>()
 
@@ -318,7 +354,216 @@ function turnAngle(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3): num
     return d
 }
 
-function createWall(path: Point[]): THREE.Group
+/**
+ * Returns the direction of the road through the given group of gate faces, from the paved neighbor face nearest to
+ * the castle center to the one furthest away, or null if the gate does not have two paved neighbors.
+ */
+function roadDirection(group: Face[], castleCenter: THREE.Vector3): THREE.Vector3 | null
+{
+    const paved = new Set<Face>()
+    for (const f of group)
+    {
+        for (const n of filterNeighbors(f, FaceType.PAVED))
+        {
+            paved.add(n)
+        }
+    }
+
+    let inner: THREE.Vector3 | null = null
+    let outer: THREE.Vector3 | null = null
+    for (const f of paved)
+    {
+        const pt = toWorld(f.centroid)
+        if (!inner || pt.distanceTo(castleCenter) < inner.distanceTo(castleCenter))
+        {
+            inner = pt
+        }
+        if (!outer || pt.distanceTo(castleCenter) > outer.distanceTo(castleCenter))
+        {
+            outer = pt
+        }
+    }
+
+    if (!inner || !outer || inner === outer)
+    {
+        return null
+    }
+    return outer.sub(inner).normalize()
+}
+
+/**
+ * Groups adjacent GATE faces and returns one gate per group, oriented along the road running through it.
+ */
+function findGates(faces: Face[], centerFace: Face): Gate[]
+{
+    const castleCenter = toWorld(centerFace.centroid)
+
+    const gates: Gate[] = []
+    const visited = new Set<Face>()
+
+    for (const face of faces)
+    {
+        if (face.type !== FaceType.GATE || visited.has(face))
+        {
+            continue
+        }
+
+        const group: Face[] = []
+        const open = [face]
+        visited.add(face)
+        while (open.length)
+        {
+            const f = open.pop()!
+            group.push(f)
+            for (const n of getNeighbors(f))
+            {
+                if (n.type === FaceType.GATE && !visited.has(n))
+                {
+                    visited.add(n)
+                    open.push(n)
+                }
+            }
+        }
+
+        const center = new THREE.Vector3()
+        for (const f of group)
+        {
+            center.add(toWorld(f.centroid))
+        }
+        center.divideScalar(group.length)
+
+        const road = roadDirection(group, castleCenter) ?? center.clone().sub(castleCenter).normalize()
+        const side = new THREE.Vector3(-road.z, 0, road.x)
+
+        // extent of the gate faces along the wall
+        let min = Infinity, max = -Infinity
+        for (const f of group)
+        {
+            const first = f.halfEdge
+            let curr = first
+            do
+            {
+                const v = curr.vertex
+                const d = (v.x * SCALE - center.x) * side.x + (v.y * SCALE - center.z) * side.z
+                min = Math.min(min, d)
+                max = Math.max(max, d)
+                curr = curr.next
+            } while (curr !== first)
+        }
+
+        const width = Math.min(GATE_MAX_WIDTH, Math.max(GATE_MIN_WIDTH, max - min))
+        gates.push({ center, road, side, width })
+    }
+    return gates
+}
+
+function isInGate(pt: THREE.Vector3, gate: Gate, margin = 0): boolean
+{
+    const dx = pt.x - gate.center.x
+    const dz = pt.z - gate.center.z
+    return (
+        Math.abs(dx * gate.road.x + dz * gate.road.z) <= GATE_CLEARANCE / 2 + margin &&
+        Math.abs(dx * gate.side.x + dz * gate.side.z) <= gate.width / 2 + margin
+    )
+}
+
+/**
+ * Returns the parameter interval in which the segment from p0 to p1 runs through the clearance area of the gate, or
+ * null if it doesn't (Liang-Barsky clipping in the local coordinates of the gate).
+ */
+function clipToGate(p0: THREE.Vector3, p1: THREE.Vector3, gate: Gate): [number, number] | null
+{
+    const { center, road, side, width } = gate
+
+    const x0 = p0.x - center.x, z0 = p0.z - center.z
+    const dx = p1.x - p0.x, dz = p1.z - p0.z
+
+    let tIn = 0, tOut = 1
+
+    const axes: [THREE.Vector3, number][] = [[road, GATE_CLEARANCE / 2], [side, width / 2]]
+    for (const [axis, half] of axes)
+    {
+        const u0 = x0 * axis.x + z0 * axis.z
+        const du = dx * axis.x + dz * axis.z
+
+        if (Math.abs(du) < 1e-9)
+        {
+            if (Math.abs(u0) > half)
+            {
+                return null
+            }
+            continue
+        }
+
+        let t0 = (-half - u0) / du
+        let t1 = (half - u0) / du
+        if (t0 > t1)
+        {
+            [t0, t1] = [t1, t0]
+        }
+        tIn = Math.max(tIn, t0)
+        tOut = Math.min(tOut, t1)
+        if (tIn >= tOut)
+        {
+            return null
+        }
+    }
+    return [tIn, tOut]
+}
+
+function createGate(gate: Gate): THREE.Group
+{
+    const group = new THREE.Group()
+
+    // the doorway model is half a unit thick on its negative x-side and runs along its local z-axis
+    const gateway = model("gateway")
+    const sx = GATE_THICKNESS / 0.5
+    gateway.scale.set(sx, GATE_HEIGHT / 1.31, gate.width)
+    gateway.position.x = 0.25 * sx
+    group.add(gateway)
+
+    for (const z of [-gate.width / 2, gate.width / 2])
+    {
+        group.add(createTower(new THREE.Vector3(0, 0, z), true))
+    }
+
+    group.position.copy(gate.center)
+    // local x along the road
+    group.rotation.y = Math.atan2(-gate.road.z, gate.road.x)
+    return group
+}
+
+function addWallPiece(group: THREE.Group, p0: THREE.Vector3, p1: THREE.Vector3): void
+{
+    const dx = p1.x - p0.x
+    const dz = p1.z - p0.z
+    const length = Math.sqrt(dx * dx + dz * dz)
+    if (length < 0.05)
+    {
+        return
+    }
+
+    // the wall model runs along its local z-axis
+    const wall = model("wall")
+    wall.scale.set(WALL_THICKNESS, WALL_HEIGHT / 1.31, length)
+    wall.position.set((p0.x + p1.x) / 2, 0, (p0.z + p1.z) / 2)
+    wall.rotation.y = Math.atan2(dx, dz)
+    group.add(wall)
+}
+
+/**
+ * Part of a wall segment as start and end parameter and the gates that cut off the start and the end, if any
+ */
+type WallInterval = [number, number, Gate | null, Gate | null]
+
+function nearestGateTower(gate: Gate, pt: THREE.Vector3): THREE.Vector3
+{
+    const { center, side, width } = gate
+    const d = (pt.x - center.x) * side.x + (pt.z - center.z) * side.z
+    return center.clone().addScaledVector(side, d < 0 ? -width / 2 : width / 2)
+}
+
+function createWall(path: Point[], gates: Gate[]): THREE.Group
 {
     const group = new THREE.Group()
 
@@ -329,22 +574,51 @@ function createWall(path: Point[]): THREE.Group
         const p0 = pts[i - 1]
         const p1 = pts[i]
 
-        const dx = p1.x - p0.x
-        const dz = p1.z - p0.z
-        const length = Math.sqrt(dx * dx + dz * dz)
+        // cut the parts of the segment running through gates, remembering which gate cut which end
+        let intervals: WallInterval[] = [[0, 1, null, null]]
+        for (const gate of gates)
+        {
+            const clip = clipToGate(p0, p1, gate)
+            if (clip)
+            {
+                const [tIn, tOut] = clip
+                intervals = intervals.flatMap(([a, b, gateA, gateB]): WallInterval[] => [
+                    b > tIn ? [a, tIn, gateA, gate] : [a, b, gateA, gateB],
+                    a < tOut ? [tOut, b, gate, gateB] : [a, b, gateA, gateB]
+                ]).filter(([a, b]) => b > a)
+            }
+        }
 
-        // the wall model runs along its local z-axis
-        const wall = model("wall")
-        wall.scale.set(WALL_THICKNESS, WALL_HEIGHT / 1.31, length)
-        wall.position.set((p0.x + p1.x) / 2, 0, (p0.z + p1.z) / 2)
-        wall.rotation.y = Math.atan2(dx, dz)
-        group.add(wall)
+        for (const [a, b, gateA, gateB] of intervals)
+        {
+            const start = p0.clone().lerp(p1, a)
+            const end = p0.clone().lerp(p1, b)
+            addWallPiece(group, start, end)
+
+            // connect ends cut by a gate to the nearest gate tower
+            if (gateA)
+            {
+                addWallPiece(group, nearestGateTower(gateA, start), start)
+            }
+            if (gateB)
+            {
+                addWallPiece(group, end, nearestGateTower(gateB, end))
+            }
+        }
     }
 
-    // the first and last point of the path are next to the gates
+    const insideGate = (pt: THREE.Vector3) => gates.some(gate => isInGate(pt, gate, TOWER_SIZE / 2))
+
+    // the first and last point of the path are next to the gates, which have their own towers. If the path didn't
+    // end at a gate, we close it with a tower
     const last = pts.length - 1
-    group.add(createTower(pts[0], true))
-    group.add(createTower(pts[last], true))
+    for (const pt of [pts[0], pts[last]])
+    {
+        if (!insideGate(pt))
+        {
+            group.add(createTower(pt, true))
+        }
+    }
 
     // towers at the sharper corners of the wall, if they're not too close to the previous tower or the end gate
     let prevTower = pts[0]
@@ -355,7 +629,8 @@ function createWall(path: Point[]): THREE.Group
         if (
             turn >= TOWER_MIN_TURN &&
             pt.distanceTo(prevTower) >= TOWER_MIN_DISTANCE &&
-            pt.distanceTo(pts[last]) >= TOWER_MIN_DISTANCE
+            pt.distanceTo(pts[last]) >= TOWER_MIN_DISTANCE &&
+            !insideGate(pt)
         )
         {
             group.add(createTower(pt, false))
@@ -468,9 +743,15 @@ function build(): void
         }
     }
 
+    const gates = findGates(faces, castle.centerFace)
+    for (const gate of gates)
+    {
+        group.add(createGate(gate))
+    }
+
     for (const path of wallPaths(castle))
     {
-        group.add(createWall(path))
+        group.add(createWall(path, gates))
     }
 
     scene.add(group)
