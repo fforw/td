@@ -136,12 +136,16 @@ function loadModels(): Promise<void>
                     const mesh = obj as THREE.Mesh
                     if (mesh.isMesh)
                     {
-                        mesh.castShadow = true
+                        const materials = [mesh.material].flat()
+
+                        // transparent surfaces like the fountain water would shadow themselves, causing flickering
+                        // shadow acne
+                        mesh.castShadow = !materials.some(m => m.transparent)
                         mesh.receiveShadow = true
 
                         // the Fantasy Town and Nature kits export fully metallic materials which render black
                         // without an environment map
-                        for (const material of [mesh.material].flat())
+                        for (const material of materials)
                         {
                             (material as THREE.MeshStandardMaterial).metalness = 0
                         }
