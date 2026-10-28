@@ -105,6 +105,11 @@ const GATE_MAX_WIDTH = 2.2
 const MARKET_FOUNTAIN_SCALE = 0.3
 
 /**
+ * Draw the face grid lines on top of the ground (0 = off, 1 = on)
+ */
+const DEBUG_GRID = 1
+
+/**
  * Height of the face grid lines above the ground
  */
 const GRID_HEIGHT = 0.005
@@ -203,7 +208,6 @@ function createGround(faces: Face[]): THREE.Group
 {
     const positions: number[] = []
     const colors: number[] = []
-    const edges: number[] = []
 
     const color = new THREE.Color()
 
@@ -223,6 +227,33 @@ function createGround(faces: Face[]): THREE.Group
         colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
     })
 
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+    geometry.computeVertexNormals()
+
+    const mesh = new THREE.Mesh(
+        geometry,
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+    )
+    mesh.receiveShadow = true
+
+    const group = new THREE.Group()
+    group.add(mesh)
+
+    if (DEBUG_GRID)
+    {
+        group.add(createGrid(faces))
+    }
+    return group
+}
+
+/**
+ * Lines along the true face borders, which the marching squares ground no longer shows
+ */
+function createGrid(faces: Face[]): THREE.LineSegments
+{
+    const edges: number[] = []
     for (const face of faces)
     {
         const first = face.halfEdge
@@ -238,27 +269,12 @@ function createGround(faces: Face[]): THREE.Group
         } while (curr !== first)
     }
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
-    geometry.computeVertexNormals()
-
-    const mesh = new THREE.Mesh(
-        geometry,
-        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
-    )
-    mesh.receiveShadow = true
-
     const edgeGeometry = new THREE.BufferGeometry()
     edgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(edges, 3))
-    const lines = new THREE.LineSegments(
+    return new THREE.LineSegments(
         edgeGeometry,
         new THREE.LineBasicMaterial({ color: "#000", transparent: true, opacity: 0.12 })
     )
-
-    const group = new THREE.Group()
-    group.add(mesh, lines)
-    return group
 }
 
 function createHouse(face: Face): THREE.Object3D
