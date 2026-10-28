@@ -1,6 +1,6 @@
-import { countNeighborsInSet, rng } from "./util"
-import { FaceType } from "./geometry"
-import type { Face, Vertex } from "./geometry"
+import {countNeighborsInSet, rng} from "./util"
+import type {Face, Vertex} from "./geometry"
+import {FaceType} from "./geometry"
 import Vector from "./vector"
 
 
@@ -467,6 +467,32 @@ interface CastleOptions
 }
 
 
+function faceRatio(face: Face)
+{
+    const {x : x0, y: y0 } = face.halfEdge.vertex;
+    const {x : x1, y: y1 } = face.halfEdge.next.vertex;
+    const {x : x2, y: y2 } = face.halfEdge.next.next.vertex;
+    const {x : x3, y: y3 } = face.halfEdge.next.next.next.vertex;
+
+    const dx0 = x3 - x0
+    const dy0 = y3 - y0
+    const dx1 = x2 - x1
+    const dy1 = y2 - y1
+
+    let d0 = Math.sqrt(dx0 * dx0 + dy0 * dy0)
+    let d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1)
+
+    if (d0 > d1)
+    {
+        return d0/d1
+    }
+    else
+    {
+        return d1/d0
+    }
+}
+
+type PlotCandidate = [Face, number]
 
 export default class Castle
 {
@@ -518,7 +544,24 @@ export default class Castle
         const castleSize = castle.reduce((a,b) => a + b.size, 0)
         const usable = castleSize - wall.size
 
+        // mark wall faces
         faces.forEach( face => {
+            const ring = findInRings(castle, face)
+            if (ring >= 0 && all.has(face))
+            {
+                // inside the castle
+                if (ring >= castle.length - 2)
+                {
+                    // our outer two rings are wall
+                    face.type = FaceType.WALL
+                }
+            }
+        })
+
+
+
+
+        const plotCandidates : PlotCandidate[] = faces.filter( face => {
             const ring = findInRings(castle, face)
             if (ring >= 0 && all.has(face))
             {
@@ -528,16 +571,22 @@ export default class Castle
                     // every second pair of rings we have a 66% of building plot
                     if (((ring >> 1) & 1) !== 0)
                     {
-                        let n = rng.next()
-                        face.type = n < 0.66 ? (n < 0.15 ? FaceType.HOUSE : FaceType.PLOT) : FaceType.DIRT
+                        return true;
                     }
                 }
-                else
-                {
-                    // our outer two rings are wall
-                    face.type = FaceType.WALL
-                }
             }
+            return false
+        }).map(c => [c,faceRatio(c)]);
+
+        plotCandidates.sort((a,b) => {
+            return a[1] - b[1]
+        })
+
+        const best= plotCandidates.slice(0, Math.floor(plotCandidates.length * 0.5))
+
+        best.forEach(pc => {
+            let n = rng.next()
+            pc[0].type = n < 0.66 ? FaceType.HOUSE : FaceType.PLOT
         })
 
         moat.forEach(f => f.type = FaceType.GRASS)
