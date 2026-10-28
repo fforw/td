@@ -8,6 +8,7 @@ import Castle, { filterNeighbors, getNeighbors } from "./Castle"
 import { FaceType } from "./geometry"
 import type { Face, Point } from "./geometry"
 import { squareFace, wallPaths } from "./plan"
+import marchingSquares from "./marchingSquares"
 
 const TAU = Math.PI * 2;
 
@@ -206,36 +207,33 @@ function createGround(faces: Face[]): THREE.Group
 
     const color = new THREE.Color()
 
+    marchingSquares(faces, (type, x0, z0, x1, z1, x2, z2) => {
+        color.set(GROUND_COLORS.get(type) ?? type.color)
+
+        // wind the triangle so the normal points up
+        const ccw = (x1 - x0) * (z2 - z0) - (z1 - z0) * (x2 - x0) < 0
+        if (ccw)
+        {
+            positions.push(x0 * SCALE, 0, z0 * SCALE, x1 * SCALE, 0, z1 * SCALE, x2 * SCALE, 0, z2 * SCALE)
+        }
+        else
+        {
+            positions.push(x0 * SCALE, 0, z0 * SCALE, x2 * SCALE, 0, z2 * SCALE, x1 * SCALE, 0, z1 * SCALE)
+        }
+        colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
+    })
+
     for (const face of faces)
     {
-        color.set(GROUND_COLORS.get(face.type) ?? face.type.color)
-
-        const [cx, cy] = face.centroid
-
         const first = face.halfEdge
         let curr = first
         do
         {
             const next = curr.next
-            const x0 = curr.vertex.x * SCALE
-            const z0 = curr.vertex.y * SCALE
-            const x1 = next.vertex.x * SCALE
-            const z1 = next.vertex.y * SCALE
-
-            // fan triangle from the centroid, wound so the normal points up
-            const ccw = (x0 - cx * SCALE) * (z1 - cy * SCALE) - (z0 - cy * SCALE) * (x1 - cx * SCALE) < 0
-            if (ccw)
-            {
-                positions.push(cx * SCALE, 0, cy * SCALE, x0, 0, z0, x1, 0, z1)
-            }
-            else
-            {
-                positions.push(cx * SCALE, 0, cy * SCALE, x1, 0, z1, x0, 0, z0)
-            }
-            colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
-
-            edges.push(x0, GRID_HEIGHT, z0, x1, GRID_HEIGHT, z1)
-
+            edges.push(
+                curr.vertex.x * SCALE, GRID_HEIGHT, curr.vertex.y * SCALE,
+                next.vertex.x * SCALE, GRID_HEIGHT, next.vertex.y * SCALE
+            )
             curr = next
         } while (curr !== first)
     }
