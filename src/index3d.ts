@@ -102,7 +102,7 @@ const GATE_MIN_WIDTH = 1
 const GATE_MAX_WIDTH = 2.2
 
 const MARKET_FOUNTAIN_SCALE = 0.3
-const MARKET_STALL_SCALE = 0.55
+const MARKET_STALL_SCALE = 0.36
 
 /**
  * A gate where a road crosses the wall
