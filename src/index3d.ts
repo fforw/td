@@ -70,16 +70,16 @@ const GROUND_COLORS = new Map<FaceType, string>([
     [FaceType.FOREST_FLOOR, "#4a5a2a"],
     [FaceType.TREE, "#5c9e3c"],
     [FaceType.TREE2, "#4f8f36"],
-    [FaceType.WALL, "#7b7a74"],
+    [FaceType.WALL, "#618336"],
     [FaceType.GATE, "#9a968c"],
     [FaceType.MARKET, "#b5ae9c"],
     [FaceType.PLOT, "#a68a5c"],
     [FaceType.HOUSE, "#8a7a5e"],
 ])
 
-const WALL_HEIGHT = 1.2
-const WALL_THICKNESS = 0.6
-const TOWER_SIZE = 0.75
+const WALL_HEIGHT = 0.6
+const WALL_THICKNESS = 0.4
+const TOWER_SIZE = 0.66
 
 /**
  * Minimum change of direction for a wall corner to get a tower
@@ -96,7 +96,7 @@ const GATE_HEIGHT = WALL_HEIGHT * 1.15
 /**
  * Thickness of the gateway arch, measured along the road
  */
-const GATE_THICKNESS = 0.9
+const GATE_THICKNESS = 0.85
 
 /**
  * Depth of the area around a gate in which walls are cut away, measured along the road
@@ -111,7 +111,7 @@ const MARKET_FOUNTAIN_SCALE = 0.3
 /**
  * Draw the face grid lines on top of the ground (0 = off, 1 = on)
  */
-const DEBUG_GRID = 1
+const DEBUG_GRID = 0
 
 /**
  * Height of the face grid lines above the ground
