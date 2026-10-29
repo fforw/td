@@ -696,6 +696,22 @@ function createColumn(prev: Vector3, pt: Vector3, next: Vector3): Object3D
 }
 
 /**
+ * Adds a column at the joint pt between two wall pieces if they are long enough to have a direction and the wall turns
+ * enough there
+ */
+function addJointColumn(group: Group, prev: Vector3, pt: Vector3, next: Vector3): void
+{
+    if (
+        prev.distanceTo(pt) >= 0.05 &&
+        pt.distanceTo(next) >= 0.05 &&
+        Math.abs(turnAngle(prev, pt, next)) >= COLUMN_MIN_TURN
+    )
+    {
+        group.add(createColumn(prev, pt, next))
+    }
+}
+
+/**
  * Part of a wall segment as start and end parameter and the gates that cut off the start and the end, if any
  */
 type WallInterval = [number, number, Gate | null, Gate | null]
@@ -739,14 +755,18 @@ function createWall(path: Point[], gates: Gate[]): Group
             const end = p0.clone().lerp(p1, b)
             addWallPiece(group, start, end)
 
-            // connect ends cut by a gate to the nearest gate tower
+            // connect ends cut by a gate to the nearest gate tower, with a column if the connection bends the wall
             if (gateA)
             {
-                addWallPiece(group, nearestGateTower(gateA, start), start)
+                const tower = nearestGateTower(gateA, start)
+                addWallPiece(group, tower, start)
+                addJointColumn(group, tower, start, end)
             }
             if (gateB)
             {
-                addWallPiece(group, end, nearestGateTower(gateB, end))
+                const tower = nearestGateTower(gateB, end)
+                addWallPiece(group, end, tower)
+                addJointColumn(group, start, end, tower)
             }
         }
     }
