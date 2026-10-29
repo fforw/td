@@ -1,5 +1,9 @@
 import "./style.css"
-import * as THREE from "three"
+import {
+    Box3, BufferGeometry, Color, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight,
+    LineBasicMaterial, LineSegments, type Material, Mesh, MeshStandardMaterial, type Object3D, PCFShadowMap,
+    PerspectiveCamera, Scene, Sphere, Vector3, WebGLRenderer
+} from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import HexagonPatch from "./HexagonPatch"
@@ -120,22 +124,22 @@ const MARKET_STALL_SCALE = 0.36
  */
 interface Gate
 {
-    center: THREE.Vector3
+    center: Vector3
     /**
      * Unit vector along the road, pointing outwards
      */
-    road: THREE.Vector3
+    road: Vector3
     /**
      * Unit vector along the wall
      */
-    side: THREE.Vector3
+    side: Vector3
     /**
      * Width of the gate along the wall
      */
     width: number
 }
 
-const templates = new Map<ModelName, THREE.Object3D>()
+const templates = new Map<ModelName, Object3D>()
 
 function loadModels(): Promise<void>
 {
@@ -144,7 +148,7 @@ function loadModels(): Promise<void>
         Object.entries(MODELS).map(
             ([name, file]) => loader.loadAsync(MEDIA + file).then(gltf => {
                 gltf.scene.traverse(obj => {
-                    const mesh = obj as THREE.Mesh
+                    const mesh = obj as Mesh
                     if (mesh.isMesh)
                     {
                         const materials = [mesh.material].flat()
@@ -158,7 +162,7 @@ function loadModels(): Promise<void>
                         // without an environment map
                         for (const material of materials)
                         {
-                            (material as THREE.MeshStandardMaterial).metalness = 0
+                            (material as MeshStandardMaterial).metalness = 0
                         }
                     }
                 })
@@ -168,7 +172,7 @@ function loadModels(): Promise<void>
     ).then(() => undefined)
 }
 
-function model(name: ModelName): THREE.Object3D
+function model(name: ModelName): Object3D
 {
     return templates.get(name)!.clone()
 }
@@ -190,9 +194,9 @@ function pick<T>(face: Face, items: T[], salt = 0): T
     return items[Math.floor(hash(face, salt) * items.length)]
 }
 
-function toWorld(pt: Point, y = 0): THREE.Vector3
+function toWorld(pt: Point, y = 0): Vector3
 {
-    return new THREE.Vector3(pt[0] * SCALE, y, pt[1] * SCALE)
+    return new Vector3(pt[0] * SCALE, y, pt[1] * SCALE)
 }
 
 /**
@@ -209,7 +213,7 @@ function createGround(faces: Face[]): THREE.Group
     const positions: number[] = []
     const colors: number[] = []
 
-    const color = new THREE.Color()
+    const color = new Color()
 
     marchingSquares(faces, (type, x0, z0, x1, z1, x2, z2) => {
         color.set(GROUND_COLORS.get(type) ?? type.color)
@@ -227,18 +231,18 @@ function createGround(faces: Face[]): THREE.Group
         colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
     })
 
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3))
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3))
+    const geometry = new BufferGeometry()
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3))
     geometry.computeVertexNormals()
 
-    const mesh = new THREE.Mesh(
+    const mesh = new Mesh(
         geometry,
-        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+        new MeshStandardMaterial({ vertexColors: true, roughness: 1 })
     )
     mesh.receiveShadow = true
 
-    const group = new THREE.Group()
+    const group = new Group()
     group.add(mesh)
 
     if (DEBUG_GRID)
@@ -251,7 +255,7 @@ function createGround(faces: Face[]): THREE.Group
 /**
  * Lines along the true face borders, which the marching squares ground no longer shows
  */
-function createGrid(faces: Face[]): THREE.LineSegments
+function createGrid(faces: Face[]): LineSegments
 {
     const edges: number[] = []
     for (const face of faces)
@@ -269,15 +273,15 @@ function createGrid(faces: Face[]): THREE.LineSegments
         } while (curr !== first)
     }
 
-    const edgeGeometry = new THREE.BufferGeometry()
-    edgeGeometry.setAttribute("position", new THREE.Float32BufferAttribute(edges, 3))
-    return new THREE.LineSegments(
+    const edgeGeometry = new BufferGeometry()
+    edgeGeometry.setAttribute("position", new Float32BufferAttribute(edges, 3))
+    return new LineSegments(
         edgeGeometry,
-        new THREE.LineBasicMaterial({ color: "#000", transparent: true, opacity: 0.12 })
+        new LineBasicMaterial({ color: "#000", transparent: true, opacity: 0.12 })
     )
 }
 
-function createHouse(face: Face): THREE.Object3D
+function createHouse(face: Face): Object3D
 {
     const [pt, size, angle] = squareFace(face)
 
@@ -285,7 +289,7 @@ function createHouse(face: Face): THREE.Object3D
     const side = size * SCALE / Math.SQRT2
     const height = side * (0.8 + hash(face, 1) * 0.6)
 
-    const house = new THREE.Group()
+    const house = new Group()
 
     const block = model(hash(face, 2) < 0.3 ? "houseWoodBlock" : "houseBlock")
     block.scale.set(side, height, side)
@@ -301,7 +305,7 @@ function createHouse(face: Face): THREE.Object3D
     return house
 }
 
-function createTree(face: Face): THREE.Object3D
+function createTree(face: Face): Object3D
 {
     const tree = model(face.type === FaceType.TREE ? pick(face, ["tree", "treeOak"] as ModelName[]) : pick(face, ["pine", "pine2"] as ModelName[]))
     const s = 0.6 + hash(face, 1) * 0.3
@@ -311,7 +315,7 @@ function createTree(face: Face): THREE.Object3D
     return tree
 }
 
-function createRock(face: Face): THREE.Object3D
+function createRock(face: Face): Object3D
 {
     const rock = model(pick(face, ["rock", "rock2", "rock3"] as ModelName[]))
     rock.position.copy(toWorld(face.centroid))
@@ -319,7 +323,7 @@ function createRock(face: Face): THREE.Object3D
     return rock
 }
 
-function createMarketDecoration(face: Face, centerFace: Face): THREE.Object3D | null
+function createMarketDecoration(face: Face, centerFace: Face): Object3D | null
 {
     if (face === centerFace)
     {
@@ -345,9 +349,9 @@ function createMarketDecoration(face: Face, centerFace: Face): THREE.Object3D | 
     return stall
 }
 
-function createTower(pt: THREE.Vector3, gate: boolean): THREE.Object3D
+function createTower(pt: Vector3, gate: boolean): Object3D
 {
-    const tower = new THREE.Group()
+    const tower = new Group()
 
     const height = gate ? WALL_HEIGHT * 1.6 : WALL_HEIGHT * 1.35
     const base = model(gate ? "gateTower" : "tower")
@@ -366,7 +370,7 @@ function createTower(pt: THREE.Vector3, gate: boolean): THREE.Object3D
 /**
  * Returns the change of direction at p1 when going from p0 over p1 to p2, in the range -PI to PI.
  */
-function turnAngle(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3): number
+function turnAngle(p0: Vector3, p1: Vector3, p2: Vector3): number
 {
     const a0 = Math.atan2(p1.z - p0.z, p1.x - p0.x)
     const a1 = Math.atan2(p2.z - p1.z, p2.x - p1.x)
@@ -386,7 +390,7 @@ function turnAngle(p0: THREE.Vector3, p1: THREE.Vector3, p2: THREE.Vector3): num
  * Returns the direction of the road through the given group of gate faces, from the paved neighbor face nearest to
  * the castle center to the one furthest away, or null if the gate does not have two paved neighbors.
  */
-function roadDirection(group: Face[], castleCenter: THREE.Vector3): THREE.Vector3 | null
+function roadDirection(group: Face[], castleCenter: Vector3): Vector3 | null
 {
     const paved = new Set<Face>()
     for (const f of group)
@@ -397,8 +401,8 @@ function roadDirection(group: Face[], castleCenter: THREE.Vector3): THREE.Vector
         }
     }
 
-    let inner: THREE.Vector3 | null = null
-    let outer: THREE.Vector3 | null = null
+    let inner: Vector3 | null = null
+    let outer: Vector3 | null = null
     for (const f of paved)
     {
         const pt = toWorld(f.centroid)
@@ -453,7 +457,7 @@ function findGates(faces: Face[], centerFace: Face): Gate[]
             }
         }
 
-        const center = new THREE.Vector3()
+        const center = new Vector3()
         for (const f of group)
         {
             center.add(toWorld(f.centroid))
@@ -461,7 +465,7 @@ function findGates(faces: Face[], centerFace: Face): Gate[]
         center.divideScalar(group.length)
 
         const road = roadDirection(group, castleCenter) ?? center.clone().sub(castleCenter).normalize()
-        const side = new THREE.Vector3(-road.z, 0, road.x)
+        const side = new Vector3(-road.z, 0, road.x)
 
         // extent of the gate faces along the wall
         let min = Infinity, max = -Infinity
@@ -485,7 +489,7 @@ function findGates(faces: Face[], centerFace: Face): Gate[]
     return gates
 }
 
-function isInGate(pt: THREE.Vector3, gate: Gate, margin = 0): boolean
+function isInGate(pt: Vector3, gate: Gate, margin = 0): boolean
 {
     const dx = pt.x - gate.center.x
     const dz = pt.z - gate.center.z
@@ -499,7 +503,7 @@ function isInGate(pt: THREE.Vector3, gate: Gate, margin = 0): boolean
  * Returns the parameter interval in which the segment from p0 to p1 runs through the clearance area of the gate, or
  * null if it doesn't (Liang-Barsky clipping in the local coordinates of the gate).
  */
-function clipToGate(p0: THREE.Vector3, p1: THREE.Vector3, gate: Gate): [number, number] | null
+function clipToGate(p0: Vector3, p1: Vector3, gate: Gate): [number, number] | null
 {
     const { center, road, side, width } = gate
 
@@ -508,7 +512,7 @@ function clipToGate(p0: THREE.Vector3, p1: THREE.Vector3, gate: Gate): [number, 
 
     let tIn = 0, tOut = 1
 
-    const axes: [THREE.Vector3, number][] = [[road, GATE_CLEARANCE / 2], [side, width / 2]]
+    const axes: [Vector3, number][] = [[road, GATE_CLEARANCE / 2], [side, width / 2]]
     for (const [axis, half] of axes)
     {
         const u0 = x0 * axis.x + z0 * axis.z
@@ -539,9 +543,9 @@ function clipToGate(p0: THREE.Vector3, p1: THREE.Vector3, gate: Gate): [number, 
     return [tIn, tOut]
 }
 
-function createGate(gate: Gate): THREE.Group
+function createGate(gate: Gate): Group
 {
-    const group = new THREE.Group()
+    const group = new Group()
 
     // the doorway model is half a unit thick on its negative x-side and runs along its local z-axis
     const gateway = model("gateway")
@@ -552,7 +556,7 @@ function createGate(gate: Gate): THREE.Group
 
     for (const z of [-gate.width / 2, gate.width / 2])
     {
-        group.add(createTower(new THREE.Vector3(0, 0, z), true))
+        group.add(createTower(new Vector3(0, 0, z), true))
     }
 
     group.position.copy(gate.center)
@@ -561,7 +565,7 @@ function createGate(gate: Gate): THREE.Group
     return group
 }
 
-function addWallPiece(group: THREE.Group, p0: THREE.Vector3, p1: THREE.Vector3): void
+function addWallPiece(group: Group, p0: Vector3, p1: Vector3): void
 {
     const dx = p1.x - p0.x
     const dz = p1.z - p0.z
@@ -584,16 +588,16 @@ function addWallPiece(group: THREE.Group, p0: THREE.Vector3, p1: THREE.Vector3):
  */
 type WallInterval = [number, number, Gate | null, Gate | null]
 
-function nearestGateTower(gate: Gate, pt: THREE.Vector3): THREE.Vector3
+function nearestGateTower(gate: Gate, pt: Vector3): Vector3
 {
     const { center, side, width } = gate
     const d = (pt.x - center.x) * side.x + (pt.z - center.z) * side.z
     return center.clone().addScaledVector(side, d < 0 ? -width / 2 : width / 2)
 }
 
-function createWall(path: Point[], gates: Gate[]): THREE.Group
+function createWall(path: Point[], gates: Gate[]): Group
 {
-    const group = new THREE.Group()
+    const group = new Group()
 
     const pts = path.map(pt => toWorld(pt))
 
@@ -635,7 +639,7 @@ function createWall(path: Point[], gates: Gate[]): THREE.Group
         }
     }
 
-    const insideGate = (pt: THREE.Vector3) => gates.some(gate => isInGate(pt, gate, TOWER_SIZE / 2))
+    const insideGate = (pt: Vector3) => gates.some(gate => isInGate(pt, gate, TOWER_SIZE / 2))
 
     // the first and last point of the path are next to the gates, which have their own towers. If the path didn't
     // end at a gate, we close it with a tower
@@ -673,43 +677,46 @@ function createWall(path: Point[], gates: Gate[]): THREE.Group
 // module scripts are deferred, so the DOM is ready at this point
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+const renderer = new WebGLRenderer({ canvas, antialias: true })
 renderer.setPixelRatio(window.devicePixelRatio)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
-renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.shadowMap.type = PCFShadowMap
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color("#a9c8e8")
+const scene = new Scene()
+scene.background = new Color("#a9c8e8")
 
-const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 500)
+const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 500)
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true
 controls.maxPolarAngle = Math.PI * 0.47
 controls.minDistance = 2
 
-scene.add(new THREE.HemisphereLight("#dfefff", "#5c6e3c", 1.6))
+scene.add(new HemisphereLight("#dfefff", "#5c6e3c", 1.6))
 
-const sun = new THREE.DirectionalLight("#fff4e0", 2.5)
+const sun = new DirectionalLight("#fff4e0", 2.5)
 sun.castShadow = true
 sun.shadow.mapSize.set(4096, 4096)
 sun.shadow.bias = -0.0005
 sun.shadow.normalBias = 0.02
+
+console.log("SUN", sun.position, sun.target.position)
+
 scene.add(sun, sun.target)
 
-let castleGroup: THREE.Group | null = null
+let castleGroup: Group | null = null
 
-function disposeGroup(group: THREE.Group): void
+function disposeGroup(group: Group): void
 {
     // models share their geometry and materials with the templates, only the ground owns its resources
     const ground = group.children[0]
     ground.traverse(obj => {
-        const { geometry, material } = obj as THREE.Mesh
+        const { geometry, material } = obj as Mesh
         if (geometry)
         {
             geometry.dispose()
-            ;(material as THREE.Material).dispose()
+            ;(material as Material).dispose()
         }
     })
 }
@@ -743,12 +750,12 @@ function build(): void
         disposeGroup(castleGroup)
     }
 
-    const group = new THREE.Group()
+    const group = new Group()
     group.add(createGround(faces))
 
     for (const face of faces)
     {
-        let obj: THREE.Object3D | null = null
+        let obj: Object3D | null = null
         switch (face.type)
         {
             case FaceType.HOUSE:
@@ -787,8 +794,8 @@ function build(): void
 
     if (firstBuild)
     {
-        const box = new THREE.Box3().setFromObject(group)
-        const radius = box.getBoundingSphere(new THREE.Sphere()).radius
+        const box = new Box3().setFromObject(group)
+        const radius = box.getBoundingSphere(new Sphere()).radius
 
         camera.position.set(0, radius * 1.1, radius * 1.3)
         controls.target.set(0, 0, 0)
