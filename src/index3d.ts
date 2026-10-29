@@ -120,7 +120,7 @@ const COLUMN_SIDES = 10
 /**
  * Diameter of the wall columns relative to the wall thickness
  */
-const COLUMN_SIZE = 1 / 3
+const COLUMN_SIZE = 2 / 3
 
 /**
  * Profile of the wall columns in wall model units as [radius, height, u, v]. It follows the cross-section of the wall
