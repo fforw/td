@@ -254,23 +254,33 @@ function buildMarket(center: Face): void
 {
     center.type = FaceType.MARKET
 
-    const first = center.halfEdge
-    let curr = first
-    do
-    {
-        const next = curr.next
-        const { twin } = curr
-        if (twin)
+    const build = (face : Face, level : number) => {
+        const first = face.halfEdge
+        let curr = first
+        do
         {
-            twin.face.type = FaceType.MARKET
+            const next = curr.next
+            const { twin } = curr
+            if (twin)
+            {
+                twin.face.type = FaceType.MARKET
 
-            const neighbors = getNeighbors(twin.face,center)
-            neighbors[1].type = FaceType.MARKET
-            neighbors[3].type = FaceType.MARKET
+                const neighbors = getNeighbors(twin.face,face)
+                neighbors[1].type = FaceType.MARKET
+                neighbors[3].type = FaceType.MARKET
 
-        }
-        curr = next
-    } while (curr !== first)
+                if (level > 0)
+                {
+                    build(twin.face, level - 1)
+                }
+
+            }
+            curr = next
+        } while (curr !== first)
+    }
+
+    build(center, 1)
+
 }
 
 function countFreeNeighbors(face: Face, considerPlotsOccupied = true): number
