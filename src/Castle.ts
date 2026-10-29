@@ -1,6 +1,6 @@
-import {countNeighborsInSet, rng} from "./util"
-import type {Face, Vertex} from "./geometry"
-import {FaceType} from "./geometry"
+import { countNeighborsInSet, rng } from "./util"
+import type { Face, Vertex } from "./geometry"
+import { FaceType } from "./geometry"
 import Vector from "./vector"
 
 

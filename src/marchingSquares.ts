@@ -1,5 +1,5 @@
-import { FaceType } from "./geometry"
 import type { Face, HalfEdge, Vertex } from "./geometry"
+import { FaceType } from "./geometry"
 
 /**
  * Marching squares for the ground of a face mesh, ported from the node based version in "islands".

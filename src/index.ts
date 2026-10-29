@@ -2,8 +2,8 @@ import "./style.css"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import { randomSeed, resetRandom } from "./util"
 import Castle from "./Castle"
-import { FaceType } from "./geometry"
 import type { Face } from "./geometry"
+import { FaceType } from "./geometry"
 import { squareFace, TAU_8TH, wallPaths } from "./plan"
 
 const PHI = (1 + Math.sqrt(5)) / 2;

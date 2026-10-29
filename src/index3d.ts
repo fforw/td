@@ -1,8 +1,24 @@
 import "./style.css"
 import {
-    Box3, BufferGeometry, Color, DirectionalLight, Float32BufferAttribute, Group, HemisphereLight,
-    LineBasicMaterial, LineSegments, type Material, Mesh, MeshStandardMaterial, type Object3D, PCFShadowMap,
-    PerspectiveCamera, Scene, Sphere, Vector3, WebGLRenderer
+    Box3,
+    BufferGeometry,
+    Color,
+    DirectionalLight,
+    Float32BufferAttribute,
+    Group,
+    HemisphereLight,
+    LineBasicMaterial,
+    LineSegments,
+    type Material,
+    Mesh,
+    MeshStandardMaterial,
+    type Object3D,
+    PCFShadowMap,
+    PerspectiveCamera,
+    Scene,
+    Sphere,
+    Vector3,
+    WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
