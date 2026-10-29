@@ -7,10 +7,10 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import HexagonPatch from "./HexagonPatch"
-import { randomSeed, resetRandom } from "./util"
+import { randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
-import { FaceType } from "./geometry"
 import type { Face, Point } from "./geometry"
+import { FaceType } from "./geometry"
 import { squareFace, wallPaths } from "./plan"
 import marchingSquares from "./marchingSquares"
 
@@ -177,21 +177,9 @@ function model(name: ModelName): Object3D
     return templates.get(name)!.clone()
 }
 
-/**
- * Deterministic pseudo random value in [0,1) for a face, so that decorations don't disturb the castle rng sequence
- */
-function hash(face: Face, salt = 0): number
-{
-    let h = Math.imul(face.id + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)
-    h ^= h >>> 15
-    h = Math.imul(h, 0x2c1b3c6d)
-    h ^= h >>> 12
-    return (h >>> 0) / 0x100000000
-}
-
 function pick<T>(face: Face, items: T[], salt = 0): T
 {
-    return items[Math.floor(hash(face, salt) * items.length)]
+    return items[Math.floor(rng.next() * items.length)]
 }
 
 function toWorld(pt: Point, y = 0): Vector3
@@ -208,7 +196,8 @@ function toRotationY(angle: number): number
     return -angle
 }
 
-function createGround(faces: Face[]): THREE.Group
+
+function createGround(faces: Face[]): Group
 {
     const positions: number[] = []
     const colors: number[] = []
@@ -287,15 +276,15 @@ function createHouse(face: Face): Object3D
 
     // size is the diagonal of the square
     const side = size * SCALE / Math.SQRT2
-    const height = side * (0.8 + hash(face, 1) * 0.6)
+    const height = side //* (0.8 + hash(face, 1) * 0.6)
 
     const house = new Group()
 
-    const block = model(hash(face, 2) < 0.3 ? "houseWoodBlock" : "houseBlock")
+    const block = model(rng.next() < 0.3 ? "houseWoodBlock" : "houseBlock")
     block.scale.set(side, height, side)
     house.add(block)
 
-    const roof = model(hash(face, 3) < 0.4 ? "roofHigh" : "roof")
+    const roof = model(rng.next() < 0.4 ? "roofHigh" : "roof")
     roof.scale.set(side, side, side)
     roof.position.y = height
     house.add(roof)
@@ -308,10 +297,10 @@ function createHouse(face: Face): Object3D
 function createTree(face: Face): Object3D
 {
     const tree = model(face.type === FaceType.TREE ? pick(face, ["tree", "treeOak"] as ModelName[]) : pick(face, ["pine", "pine2"] as ModelName[]))
-    const s = 0.6 + hash(face, 1) * 0.3
+    const s = 0.4 + rng.next() * 0.2
     tree.scale.set(s, s, s)
     tree.position.copy(toWorld(face.centroid))
-    tree.rotation.y = hash(face, 2) * TAU
+    tree.rotation.y = rng.next() * TAU
     return tree
 }
 
@@ -319,7 +308,7 @@ function createRock(face: Face): Object3D
 {
     const rock = model(pick(face, ["rock", "rock2", "rock3"] as ModelName[]))
     rock.position.copy(toWorld(face.centroid))
-    rock.rotation.y = hash(face, 2) * TAU
+    rock.rotation.y = rng.next() * TAU
     return rock
 }
 
@@ -334,7 +323,7 @@ function createMarketDecoration(face: Face, centerFace: Face): Object3D | null
         return fountain
     }
 
-    if (hash(face, 1) < 0.5)
+    if (rng.next() < 0.7)
     {
         return null
     }
