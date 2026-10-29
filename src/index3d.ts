@@ -151,6 +151,11 @@ const GATE_THICKNESS = 0.85
  */
 const GATE_CLEARANCE = 2
 
+/**
+ * Minimum length of the wall piece from a gate tower to the rest of the wall
+ */
+const GATE_JOIN_DISTANCE = 1
+
 const GATE_MIN_WIDTH = 1
 const GATE_MAX_WIDTH = 2.2
 
@@ -531,6 +536,114 @@ function findGates(faces: Face[], centerFace: Face): Gate[]
     return gates
 }
 
+/**
+ * Where a wall path leaves the gate area through one of the tower lines of the gate
+ */
+interface WallCrossing
+{
+    /**
+     * Index of the first path point beyond the tower line, which is also the number of path points inside the gate
+     */
+    index: number
+    /**
+     * Side of the gate (-1 or 1) on which the path leaves
+     */
+    sign: number
+    /**
+     * Position of the crossing along the road of the gate
+     */
+    road: number
+}
+
+/**
+ * Returns where the wall path starting at the gate first crosses one of the tower lines of the gate, or null if it
+ * doesn't.
+ */
+function wallCrossing(gate: Gate, pts: Vector3[]): WallCrossing | null
+{
+    const { center, road, side, width } = gate
+    const half = width / 2
+
+    for (let i = 0; i < pts.length; i++)
+    {
+        const dx = pts[i].x - center.x
+        const dz = pts[i].z - center.z
+        const s = dx * side.x + dz * side.z
+        if (Math.abs(s) >= half)
+        {
+            const sign = Math.sign(s)
+            const prev = i > 0 ? pts[i - 1] : pts[i]
+            const ps = (prev.x - center.x) * side.x + (prev.z - center.z) * side.z
+            const t = i > 0 ? (half - ps * sign) / (Math.abs(s) - ps * sign) : 0
+            const point = prev.clone().lerp(pts[i], t)
+            return {
+                index: i,
+                sign,
+                road: (point.x - center.x) * road.x + (point.z - center.z) * road.z
+            }
+        }
+    }
+    return null
+}
+
+/**
+ * The gate faces lie in the outer ring of the wall while the wall paths mostly run along the inner one. Moves the gates
+ * along their roads onto the wall, to the average position at which the walls next to them reach their tower lines.
+ * The wall paths then run straight from the gate towers to their first point that isn't too close to them, which
+ * also straightens the wiggles the face grid causes next to the gates.
+ */
+function alignGatesToWalls(gates: Gate[], paths: Vector3[][]): void
+{
+    for (const gate of gates)
+    {
+        const ends: [Vector3[], boolean, WallCrossing][] = []
+        for (const path of paths)
+        {
+            for (const atEnd of [false, true])
+            {
+                const pts = atEnd ? path.toReversed() : path
+                if (pts[0].distanceTo(gate.center) <= GATE_MAX_WIDTH)
+                {
+                    const crossing = wallCrossing(gate, pts)
+                    if (crossing)
+                    {
+                        ends.push([path, atEnd, crossing])
+                    }
+                }
+            }
+        }
+
+        if (!ends.length)
+        {
+            continue
+        }
+
+        const shift = ends.reduce((sum, [, , { road }]) => sum + road, 0) / ends.length
+        gate.center.addScaledVector(gate.road, shift)
+
+        for (const [path, atEnd, { index, sign }] of ends)
+        {
+            const tower = gate.center.clone().addScaledVector(gate.side, sign * gate.width / 2)
+            const pts = atEnd ? path.toReversed() : path
+
+            let count = index
+            while (count < pts.length - 1 && pts[count].distanceTo(tower) < GATE_JOIN_DISTANCE)
+            {
+                count++
+            }
+
+            if (atEnd)
+            {
+                path.splice(path.length - count, count, tower)
+            }
+            else
+            {
+                path.splice(0, count, tower)
+            }
+        }
+    }
+}
+
 function isInGate(pt: Vector3, gate: Gate, margin = 0): boolean
 {
     const dx = pt.x - gate.center.x
@@ -723,11 +836,9 @@ function nearestGateTower(gate: Gate, pt: Vector3): Vector3
     return center.clone().addScaledVector(side, d < 0 ? -width / 2 : width / 2)
 }
 
-function createWall(path: Point[], gates: Gate[]): Group
+function createWall(pts: Vector3[], gates: Gate[]): Group
 {
     const group = new Group()
-
-    const pts = path.map(pt => toWorld(pt))
 
     for (let i = 1; i < pts.length; i++)
     {
@@ -800,9 +911,9 @@ function createWall(path: Point[], gates: Gate[]): Group
             group.add(createTower(pt, false))
             prevTower = pt
         }
-        else if (turn >= COLUMN_MIN_TURN && !insideGate(pt))
+        else if (!gates.some(gate => isInGate(pt, gate)))
         {
-            group.add(createColumn(pts[i - 1], pt, pts[i + 1]))
+            addJointColumn(group, pts[i - 1], pt, pts[i + 1])
         }
     }
 
@@ -914,13 +1025,15 @@ function build(): void
         }
     }
 
+    const paths = wallPaths(castle).map(path => path.map(pt => toWorld(pt)))
     const gates = findGates(faces, castle.centerFace)
+    alignGatesToWalls(gates, paths)
     for (const gate of gates)
     {
         group.add(createGate(gate))
     }
 
-    for (const path of wallPaths(castle))
+    for (const path of paths)
     {
         group.add(createWall(path, gates))
     }
