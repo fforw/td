@@ -315,7 +315,6 @@ function countFreeNeighbors(face: Face, considerPlotsOccupied = true): number
 }
 
 
-const DECO = [FaceType.GRASS, FaceType.TREE, FaceType.GRASS, FaceType.TREE2, FaceType.GRASS]
 const TREES = [FaceType.TREE, FaceType.TREE2]
 
 
@@ -639,7 +638,7 @@ export default class Castle
                     let free = countFreeNeighbors(face)
                     if (free === 1 || (free === 2 && getNeighbors(face).find(f => countFreeNeighbors(f) === 4)))
                     {
-                        face.type = rng.nextArrayItem(DECO)
+                        face.type = FaceType.GRASS
                     }
                     else if (free === 4 && rng.next() < 0.333)
                     {

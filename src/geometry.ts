@@ -1,3 +1,5 @@
+import {rng} from "./util";
+
 let vertexCounter = 1000;
 
 /**
@@ -142,6 +144,13 @@ for (const [name, ft] of Object.entries(FaceType))
 
 //console.log("OCCUPIED", _faceTypeNames.filter(n => FaceType[n].occupied))
 
+const DEFAULT_TYPES = [
+    FaceType.DIRT,
+    FaceType.GRASS,
+    FaceType.TREE,
+    FaceType.TREE2
+]
+
 export class Face
 {
     id = 0
@@ -153,7 +162,7 @@ export class Face
     /**
      * Type of the data
      */
-    type: FaceType = FaceType.DIRT
+    type: FaceType = rng.nextArrayItem(DEFAULT_TYPES);
 
     /**
      * Type dependent user data
