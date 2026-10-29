@@ -107,6 +107,33 @@ const TOWER_MIN_TURN = 0.4
  */
 const TOWER_MIN_DISTANCE = 2.5
 
+/**
+ * Minimum change of direction for a wall corner without a tower to get a column filling the gap on the outer side
+ */
+const COLUMN_MIN_TURN = 0.15
+
+/**
+ * Number of sides of the wall columns
+ */
+const COLUMN_SIDES = 10
+
+/**
+ * Profile of the wall columns in wall model units as [radius, height, u, v]. It follows the cross-section of the wall
+ * model up to the walkway and ends in a rounded stone between the battlements. The texture coordinates are the ones
+ * the wall model uses at the same height.
+ */
+const COLUMN_PROFILE: [number, number, number, number][][] = [
+    // foot
+    [[0.5, 0, 0.844, 0.975], [0.5, 0.28, 0.844, 0.932], [0.465, 0.45, 0.844, 0.906]],
+    // wall face
+    [[0.465, 0.45, 0.781, 0.875], [0.465, 1.01, 0.781, 0.875]],
+    // walkway lip and rounded top
+    [
+        [0.465, 1.01, 0.844, 0.821], [0.5, 1.11, 0.844, 0.806], [0.47, 1.22, 0.844, 0.789],
+        [0.36, 1.3, 0.844, 0.78], [0.18, 1.34, 0.844, 0.775], [0, 1.35, 0.844, 0.775]
+    ],
+]
+
 const GATE_HEIGHT = WALL_HEIGHT * 1.15
 
 /**
@@ -593,6 +620,66 @@ function addWallPiece(group: Group, p0: Vector3, p1: Vector3): void
     group.add(wall)
 }
 
+let columnGeometry: BufferGeometry | null = null
+
+/**
+ * Lathes the column profile into a faceted geometry in wall model units, sharing the texture of the wall model
+ */
+function getColumnGeometry(): BufferGeometry
+{
+    if (columnGeometry)
+    {
+        return columnGeometry
+    }
+
+    const positions: number[] = []
+    const uvs: number[] = []
+
+    for (const part of COLUMN_PROFILE)
+    {
+        for (let i = 1; i < part.length; i++)
+        {
+            const [r0, y0, u0, v0] = part[i - 1]
+            const [r1, y1, u1, v1] = part[i]
+            for (let j = 0; j < COLUMN_SIDES; j++)
+            {
+                const a0 = j * TAU / COLUMN_SIDES
+                const a1 = (j + 1) * TAU / COLUMN_SIDES
+                const c0 = Math.cos(a0), s0 = Math.sin(a0)
+                const c1 = Math.cos(a1), s1 = Math.sin(a1)
+
+                // two counter-clockwise triangles when seen from the outside
+                positions.push(
+                    r0 * c0, y0, r0 * s0, r1 * c0, y1, r1 * s0, r0 * c1, y0, r0 * s1,
+                    r0 * c1, y0, r0 * s1, r1 * c0, y1, r1 * s0, r1 * c1, y1, r1 * s1
+                )
+                uvs.push(u0, v0, u1, v1, u0, v0, u0, v0, u1, v1, u1, v1)
+            }
+        }
+    }
+
+    const geometry = new BufferGeometry()
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2))
+    geometry.computeVertexNormals()
+    columnGeometry = geometry
+    return geometry
+}
+
+/**
+ * Creates a small column at a wall corner that fills the gap the two wall pieces leave on the outer side
+ */
+function createColumn(pt: Vector3): Object3D
+{
+    const wallMesh = templates.get("wall")!.getObjectByProperty("isMesh", true) as Mesh
+    const column = new Mesh(getColumnGeometry(), wallMesh.material)
+    column.castShadow = true
+    column.receiveShadow = true
+    column.scale.set(WALL_THICKNESS, WALL_HEIGHT / 1.31, WALL_THICKNESS)
+    column.position.copy(pt)
+    return column
+}
+
 /**
  * Part of a wall segment as start and end parameter and the gates that cut off the start and the end, if any
  */
@@ -677,6 +764,10 @@ function createWall(path: Point[], gates: Gate[]): Group
         {
             group.add(createTower(pt, false))
             prevTower = pt
+        }
+        else if (turn >= COLUMN_MIN_TURN && !insideGate(pt))
+        {
+            group.add(createColumn(pt))
         }
     }
 
