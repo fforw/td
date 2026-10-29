@@ -239,18 +239,15 @@ const paint = () => {
     const faces = p.build()
     const c = new Castle(faces)
 
-
-
-    const p0 = new HexagonPatch(PATCH_SIZE,0,size)
-    const p1 = new HexagonPatch(0,PATCH_SIZE,size)
-    const p2 = new HexagonPatch(-PATCH_SIZE,0,size)
-    const p3 = new HexagonPatch(0,-PATCH_SIZE,size)
-
-    const p4 = new HexagonPatch(PATCH_SIZE,PATCH_SIZE,size)
-    const p5 = new HexagonPatch(PATCH_SIZE,-PATCH_SIZE,size)
-    const p6 = new HexagonPatch(-PATCH_SIZE,-PATCH_SIZE,size)
-    const p7 = new HexagonPatch(-PATCH_SIZE,PATCH_SIZE,size)
-
+    // const p0 = new HexagonPatch(PATCH_SIZE,0,size)
+    // const p1 = new HexagonPatch(0,PATCH_SIZE,size)
+    // const p2 = new HexagonPatch(-PATCH_SIZE,0,size)
+    // const p3 = new HexagonPatch(0,-PATCH_SIZE,size)
+    //
+    // const p4 = new HexagonPatch(PATCH_SIZE,PATCH_SIZE,size)
+    // const p5 = new HexagonPatch(PATCH_SIZE,-PATCH_SIZE,size)
+    // const p6 = new HexagonPatch(-PATCH_SIZE,-PATCH_SIZE,size)
+    // const p7 = new HexagonPatch(-PATCH_SIZE,PATCH_SIZE,size)
 
     theFaces = faces
         // .concat(p0.build())
@@ -293,6 +290,7 @@ const paint = () => {
 
     const paths = wallPaths(c)
 
+    ctx.save()
     for (let i = 0; i < paths.length; i++)
     {
         const points = paths[i]
@@ -315,6 +313,7 @@ const paint = () => {
         ctx.fillStyle = "#f0f"
         ctx.fillRect(cx + points[0][0] - 1, cy + points[0][1] - 1, 2, 2)
     }
+    ctx.restore()
 
 
 }
