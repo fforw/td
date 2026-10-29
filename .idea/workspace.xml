@@ -5,7 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="17c29973-b146-4826-acc7-a8c176877a3c" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/codeStyles/codeStyleConfig.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index3d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/index3d.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,8 +33,9 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "test/three-js",
+    "git-widget-placeholder": "feat/marching-squares-ground",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/home/sven/ideaprojects/td",
     "node.js.detected.package.eslint": "true",
@@ -40,8 +44,8 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "pnpm",
     "python.packages.toolwindow.project.migrated.to.right.top.v2": "true",
-    "settings.editor.selected.configurable": "preferences.keymap",
-    "ts.external.directory.path": "/home/sven/ideaprojects/td/node_modules/.pnpm/@typescript+typescript-linux-x64@7.0.2/node_modules/@typescript/typescript-linux-x64/lib"
+    "settings.editor.selected.configurable": "preferences.sourceCode.TypeScript",
+    "ts.external.directory.path": "/home/sven/ideaprojects/td/node_modules/typescript6/lib"
   }
 }]]></component>
   <component name="RunManager">
