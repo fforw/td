@@ -156,6 +156,11 @@ const GATE_CLEARANCE = 2
  */
 const GATE_JOIN_DISTANCE = 1
 
+/**
+ * Number of steps along the road from the gate faces within which paved faces determine the road line
+ */
+const GATE_ROAD_DEPTH = 2
+
 const GATE_MIN_WIDTH = 1
 const GATE_MAX_WIDTH = 2.2
 
@@ -434,40 +439,61 @@ function turnAngle(p0: Vector3, p1: Vector3, p2: Vector3): number
 }
 
 /**
- * Returns the direction of the road through the given group of gate faces, from the paved neighbor face nearest to
- * the castle center to the one furthest away, or null if the gate does not have two paved neighbors.
+ * Returns the center line of the road through the given group of gate faces as a point on it and its direction
+ * pointing outwards, or null if the road doesn't continue on both sides. The line runs through the centers of the
+ * paved faces close to the gate on the inner and on the outer side, which averages out the zig-zag of the road
+ * across the face grid.
  */
-function roadDirection(group: Face[], castleCenter: Vector3): Vector3 | null
+function roadLine(group: Face[], gateCenter: Vector3, castleCenter: Vector3): [Vector3, Vector3] | null
 {
-    const paved = new Set<Face>()
-    for (const f of group)
+    // paved faces within a few steps of the gate
+    const seen = new Set<Face>(group)
+    let ring: Face[] = group
+    const paved: Face[] = []
+    for (let i = 0; i < GATE_ROAD_DEPTH; i++)
     {
-        for (const n of filterNeighbors(f, FaceType.PAVED))
+        const next: Face[] = []
+        for (const f of ring)
         {
-            paved.add(n)
+            for (const n of filterNeighbors(f, FaceType.PAVED))
+            {
+                if (!seen.has(n))
+                {
+                    seen.add(n)
+                    next.push(n)
+                    paved.push(n)
+                }
+            }
         }
+        ring = next
     }
 
-    let inner: Vector3 | null = null
-    let outer: Vector3 | null = null
+    const inner = new Vector3()
+    const outer = new Vector3()
+    let innerCount = 0, outerCount = 0
+    const gateDistance = gateCenter.distanceTo(castleCenter)
     for (const f of paved)
     {
         const pt = toWorld(f.centroid)
-        if (!inner || pt.distanceTo(castleCenter) < inner.distanceTo(castleCenter))
+        if (pt.distanceTo(castleCenter) < gateDistance)
         {
-            inner = pt
+            inner.add(pt)
+            innerCount++
         }
-        if (!outer || pt.distanceTo(castleCenter) > outer.distanceTo(castleCenter))
+        else
         {
-            outer = pt
+            outer.add(pt)
+            outerCount++
         }
     }
 
-    if (!inner || !outer || inner === outer)
+    if (!innerCount || !outerCount)
     {
         return null
     }
-    return outer.sub(inner).normalize()
+    inner.divideScalar(innerCount)
+    outer.divideScalar(outerCount)
+    return [inner, outer.sub(inner).normalize()]
 }
 
 /**
@@ -511,7 +537,15 @@ function findGates(faces: Face[], centerFace: Face): Gate[]
         }
         center.divideScalar(group.length)
 
-        const road = roadDirection(group, castleCenter) ?? center.clone().sub(castleCenter).normalize()
+        // put the gate on the center line of the road
+        const line = roadLine(group, center, castleCenter)
+        const road = line ? line[1] : center.clone().sub(castleCenter).normalize()
+        if (line)
+        {
+            const [pt] = line
+            const d = (center.x - pt.x) * road.x + (center.z - pt.z) * road.z
+            center.copy(pt).addScaledVector(road, d)
+        }
         const side = new Vector3(-road.z, 0, road.x)
 
         // extent of the gate faces along the wall
