@@ -736,11 +736,13 @@ function createGate(gate: Gate): Group
 {
     const group = new Group()
 
-    // the doorway model is half a unit thick on its negative x-side and runs along its local z-axis
+    // the doorway model is half a unit thick on its negative x-side, has its battlements on that side and runs along
+    // its local z-axis. Turn it around so that the battlements face outwards.
     const gateway = model("gateway")
     const sx = GATE_THICKNESS / 0.5
     gateway.scale.set(sx, GATE_HEIGHT / 1.31, gate.width)
-    gateway.position.x = 0.25 * sx
+    gateway.rotation.y = Math.PI
+    gateway.position.x = -0.25 * sx
     group.add(gateway)
 
     for (const z of [-gate.width / 2, gate.width / 2])
