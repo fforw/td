@@ -1,5 +1,7 @@
 import Prando from "prando";
 import type { Face, FaceType } from "./geometry";
+import {Color, Group} from "three";
+import marchingSquares from "./marchingSquares";
 
 
 export function clamp(v: number): number
@@ -114,3 +116,28 @@ export function countNeighborsNotInSet(face: Face, set: Set<Face>): number
 
     return count
 }
+
+/**
+ * Returns true if the given face connects to the given other face
+ *
+ * @param face      face
+ * @param other     other face
+ */
+export function connectsTo(face : Face, other : Face)
+{
+    const first = face.halfEdge
+    let curr = first
+    do
+    {
+        const next = curr.next
+        const {twin} = curr
+        if (twin && twin.face === other)
+        {
+            return true;
+        }
+        curr = next
+    } while (curr !== first)
+
+    return false;
+}
+
