@@ -118,19 +118,24 @@ const COLUMN_MIN_TURN = 0.15
 const COLUMN_SIDES = 10
 
 /**
+ * Diameter of the wall columns relative to the wall thickness
+ */
+const COLUMN_SIZE = 1 / 3
+
+/**
  * Profile of the wall columns in wall model units as [radius, height, u, v]. It follows the cross-section of the wall
- * model up to the walkway and ends in a rounded stone between the battlements. The texture coordinates are the ones
- * the wall model uses at the same height.
+ * model up to the walkway and ends in a stone cut flat at the height of the battlements. The texture coordinates are
+ * the ones the wall model uses at the same height.
  */
 const COLUMN_PROFILE: [number, number, number, number][][] = [
     // foot
     [[0.5, 0, 0.844, 0.975], [0.5, 0.28, 0.844, 0.932], [0.465, 0.45, 0.844, 0.906]],
     // wall face
     [[0.465, 0.45, 0.781, 0.875], [0.465, 1.01, 0.781, 0.875]],
-    // walkway lip and rounded top
+    // walkway lip and flat top
     [
-        [0.465, 1.01, 0.844, 0.821], [0.5, 1.11, 0.844, 0.806], [0.47, 1.22, 0.844, 0.789],
-        [0.36, 1.3, 0.844, 0.78], [0.18, 1.34, 0.844, 0.775], [0, 1.35, 0.844, 0.775]
+        [0.465, 1.01, 0.844, 0.821], [0.5, 1.11, 0.844, 0.806], [0.5, 1.25, 0.844, 0.783],
+        [0.44, 1.31, 0.844, 0.775], [0, 1.31, 0.844, 0.775]
     ],
 ]
 
@@ -667,16 +672,26 @@ function getColumnGeometry(): BufferGeometry
 }
 
 /**
- * Creates a small column at a wall corner that fills the gap the two wall pieces leave on the outer side
+ * Creates a small column at the wall corner pt that covers the gap the two wall pieces leave on the outer side. The
+ * column stands between the outer corners of the two wall pieces.
  */
-function createColumn(pt: Vector3): Object3D
+function createColumn(prev: Vector3, pt: Vector3, next: Vector3): Object3D
 {
+    const d0 = pt.clone().sub(prev).normalize()
+    const d1 = next.clone().sub(pt).normalize()
+
+    // the normals point to the left of the wall direction, the gap opens on the side the wall turns away from
+    const turn = d0.x * d1.z - d0.z * d1.x
+    const offset = (turn > 0 ? -WALL_THICKNESS : WALL_THICKNESS) / 4
+    const n0 = new Vector3(-d0.z, 0, d0.x)
+    const n1 = new Vector3(-d1.z, 0, d1.x)
+
     const wallMesh = templates.get("wall")!.getObjectByProperty("isMesh", true) as Mesh
     const column = new Mesh(getColumnGeometry(), wallMesh.material)
     column.castShadow = true
     column.receiveShadow = true
-    column.scale.set(WALL_THICKNESS, WALL_HEIGHT / 1.31, WALL_THICKNESS)
-    column.position.copy(pt)
+    column.scale.set(WALL_THICKNESS * COLUMN_SIZE, WALL_HEIGHT / 1.31, WALL_THICKNESS * COLUMN_SIZE)
+    column.position.copy(pt).addScaledVector(n0.add(n1), offset)
     return column
 }
 
@@ -767,7 +782,7 @@ function createWall(path: Point[], gates: Gate[]): Group
         }
         else if (turn >= COLUMN_MIN_TURN && !insideGate(pt))
         {
-            group.add(createColumn(pt))
+            group.add(createColumn(pts[i - 1], pt, pts[i + 1]))
         }
     }
 
