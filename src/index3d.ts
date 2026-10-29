@@ -7,7 +7,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import HexagonPatch from "./HexagonPatch"
-import { randomSeed, resetRandom, rng } from "./util"
+import { connectsTo, randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
 import type { Face, Point } from "./geometry"
 import { FaceType } from "./geometry"
@@ -321,6 +321,11 @@ function createMarketDecoration(face: Face, centerFace: Face): Object3D | null
         // the pool floor of the fountain is at the model's base, lift it above the ground and the grid lines
         fountain.position.copy(toWorld(face.centroid, GRID_HEIGHT * 2))
         return fountain
+    }
+
+    if (connectsTo(face, centerFace))
+    {
+        return null;
     }
 
     if (rng.next() < 0.7)
