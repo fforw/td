@@ -19,10 +19,13 @@ import { faceOf, next, prev } from "./QuadPatch"
  */
 export const GROUND_PRIORITY: FaceType[] = [
     FaceType.GRASS,
+    FaceType.PRAIRIE,
     FaceType.TREE,
     FaceType.TREE2,
     FaceType.ROCK,
     FaceType.FOREST_FLOOR,
+    FaceType.SWAMP,
+    FaceType.SNOW,
     FaceType.SAND,
     FaceType.DIRT,
     FaceType.PLOT,

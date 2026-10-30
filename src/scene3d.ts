@@ -56,6 +56,9 @@ export const GROUND_COLORS = new Map<FaceType, string>([
     [FaceType.MARKET, "#b5ae9c"],
     [FaceType.PLOT, "#a68a5c"],
     [FaceType.HOUSE, "#8a7a5e"],
+    [FaceType.SNOW, "#e9eef2"],
+    [FaceType.PRAIRIE, "#c2ae62"],
+    [FaceType.SWAMP, "#56633a"],
 ])
 
 const templates = new Map<ModelName, Object3D>()
