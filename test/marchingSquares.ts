@@ -72,7 +72,19 @@ describe("marchingSquares", function () {
         {
             face.type = GROUND_PRIORITY[0]
         }
-        const road = faces[Math.floor(faces.length / 2)]
+        // a face inside the patch, faces on the border keep their type out to the open edges
+        const road = faces.find(face => {
+            let curr = face.halfEdge
+            do
+            {
+                if (!curr.twin)
+                {
+                    return false
+                }
+                curr = curr.next
+            } while (curr !== face.halfEdge)
+            return true
+        })!
         const roadType = GROUND_PRIORITY[GROUND_PRIORITY.length - 1]
         road.type = roadType
 
