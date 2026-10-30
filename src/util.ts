@@ -29,6 +29,17 @@ export function resetRandom(seed: number): void
     rng = new Prando(seed)
 }
 
+/**
+ * Mixes the world seed with the patch position, so every patch gets its own reproducible random sequence.
+ */
+export function patchSeed(seed: number, q: number, r: number): number
+{
+    let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b)
+    h = Math.imul(h ^ q, 0xc2b2ae35)
+    h = Math.imul(h ^ (h >>> 16) ^ r, 0x27d4eb2f)
+    return (h ^ (h >>> 15)) >>> 0
+}
+
 export function countNeighbors(face: Face, predicate: (face: Face) => boolean): number
 {
     const first = face.halfEdge;
