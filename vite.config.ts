@@ -24,6 +24,11 @@ export default defineConfig(({ mode }) => {
             __STATS: JSON.stringify(!!process.env.STATS)
         },
 
+        // shared modules of workers are split into chunks, which needs ES module workers
+        worker: {
+            format: "es"
+        },
+
         test: {
             include: [TEST_PATTERN]
         },
