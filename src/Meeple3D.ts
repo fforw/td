@@ -62,6 +62,24 @@ const EYE_SPREAD = 0.33
 const EYE_DROP = 0.15
 
 /**
+ * Walk cycle speed in radians per second. Each cycle has two steps.
+ */
+const WALK_SPEED = 5.5
+
+/**
+ * Height of a step bounce in meeple units, and how much the body stretches with it
+ */
+const WALK_BOUNCE = 0.07
+const WALK_STRETCH = 0.05
+
+/**
+ * Angle in radians the meeple rocks from side to side around its facing direction while walking, and the height of
+ * the pivot, at about the belly button
+ */
+const WALK_ROLL = 0.12
+const WALK_PIVOT = 0.3
+
+/**
  * Speed of turning toward the camera and back, in full turns per second
  */
 const ATTENTION_SPEED = 3
@@ -473,12 +491,14 @@ export default class MeepleCrowd
         this.meeples.forEach((meeple, i) => {
             const { position, look, phase } = meeple
 
-            let bounce = 0, stretch = 1
+            let bounce = 0, stretch = 1, roll = 0
             if (this.walking)
             {
-                const s = Math.sin(time * 9 + phase)
-                bounce = Math.abs(s) * 0.07
-                stretch = 1 + s * 0.05
+                // the body is highest and rocked furthest over the foot it stands on
+                const s = Math.sin(time * WALK_SPEED + phase)
+                bounce = Math.abs(s) * WALK_BOUNCE
+                stretch = 1 + s * WALK_STRETCH
+                roll = s * WALK_ROLL
             }
 
             const headY = (HEAD_Y + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
@@ -510,6 +530,14 @@ export default class MeepleCrowd
             rotation.multiplyQuaternions(leanRotation, facingRotation)
 
             figure.compose(tmpPos.set(position.x, position.y + bounce * MEEPLE_SCALE, position.z), rotation, tmpScale.setScalar(MEEPLE_SCALE))
+            if (roll !== 0)
+            {
+                // rock around the facing direction at belly height
+                local.makeTranslation(0, WALK_PIVOT, 0)
+                    .multiply(rollMatrix.makeRotationZ(roll))
+                    .multiply(rollPivot.makeTranslation(0, -WALK_PIVOT, 0))
+                figure.multiply(local)
+            }
 
             local.makeScale(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch))
             this.body.setMatrixAt(i, part.multiplyMatrices(figure, local))
@@ -544,5 +572,7 @@ const rotation = new Quaternion()
 const figure = new Matrix4()
 const local = new Matrix4()
 const part = new Matrix4()
+const rollMatrix = new Matrix4()
+const rollPivot = new Matrix4()
 const tmpPos = new Vector3()
 const tmpScale = new Vector3()
