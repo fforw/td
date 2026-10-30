@@ -74,6 +74,7 @@ export class Edge
 let faceCounter = 0;
 
 const _faceTypeNames: string[] = [];
+const _faceTypes: FaceType[] = [];
 
 interface FaceTypeOptions
 {
@@ -85,6 +86,11 @@ interface FaceTypeOptions
 export class FaceType
 {
     name = ""
+
+    /**
+     * Position in the list of all face types, used to store face types as numbers
+     */
+    index = -1
 
     color = "#fff"
     terrain = 1
@@ -128,6 +134,14 @@ export class FaceType
         return _faceTypeNames
     }
 
+    /**
+     * Returns the face type with the given index
+     */
+    static byIndex(index: number): FaceType
+    {
+        return _faceTypes[index]
+    }
+
     
 
 }
@@ -138,7 +152,9 @@ for (const [name, ft] of Object.entries(FaceType))
     if (ft instanceof FaceType)
     {
         ft.name = name
+        ft.index = _faceTypes.length
         _faceTypeNames.push(name)
+        _faceTypes.push(ft)
     }
 }
 

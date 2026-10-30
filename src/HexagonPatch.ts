@@ -700,6 +700,9 @@ function borderKey(q: number, r: number, dir: number): string
 
 interface BorderEdge
 {
+    /** position of the hexagon inside the patch */
+    q: number
+    r: number
     /** direction of the edge within its hexagon */
     dir: number
     /** position of the neighbor hexagon outside the patch */
@@ -912,6 +915,8 @@ export default class HexagonPatch
         // the original border half edges became the first half of the subdivided edge
         borderEdges.forEach(
             ({ q, r, dir, nq, nr, halfEdge }) => this.border.set(borderKey(q, r, dir), {
+                q,
+                r,
                 dir,
                 nq,
                 nr,
