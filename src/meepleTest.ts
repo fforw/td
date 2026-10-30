@@ -79,6 +79,8 @@ sun.shadow.normalBias = 0.01
 const shadowCam = sun.shadow.camera
 shadowCam.left = shadowCam.bottom = -radius
 shadowCam.right = shadowCam.top = radius
+// the bias is relative to the depth range, with the default far plane of 500 it would be as large as a meeple
+shadowCam.far = radius * 5
 shadowCam.updateProjectionMatrix()
 scene.add(sun)
 
