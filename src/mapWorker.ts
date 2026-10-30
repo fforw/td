@@ -3,7 +3,15 @@ import { planCastle } from "./castlePlan"
 import HexagonPatch from "./HexagonPatch"
 import type { MapRequest, MapResponse } from "./MapWorkerClient"
 import { packPatch, transferables } from "./QuadPatch"
-import { patchSeed, resetRandom } from "./util"
+import Terrain from "./terrain"
+import { patchSeed, resetRandom, rng } from "./util"
+
+
+/**
+ * Terrain of the current world seed
+ */
+let terrain: Terrain | null = null
+let terrainSeed = NaN
 
 
 function respond(response: MapResponse): void
@@ -19,6 +27,18 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
         resetRandom(patchSeed(seed, q, r))
         const patch = new HexagonPatch(q, r, size)
         const faces = patch.build()
+
+        if (seed !== terrainSeed)
+        {
+            terrain = new Terrain(seed)
+            terrainSeed = seed
+        }
+        const random = () => rng.next()
+        for (const face of faces)
+        {
+            const [x, y] = face.centroid
+            face.type = terrain!.faceType(x, y, random)
+        }
 
         // the castle changes the face types, so it has to be built before packing
         const plan = castle ? planCastle(faces, new Castle(faces)) : null
