@@ -18,9 +18,10 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
+import { createCastle } from "./castle3d"
 import { FaceType } from "./geometry"
 import { PATCH_SIZE } from "./HexagonPatch"
-import MapWorkerClient from "./MapWorkerClient"
+import MapWorkerClient, { type BuiltPatch } from "./MapWorkerClient"
 import { marchingSquaresPatch } from "./marchingSquares"
 import PatchWorld from "./PatchWorld"
 import type { QuadPatch } from "./QuadPatch"
@@ -245,11 +246,15 @@ function updateGround(entry: LoadedPatch): void
 }
 
 
-function addPatch(key: string, patch: QuadPatch): void
+function addPatch(key: string, { patch, castle }: BuiltPatch): void
 {
     const slot = world.add(patch)
     const group = new Group()
     group.add(...createModels(patch))
+    if (castle)
+    {
+        group.add(createCastle(castle))
+    }
     scene.add(group)
 
     const entry: LoadedPatch = { key, slot, group, ground: null }
@@ -314,8 +319,9 @@ function updatePatches(pq: number, pr: number): void
     {
         const key = patchKey(q, r)
         requested.add(key)
-        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE).then(
-            patch => {
+        // for now there's only the castle in the starting patch
+        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0).then(
+            result => {
                 if (requestedFor !== generation)
                 {
                     return
@@ -325,7 +331,7 @@ function updatePatches(pq: number, pr: number): void
                 // the camera might have moved on while the patch was built
                 if (Math.max(Math.abs(q - centerQ), Math.abs(r - centerR)) <= LOAD_RADIUS + 1)
                 {
-                    addPatch(key, patch)
+                    addPatch(key, result)
                 }
             },
             err => {
