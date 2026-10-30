@@ -146,8 +146,10 @@ for (const [name, ft] of Object.entries(FaceType))
 
 const DEFAULT_TYPES = [
     FaceType.DIRT,
-    FaceType.GRASS,
     FaceType.TREE,
+    FaceType.TREE,
+    FaceType.TREE,
+    FaceType.TREE2,
     FaceType.TREE2
 ]
 
