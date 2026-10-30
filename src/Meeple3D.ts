@@ -44,9 +44,10 @@ const HEAD_RAISE = 0.1
 const OUTLINE = 0.022
 
 /**
- * Distance in head radii in front of the head center at which the eyes are drawn. It must clear the curly hair lumps.
+ * Distance in head radii an eye is drawn in front of its point on the head. Facing the camera, an eye must clear the
+ * head and the curly hair lumps, which reach about 1.45 head radii from the center.
  */
-const EYE_DEPTH = 1.5
+const EYE_LIFT = 0.5
 
 /**
  * Size of one eye sprite in head radii
@@ -58,11 +59,6 @@ const EYE_SIZE = 0.72
  */
 const EYE_SPREAD = 0.33
 const EYE_DROP = 0.15
-
-/**
- * Minimum cosine between an eye's point on the head and the direction to the camera. Below it the eye is hidden.
- */
-const EYE_MARGIN = 0.3
 
 export enum HairStyle
 {
@@ -195,8 +191,8 @@ function createEyeTexture(): CanvasTexture
 
 
 /**
- * Two camera facing quads, one per eye, each pinned to its own point on the head. An eye keeps its size and vanishes
- * as soon as its point turns away from the camera.
+ * Two camera facing quads, one per eye, each pinned to its own point on the head. An eye keeps its size and slides
+ * behind the head as its point turns away from the camera.
  */
 function createEyeGeometry(): BufferGeometry
 {
@@ -242,10 +238,9 @@ function createEyeMaterial(): ShaderMaterial
             uniform float eyeSize;
             varying vec2 vUv;
 
-            #define EYE_DEPTH ${EYE_DEPTH.toFixed(2)}
+            #define EYE_LIFT ${EYE_LIFT.toFixed(2)}
             #define EYE_SPREAD ${EYE_SPREAD.toFixed(2)}
             #define EYE_DROP ${EYE_DROP.toFixed(2)}
-            #define EYE_MARGIN ${EYE_MARGIN.toFixed(2)}
 
             void main()
             {
@@ -260,23 +255,16 @@ function createEyeMaterial(): ShaderMaterial
                     cos(EYE_SPREAD) * cos(EYE_DROP)
                 );
                 vec3 anchor = (mv * vec4(dir * headRadius, 1.0)).xyz;
-                vec3 normal = normalize(mat3(mv) * dir);
-
-                // clip the eye once its point turns away. The margin keeps the whole eye inside the silhouette.
-                if (dot(normal, normalize(-anchor)) < EYE_MARGIN)
-                {
-                    gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
-                    return;
-                }
 
                 vec3 pos = anchor;
                 pos.xy += position.xy * eyeSize * scale;
 
-                // slide every vertex along its view ray onto a plane in front of the head and the hair. The eyes
-                // keep their place on screen, but are always drawn whole instead of being cut by their own head.
-                // Other meeples are far enough away to still hide them correctly.
-                vec3 center = (mv * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-                float depth = center.z + headRadius * scale * EYE_DEPTH;
+                // slide every vertex along its view ray onto a plane a little in front of the eye's point on the
+                // head. The eyes keep their place on screen, and the nearer eye is drawn over the farther one.
+                // Facing the camera, the plane clears the head and hair, so an eye is drawn whole. As the point turns
+                // away, the plane sinks into the head, which then hides the eye from the face side, like sliding
+                // behind it. Other meeples are far enough away to still hide them correctly.
+                float depth = anchor.z + headRadius * scale * EYE_LIFT;
                 pos *= depth / pos.z;
 
                 gl_Position = projectionMatrix * vec4(pos, 1.0);
