@@ -6,16 +6,7 @@ import { FaceType } from "./geometry"
  * Map scale, models and ground colors shared by the 3D views
  */
 
-/**
- * Size of the hexagon patch faces in 2D units
- */
-export const FACE_SIZE = 40
-
-/**
- * Scale from 2D plan units to 3D world units. One face is roughly one world unit, which is the grid size of the
- * Kenney kits.
- */
-export const SCALE = 1 / FACE_SIZE
+export { FACE_SIZE, SCALE } from "./scale"
 
 const MEDIA = import.meta.env.BASE_URL + "media/"
 
