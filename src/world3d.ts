@@ -46,6 +46,13 @@ const PATCH_DEPTH = 1.5 * FACE_SIZE * PATCH_SIZE * SCALE
 const SUN_DISTANCE = 40
 const SHADOW_RADIUS = 30
 
+/**
+ * Top speed of moving with the cursor keys in camera distances per second, and how quickly the movement follows the
+ * keys, as rate of an exponential approach
+ */
+const KEY_SPEED = 0.8
+const KEY_RESPONSE = 6
+
 const params = new URLSearchParams(location.search)
 
 /**
@@ -398,9 +405,67 @@ canvas.addEventListener("pointerup", ev => {
     }
 })
 
+const pressed = new Set<string>()
+window.addEventListener("keydown", ev => {
+    if (ev.key.startsWith("Arrow"))
+    {
+        pressed.add(ev.key)
+        // don't scroll the page
+        ev.preventDefault()
+    }
+})
+window.addEventListener("keyup", ev => pressed.delete(ev.key))
+// we don't get the keyup of keys released while the page has no focus
+window.addEventListener("blur", () => pressed.clear())
+
+const keyVelocity = new Vector3()
+const keyTarget = new Vector3()
+const forward = new Vector3()
+const right = new Vector3()
+
+/**
+ * Moves the camera together with the point it looks at along the ground, relative to the view direction. The movement
+ * speeds up and slows down smoothly and scales with the camera distance, so it feels the same at every zoom level.
+ *
+ * @param dt    seconds since the last frame
+ */
+function moveWithKeys(dt: number): void
+{
+    const sideways = (pressed.has("ArrowRight") ? 1 : 0) - (pressed.has("ArrowLeft") ? 1 : 0)
+    const ahead = (pressed.has("ArrowUp") ? 1 : 0) - (pressed.has("ArrowDown") ? 1 : 0)
+
+    camera.getWorldDirection(forward)
+    forward.y = 0
+    forward.normalize()
+    right.set(-forward.z, 0, forward.x)
+
+    keyTarget.set(0, 0, 0).addScaledVector(right, sideways).addScaledVector(forward, ahead)
+    if (sideways || ahead)
+    {
+        keyTarget.setLength(KEY_SPEED * camera.position.distanceTo(controls.target))
+    }
+
+    keyVelocity.lerp(keyTarget, 1 - Math.exp(-KEY_RESPONSE * dt))
+    if (keyVelocity.lengthSq() < 1e-6 && !sideways && !ahead)
+    {
+        keyVelocity.set(0, 0, 0)
+        return
+    }
+
+    camera.position.addScaledVector(keyVelocity, dt)
+    controls.target.addScaledVector(keyVelocity, dt)
+}
+
+let lastTime = 0
+
 loadModels().then(() => {
     newWorld(seed)
-    renderer.setAnimationLoop(() => {
+    renderer.setAnimationLoop(time => {
+        // limit the step after the tab was in the background
+        const dt = lastTime ? Math.min(0.1, (time - lastTime) / 1000) : 0
+        lastTime = time
+
+        moveWithKeys(dt)
         controls.update()
         updateCenter()
 
