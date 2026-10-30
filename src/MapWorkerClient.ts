@@ -1,3 +1,4 @@
+import type { CastlePlan } from "./castlePlan"
 import type { QuadPatch } from "./QuadPatch"
 
 /**
@@ -17,18 +18,31 @@ export interface PatchRequest
      * Hexagon size in map units
      */
     size: number
+    /**
+     * Build a castle around the face closest to the world origin
+     */
+    castle: boolean
 }
 
 export type MapRequest = PatchRequest
 
+/**
+ * Packed patch together with the plan of the castle built on it, if any
+ */
+export interface BuiltPatch
+{
+    patch: QuadPatch
+    castle: CastlePlan | null
+}
+
 export type MapResponse =
-    { id: number, patch: QuadPatch, error?: undefined } |
+    { id: number, result: BuiltPatch, error?: undefined } |
     { id: number, error: string }
 
 
 interface Pending
 {
-    resolve: (patch: QuadPatch) => void
+    resolve: (result: BuiltPatch) => void
     reject: (error: Error) => void
 }
 
@@ -62,7 +76,7 @@ export default class MapWorkerClient
             }
             else
             {
-                pending.resolve(data.patch)
+                pending.resolve(data.result)
             }
         }
 
@@ -82,15 +96,16 @@ export default class MapWorkerClient
      * @param r         r-position of the patch center
      * @param seed      world seed
      * @param size      hexagon size in map units
+     * @param castle    build a castle around the face closest to the world origin
      *
-     * @return packed patch
+     * @return packed patch and castle plan
      */
-    buildPatch(q: number, r: number, seed: number, size: number): Promise<QuadPatch>
+    buildPatch(q: number, r: number, seed: number, size: number, castle = false): Promise<BuiltPatch>
     {
         const id = this.nextId++
         return new Promise((resolve, reject) => {
             this.pending.set(id, { resolve, reject })
-            this.worker.postMessage({ id, type: "patch", q, r, seed, size } satisfies MapRequest)
+            this.worker.postMessage({ id, type: "patch", q, r, seed, size, castle } satisfies MapRequest)
         })
     }
 
