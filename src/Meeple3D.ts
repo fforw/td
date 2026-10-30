@@ -43,6 +43,11 @@ const HEAD_RAISE = 0.1
  */
 const OUTLINE = 0.022
 
+/**
+ * Distance in head radii in front of the head center at which the eyes are drawn. It must clear the curly hair lumps.
+ */
+const EYE_DEPTH = 1.5
+
 export enum HairStyle
 {
     CURLY,
@@ -190,6 +195,8 @@ function createEyeMaterial(): ShaderMaterial
             uniform float eyeWidth;
             varying vec2 vUv;
 
+            #define EYE_DEPTH ${EYE_DEPTH.toFixed(2)}
+
             void main()
             {
                 vUv = uv;
@@ -201,17 +208,23 @@ function createEyeMaterial(): ShaderMaterial
 
                 // how much the face points at the camera, which looks down -z in view space
                 float front = forward.z / scale;
-                if (front < 0.4)
+                if (front < 0.35)
                 {
                     gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
                     return;
                 }
 
-                // the eyes sit low on the face, then pull them toward the camera so they don't clip into the head.
-                // In profile they stay further in and get narrower, so they never stick out of the silhouette.
+                // the eyes sit low on the face. In profile they stay further in and get narrower, so they never
+                // stick out of the silhouette, and they shrink away instead of popping when the head turns away
                 vec3 pos = center + forward * 0.6 * headRadius - up * 0.12 * headRadius;
-                pos.z += headRadius * scale * 0.35;
-                pos.xy += position.xy * eyeWidth * scale * vec2(mix(0.3, 1.0, front), 1.0);
+                float size = eyeWidth * scale * smoothstep(0.35, 0.55, front);
+                pos.xy += position.xy * size * vec2(mix(0.3, 1.0, front), 1.0);
+
+                // slide every vertex along its view ray onto a plane in front of the head and the hair. The eyes
+                // keep their place on screen, but are always drawn whole instead of being cut by their own head.
+                // Other meeples are far enough away to still hide them correctly.
+                float depth = center.z + headRadius * scale * EYE_DEPTH;
+                pos *= depth / pos.z;
 
                 gl_Position = projectionMatrix * vec4(pos, 1.0);
             }
