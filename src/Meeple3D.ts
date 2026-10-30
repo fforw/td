@@ -4,13 +4,13 @@ import {
     CanvasTexture,
     Color,
     DataTexture,
+    Float32BufferAttribute,
     Group,
     InstancedMesh,
     Matrix4,
     MeshBasicMaterial,
     MeshToonMaterial,
     NearestFilter,
-    PlaneGeometry,
     Quaternion,
     RedFormat,
     ShaderMaterial,
@@ -47,6 +47,22 @@ const OUTLINE = 0.022
  * Distance in head radii in front of the head center at which the eyes are drawn. It must clear the curly hair lumps.
  */
 const EYE_DEPTH = 1.5
+
+/**
+ * Size of one eye sprite in head radii
+ */
+const EYE_SIZE = 0.72
+
+/**
+ * Angles in radians from the face center to the side and down to the points the eyes are pinned to
+ */
+const EYE_SPREAD = 0.33
+const EYE_DROP = 0.15
+
+/**
+ * Minimum cosine between an eye's point on the head and the direction to the camera. Below it the eye is hidden.
+ */
+const EYE_MARGIN = 0.3
 
 export enum HairStyle
 {
@@ -179,50 +195,87 @@ function createEyeTexture(): CanvasTexture
 
 
 /**
- * Camera facing quad placed on the front of the head. It squashes and slides sideways when the meeple turns, and
- * disappears when it faces away.
+ * Two camera facing quads, one per eye, each pinned to its own point on the head. An eye keeps its size and vanishes
+ * as soon as its point turns away from the camera.
  */
+function createEyeGeometry(): BufferGeometry
+{
+    const positions: number[] = []
+    const uvs: number[] = []
+    const sides: number[] = []
+    const indices: number[] = []
+
+    // the meeple's +x is on the left of the texture when it faces the camera
+    for (const side of [-1, 1])
+    {
+        const base = positions.length / 3
+        const u0 = side < 0 ? 0 : 0.5
+        for (const [x, y] of [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]])
+        {
+            positions.push(x, y, 0)
+            uvs.push(u0 + (x + 0.5) * 0.5, y + 0.5)
+            sides.push(side)
+        }
+        indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
+    }
+
+    const geometry = new BufferGeometry()
+    geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("uv", new Float32BufferAttribute(uvs, 2))
+    geometry.setAttribute("side", new Float32BufferAttribute(sides, 1))
+    geometry.setIndex(indices)
+    return geometry
+}
+
+
 function createEyeMaterial(): ShaderMaterial
 {
     return new ShaderMaterial({
         uniforms: {
             map: { value: createEyeTexture() },
             headRadius: { value: HEAD_RADIUS },
-            eyeWidth: { value: HEAD_RADIUS * 1.45 }
+            eyeSize: { value: HEAD_RADIUS * EYE_SIZE }
         },
         vertexShader: /* glsl */`
+            attribute float side;
             uniform float headRadius;
-            uniform float eyeWidth;
+            uniform float eyeSize;
             varying vec2 vUv;
 
             #define EYE_DEPTH ${EYE_DEPTH.toFixed(2)}
+            #define EYE_SPREAD ${EYE_SPREAD.toFixed(2)}
+            #define EYE_DROP ${EYE_DROP.toFixed(2)}
+            #define EYE_MARGIN ${EYE_MARGIN.toFixed(2)}
 
             void main()
             {
                 vUv = uv;
                 mat4 mv = modelViewMatrix * instanceMatrix;
-                vec3 center = (mv * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-                vec3 forward = (mv * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
-                vec3 up = (mv * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
-                float scale = length(forward);
+                float scale = length((mv * vec4(1.0, 0.0, 0.0, 0.0)).xyz);
 
-                // how much the face points at the camera, which looks down -z in view space
-                float front = forward.z / scale;
-                if (front < 0.35)
+                // the point on the head the eye is pinned to, slightly below and to the side of the face center
+                vec3 dir = vec3(
+                    side * sin(EYE_SPREAD) * cos(EYE_DROP),
+                    -sin(EYE_DROP),
+                    cos(EYE_SPREAD) * cos(EYE_DROP)
+                );
+                vec3 anchor = (mv * vec4(dir * headRadius, 1.0)).xyz;
+                vec3 normal = normalize(mat3(mv) * dir);
+
+                // clip the eye once its point turns away. The margin keeps the whole eye inside the silhouette.
+                if (dot(normal, normalize(-anchor)) < EYE_MARGIN)
                 {
                     gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
                     return;
                 }
 
-                // the eyes sit low on the face. In profile they stay further in and get narrower, so they never
-                // stick out of the silhouette, and they shrink away instead of popping when the head turns away
-                vec3 pos = center + forward * 0.6 * headRadius - up * 0.12 * headRadius;
-                float size = eyeWidth * scale * smoothstep(0.35, 0.55, front);
-                pos.xy += position.xy * size * vec2(mix(0.3, 1.0, front), 1.0);
+                vec3 pos = anchor;
+                pos.xy += position.xy * eyeSize * scale;
 
                 // slide every vertex along its view ray onto a plane in front of the head and the hair. The eyes
                 // keep their place on screen, but are always drawn whole instead of being cut by their own head.
                 // Other meeples are far enough away to still hide them correctly.
+                vec3 center = (mv * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
                 float depth = center.z + headRadius * scale * EYE_DEPTH;
                 pos *= depth / pos.z;
 
@@ -303,7 +356,7 @@ export default class MeepleCrowd
             this.createPart(style === HairStyle.CURLY ? createCurlyHair() : createShortHair(), toon, true)
         ]))
 
-        this.eyes = new InstancedMesh(new PlaneGeometry(1, 0.5), createEyeMaterial(), capacity)
+        this.eyes = new InstancedMesh(createEyeGeometry(), createEyeMaterial(), capacity)
         this.eyes.frustumCulled = false
         this.group.add(this.eyes)
 
