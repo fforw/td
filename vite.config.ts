@@ -36,7 +36,8 @@ export default defineConfig(({ mode }) => {
                 input: {
                     main: resolve(import.meta.dirname, "index.html"),
                     test: resolve(import.meta.dirname, "test.html"),
-                    "3d": resolve(import.meta.dirname, "3d.html")
+                    "3d": resolve(import.meta.dirname, "3d.html"),
+                    meeple: resolve(import.meta.dirname, "meeple.html")
                 }
             }
         }
