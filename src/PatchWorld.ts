@@ -97,6 +97,16 @@ export default class PatchWorld
      */
     remove(slot: number): void
     {
+        this.neighbors(slot).forEach(other => this.disconnect(slot, other))
+        this.slots[slot] = null
+    }
+
+
+    /**
+     * Returns the slots of all patches connected to the patch in the given slot
+     */
+    neighbors(slot: number): number[]
+    {
         const { seamTwin } = this.getSlot(slot)
         const neighbors = new Set<number>()
         for (let i = 0; i < seamTwin.length; i++)
@@ -106,8 +116,7 @@ export default class PatchWorld
                 neighbors.add(seamTwin[i] >> SLOT_SHIFT)
             }
         }
-        neighbors.forEach(other => this.disconnect(slot, other))
-        this.slots[slot] = null
+        return [...neighbors]
     }
 
 

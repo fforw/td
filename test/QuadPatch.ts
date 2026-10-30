@@ -169,8 +169,10 @@ describe("QuadPatch", function () {
 
         const connected = checkWorld(world, slots)
         assert(connected < borderTotal)
+        assert(world.neighbors(slots[0]).sort().join() === [slots[1], slots[2]].sort().join())
 
         world.disconnect(slots[0], slots[1])
+        assert(world.neighbors(slots[0]).join() === String(slots[2]))
         const partly = checkWorld(world, slots)
         assert(partly > connected)
 
