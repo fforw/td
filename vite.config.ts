@@ -42,7 +42,8 @@ export default defineConfig(({ mode }) => {
                     main: resolve(import.meta.dirname, "index.html"),
                     test: resolve(import.meta.dirname, "test.html"),
                     "3d": resolve(import.meta.dirname, "3d.html"),
-                    meeple: resolve(import.meta.dirname, "meeple.html")
+                    meeple: resolve(import.meta.dirname, "meeple.html"),
+                    world: resolve(import.meta.dirname, "world.html")
                 }
             }
         }
