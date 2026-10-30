@@ -37,6 +37,12 @@ const CLIMATE_PERIOD = 40 * 600
 const LAPSE_RATE = 0.45
 
 /**
+ * Temperature loss from the driest to the wettest areas. Besides making wet areas a bit colder, it bends the climate
+ * borders, which would otherwise run straight from west to east wherever the height doesn't change the temperature.
+ */
+const MOISTURE_COOLING = 0.25
+
+/**
  * Heights in the range -1 to 1 and temperatures and moisture in the range 0 to 1 at which the terrain changes
  */
 export const SEA_LEVEL = -0.15
@@ -153,11 +159,13 @@ export default class Terrain
             height += (START_HEIGHT - height) * w
         }
 
+        const moisture = 0.5 + 0.5 * this.moistureNoise(x / MOISTURE_SCALE, y / MOISTURE_SCALE)
+
         // the start lies halfway between the warmest and the coldest band
         const base = 0.5 + 0.5 * Math.sin(TAU * y / CLIMATE_PERIOD)
-        const temperature = Math.max(0, base - Math.max(0, height - SEA_LEVEL) * LAPSE_RATE)
-
-        const moisture = 0.5 + 0.5 * this.moistureNoise(x / MOISTURE_SCALE, y / MOISTURE_SCALE)
+        const temperature = Math.min(1, Math.max(0,
+            base - Math.max(0, height - SEA_LEVEL) * LAPSE_RATE - (moisture - 0.5) * MOISTURE_COOLING
+        ))
 
         return { height, temperature, moisture }
     }
