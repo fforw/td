@@ -147,7 +147,6 @@ let facingMode = 0
 const facingButton = document.createElement("button")
 facingButton.addEventListener("click", () => setFacingMode((facingMode + 1) % FACING_MODES.length))
 ui.append(facingButton)
-checkbox("walk", () => crowd.walking, v => crowd.walking = v)
 
 function setFacingMode(mode: number): void
 {
@@ -161,6 +160,7 @@ const params = new URLSearchParams(location.search)
 const facingParam = FACING_MODES.indexOf(params.get("facing") ?? "")
 setFacingMode(facingParam < 0 ? 1 : facingParam)
 crowd.walking = params.has("walk")
+checkbox("walk", () => crowd.walking, v => crowd.walking = v)
 for (const index of (params.get("look") ?? "").split(",").filter(Boolean))
 {
     crowd.meeples[+index].lookAtCamera = true
