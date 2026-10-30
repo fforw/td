@@ -53,12 +53,12 @@ const EYE_LIFT = 0.5
 /**
  * Size of one eye sprite in head radii
  */
-const EYE_SIZE = 0.72
+const EYE_SIZE =0.9
 
 /**
  * Angles in radians from the face center to the side and down to the points the eyes are pinned to
  */
-const EYE_SPREAD = 0.33
+const EYE_SPREAD = 0.4
 const EYE_DROP = 0.15
 
 /**
