@@ -1,4 +1,3 @@
-import { Vector3 } from "three"
 import type Castle from "./Castle"
 import { filterNeighbors, getNeighbors } from "./Castle"
 import type { Face, Point } from "./geometry"
@@ -6,6 +5,7 @@ import { FaceType } from "./geometry"
 import { squareFace, wallPaths } from "./plan"
 import { SCALE } from "./scale"
 import { connectsTo, rng } from "./util"
+import Vector3 from "./Vector3"
 
 /*
  * Layout of the castle in world units, worked out on the faces of a patch. It doesn't depend on any 3D objects, so the
@@ -30,7 +30,7 @@ const GATE_MAX_WIDTH = 2.2
 /**
  * A gate where a road crosses the wall
  */
-export interface Gate
+interface Gate
 {
     center: Vector3
     /**
@@ -352,18 +352,6 @@ function alignGatesToWalls(gates: Gate[], paths: Vector3[][]): void
         }
     }
 }
-
-export function toGate(plan: GatePlan): Gate
-{
-    const { x, z, roadX, roadZ, width } = plan
-    return {
-        center: new Vector3(x, 0, z),
-        road: new Vector3(roadX, 0, roadZ),
-        side: new Vector3(-roadZ, 0, roadX),
-        width
-    }
-}
-
 
 /**
  * Works out the layout of the given castle. Uses the random number generator for the choices of houses and stalls.

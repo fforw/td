@@ -1,5 +1,5 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Object3D, Vector3 } from "three"
-import { type CastlePlan, type Gate, type HousePlan, toGate } from "./castlePlan"
+import type { CastlePlan, GatePlan, HousePlan } from "./castlePlan"
 import { model, template } from "./scene3d"
 
 /*
@@ -82,6 +82,38 @@ function toRotationY(angle: number): number
 {
     return -angle
 }
+
+/**
+ * A gate where a road crosses the wall
+ */
+interface Gate
+{
+    center: Vector3
+    /**
+     * Unit vector along the road, pointing outwards
+     */
+    road: Vector3
+    /**
+     * Unit vector along the wall
+     */
+    side: Vector3
+    /**
+     * Width of the gate along the wall
+     */
+    width: number
+}
+
+export function toGate(plan: GatePlan): Gate
+{
+    const { x, z, roadX, roadZ, width } = plan
+    return {
+        center: new Vector3(x, 0, z),
+        road: new Vector3(roadX, 0, roadZ),
+        side: new Vector3(-roadZ, 0, roadX),
+        width
+    }
+}
+
 
 function createHouse(plan: HousePlan): Object3D
 {
