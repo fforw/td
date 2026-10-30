@@ -1,4 +1,4 @@
-import type { Mesh, MeshStandardMaterial, Object3D } from "three"
+import { InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, type Object3D } from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import { FaceType } from "./geometry"
 
@@ -111,4 +111,39 @@ export function template(name: ModelName): Object3D
 export function model(name: ModelName): Object3D
 {
     return template(name).clone()
+}
+
+
+/**
+ * Creates instanced meshes for all meshes of the given model, with one instance per matrix. They share geometry and
+ * materials with the template, so disposing them only frees the instance data.
+ *
+ * @param name          model
+ * @param matrices      transformation per instance
+ *
+ * @return one instanced mesh per mesh of the model
+ */
+export function instanceModel(name: ModelName, matrices: Matrix4[]): InstancedMesh[]
+{
+    const root = template(name)
+    root.updateMatrixWorld(true)
+
+    const instances: InstancedMesh[] = []
+    const matrix = new Matrix4()
+    root.traverse(obj => {
+        const mesh = obj as Mesh
+        if (mesh.isMesh)
+        {
+            const instanced = new InstancedMesh(mesh.geometry, mesh.material, matrices.length)
+            instanced.castShadow = mesh.castShadow
+            instanced.receiveShadow = mesh.receiveShadow
+            for (let i = 0; i < matrices.length; i++)
+            {
+                instanced.setMatrixAt(i, matrix.multiplyMatrices(matrices[i], mesh.matrixWorld))
+            }
+            instanced.computeBoundingSphere()
+            instances.push(instanced)
+        }
+    })
+    return instances
 }
