@@ -110,7 +110,7 @@ const TOWER_MIN_DISTANCE = 2.5
 /**
  * Minimum change of direction for a wall corner without a tower to get a column filling the gap on the outer side
  */
-const COLUMN_MIN_TURN = 0.15
+const COLUMN_MIN_TURN = 0.25
 
 /**
  * Number of sides of the wall columns
