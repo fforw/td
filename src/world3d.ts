@@ -250,7 +250,8 @@ function addPatch(key: string, { patch, castle }: BuiltPatch): void
 {
     const slot = world.add(patch)
     const group = new Group()
-    group.add(...createModels(patch))
+    // patches of water or snow have no models, and add() complains about being called without objects
+    createModels(patch).forEach(obj => group.add(obj))
     if (castle)
     {
         group.add(createCastle(castle))
