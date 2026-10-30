@@ -21,7 +21,6 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import HexagonPatch from "./HexagonPatch"
 import { connectsTo, randomSeed, resetRandom, rng } from "./util"
 import Castle, { filterNeighbors, getNeighbors } from "./Castle"
@@ -29,69 +28,9 @@ import type { Face, Point } from "./geometry"
 import { FaceType } from "./geometry"
 import { squareFace, wallPaths } from "./plan"
 import marchingSquares from "./marchingSquares"
+import { FACE_SIZE, GROUND_COLORS, loadModels, model, type ModelName, SCALE, template } from "./scene3d"
 
 const TAU = Math.PI * 2;
-
-/**
- * Size of the hexagon patch faces in 2D units
- */
-const FACE_SIZE = 40
-
-/**
- * Scale from 2D plan units to 3D world units. One face is roughly one world unit, which is the grid size of the
- * Kenney kits.
- */
-const SCALE = 1 / FACE_SIZE
-
-const MEDIA = import.meta.env.BASE_URL + "media/"
-
-const MODELS = {
-    wall: "castle/wall.glb",
-    tower: "castle/tower-square.glb",
-    towerRoof: "castle/tower-square-top-roof.glb",
-    gateway: "castle/wall-doorway.glb",
-    gateTower: "castle/tower-hexagon-base.glb",
-    gateTowerRoof: "castle/tower-hexagon-roof.glb",
-
-    houseBlock: "town/wallBlock.glb",
-    houseWoodBlock: "town/wallWoodBlock.glb",
-    roof: "town/roofPoint.glb",
-    roofHigh: "town/roofHighPoint.glb",
-    fountain: "town/fountainRound.glb",
-    stall: "town/stall.glb",
-    stallRed: "town/stallRed.glb",
-    stallGreen: "town/stallGreen.glb",
-
-    tree: "nature/tree_default.glb",
-    treeOak: "nature/tree_oak.glb",
-    pine: "nature/tree_pineRoundA.glb",
-    pine2: "nature/tree_pineRoundC.glb",
-    rock: "nature/rock_largeA.glb",
-    rock2: "nature/rock_largeC.glb",
-    rock3: "nature/rock_tallA.glb",
-}
-
-type ModelName = keyof typeof MODELS
-
-/**
- * Ground colors for the face types. The 2D colors are made for a black background and are too dark for a lit scene.
- */
-const GROUND_COLORS = new Map<FaceType, string>([
-    [FaceType.DIRT, "#8a6a3e"],
-    [FaceType.PAVED, "#9a968c"],
-    [FaceType.GRASS, "#5c9e3c"],
-    [FaceType.SAND, "#d8c98a"],
-    [FaceType.WATER, "#3a6ea5"],
-    [FaceType.ROCK, "#6f8f4a"],
-    [FaceType.FOREST_FLOOR, "#4a5a2a"],
-    [FaceType.TREE, "#5c9e3c"],
-    [FaceType.TREE2, "#4f8f36"],
-    [FaceType.WALL, "#618336"],
-    [FaceType.GATE, "#9a968c"],
-    [FaceType.MARKET, "#b5ae9c"],
-    [FaceType.PLOT, "#a68a5c"],
-    [FaceType.HOUSE, "#8a7a5e"],
-])
 
 const WALL_HEIGHT = 0.6
 const WALL_THICKNESS = 0.4
@@ -195,44 +134,6 @@ interface Gate
      * Width of the gate along the wall
      */
     width: number
-}
-
-const templates = new Map<ModelName, Object3D>()
-
-function loadModels(): Promise<void>
-{
-    const loader = new GLTFLoader()
-    return Promise.all(
-        Object.entries(MODELS).map(
-            ([name, file]) => loader.loadAsync(MEDIA + file).then(gltf => {
-                gltf.scene.traverse(obj => {
-                    const mesh = obj as Mesh
-                    if (mesh.isMesh)
-                    {
-                        const materials = [mesh.material].flat()
-
-                        // transparent surfaces like the fountain water would shadow themselves, causing flickering
-                        // shadow acne
-                        mesh.castShadow = !materials.some(m => m.transparent)
-                        mesh.receiveShadow = true
-
-                        // the Fantasy Town and Nature kits export fully metallic materials which render black
-                        // without an environment map
-                        for (const material of materials)
-                        {
-                            (material as MeshStandardMaterial).metalness = 0
-                        }
-                    }
-                })
-                templates.set(name as ModelName, gltf.scene)
-            })
-        )
-    ).then(() => undefined)
-}
-
-function model(name: ModelName): Object3D
-{
-    return templates.get(name)!.clone()
 }
 
 function pick<T>(face: Face, items: T[], salt = 0): T
@@ -835,7 +736,7 @@ function createColumn(prev: Vector3, pt: Vector3, next: Vector3): Object3D
     const n0 = new Vector3(-d0.z, 0, d0.x)
     const n1 = new Vector3(-d1.z, 0, d1.x)
 
-    const wallMesh = templates.get("wall")!.getObjectByProperty("isMesh", true) as Mesh
+    const wallMesh = template("wall").getObjectByProperty("isMesh", true) as Mesh
     const column = new Mesh(getColumnGeometry(), wallMesh.material)
     column.castShadow = true
     column.receiveShadow = true
