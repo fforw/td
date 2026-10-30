@@ -311,11 +311,11 @@ export default class MeepleCrowd
     /**
      * Angle in radians the whole figure leans back, away from the camera, to show more face from above
      */
-    lean = 0.3
+    lean = 0
     /**
      * Extra angle in radians the head tilts up
      */
-    headTilt = 0.2
+    headTilt = 0.27
     walking = false
 
     private readonly capacity: number

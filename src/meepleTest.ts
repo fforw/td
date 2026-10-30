@@ -154,9 +154,10 @@ function setFacingMode(mode: number): void
     crowd.meeples.forEach(m => m.facing = mode === 1 ? rng.next() * TAU : 0)
 }
 
-// e.g. ?facing=random&walk
+// e.g. ?facing=camera&walk
 const params = new URLSearchParams(location.search)
-setFacingMode(Math.max(0, FACING_MODES.indexOf(params.get("facing") ?? "")))
+const facingParam = FACING_MODES.indexOf(params.get("facing") ?? "")
+setFacingMode(facingParam < 0 ? 1 : facingParam)
 crowd.walking = params.has("walk")
 
 
