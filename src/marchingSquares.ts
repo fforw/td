@@ -1,5 +1,8 @@
 import type { Face, HalfEdge, Vertex } from "./geometry"
 import { FaceType } from "./geometry"
+import type PatchWorld from "./PatchWorld"
+import { SLOT_SHIFT } from "./PatchWorld"
+import { faceOf, next, prev } from "./QuadPatch"
 
 /**
  * Marching squares for the ground of a face mesh, ported from the node based version in "islands".
@@ -267,5 +270,119 @@ export default function marchingSquares(faces: Face[], cb: TriangleCallback): vo
             prev = curr
             curr = curr.next
         } while (curr !== first)
+    }
+}
+
+
+// face type counts around a vertex by FaceType index
+const typeCounts = new Int32Array(FaceType.typeNames().length)
+
+function countFace(world: PatchWorld, h: number): void
+{
+    typeCounts[world.faceType(faceOf(h))]++
+}
+
+/**
+ * Most common face type around the start vertex of the given global half edge, ties going to the background type like
+ * in vertexGround(). Fans that reach a seam continue in the connected neighbor patch.
+ */
+function packedVertexGround(world: PatchWorld, h: number): FaceType
+{
+    typeCounts.fill(0)
+
+    let curr = h
+    let open = false
+    do
+    {
+        countFace(world, curr)
+        const twin = world.twin(curr)
+        if (twin < 0)
+        {
+            open = true
+            break
+        }
+        curr = next(twin)
+    } while (curr !== h)
+
+    if (open)
+    {
+        // we hit an open border, count the rest of the fan in the other direction
+        curr = h
+        let twin
+        while ((twin = world.twin(prev(curr))) >= 0)
+        {
+            curr = twin
+            countFace(world, curr)
+        }
+    }
+
+    let best: FaceType | null = null
+    let bestCount = 0
+    for (let i = 0; i < typeCounts.length; i++)
+    {
+        const count = typeCounts[i]
+        const type = FaceType.byIndex(i)
+        if (count > 0 && (!best || count > bestCount || (count === bestCount && rank(type) < rank(best))))
+        {
+            best = type
+            bestCount = count
+        }
+    }
+    return best!
+}
+
+/**
+ * Creates the ground triangles for the packed patch in the given slot of the world. Edges and vertices on seams take
+ * the faces of connected neighbor patches into account, so the ground of a patch has to be created again when its
+ * neighbors change.
+ */
+export function marchingSquaresPatch(world: PatchWorld, slot: number, cb: TriangleCallback): void
+{
+    const { positions, vertex, faceType } = world.getPatch(slot)
+    const base = slot << SLOT_SHIFT
+
+    const vertexTypes: (FaceType | undefined)[] = new Array(positions.length / 3)
+    const edgeType = (h: number, type: FaceType) => {
+        const twin = world.twin(base | h)
+        return twin < 0 ? type : background(type, FaceType.byIndex(world.faceType(faceOf(twin))))
+    }
+
+    for (let f = 0; f < faceType.length; f++)
+    {
+        const type = FaceType.byIndex(faceType[f])
+
+        let cx = 0
+        let cy = 0
+        for (let h = f * 4; h < f * 4 + 4; h++)
+        {
+            cx += positions[vertex[h] * 3]
+            cy += positions[vertex[h] * 3 + 1]
+        }
+        cx /= 4
+        cy /= 4
+
+        for (let h = f * 4; h < f * 4 + 4; h++)
+        {
+            const p = prev(h)
+            const v = vertex[h] * 3
+            const n = vertex[next(h)] * 3
+            const pv = vertex[p] * 3
+
+            xs[0] = positions[v]
+            ys[0] = positions[v + 1]
+            xs[1] = (positions[v] + positions[n]) / 2
+            ys[1] = (positions[v + 1] + positions[n + 1]) / 2
+            xs[2] = cx
+            ys[2] = cy
+            xs[3] = (positions[pv] + positions[v]) / 2
+            ys[3] = (positions[pv + 1] + positions[v + 1]) / 2
+
+            ground[0] = vertexTypes[vertex[h]] ??= packedVertexGround(world, base | h)
+            ground[1] = edgeType(h, type)
+            ground[2] = type
+            ground[3] = edgeType(p, type)
+
+            marchCell(cb)
+        }
     }
 }

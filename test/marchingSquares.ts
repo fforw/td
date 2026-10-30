@@ -1,7 +1,9 @@
 import { assert, describe, it } from "vitest"
 
-import HexagonPatch from "../src/HexagonPatch"
-import marchingSquares, { GROUND_PRIORITY } from "../src/marchingSquares"
+import HexagonPatch, { PATCH_SIZE } from "../src/HexagonPatch"
+import marchingSquares, { GROUND_PRIORITY, marchingSquaresPatch } from "../src/marchingSquares"
+import PatchWorld from "../src/PatchWorld"
+import { packPatch } from "../src/QuadPatch"
 import { resetRandom, rng } from "../src/util"
 import type { Face } from "../src/geometry"
 
@@ -85,5 +87,63 @@ describe("marchingSquares", function () {
         // a lone face becomes the small diamond around its centroid, an eighth of the face
         const ratio = area / faceArea(road)
         assert(Math.abs(ratio - 0.125) < 1e-9)
+    })
+})
+
+
+describe("marchingSquaresPatch", function () {
+
+    function createPatch(q: number, r: number)
+    {
+        resetRandom(4711 + q)
+        const patch = new HexagonPatch(q, r, 40)
+        const faces = patch.build()
+        for (const face of faces)
+        {
+            face.type = GROUND_PRIORITY[Math.floor(rng.next() * 4)]
+        }
+        return { patch, faces, packed: packPatch(patch, faces) }
+    }
+
+    function collect(fn: (cb: (...args: unknown[]) => void) => void): string[]
+    {
+        const triangles: string[] = []
+        fn((type, ...coords) => triangles.push((type as { name: string }).name + " " + coords.join()))
+        return triangles
+    }
+
+    it("creates the same ground as the object structure for a single patch", function () {
+        const { faces, packed } = createPatch(0, 0)
+        const world = new PatchWorld()
+        const slot = world.add(packed)
+
+        const expected = collect(cb => marchingSquares(faces, cb))
+        const actual = collect(cb => marchingSquaresPatch(world, slot, cb))
+        assert(expected.length > 0)
+        assert(actual.join("\n") === expected.join("\n"))
+    })
+
+    it("creates the same ground across seams as the object structure", function () {
+        const a = createPatch(0, 0)
+        const b = createPatch(PATCH_SIZE, 0)
+
+        const world = new PatchWorld()
+        const slotA = world.add(a.packed)
+        const unconnected = collect(cb => marchingSquaresPatch(world, slotA, cb))
+        const slotB = world.add(b.packed)
+
+        assert(a.patch.connect(b.patch) > 0)
+        const expected = collect(cb => marchingSquares(a.faces.concat(b.faces), cb))
+        const actual = collect(cb => {
+            marchingSquaresPatch(world, slotA, cb)
+            marchingSquaresPatch(world, slotB, cb)
+        })
+        assert(actual.join("\n") === expected.join("\n"))
+
+        // the neighbor changes the ground along the seam
+        world.remove(slotB)
+        const alone = collect(cb => marchingSquaresPatch(world, slotA, cb))
+        assert(alone.join("\n") === unconnected.join("\n"))
+        assert(alone.join("\n") !== actual.slice(0, alone.length).join("\n"))
     })
 })
