@@ -166,6 +166,7 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
+const viewDirection = new Vector3()
 const timer = new Timer()
 renderer.setAnimationLoop(t => {
     timer.update(t)
@@ -176,8 +177,11 @@ renderer.setAnimationLoop(t => {
     }
     else if (facingMode === 0)
     {
-        // turn toward the camera, like the 2D sprites
-        crowd.meeples.forEach(m => m.facing = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z))
+        // all face against the view direction, like the 2D sprites. Turning each toward the camera position looks
+        // like a sideways glance near the screen edges.
+        const view = camera.getWorldDirection(viewDirection)
+        const facing = Math.atan2(-view.x, -view.z)
+        crowd.meeples.forEach(m => m.facing = facing)
     }
     controls.update()
     crowd.update(camera, time)
