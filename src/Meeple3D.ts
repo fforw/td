@@ -17,6 +17,7 @@ import {
     SphereGeometry,
     SRGBColorSpace,
     type Camera,
+    type Raycaster,
     Vector3
 } from "three"
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js"
@@ -60,6 +61,16 @@ const EYE_SIZE = 0.72
 const EYE_SPREAD = 0.33
 const EYE_DROP = 0.15
 
+/**
+ * Speed of turning toward the camera and back, in full turns per second
+ */
+const ATTENTION_SPEED = 3
+
+/**
+ * Maximum angle in radians a meeple looking at the camera tilts its head up
+ */
+const MAX_LOOK_UP = 1.0
+
 export enum HairStyle
 {
     CURLY,
@@ -93,6 +104,10 @@ export interface Meeple
      * Phase offset of the walk animation
      */
     phase: number
+    /**
+     * Turns the meeple toward the camera with its face up to the viewer, e.g. while the player interacts with it
+     */
+    lookAtCamera?: boolean
 }
 
 
@@ -318,6 +333,12 @@ export default class MeepleCrowd
     headTilt = 0.27
     walking = false
 
+    /**
+     * How far each meeple has turned toward the camera, from 0 to 1
+     */
+    private readonly attention: number[] = []
+    private lastTime = 0
+
     private readonly capacity: number
     private readonly body: InstancedMesh
     private readonly head: InstancedMesh
@@ -393,6 +414,7 @@ export default class MeepleCrowd
             throw new Error("Meeple capacity exceeded")
         }
         this.meeples.push(meeple)
+        this.attention.push(0)
         this.updateColors()
     }
 
@@ -424,14 +446,32 @@ export default class MeepleCrowd
     }
 
     /**
+     * Returns the meeple whose body or head the ray hits first
+     */
+    pick(raycaster: Raycaster): Meeple | null
+    {
+        for (const mesh of [this.body, this.head])
+        {
+            // the matrices change every frame
+            mesh.computeBoundingSphere()
+        }
+        // body and head instances have the index of their meeple
+        const [hit] = raycaster.intersectObjects([this.body, this.head], false)
+        return hit?.instanceId !== undefined ? this.meeples[hit.instanceId] : null
+    }
+
+    /**
      * Updates all instance matrices for the current camera and animation time in seconds
      */
     update(camera: Camera, time: number): void
     {
         const counts = new Map<HairStyle, number>()
+        const step = Math.min(0.1, Math.max(0, time - this.lastTime)) * ATTENTION_SPEED
+        this.lastTime = time
+        const cam = camera.position
 
         this.meeples.forEach((meeple, i) => {
-            const { position, facing, look, phase } = meeple
+            const { position, look, phase } = meeple
 
             let bounce = 0, stretch = 1
             if (this.walking)
@@ -441,8 +481,29 @@ export default class MeepleCrowd
                 stretch = 1 + s * 0.05
             }
 
+            const headY = (HEAD_Y + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
+
+            // ease toward the camera and back
+            const target = meeple.lookAtCamera ? 1 : 0
+            const attention = this.attention[i] += Math.max(-step, Math.min(step, target - this.attention[i]))
+            const t = attention * attention * (3 - 2 * attention)
+
+            let facing = meeple.facing
+            let headTilt = this.headTilt
+            if (t > 0)
+            {
+                const dx = cam.x - position.x
+                const dz = cam.z - position.z
+                // shortest turn toward the camera
+                const turn = ((Math.atan2(dx, dz) - facing) % TAU + TAU * 1.5) % TAU - Math.PI
+                facing += turn * t
+
+                const lookUp = Math.atan2(cam.y - position.y - headY * MEEPLE_SCALE, Math.hypot(dx, dz))
+                headTilt += (Math.min(MAX_LOOK_UP, lookUp) - this.lean - headTilt) * t
+            }
+
             // lean back, away from the camera, around the feet
-            toCamera.set(camera.position.x - position.x, 0, camera.position.z - position.z).normalize()
+            toCamera.set(cam.x - position.x, 0, cam.z - position.z).normalize()
             axis.crossVectors(UP, toCamera)
             leanRotation.setFromAxisAngle(axis, -this.lean)
             facingRotation.setFromAxisAngle(UP, facing)
@@ -453,8 +514,7 @@ export default class MeepleCrowd
             local.makeScale(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch))
             this.body.setMatrixAt(i, part.multiplyMatrices(figure, local))
 
-            const headY = (HEAD_Y + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
-            local.makeRotationX(-this.headTilt).setPosition(0, headY, 0)
+            local.makeRotationX(-headTilt).setPosition(0, headY, 0)
             part.multiplyMatrices(figure, local)
             this.head.setMatrixAt(i, part)
             this.eyes.setMatrixAt(i, part)

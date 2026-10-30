@@ -8,8 +8,10 @@ import {
     PCFShadowMap,
     PerspectiveCamera,
     PlaneGeometry,
+    Raycaster,
     Scene,
     Timer,
+    Vector2,
     Vector3,
     WebGLRenderer
 } from "three"
@@ -154,11 +156,43 @@ function setFacingMode(mode: number): void
     crowd.meeples.forEach(m => m.facing = mode === 1 ? rng.next() * TAU : 0)
 }
 
-// e.g. ?facing=camera&walk
+// e.g. ?facing=camera&walk&look=24,30
 const params = new URLSearchParams(location.search)
 const facingParam = FACING_MODES.indexOf(params.get("facing") ?? "")
 setFacingMode(facingParam < 0 ? 1 : facingParam)
 crowd.walking = params.has("walk")
+for (const index of (params.get("look") ?? "").split(",").filter(Boolean))
+{
+    crowd.meeples[+index].lookAtCamera = true
+}
+
+const hint = document.createElement("div")
+hint.textContent = "click a meeple to make it look at you"
+ui.append(hint)
+
+// a click without dragging toggles looking at the camera, like a player interacting with a meeple
+const raycaster = new Raycaster()
+let downX = 0, downY = 0
+canvas.addEventListener("pointerdown", ev => {
+    downX = ev.clientX
+    downY = ev.clientY
+})
+canvas.addEventListener("pointerup", ev => {
+    const dx = ev.clientX - downX
+    const dy = ev.clientY - downY
+    if (ev.button === 0 && dx * dx + dy * dy < 16)
+    {
+        raycaster.setFromCamera(new Vector2(
+            ev.clientX / window.innerWidth * 2 - 1,
+            -ev.clientY / window.innerHeight * 2 + 1
+        ), camera)
+        const meeple = crowd.pick(raycaster)
+        if (meeple)
+        {
+            meeple.lookAtCamera = !meeple.lookAtCamera
+        }
+    }
+})
 
 
 window.addEventListener("resize", () => {
