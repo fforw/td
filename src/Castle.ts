@@ -564,21 +564,28 @@ export default class Castle
                     // our outer two rings are wall
                     face.type = FaceType.WALL
                 }
+                else
+                {
+                    if (face.type === FaceType.TREE || face.type === FaceType.TREE2)
+                    {
+                        if (ring >= castle.length - 3 || rng.next() < 0.333)
+                        {
+                            face.type = FaceType.GRASS
+                        }
+                    }
+                }
             }
         })
-
-
-
 
         const plotCandidates : PlotCandidate[] = faces.filter( face => {
             const ring = findInRings(castle, face)
             if (ring >= 0 && all.has(face))
             {
                 // inside the castle
-                if (ring < castle.length - 2)
+                if (ring < castle.length - 3)
                 {
-                    // every second pair of rings we have a 66% of building plot
-                    if (((ring >> 1) & 1) !== 0)
+                    // we register every second ring as potential candidate
+                    if ((ring & 1) !== 0)
                     {
                         return true;
                     }
@@ -587,15 +594,18 @@ export default class Castle
             return false
         }).map(c => [c,faceRatio(c)]);
 
+        // we sort starting with the smallest face ratio ..
         plotCandidates.sort((a,b) => {
             return a[1] - b[1]
         })
 
+        // .. and take the best 50% of faces
         const best= plotCandidates.slice(0, Math.floor(plotCandidates.length * 0.5))
 
+        // and turn 3/4 of those into houses, the others into plots
         best.forEach(pc => {
             let n = rng.next()
-            pc[0].type = n < 0.66 ? FaceType.HOUSE : FaceType.PLOT
+            pc[0].type = n < 0.75 ? FaceType.HOUSE : FaceType.PLOT
         })
 
         moat.forEach(f => f.type = FaceType.GRASS)
