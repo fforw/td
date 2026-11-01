@@ -431,36 +431,25 @@ export default class MeepleCrowd
         {
             throw new Error("Meeple capacity exceeded")
         }
+        const i = this.meeples.length
         this.meeples.push(meeple)
         this.attention.push(0)
-        this.updateColors()
-    }
 
-    private updateColors(): void
-    {
-        const counts = new Map<HairStyle, number>()
-        this.meeples.forEach((m, i) => {
-            const { look } = m
-            this.body.setColorAt(i, look.shirt)
-            this.head.setColorAt(i, look.skin)
-            const hair = this.hair.get(look.hairStyle)
-            if (hair)
-            {
-                const n = counts.get(look.hairStyle) ?? 0
-                hair.setColorAt(n, look.hair)
-                counts.set(look.hairStyle, n + 1)
-            }
-        })
-
-        const n = this.meeples.length
-        this.body.count = this.head.count = this.eyes.count = n
-        for (const [style, mesh] of this.hair)
-        {
-            mesh.count = counts.get(style) ?? 0
-            mesh.instanceColor!.needsUpdate = true
-        }
+        // only the new meeple's colors, rewriting all of them on every add makes building a crowd quadratic
+        const { look } = meeple
+        this.body.setColorAt(i, look.shirt)
+        this.head.setColorAt(i, look.skin)
+        this.body.count = this.head.count = this.eyes.count = i + 1
         this.body.instanceColor!.needsUpdate = true
         this.head.instanceColor!.needsUpdate = true
+
+        // hair instances are packed per style in the order the meeples were added
+        const hair = this.hair.get(look.hairStyle)
+        if (hair)
+        {
+            hair.setColorAt(hair.count++, look.hair)
+            hair.instanceColor!.needsUpdate = true
+        }
     }
 
     /**
