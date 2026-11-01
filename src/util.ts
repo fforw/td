@@ -150,3 +150,43 @@ export function connectsTo(face : Face, other : Face)
     return false;
 }
 
+export type WeightedChoice<T> = [weight : number, value : T | (() => T)]
+
+/**
+ * Returns a random choice from an array of weighted choices. Each weighted choice contains a number which expresses
+ * its weight compared the other options and then either a value or a function returning a value.
+ *
+ * @param choices   Array of weighted choices
+ *
+ * @template T  value type shared by all weighted choices
+ */
+export function weightedRandom<T>(choices : WeightedChoice<T>[]) : (rnd? : number) => T
+{
+    let sum = 0;
+
+    for (const [weight] of choices)
+    {
+        sum += weight;
+    }
+
+    const resolve = (value : T | (() => T)) : T => typeof value === "function" ? (value as () => T)() : value;
+
+    return (rnd = rng.next()) => {
+
+        let val = rnd * sum;
+
+        const last = choices.length - 1;
+        for (let i = 0; i < last; i++)
+        {
+            const [weight, value] = choices[i];
+
+            val -= weight;
+            if (val <= 0)
+            {
+                return resolve(value);
+            }
+        }
+
+        return resolve(choices[last][1]);
+    }
+}

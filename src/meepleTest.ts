@@ -17,18 +17,34 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import MeepleCrowd, { HairStyle, MEEPLE_SCALE, type MeepleLook } from "./Meeple3D"
-import { randomSeed, resetRandom, rng } from "./util"
+import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 
 const TAU = Math.PI * 2
 
 /**
  * Meeples per row and column of the test grid, like the 2D sprite sheet
  */
-const GRID = 7
-const SPACING = MEEPLE_SCALE * 1.5
+const GRID = 10
+const SPACING = MEEPLE_SCALE * 1.2
 
-const SKINS = ["#f0c8aa", "#d9a07e", "#a86a48", "#6a3e24"]
-const HAIR = ["#e8865a", "#f0d050", "#8a5a28", "#22182c"]
+const SKINS = [
+    "#f0c8aa",
+    "#d9a07e",
+    "#a86a48",
+    "#6b321b",
+    "#301911"]
+const HAIR = weightedRandom(
+    [
+        [1, "#a63a36"],
+        [1, "#e1e6e6"],
+        [0.5, "#9928b6"],
+        [0.5, "#008ee1"],
+        [6, "#bfa239"],
+        [6, "#754b21"],
+        [4, "#141414"]
+    ]
+)
+
 const SHIRTS = ["#a01828", "#1a78b0", "#8c2898", "#187830", "#3a8c8c", "#8c8c8c", "#d0a838"]
 
 function pick<T>(array: T[]): T
@@ -41,7 +57,7 @@ function randomLook(): MeepleLook
     return {
         skin: new Color(pick(SKINS)),
         shirt: new Color(pick(SHIRTS)),
-        hair: new Color(pick(HAIR)),
+        hair: new Color(HAIR()),
         hairStyle: pick([HairStyle.CURLY, HairStyle.CURLY, HairStyle.SHORT, HairStyle.BALD]),
         height: rng.next()
     }
