@@ -46,6 +46,10 @@ export default defineConfig(({ mode }) => {
                     world: resolve(import.meta.dirname, "world.html")
                 }
             }
+        },
+
+        server: {
+            allowedHosts: ["pronto.fritz.box"]
         }
     }
 })

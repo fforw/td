@@ -20,7 +20,7 @@
         "vitest": "^5.0.4"
     },
     "scripts": {
-        "dev": "vite",
+        "dev": "vite --host 0.0.0.0",
         "build": "tsc && vite build",
         "build-dev": "tsc && vite build --mode development",
         "preview": "vite preview --outDir docs",
