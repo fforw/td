@@ -284,19 +284,17 @@ function createEyeMaterial(): ShaderMaterial
 
 
 /**
- * Returns the geometry of a loaded hair model relative to the head center. The objects sit on the head of the
- * exported meeple, so their transforms are baked in and the head height taken out.
+ * Returns the geometry of a loaded hair model. The objects have their origin at the head center, so the geometry is
+ * used as it is and their transforms are ignored.
  */
 function hairGeometry(name: ModelName): BufferGeometry
 {
-    const scene = template(name)
-    scene.updateMatrixWorld(true)
     let geometry: BufferGeometry | null = null
-    scene.traverse(obj => {
+    template(name).traverse(obj => {
         const mesh = obj as Mesh
         if (mesh.isMesh && !geometry)
         {
-            geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld).translate(0, -HEAD_Y, 0)
+            geometry = mesh.geometry
         }
     })
     if (!geometry)
