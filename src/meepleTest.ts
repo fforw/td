@@ -45,6 +45,12 @@ const HAIR = weightedRandom(
     ]
 )
 
+const HAIR_STYLES = [
+    HairStyle.CURLY,
+    HairStyle.SHORT,
+    HairStyle.BALD
+];
+
 const SHIRTS = ["#a01828", "#1a78b0", "#8c2898", "#187830", "#3a8c8c", "#8c8c8c", "#d0a838"]
 
 function pick<T>(array: T[]): T
@@ -58,7 +64,7 @@ function randomLook(): MeepleLook
         skin: new Color(pick(SKINS)),
         shirt: new Color(pick(SHIRTS)),
         hair: new Color(HAIR()),
-        hairStyle: pick([HairStyle.CURLY, HairStyle.CURLY, HairStyle.SHORT, HairStyle.BALD]),
+        hairStyle: pick(HAIR_STYLES),
         height: rng.next()
     }
 }
