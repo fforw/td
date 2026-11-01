@@ -63,12 +63,15 @@ export const GROUND_COLORS = new Map<FaceType, string>([
 
 const templates = new Map<ModelName, Object3D>()
 
-export function loadModels(): Promise<void>
+/**
+ * Loads the given models, all by default
+ */
+export function loadModels(names = Object.keys(MODELS) as ModelName[]): Promise<void>
 {
     const loader = new GLTFLoader()
     return Promise.all(
-        Object.entries(MODELS).map(
-            ([name, file]) => loader.loadAsync(MEDIA + file).then(gltf => {
+        names.map(
+            name => loader.loadAsync(MEDIA + MODELS[name]).then(gltf => {
                 gltf.scene.traverse(obj => {
                     const mesh = obj as Mesh
                     if (mesh.isMesh)
@@ -88,7 +91,7 @@ export function loadModels(): Promise<void>
                         }
                     }
                 })
-                templates.set(name as ModelName, gltf.scene)
+                templates.set(name, gltf.scene)
             })
         )
     ).then(() => undefined)
