@@ -25,6 +25,7 @@
         "build-dev": "tsc && vite build --mode development",
         "preview": "vite preview --outDir docs",
         "typecheck": "tsc",
+        "export-meeple": "node scripts/exportMeeple.ts",
         "test": "vitest run",
         "test:watch": "vitest"
     },
