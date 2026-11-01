@@ -87,8 +87,6 @@ export enum HairStyle
     BALD
 }
 
-const HAIR_STYLES = [HairStyle.CURLY, HairStyle.SHORT]
-
 export interface MeepleLook
 {
     skin: Color
@@ -321,10 +319,14 @@ export default class MeepleCrowd
 
         this.body = this.createPart(createBodyGeometry(), toon, true)
         this.head = this.createPart(createHeadGeometry(), toon, true)
-        this.hair = new Map(HAIR_STYLES.map(style => [
-            style,
-            this.createPart(style === HairStyle.CURLY ? createCurlyHair() : createShortHair(), toon, true)
-        ]))
+        // short hair lies on the head faces, so it wins the depth test with an offset and needs no outline of its own
+        const shortHair = toon.clone()
+        shortHair.polygonOffset = true
+        shortHair.polygonOffsetFactor = shortHair.polygonOffsetUnits = -1
+        this.hair = new Map([
+            [HairStyle.CURLY, this.createPart(createCurlyHair(), toon, true)],
+            [HairStyle.SHORT, this.createPart(createShortHair(), shortHair, false)]
+        ])
 
         this.eyes = new InstancedMesh(createEyeGeometry(), createEyeMaterial(), capacity)
         this.eyes.frustumCulled = false
@@ -390,7 +392,9 @@ export default class MeepleCrowd
         const hair = this.hair.get(look.hairStyle)
         if (hair)
         {
-            hair.setColorAt(hair.count++, look.hair)
+            // short hair lets some skin show through
+            const color = look.hairStyle === HairStyle.SHORT ? tmpColor.copy(look.hair).lerp(look.skin, 1 / 3) : look.hair
+            hair.setColorAt(hair.count++, color)
             hair.instanceColor!.needsUpdate = true
         }
     }
@@ -508,3 +512,4 @@ const rollMatrix = new Matrix4()
 const rollPivot = new Matrix4()
 const tmpPos = new Vector3()
 const tmpScale = new Vector3()
+const tmpColor = new Color()

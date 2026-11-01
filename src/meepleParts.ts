@@ -14,6 +14,9 @@ export const HEAD_RADIUS = 0.3
  */
 export const HEAD_Y = 0.78
 
+const HEAD_COLUMNS = 14
+const HEAD_ROWS = 10
+
 
 export function createBodyGeometry(): BufferGeometry
 {
@@ -27,7 +30,7 @@ export function createBodyGeometry(): BufferGeometry
 
 export function createHeadGeometry(): BufferGeometry
 {
-    return new SphereGeometry(HEAD_RADIUS, 14, 10)
+    return new SphereGeometry(HEAD_RADIUS, HEAD_COLUMNS, HEAD_ROWS)
 }
 
 
@@ -65,10 +68,55 @@ export function createCurlyHair(): BufferGeometry
 }
 
 
+/**
+ * Rows of short hair per head column, counted from the top in half quads, from the column in the middle of the face
+ * around to the one at the back. Both sides of the head mirror this.
+ */
+const HAIRLINE = [3, 3, 3.5, 5.5, 6, 6, 6, 6]
+
+/**
+ * Head column in the middle of the face. SphereGeometry starts its columns at -x and goes toward +z.
+ */
+const FACE_COLUMN = 3
+
+
+/**
+ * Hair painted onto the head: a copy of the head faces above a stepped hairline, drawn in front of the head with a
+ * polygon offset.
+ */
 export function createShortHair(): BufferGeometry
 {
-    // a cap tilted back so it covers the back of the head but leaves the forehead visible
-    const geometry = new SphereGeometry(HEAD_RADIUS * 1.08, 12, 6, 0, TAU, 0, Math.PI * 0.42)
-    geometry.rotateX(-0.45)
+    const geometry = createHeadGeometry()
+    const row = HEAD_COLUMNS + 1
+    const indices: number[] = []
+    for (let ix = 0; ix < HEAD_COLUMNS; ix++)
+    {
+        // signed number of columns from the face column, -6 to 7
+        const k = ((ix - FACE_COLUMN) % HEAD_COLUMNS + HEAD_COLUMNS + HEAD_COLUMNS / 2) % HEAD_COLUMNS - HEAD_COLUMNS / 2
+        const depth = HAIRLINE[Math.abs(k)]
+        for (let iy = 0; iy < depth; iy++)
+        {
+            const a = iy * row + ix + 1
+            const b = iy * row + ix
+            const c = (iy + 1) * row + ix
+            const d = (iy + 1) * row + ix + 1
+            if (iy + 1 > depth)
+            {
+                // half a quad: the upper triangle, its lower corner on the side away from the face, so the hairline
+                // runs down toward the back on both sides
+                indices.push(a, b, k < 0 ? c : d)
+            }
+            else if (iy === 0)
+            {
+                // a and b are both the pole, like SphereGeometry only keep the lower triangle
+                indices.push(b, c, d)
+            }
+            else
+            {
+                indices.push(a, b, d, b, c, d)
+            }
+        }
+    }
+    geometry.setIndex(indices)
     return geometry
 }
