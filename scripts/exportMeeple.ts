@@ -7,7 +7,7 @@
 import { writeFileSync } from "node:fs"
 import { Group, Mesh, MeshBasicMaterial } from "three"
 import { OBJExporter } from "three/addons/exporters/OBJExporter.js"
-import { createBodyGeometry, createCurlyHair, createHeadGeometry, createShortHair, HEAD_Y } from "../src/meepleParts.ts"
+import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_Y } from "../src/meepleParts.ts"
 
 const out = process.argv[2] ?? "meeple.obj"
 
@@ -25,7 +25,6 @@ function part(name: string, geometry: Mesh["geometry"], y = 0): void
 part("body", createBodyGeometry())
 // hair is placed relative to the head center, like the instance matrices do
 part("head", createHeadGeometry(), HEAD_Y)
-part("hair_curly", createCurlyHair(), HEAD_Y)
 part("hair_short", createShortHair(), HEAD_Y)
 
 group.updateMatrixWorld(true)

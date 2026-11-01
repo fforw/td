@@ -34,6 +34,10 @@ export const MODELS = {
     rock: "nature/rock_largeA.glb",
     rock2: "nature/rock_largeC.glb",
     rock3: "nature/rock_tallA.glb",
+
+    hairCurly: "meeple/curly.glb",
+    hairLong: "meeple/long.glb",
+    hairSidePart: "meeple/side-part.glb",
 }
 
 export type ModelName = keyof typeof MODELS

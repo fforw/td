@@ -16,7 +16,8 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, MEEPLE_SCALE, type MeepleLook } from "./Meeple3D"
+import MeepleCrowd, { HairStyle, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook } from "./Meeple3D"
+import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 
 const TAU = Math.PI * 2
@@ -48,7 +49,9 @@ const HAIR = weightedRandom(
 const HAIR_STYLES = [
     HairStyle.CURLY,
     HairStyle.SHORT,
-    HairStyle.BALD
+    HairStyle.BALD,
+    HairStyle.LONG,
+    HairStyle.SIDE_PART
 ];
 
 const SHIRTS = ["#a01828", "#1a78b0", "#8c2898", "#187830", "#3a8c8c", "#8c8c8c", "#d0a838"]
@@ -112,6 +115,8 @@ ground.receiveShadow = true
 scene.add(ground)
 
 resetRandom(randomSeed())
+
+await loadModels(MEEPLE_MODELS)
 
 const crowd = new MeepleCrowd(GRID * GRID)
 const offset = (GRID - 1) * SPACING / 2

@@ -7,6 +7,7 @@ import {
     Float32BufferAttribute,
     Group,
     InstancedMesh,
+    type Mesh,
     Matrix4,
     MeshBasicMaterial,
     MeshToonMaterial,
@@ -19,7 +20,8 @@ import {
     type Raycaster,
     Vector3
 } from "three"
-import { createBodyGeometry, createCurlyHair, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
+import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
+import { type ModelName, template } from "./scene3d"
 
 const TAU = Math.PI * 2
 
@@ -84,8 +86,24 @@ export enum HairStyle
 {
     CURLY,
     SHORT,
-    BALD
+    BALD,
+    LONG,
+    SIDE_PART
 }
+
+/**
+ * Hair styles modeled in Blender, around the head center
+ */
+const HAIR_MODELS = new Map<HairStyle, ModelName>([
+    [HairStyle.CURLY, "hairCurly"],
+    [HairStyle.LONG, "hairLong"],
+    [HairStyle.SIDE_PART, "hairSidePart"]
+])
+
+/**
+ * Models to load with loadModels() before creating a MeepleCrowd
+ */
+export const MEEPLE_MODELS = [...HAIR_MODELS.values()]
 
 export interface MeepleLook
 {
@@ -265,6 +283,30 @@ function createEyeMaterial(): ShaderMaterial
 }
 
 
+/**
+ * Returns the geometry of a loaded hair model relative to the head center. The objects sit on the head of the
+ * exported meeple, so their transforms are baked in and the head height taken out.
+ */
+function hairGeometry(name: ModelName): BufferGeometry
+{
+    const scene = template(name)
+    scene.updateMatrixWorld(true)
+    let geometry: BufferGeometry | null = null
+    scene.traverse(obj => {
+        const mesh = obj as Mesh
+        if (mesh.isMesh && !geometry)
+        {
+            geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld).translate(0, -HEAD_Y, 0)
+        }
+    })
+    if (!geometry)
+    {
+        throw new Error("No mesh in hair model " + name)
+    }
+    return geometry
+}
+
+
 function createOutlineMaterial(color: Color): MeshBasicMaterial
 {
     const material = new MeshBasicMaterial({ color, side: BackSide })
@@ -280,7 +322,7 @@ function createOutlineMaterial(color: Color): MeshBasicMaterial
 
 /**
  * Instanced 3D meeples built from a few shared parts, like the 2D version. Each part type is one draw call (plus one
- * for its outline), so the number of meeples hardly matters.
+ * for its outline), so the number of meeples hardly matters. The MEEPLE_MODELS must be loaded first.
  */
 export default class MeepleCrowd
 {
@@ -324,7 +366,7 @@ export default class MeepleCrowd
         shortHair.polygonOffset = true
         shortHair.polygonOffsetFactor = shortHair.polygonOffsetUnits = -1
         this.hair = new Map([
-            [HairStyle.CURLY, this.createPart(createCurlyHair(), toon, true)],
+            ...[...HAIR_MODELS].map(([style, name]) => [style, this.createPart(hairGeometry(name), toon, true)] as const),
             [HairStyle.SHORT, this.createPart(createShortHair(), shortHair, false)]
         ])
 
