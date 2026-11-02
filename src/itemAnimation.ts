@@ -36,6 +36,11 @@ export interface ItemPose
      * Angle in radians the item swings around the attachment point with every step, for the widest gait
      */
     swing: number
+    /**
+     * Item drawn instead of the held one. It is not blended: it appears as soon as the transition into the pose
+     * starts, and goes again when the transition into a pose without it starts.
+     */
+    image?: ItemName
 }
 
 export type EasingName = "linear" | "easeIn" | "easeOut" | "easeInOut" | "easeInBack" | "easeOutBack"
@@ -267,6 +272,8 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
                 {
                     lift: 0.3,
                     swing: 0,
+                    // nock an arrow
+                    image: "bowArrow",
                     transition: {
                         duration: 0.4,
                         easing: "easeOut"
@@ -341,8 +348,8 @@ function clampHeight(height: number): number
 
 function pose(base: ItemPose, changes: Partial<ItemPose>): ItemPose
 {
-    const { pivot, height, angle, lift, roll, swing } = { ...base, ...changes }
-    return { pivot, height: clampHeight(height), angle, lift, roll, swing }
+    const { pivot, height, angle, lift, roll, swing, image } = { ...base, ...changes }
+    return { pivot, height: clampHeight(height), angle, lift, roll, swing, image }
 }
 
 
@@ -599,7 +606,8 @@ function copyPose(from: ItemPose, out: ItemPose): ItemPose
 
 
 /**
- * Blends two poses. The angle turns the short way around, the roll does not, so an item can spin.
+ * Blends two poses. The angle turns the short way around, the roll does not, so an item can spin. The image is the
+ * one of the second pose from the start.
  */
 export function blendPose(a: ItemPose, b: ItemPose, t: number, out: ItemPose): ItemPose
 {
@@ -610,5 +618,6 @@ export function blendPose(a: ItemPose, b: ItemPose, t: number, out: ItemPose): I
     out.lift = lerp(a.lift, b.lift)
     out.roll = lerp(a.roll, b.roll)
     out.swing = lerp(a.swing, b.swing)
+    out.image = b.image
     return out
 }

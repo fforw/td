@@ -497,10 +497,17 @@ export default class MeepleCrowd
         {
             throw new Error("Meeple capacity exceeded")
         }
-        const item = meeple.item && this.items.get(meeple.item)
-        if (meeple.item && !item)
+        if (meeple.item)
         {
-            throw new Error("Item not loaded: " + meeple.item)
+            // the held item and the images its animation draws instead
+            const { idle, ready, action } = itemAnimation(meeple.item)
+            for (const name of [meeple.item, ...[idle, ready, ...action.steps].map(p => p.image)])
+            {
+                if (name && !this.items.has(name))
+                {
+                    throw new Error("Item not loaded: " + name)
+                }
+            }
         }
         const i = this.meeples.length
         this.meeples.push(meeple)
@@ -523,12 +530,6 @@ export default class MeepleCrowd
             const color = look.hairStyle === HairStyle.SHORT ? tmpColor.copy(look.hair).lerp(look.skin, 1 / 3) : look.hair
             hair.setColorAt(hair.count++, color)
             hair.instanceColor!.needsUpdate = true
-        }
-
-        // like the hair, items are packed per item in the order the meeples were added
-        if (item)
-        {
-            item.count++
         }
     }
 
@@ -649,13 +650,14 @@ export default class MeepleCrowd
                 counts.set(look.hairStyle, n + 1)
             }
 
-            const item = meeple.item && this.items.get(meeple.item)
-            if (item)
+            if (meeple.item)
             {
-                const animation = itemAnimation(meeple.item!)
+                const animation = itemAnimation(meeple.item)
                 const state = this.itemStates[i]
                 advanceItem(animation, state, !!meeple.ready, time)
                 const { pivot, height, angle, lift } = itemPose(animation, state, time, pose)
+                // the drawn image can change with the pose
+                const image = pose.image ?? meeple.item
 
                 // the attachment point moves with the stretch of the body, its normal by the inverse scale
                 bodySurface(height, angle, attach, normal)
@@ -672,11 +674,18 @@ export default class MeepleCrowd
                     .setPosition(attach)
                     // scale the sprite and move its pivot to the attachment point
                     .multiply(itemShape.makeTranslation(-pivot[0] * ITEM_SIZE, -pivot[1] * ITEM_SIZE, 0).scale(itemScale))
-                const n = itemCounts.get(meeple.item!) ?? 0
-                item.setMatrixAt(n, part.multiplyMatrices(figure, local))
-                itemCounts.set(meeple.item!, n + 1)
+
+                // the instances are packed per image anew every frame
+                const n = itemCounts.get(image) ?? 0
+                this.items.get(image)!.setMatrixAt(n, part.multiplyMatrices(figure, local))
+                itemCounts.set(image, n + 1)
             }
         })
+
+        for (const [name, mesh] of this.items)
+        {
+            mesh.count = itemCounts.get(name) ?? 0
+        }
 
         for (const mesh of [this.body, this.head, this.eyes, ...this.hair.values(), ...this.items.values()])
         {

@@ -179,6 +179,31 @@ describe("advanceItem and itemPose", function () {
         assert(phase(state) === "unreadying")
     })
 
+    it("switches to a step's image as soon as the transition into the step starts", function () {
+        const animation = resolveAnimation({
+            ready: { transition: { duration: 0.5, easing: "linear" } },
+            action: {
+                steps: [
+                    { image: "bowArrow", transition: { duration: 1, easing: "linear" }, hold: 0.5 },
+                    { roll: 1, transition: { duration: 1, easing: "linear" } }
+                ],
+                out: { duration: 1, easing: "linear" }
+            }
+        })
+        const state = newItemState()
+        const image = (time: number) => {
+            advanceItem(animation, state, false, time)
+            return itemPose(animation, state, time, newPose()).image
+        }
+        actItem(animation, state)
+        assert(image(0) === undefined)
+        assert(image(0.25) === undefined)
+        assert(image(0.5) === "bowArrow")
+        assert(image(1.9) === "bowArrow")
+        assert(image(2) === undefined)
+        assert(image(3.5) === undefined)
+    })
+
     it("plays the action again when acting again", function () {
         const state = newItemState()
         actItem(ONCE, state)
