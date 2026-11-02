@@ -20,6 +20,7 @@ import {
     type Raycaster,
     Vector3
 } from "three"
+import { canEquip, type Character, checkClasses } from "./character"
 import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "./itemAnimation"
 import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "./itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
@@ -167,6 +168,11 @@ export interface Meeple
      * Item held in the left hand, animated like in the right one, but mirrored. It must not change either.
      */
     leftItem?: ItemName
+    /**
+     * Stats and classes. With them, the meeple must meet the minimum stats of its classes and be allowed to hold its
+     * items.
+     */
+    character?: Character
     /**
      * Holds the items readied. Acting readies them as well.
      */
@@ -509,6 +515,14 @@ export default class MeepleCrowd
         if (this.meeples.length >= this.capacity)
         {
             throw new Error("Meeple capacity exceeded")
+        }
+        if (meeple.character)
+        {
+            const problem = checkClasses(meeple.character) ?? canEquip(meeple.character, meeple.item, meeple.leftItem)
+            if (problem)
+            {
+                throw new Error(meeple.name + ": " + problem)
+            }
         }
         for (const item of [meeple.item, meeple.leftItem])
         {
