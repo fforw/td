@@ -1,0 +1,1701 @@
+<title>Stone Script Specimen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: specimen sheet, a header with the rules of the style, then a grid of glyph cards, then the radical families */
+:root {
+    --paper: #eef0f3;
+    --card: #f9fafb;
+    --ink: #1d2340;
+    --muted: #5d6478;
+    --rule: #d3d7e0;
+    --accent: #c2410c;
+    --ghost: rgba(29, 35, 64, 0.10);
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --paper: #14172a; --card: #1b1f36; --ink: #e4e7f2; --muted: #9aa1b8; --rule: #2d3350;
+        --accent: #fb923c; --ghost: rgba(228, 231, 242, 0.12); color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --paper: #14172a; --card: #1b1f36; --ink: #e4e7f2; --muted: #9aa1b8; --rule: #2d3350;
+    --accent: #fb923c; --ghost: rgba(228, 231, 242, 0.12); color-scheme: dark;
+}
+
+body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+}
+.wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-block: 40px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 40px;
+}
+header { display: grid; gap: 16px; }
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(32px, 6vw, 56px);
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+}
+h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 24px;
+    margin: 0;
+    text-wrap: balance;
+}
+.lede { max-width: 65ch; margin: 0; color: var(--muted); }
+
+.rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px 24px;
+    padding: 16px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+}
+.rule { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; font-size: 14px; }
+.rule canvas { width: 44px; height: 44px; }
+.rule b { display: block; font-weight: 700; }
+.rule span { color: var(--muted); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+button, .toggle {
+    font: 500 14px var(--body);
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+}
+button:hover, .toggle:hover { border-color: var(--ink); }
+button:focus-visible, .toggle:focus-within, .card:focus-visible, .chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; border: 0; padding: 0; margin: 0; }
+.seg legend { float: left; margin-right: 8px; }
+.seg label {
+    font: 500 14px var(--body);
+    padding: 8px 14px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--card);
+    cursor: pointer;
+}
+.seg label:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.seg label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.swatches { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.swatches .src { margin-right: 4px; }
+.swatch { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--rule); display: inline-block; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; }
+.toggle input { accent-color: var(--accent); margin: 0; }
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+}
+.groups { display: grid; gap: 32px; }
+.group { display: grid; gap: 12px; min-width: 0; }
+.group-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.group-head h2 { display: flex; align-items: baseline; gap: 10px; }
+.radical { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif; font-weight: 400; }
+.group-head .src { margin-left: auto; }
+.card .rad { color: var(--accent); }
+.card {
+    background: var(--card);
+    display: grid;
+    gap: 6px;
+    padding: 14px 14px 12px;
+    cursor: pointer;
+    border: 0;
+    border-radius: 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+}
+.card:hover { background: var(--paper); }
+.card canvas { width: 100%; aspect-ratio: 1; max-width: 100%; display: block; }
+.meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.concept { font-weight: 700; font-size: 15px; }
+.src { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.families { display: grid; gap: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+    font: 500 14px var(--body);
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--card);
+    color: var(--ink);
+    cursor: pointer;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--card); }
+.note { font-size: 14px; color: var(--muted); max-width: 65ch; margin: 0; }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 16px; }
+footer a { color: inherit; }
+</style>
+
+<div class="wrap">
+    <header>
+        <div class="eyebrow">Treasure &amp; Dread · glyph language</div>
+        <h1>Stone script</h1>
+        <p class="lede">Each glyph is built from the stroke order and stroke types of a source character. The layout of the
+            source stays, the shapes change. Every stroke becomes one tile, picked by the kind of stroke and sized by its
+            length. The polygon tiles follow the regular n-gons of gen-100. Every root is composed once and reused, so 心 looks the same in heart, anger, love and
+            fear. Roots are laid out one level deep, so nested parts stay large. Like in gen-100,
+            each polygon is set face to face against the one before it where there is room, on
+            a side picked by the world seed. Each world also deals the polygons out anew, and the stroke kind left with no
+            polygon becomes a line below its group: one game world, one fixed form per root. Colors come from
+            one of the curated palettes: a tile is drawn in the main color 65% of the time, the alternate color 30% and
+            the accent 5%. Roots and tiles settle around each other without overlapping; roots keep a little more distance, joined by a short dash across the gap, and a
+            loose stroke next to a root is joined to it by a dot. Click a glyph to watch it being written in stroke order.</p>
+        <div class="rules" id="rules"></div>
+        <div class="controls">
+            <fieldset class="seg">
+                <legend class="eyebrow">Style</legend>
+                <label for="style-polygons"><input type="radio" name="style" id="style-polygons" value="polygons" checked> Polygons</label>
+                <label for="style-stones"><input type="radio" name="style" id="style-stones" value="stones"> Stones</label>
+                <label for="style-bars"><input type="radio" name="style" id="style-bars" value="bars"> Bars and arcs</label>
+            </fieldset>
+            <button type="button" id="replay">Write all again</button>
+            <button type="button" id="world">Another world</button>
+            <button type="button" id="palette">Another palette</button>
+            <span class="swatches" id="swatches" aria-live="polite"></span>
+            <label class="toggle" for="ghost"><input type="checkbox" id="ghost"> Show source character behind glyph</label>
+        </div>
+    </header>
+
+    <main class="groups" id="groups"></main>
+
+    <section class="families">
+        <h2>Families</h2>
+        <p class="note">Glyphs that share a component in the source share the shapes for it. Pick a component to mark its
+            strokes in every glyph that contains it.</p>
+        <div class="chips" id="chips"></div>
+    </section>
+
+    <footer>Stroke data from <a href="https://kanjivg.tagaini.net/" rel="noopener">KanjiVG</a> by Ulrich Apel,
+        CC BY-SA 3.0. The derived glyphs are shared under the same license.</footer>
+</div>
+
+<script>
+const DATA = /*DATA*/null
+
+const BOX = 109
+const GRID = BOX / 12
+const T = 7.5
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+const snap = v => Math.round(v / (GRID / 2)) * (GRID / 2)
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1])
+
+function pathLength(pts)
+{
+    let l = 0
+    for (let i = 1; i < pts.length; i++) l += dist(pts[i - 1], pts[i])
+    return l
+}
+
+/**
+ * Splits a sampled stroke at sharp corners
+ */
+function splitCorners(pts)
+{
+    const cuts = [0]
+    for (let i = 2; i < pts.length - 2; i++)
+    {
+        const a = pts[i - 2], b = pts[i], c = pts[i + 2]
+        const a1 = Math.atan2(b[1] - a[1], b[0] - a[0])
+        const a2 = Math.atan2(c[1] - b[1], c[0] - b[0])
+        let turn = Math.abs(a2 - a1)
+        if (turn > Math.PI) turn = 2 * Math.PI - turn
+        if (turn > 1.0 && i - cuts[cuts.length - 1] > 2) cuts.push(i)
+    }
+    cuts.push(pts.length - 1)
+    const segs = []
+    for (let k = 1; k < cuts.length; k++) segs.push(pts.slice(cuts[k - 1], cuts[k] + 1))
+    return segs
+}
+
+/**
+ * Circle through three points, or null if they are nearly collinear
+ */
+function circle(p0, p1, p2)
+{
+    const ax = p1[0] - p0[0], ay = p1[1] - p0[1]
+    const bx = p2[0] - p0[0], by = p2[1] - p0[1]
+    const d = 2 * (ax * by - ay * bx)
+    if (Math.abs(d) < 1e-6) return null
+    const a2 = ax * ax + ay * ay, b2 = bx * bx + by * by
+    const cx = p0[0] + (by * a2 - ay * b2) / d
+    const cy = p0[1] + (ax * b2 - bx * a2) / d
+    return { cx, cy, r: Math.hypot(cx - p0[0], cy - p0[1]), ccw: d < 0 }
+}
+
+/**
+ * Turns a stroke into shapes of the stone style: bars, arcs, stones, joints and hook beads
+ */
+function shapesFor(stroke)
+{
+    const { pts, type } = stroke
+    const total = pathLength(pts)
+    if (total < 14)
+    {
+        const c = pts[Math.floor(pts.length / 2)]
+        return [{ kind: "stone", x: snap(c[0]), y: snap(c[1]), r: T * 0.95 }]
+    }
+
+    let segs = splitCorners(pts)
+    const shapes = []
+    let hook = null
+    const last = segs[segs.length - 1]
+    if (segs.length > 1 && pathLength(last) < total * 0.22)
+    {
+        hook = last[last.length - 1]
+        segs = segs.slice(0, -1)
+    }
+
+    segs.forEach((seg, i) => {
+        const a = seg[0], b = seg[seg.length - 1]
+        const L = dist(a, b)
+        const m = seg[Math.floor(seg.length / 2)]
+        const dev = Math.abs((b[0] - a[0]) * (a[1] - m[1]) - (a[0] - m[0]) * (b[1] - a[1])) / Math.max(L, 1e-6)
+        const angle = Math.atan2(b[1] - a[1], b[0] - a[0])
+        const slant = Math.abs(Math.sin(2 * angle))
+
+        if (dev / L < 0.07 && slant < 0.45)
+        {
+            // close enough to horizontal or vertical: a square-ended bar on the grid
+            const horizontal = Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))
+            const x0 = snap(a[0]), y0 = snap(a[1]), x1 = snap(b[0]), y1 = snap(b[1])
+            shapes.push(horizontal
+                ? { kind: "bar", x0, y0: (y0 + y1) / 2, x1, y1: (y0 + y1) / 2 }
+                : { kind: "bar", x0: (x0 + x1) / 2, y0, x1: (x0 + x1) / 2, y1 })
+        }
+        else
+        {
+            // slants and curves become circular arcs, slants get a fixed bow so they read as round
+            let mid = m
+            if (dev / L < 0.07)
+            {
+                const nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L
+                const bow = L * 0.12 * (angle > 0 ? 1 : -1)
+                mid = [(a[0] + b[0]) / 2 + nx * bow, (a[1] + b[1]) / 2 + ny * bow]
+            }
+            const c = circle(a, mid, b)
+            if (!c || c.r > BOX * 4)
+            {
+                shapes.push({ kind: "bar", x0: a[0], y0: a[1], x1: b[0], y1: b[1] })
+            }
+            else
+            {
+                const s = Math.atan2(a[1] - c.cy, a[0] - c.cx)
+                let e = Math.atan2(b[1] - c.cy, b[0] - c.cx)
+                // go the way through the middle point
+                const mAng = Math.atan2(mid[1] - c.cy, mid[0] - c.cx)
+                const norm = v => (v % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+                const ccw = norm(mAng - s) > norm(e - s)
+                shapes.push({ kind: "arc", cx: c.cx, cy: c.cy, r: c.r, s, e, ccw })
+            }
+        }
+        if (i > 0)
+        {
+            shapes.push({ kind: "joint", x: snap(a[0]), y: snap(a[1]) })
+        }
+    })
+
+    if (hook)
+    {
+        shapes.push({ kind: "bead", x: snap(hook[0]), y: snap(hook[1]), r: T * 0.75 })
+    }
+    else if (type.includes("㇏"))
+    {
+        const end = pts[pts.length - 1]
+        shapes.push({ kind: "ring", x: snap(end[0]), y: snap(end[1]), r: T * 0.9 })
+    }
+    return shapes
+}
+
+const CELL = BOX / 6
+
+/**
+ * Turns a stroke into a single tile of the stones style: the stroke's class picks the tile, its length the size and
+ * its centroid the place
+ */
+function stoneFor(stroke)
+{
+    const { pts, type } = stroke
+    const total = pathLength(pts)
+    let cx = 0, cy = 0
+    for (const p of pts) { cx += p[0]; cy += p[1] }
+    const x = cx / pts.length
+    const y = cy / pts.length
+
+    if (total < 14) return [{ kind: "dot", x, y, size: 4 }]
+
+    // broad strokes become large shapes, small marks small ones
+    const size = Math.max(5, Math.min(19, 3 + total * 0.16))
+    const a = pts[0], b = pts[pts.length - 1]
+    const L = dist(a, b)
+    const m = pts[Math.floor(pts.length / 2)]
+    const dev = Math.abs((b[0] - a[0]) * (a[1] - m[1]) - (a[0] - m[0]) * (b[1] - a[1])) / Math.max(L, 1e-6)
+    const angle = Math.atan2(b[1] - a[1], b[0] - a[0])
+    const segs = splitCorners(pts)
+    const lastSeg = segs[segs.length - 1]
+    const hooked = segs.length > 1 && pathLength(lastSeg) < total * 0.22
+    const cornered = segs.length - (hooked ? 1 : 0) > 1
+
+    const shapes = []
+    if (cornered) shapes.push({ kind: "frame", x, y, size })
+    else if (dev / Math.max(L, 1) > 0.18) shapes.push({ kind: "ring", x, y, size })
+    else
+    {
+        const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle))
+        if (c > 0.9) shapes.push({ kind: "square", x, y, size })
+        else if (s > 0.9) shapes.push({ kind: "disc", x, y, size })
+        else if (Math.cos(angle) < 0) shapes.push({ kind: "half", x, y, size, angle })
+        else shapes.push({ kind: "quarter", x, y, size, angle })
+    }
+    if (hooked)
+    {
+        const end = lastSeg[lastSeg.length - 1], start = lastSeg[0]
+        const hx = end[0] - start[0], hy = end[1] - start[1], hl = Math.hypot(hx, hy) || 1
+        shapes.push({ kind: "dot", x: x + hx / hl * (size + 5), y: y + hy / hl * (size + 5), size: 3 })
+    }
+    else if (type.includes("㇏"))
+    {
+        shapes.push({ kind: "dot", x: x + size + 5, y: y + size * 0.6, size: 3 })
+    }
+    return shapes
+}
+
+/**
+ * Radius of the circle that holds the given tile
+ */
+function bound(s)
+{
+    switch (s.kind)
+    {
+        case "square":
+        case "frame": return s.size * 1.3
+        case "half": return s.size * 1.15
+        case "quarter": return s.size * 1.25
+        case "orbit": return s.size * (1 + s.thick / 2)
+        case "line": return s.size
+        case "bracket": return s.size * 1.2
+        default: return s.size
+    }
+}
+
+/**
+ * Packs items, each a rigid group of shapes, tightly without overlap. Overlap is tested shape against shape, so items
+ * can nest into each other's gaps. Items are drawn towards the common center to close gaps, and a little towards where
+ * they started, so the composition keeps the source's balance. Small items give way more than large ones.
+ */
+/**
+ * Joints connect parts of a glyph; they take no room in the packing
+ */
+const isJoint = sh => sh.kind === "link" || sh.kind === "knot"
+
+function packItems(items)
+{
+    const GAP = 2.5
+    // extra distance between two roots, room for the dash that links them, and between a root and a loose stroke,
+    // room for the dot that joins them
+    const ROOT_GAP = 6
+    const LOOSE_GAP = 4
+    const move = (it, dx, dy) => {
+        it.x += dx; it.y += dy
+        for (const sh of it.shapes) { sh.x += dx; sh.y += dy }
+    }
+    const weight = it => it.shapes.reduce((w, sh) => isJoint(sh) ? w : w + bound(sh) ** 2, 0)
+
+    // push that separates two items: as deep as their deepest overlap, along the sum of all overlaps, so a small item
+    // caught between two shapes of a large one gets out instead of bouncing between them
+    const overlap = (a, b) => {
+        let vx = 0, vy = 0, depth = 0
+        const gap = a.root && b.root ? GAP + ROOT_GAP : a.root || b.root ? GAP + LOOSE_GAP : GAP
+        for (const sa of a.shapes)
+        {
+            if (isJoint(sa)) continue
+            for (const sb of b.shapes)
+            {
+                if (isJoint(sb)) continue
+                let dx = sb.x - sa.x, dy = sb.y - sa.y
+                let d = Math.hypot(dx, dy)
+                const dp = bound(sa) + bound(sb) + gap - d
+                if (dp <= 0) continue
+                if (d < 1e-3) { dx = b.x - a.x || 1; dy = b.y - a.y; d = Math.hypot(dx, dy) }
+                vx += dx / d * dp
+                vy += dy / d * dp
+                depth = Math.max(depth, dp)
+            }
+        }
+        if (!depth) return null
+        let len = Math.hypot(vx, vy)
+        if (len < depth * 0.2)
+        {
+            // the overlaps cancel out, leave along the line between the items
+            vx = b.x - a.x || 1; vy = b.y - a.y; len = Math.hypot(vx, vy)
+        }
+        return { depth, nx: vx / len, ny: vy / len }
+    }
+    const separate = () => {
+        let moved = false
+        for (let i = 0; i < items.length; i++)
+        {
+            for (let j = i + 1; j < items.length; j++)
+            {
+                const o = overlap(items[i], items[j])
+                if (!o) continue
+                const wa = weight(items[i]), wb = weight(items[j])
+                const fa = wb / (wa + wb), fb = 1 - fa
+                move(items[i], -o.nx * o.depth * fa, -o.ny * o.depth * fa)
+                move(items[j], o.nx * o.depth * fb, o.ny * o.depth * fb)
+                moved = true
+            }
+        }
+        return moved
+    }
+
+    const anchors = items.map(it => [it.x, it.y])
+    const total = items.reduce((w, it) => w + weight(it), 0)
+    for (let round = 0; round < 120; round++)
+    {
+        let cx = 0, cy = 0
+        for (const it of items) { cx += it.x * weight(it) / total; cy += it.y * weight(it) / total }
+        items.forEach((it, i) => move(it,
+            (cx - it.x) * 0.08 + (anchors[i][0] - it.x) * 0.02,
+            (cy - it.y) * 0.08 + (anchors[i][1] - it.y) * 0.02))
+        for (let k = 0; k < 6 && separate(); k++) {}
+    }
+    for (let k = 0; k < 400 && separate(); k++) {}
+
+    // an item can still be stuck in a pocket of a larger one; walk it out away from the larger item's center
+    for (let i = 0; i < items.length; i++)
+    {
+        for (let j = 0; j < items.length; j++)
+        {
+            if (i === j || !overlap(items[i], items[j])) continue
+            const [big, small] = weight(items[i]) >= weight(items[j]) ? [items[i], items[j]] : [items[j], items[i]]
+            let dx = small.x - big.x, dy = small.y - big.y
+            const len = Math.hypot(dx, dy) || 1
+            dx = (dx || 1) / len; dy /= len
+            for (let step = 0; step < 400 && items.some(it => it !== small && overlap(it, small)); step++)
+            {
+                move(small, dx, dy)
+            }
+        }
+    }
+}
+
+const ENTRIES = new Map(DATA.map(e => [e.char, e]))
+
+/**
+ * A root stands for its base form, so a variant like 忄 is written like 心
+ */
+const nodeKey = node => node.original && !node.partial ? node.original : node.el
+
+function nodeStrokes(node)
+{
+    return node.kids.flatMap(k => typeof k === "number" ? [k] : nodeStrokes(k))
+}
+
+/**
+ * Compositions per root, centered on 0 and scaled so the larger side is 1. Every root is composed once and then
+ * reused everywhere, so it always looks the same. A root that is also a character of its own is composed from that
+ * character.
+ */
+const compositions = new Map()
+const composing = new Set()
+
+function composition(key, node, entry)
+{
+    let comp = compositions.get(key)
+    if (!comp)
+    {
+        const own = ENTRIES.get(key)
+        composing.add(key)
+        comp = own && own !== entry ? compose(own.tree, own, true) : compose(node, entry, true)
+        composing.delete(key)
+        compositions.set(key, comp)
+    }
+    return comp
+}
+
+/**
+ * Composes a component from its strokes and sub-roots. Shapes carry the rank of their stroke within the component, so
+ * the stroke order survives when the composition is used in another character.
+ */
+/**
+ * Width of an orbit, and the gap between a group and its first orbit or between two orbits
+ */
+const ORBIT_WIDTH = 3.5
+const ORBIT_GAP = 3.5
+
+/**
+ * Seed of the game world. Within one world every root has one fixed form, another world arranges the same roots a
+ * little differently. Read from a "#seed-123" link, random otherwise.
+ */
+let worldSeed = Number(/seed-(\d+)/.exec(location.hash ?? "")?.[1] ?? Math.floor(Math.random() * 1e6))
+
+/**
+ * Number in [0, 1) that only depends on the given text
+ */
+function hash01(text)
+{
+    let h = 2166136261
+    for (const c of text)
+    {
+        h = Math.imul(h ^ c.codePointAt(0), 16777619)
+    }
+    h = (h + 0x6d2b79f5) | 0
+    let t = Math.imul(h ^ (h >>> 15), 1 | h)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+
+/**
+ * Corners of a tile as a convex polygon, null for shapes that aren't tiles
+ */
+function corners(sh)
+{
+    if (sh.kind === "line")
+    {
+        const h = sh.size * sh.thick / 2
+        return [[sh.x - sh.size, sh.y - h], [sh.x + sh.size, sh.y - h], [sh.x + sh.size, sh.y + h], [sh.x - sh.size, sh.y + h]]
+    }
+    if (sh.kind === "ngon")
+    {
+        const out = []
+        for (let i = 0; i < sh.sides; i++)
+        {
+            const a = sh.rot + i * 2 * Math.PI / sh.sides
+            out.push([sh.x + Math.cos(a) * sh.size, sh.y + Math.sin(a) * sh.size])
+        }
+        return out
+    }
+    if (sh.kind === "bracket")
+    {
+        const h = sh.size * 0.8, cos = Math.cos(sh.rot), sin = Math.sin(sh.rot)
+        return [[-h, -h], [h, -h], [h, h], [-h, h]].map(([x, y]) => [sh.x + x * cos - y * sin, sh.y + x * sin + y * cos])
+    }
+    return null
+}
+
+/**
+ * Whether two convex polygons are at least `gap` apart, by separating axes
+ */
+function apart(pa, pb, gap)
+{
+    for (const poly of [pa, pb])
+    {
+        for (let i = 0; i < poly.length; i++)
+        {
+            const [x0, y0] = poly[i], [x1, y1] = poly[(i + 1) % poly.length]
+            const len = Math.hypot(x1 - x0, y1 - y0)
+            const nx = (y1 - y0) / len, ny = -(x1 - x0) / len
+            let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity
+            for (const [x, y] of pa) { const d = x * nx + y * ny; minA = Math.min(minA, d); maxA = Math.max(maxA, d) }
+            for (const [x, y] of pb) { const d = x * nx + y * ny; minB = Math.min(minB, d); maxB = Math.max(maxB, d) }
+            if (maxA + gap <= minB || maxB + gap <= minA) return true
+        }
+    }
+    return false
+}
+
+/**
+ * Gap between two aligned faces
+ */
+const ALIGN_GAP = 2.5
+
+/**
+ * Sides of a tile for alignment: count, angle of the first side's outward normal and the distance of the sides from
+ * the center
+ */
+function sidesOf(sh)
+{
+    if (sh.kind === "bracket") return { count: 4, normal: sh.rot, inner: sh.size * 0.8, length: sh.size * 1.6 }
+    return {
+        count: sh.sides,
+        normal: sh.rot + Math.PI / sh.sides,
+        inner: inradius(sh),
+        length: 2 * sh.size * Math.sin(Math.PI / sh.sides)
+    }
+}
+
+/**
+ * Turns a tile so one of its sides has the given outward normal
+ */
+function turnTo(sh, normal)
+{
+    sh.rot = sh.kind === "bracket" ? normal : normal - Math.PI / sh.sides
+}
+
+/**
+ * The main feature of gen-100: every polygon tile is set against the one before it, face to face. It sits on the
+ * middle of one of the previous tile's sides, turned so one of its own sides runs parallel to it. Line marks take part
+ * like the polygons and are sized to the side they sit on. Which side is chosen by seeded chance, sides looking towards the tile more likely; a tile only
+ * moves if the new place is free, otherwise the next side is tried.
+ */
+function alignTiles(items, key)
+{
+    const tiles = items
+        .filter(it => !it.root && (it.shapes[0].kind === "ngon" || it.shapes[0].kind === "bracket"))
+        .map(it => it.shapes[0])
+    const others = sh => items.flatMap(it => it.shapes).filter(o => o !== sh && corners(o))
+    for (let i = 1; i < tiles.length; i++)
+    {
+        const prev = tiles[i - 1], tile = tiles[i]
+        const { count, normal, inner } = sidesOf(prev)
+        const toward = Math.atan2(tile.y - prev.y, tile.x - prev.x)
+        const faces = []
+        for (let k = 0; k < count; k++)
+        {
+            const a = normal + k * 2 * Math.PI / count
+            const off = Math.abs(Math.atan2(Math.sin(a - toward), Math.cos(a - toward)))
+            // weighted random order, u^(1 / weight), the larger the earlier. Every side has a chance, the ones
+            // looking towards the tile a better one.
+            const weight = 1.2 + Math.cos(off)
+            faces.push({ a, order: Math.pow(hash01(key + "/" + i + "/" + k), 1 / weight) })
+        }
+        faces.sort((f, g) => g.order - f.order)
+
+        const old = { x: tile.x, y: tile.y, rot: tile.rot, size: tile.size }
+        // a line mark set against a side is exactly as long as that side
+        if (tile.kind === "bracket") tile.size = sidesOf(prev).length / 1.6
+        let placed = false
+        for (const { a } of faces)
+        {
+            const dist = inner + ALIGN_GAP + sidesOf(tile).inner
+            tile.x = prev.x + Math.cos(a) * dist
+            tile.y = prev.y + Math.sin(a) * dist
+            // one of the tile's sides faces back along a
+            turnTo(tile, a + Math.PI)
+            const poly = corners(tile)
+            if (others(tile).every(o => apart(poly, corners(o), ALIGN_GAP * 0.99)))
+            {
+                placed = true
+                break
+            }
+        }
+        if (!placed) Object.assign(tile, old)
+    }
+}
+
+/**
+ * How likely a tile is drawn in the main, the alternate (secondary) or the accent color
+ */
+const ROLE_WEIGHTS = [0.65, 0.3, 0.05]
+
+/**
+ * Color role for a number in [0, 1), picked by ROLE_WEIGHTS
+ */
+function pickRole(u)
+{
+    for (let i = 0; i < ROLE_WEIGHTS.length; i++)
+    {
+        if (u < ROLE_WEIGHTS[i]) return i
+        u -= ROLE_WEIGHTS[i]
+    }
+    return 0
+}
+
+/**
+ * Gives every tile of a group that has no color role yet one, seeded by world and group. Tiles of roots come with the
+ * roles of the root's composition, so a root keeps its colors in every glyph of a world.
+ */
+function assignRoles(items, key)
+{
+    let index = 0
+    for (const sh of items.flatMap(it => it.shapes))
+    {
+        if (isJoint(sh)) sh.role = 0
+        else if (sh.role === undefined) sh.role = pickRole(hash01(key + "/role/" + index++))
+    }
+}
+
+/**
+ * Puts an arc around the given items for each curved stroke, one further out than the other. Start and span are
+ * multiples of a quarter turn, seeded by the group so a root always gets the same arcs.
+ */
+/**
+ * Length of a group line compared to the width of its group
+ */
+const LINE_LENGTH = 0.618
+
+/**
+ * Puts a horizontal line centered below the given items for each stroke of the line kind, a little shorter than the
+ * group is wide. Further lines go further down.
+ */
+function addLines(items, ranks)
+{
+    const tiles = items.flatMap(it => it.shapes).filter(sh => !isJoint(sh))
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const sh of tiles)
+    {
+        const r = bound(sh)
+        x0 = Math.min(x0, sh.x - r); y0 = Math.min(y0, sh.y - r)
+        x1 = Math.max(x1, sh.x + r); y1 = Math.max(y1, sh.y + r)
+    }
+    const half = Math.max((x1 - x0) / 2 * LINE_LENGTH, ORBIT_WIDTH * 2)
+    const cx = (x0 + x1) / 2
+    ranks.forEach((rank, i) => {
+        const offset = ORBIT_GAP + ORBIT_WIDTH / 2 + i * (ORBIT_WIDTH + ORBIT_GAP)
+        const line = { kind: "line", x: cx, y: y1 + offset, size: half, thick: ORBIT_WIDTH / half, rank }
+        items.push({ x: line.x, y: line.y, r: half, shapes: [line] })
+    })
+}
+
+function addOrbits(items, ranks, key)
+{
+    const tiles = items.flatMap(it => it.shapes).filter(sh => !isJoint(sh))
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const sh of tiles)
+    {
+        const r = bound(sh)
+        x0 = Math.min(x0, sh.x - r); y0 = Math.min(y0, sh.y - r)
+        x1 = Math.max(x1, sh.x + r); y1 = Math.max(y1, sh.y + r)
+    }
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const inner = Math.max(...tiles.map(sh => Math.hypot(sh.x - cx, sh.y - cy) + bound(sh)))
+    const QUARTER = Math.PI / 2
+    ranks.forEach((rank, i) => {
+        const radius = inner + ORBIT_GAP + ORBIT_WIDTH / 2 + i * (ORBIT_WIDTH + ORBIT_GAP)
+        const orbit = {
+            kind: "orbit",
+            x: cx,
+            y: cy,
+            size: radius,
+            thick: ORBIT_WIDTH / radius,
+            start: Math.floor(hash01(key + "/start/" + i) * 4) * QUARTER,
+            span: (1 + Math.floor(hash01(key + "/span/" + i) * 3)) * QUARTER,
+            rank
+        }
+        items.push({ x: cx, y: cy, r: bound(orbit), shapes: [orbit] })
+    })
+}
+
+function compose(node, entry, flat = false)
+{
+    const order = nodeStrokes(node)
+    const rank = new Map(order.map((s, i) => [s, i]))
+    const items = []
+    // curved strokes become arcs around the group instead of tiles
+    const curved = []
+    // so do strokes of the kind this world deals a line to, below the group
+    const lined = []
+
+    const addStroke = index => {
+        const made = STYLES[style].make(entry.strokes[index])
+        if (style === "polygons" && made[0].curved)
+        {
+            curved.push(rank.get(index))
+            return
+        }
+        if (style === "polygons" && made[0].line)
+        {
+            lined.push(rank.get(index))
+            return
+        }
+        for (const sh of made)
+        {
+            const shape = { ...sh, rank: rank.get(index) }
+            items.push({ x: shape.x, y: shape.y, r: bound(shape), shapes: [shape] })
+        }
+    }
+    const addKids = n => {
+        for (const kid of n.kids)
+        {
+            if (typeof kid === "number")
+            {
+                addStroke(kid)
+                continue
+            }
+            const strokes = nodeStrokes(kid)
+            const key = nodeKey(kid)
+            if (strokes.length === 1)
+            {
+                addStroke(strokes[0])
+                continue
+            }
+            if (flat || composing.has(key))
+            {
+                addKids(kid)
+                continue
+            }
+            const comp = composition(key, kid, entry)
+            let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+            for (const i of strokes)
+            {
+                for (const [px, py] of entry.strokes[i].pts)
+                {
+                    x0 = Math.min(x0, px); y0 = Math.min(y0, py); x1 = Math.max(x1, px); y1 = Math.max(y1, py)
+                }
+            }
+            // roughly the area the root has in the source, with its own proportions. Small roots are scaled down less,
+            // so roots nested deep inside a character don't shrink away.
+            const extent = Math.sqrt(Math.max(x1 - x0, 10) * Math.max(y1 - y0, 10))
+            const k = Math.pow(extent, 0.6) * Math.pow(BOX, 0.4) / Math.sqrt(comp.w * comp.h) * (style === "polygons" ? TILE_SCALE : 1)
+            const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+            const shapes = comp.shapes.map(sh => ({
+                ...sh,
+                x: cx + sh.x * k,
+                y: cy + sh.y * k,
+                size: sh.size * k,
+                // the root may have a different number of strokes here (忄 for 心), spread its ranks over ours
+                rank: rank.get(strokes[Math.min(strokes.length - 1, Math.floor(sh.rank * strokes.length / comp.n))]),
+                // every root has its own color, the same in every glyph
+                tint: isJoint(sh) ? undefined : key
+            }))
+            const r = Math.max(...shapes.map(sh => Math.hypot(sh.x - cx, sh.y - cy) + bound(sh)))
+            items.push({ x: cx, y: cy, r, shapes, root: true })
+        }
+    }
+    addKids(node)
+    packItems(items)
+    if (style === "polygons") alignTiles(items, worldSeed + "/" + nodeKey(node))
+    linkRoots(items)
+    if (lined.length) addLines(items, lined)
+    if (curved.length) addOrbits(items, curved, worldSeed + "/" + nodeKey(node))
+    assignRoles(items, worldSeed + "/" + nodeKey(node))
+
+    const shapes = items.flatMap(it => it.shapes)
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    for (const sh of shapes)
+    {
+        const r = bound(sh)
+        x0 = Math.min(x0, sh.x - r); y0 = Math.min(y0, sh.y - r)
+        x1 = Math.max(x1, sh.x + r); y1 = Math.max(y1, sh.y + r)
+    }
+    const scale = Math.max(x1 - x0, y1 - y0)
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    for (const sh of shapes)
+    {
+        sh.x = (sh.x - cx) / scale
+        sh.y = (sh.y - cy) / scale
+        sh.size /= scale
+    }
+    return { shapes, n: order.length, w: (x1 - x0) / scale, h: (y1 - y0) / scale }
+}
+
+const inradius = sh => sh.kind === "ngon" ? sh.size * Math.cos(Math.PI / sh.sides) : sh.size
+
+/**
+ * Normal of the face of `sh` that looks the most towards the given direction
+ */
+function faceNormal(sh, dx, dy)
+{
+    const toward = Math.atan2(dy, dx)
+    if (sh.kind !== "ngon") return toward
+    const step = 2 * Math.PI / sh.sides
+    let best = 0, bestDiff = Infinity
+    for (let i = 0; i < sh.sides; i++)
+    {
+        const a = sh.rot + (i + 0.5) * step
+        const diff = Math.abs(Math.atan2(Math.sin(a - toward), Math.cos(a - toward)))
+        if (diff < bestDiff) { bestDiff = diff; best = a }
+    }
+    return best
+}
+
+/**
+ * Middle of the gap between two shapes, seen from the face of the larger one, with that face's normal. Returns null
+ * unless that face really looks at the other shape across a gap wide enough for a joint.
+ */
+function gapAcross(sa, sb)
+{
+    const [ref, other] = sa.size >= sb.size ? [sa, sb] : [sb, sa]
+    const dx = other.x - ref.x, dy = other.y - ref.y
+    const a = faceNormal(ref, dx, dy)
+    const nx = Math.cos(a), ny = Math.sin(a)
+    const d = Math.hypot(dx, dy)
+    if ((dx * nx + dy * ny) / d < 0.8) return null
+    const inner = inradius(ref)
+    const span = dx * nx + dy * ny - inradius(other) - inner
+    if (span < 2.5) return null
+    // slide along the face towards the other shape, but stay on the face
+    const side = -dx * ny + dy * nx
+    const halfFace = ref.kind === "ngon" ? ref.size * Math.sin(Math.PI / ref.sides) * 0.6 : 0
+    const shift = Math.max(-halfFace, Math.min(halfFace, side))
+    const mid = inner + span / 2
+    return { x: ref.x + nx * mid - ny * shift, y: ref.y + ny * mid + nx * shift, angle: a, span }
+}
+
+/**
+ * Where to join two sets of shapes: across the narrowest gap between two tiles whose faces look at each other, as long
+ * as the gap is at most `maxGap`. Null if there is no such place.
+ */
+function joint(a, b, maxGap)
+{
+    const pairs = []
+    for (const sa of a)
+    {
+        if (isJoint(sa)) continue
+        for (const sb of b)
+        {
+            if (isJoint(sb)) continue
+            const gap = Math.hypot(sb.x - sa.x, sb.y - sa.y) - bound(sa) - bound(sb)
+            if (gap <= maxGap) pairs.push({ gap, sa, sb })
+        }
+    }
+    pairs.sort((p, q) => p.gap - q.gap)
+    for (const { gap, sa, sb } of pairs)
+    {
+        const g = gapAcross(sa, sb)
+        if (g) return { ...g, gap }
+    }
+    return null
+}
+
+const firstRank = item => Math.min(...item.shapes.filter(sh => !isJoint(sh)).map(sh => sh.rank))
+
+/**
+ * Joins the parts of a composition. Every two roots that sit next to each other get a short dash, crossing the gap at
+ * right angles to facing sides, like a seam. A loose stroke next to a root is joined to the nearest one by a dot.
+ * Joints are drawn when the later of the two parts starts.
+ */
+function linkRoots(items)
+{
+    const roots = items.filter(it => it.root)
+    for (let i = 0; i < roots.length; i++)
+    {
+        for (let j = i + 1; j < roots.length; j++)
+        {
+            // only roots that touch, give or take the extra gap kept between them
+            const g = joint(roots[i].shapes, roots[j].shapes, 12)
+            if (g) roots[j].shapes.push({ kind: "link", x: g.x, y: g.y, size: g.span * 0.32, angle: g.angle, rank: firstRank(roots[j]) })
+        }
+    }
+
+    // the main tile of each loose stroke; hooks and sweeps add a second, smaller one
+    const loose = new Map()
+    for (const it of items)
+    {
+        if (it.root) continue
+        const sh = it.shapes[0]
+        const prev = loose.get(sh.rank)
+        if (!prev || sh.size > prev.size) loose.set(sh.rank, sh)
+    }
+    for (const sh of loose.values())
+    {
+        let best = null
+        for (const root of roots)
+        {
+            const g = joint([sh], root.shapes, 9)
+            if (g && (!best || g.gap < best.g.gap)) best = { g, root }
+        }
+        if (!best) continue
+        best.root.shapes.push({
+            kind: "knot",
+            x: best.g.x,
+            y: best.g.y,
+            size: Math.max(1.2, Math.min(2.4, best.g.span * 0.22)),
+            rank: Math.max(sh.rank, firstRank(best.root))
+        })
+    }
+}
+
+/**
+ * Lays out the glyph of a character in the stones style, built from the compositions of its roots
+ */
+function stoneGlyph(entry)
+{
+    const comp = compose(entry.tree, entry)
+    const strokes = entry.strokes.map(st => ({ comps: st.comps, shapes: [] }))
+    for (const sh of comp.shapes)
+    {
+        strokes[sh.rank].shapes.push({ ...sh, x: BOX / 2 + sh.x * BOX, y: BOX / 2 + sh.y * BOX, size: sh.size * BOX })
+    }
+    for (const st of strokes) st.length = st.shapes.reduce((l, s) => l + shapeLength(s), 0)
+    return { ...entry, strokes }
+}
+
+/**
+ * Regular n-gon tile, after the shapes of gen-100. `rot` is the angle of the first corner.
+ */
+const ngon = (x, y, size, sides, rot) => ({ kind: "ngon", x, y, size, sides, rot })
+
+/**
+ * Small mark: a square filled with two lines, horizontal or vertical as seen in the square, which can be turned by rot
+ */
+const bracket = (x, y, size, vertical) => ({ kind: "bracket", x, y, size, vertical, rot: 0 })
+
+/**
+ * Turns a stroke into polygon tiles: the kind of stroke picks the number of corners, its length the size. Shapes with
+ * a direction (triangles, pentagons) point the way the stroke runs.
+ */
+/**
+ * How big tiles are compared to the spread of the source strokes. Larger tiles fill the glyph box better, so less has
+ * to be scaled down to fit.
+ */
+const TILE_SCALE = Number(new URLSearchParams(location.search).get("tile")) || 1.5
+
+/**
+ * Stroke kinds that become polygon tiles, with the angle a polygon for that kind is shown at in the vocabulary
+ */
+const STROKE_KINDS = {
+    horizontal: { title: "Horizontal stroke", angle: 0 },
+    vertical: { title: "Vertical stroke", angle: Math.PI / 2 },
+    fallLeft: { title: "Falling left", angle: Math.PI * 0.7 },
+    fallRight: { title: "Falling right", angle: Math.PI * 0.25 },
+    turning: { title: "Turning stroke", angle: 0 },
+}
+const POLYGON_NAMES = { 3: "triangle", 4: "square", 5: "pentagon", 6: "hexagon outline", 7: "line", 8: "octagon" }
+
+/**
+ * Corner count that stands for "no polygon": the stroke kind dealt it becomes a line below its group
+ */
+const LINE = 7
+
+/**
+ * Corner count per stroke kind in the current world. Every world deals the polygons out anew, so the same roots are
+ * built from different shapes; within a world a stroke kind always gives the same polygon.
+ */
+let dealt = null
+function worldShapes()
+{
+    if (!dealt || dealt.seed !== worldSeed)
+    {
+        const pool = [3, 4, 5, 6, 7, 8].sort((a, b) => hash01(worldSeed + "/shape/" + a) - hash01(worldSeed + "/shape/" + b))
+        dealt = { seed: worldSeed, sides: Object.fromEntries(Object.keys(STROKE_KINDS).map((kind, i) => [kind, pool[i]])) }
+    }
+    return dealt.sides
+}
+
+/**
+ * Polygon tile for a stroke kind. Falling strokes point along the stroke, the others sit level: vertical strokes on a
+ * corner, horizontal and turning ones on a side.
+ */
+function kindTile(kind, x, y, size, angle)
+{
+    const sides = worldShapes()[kind]
+    if (sides === LINE)
+    {
+        // placed by compose() as a line below the group
+        return { ...ngon(x, y, size, 4, 0), line: true }
+    }
+    const rot = kind === "fallLeft" || kind === "fallRight" ? angle
+        : kind === "vertical" ? -Math.PI / 2
+        : -Math.PI / 2 + Math.PI / sides
+    return ngon(x, y, sides === 3 ? size * 1.1 : size, sides, rot)
+}
+
+function polygonFor(stroke)
+{
+    const { pts, type } = stroke
+    const total = pathLength(pts)
+    let cx = 0, cy = 0
+    for (const p of pts) { cx += p[0]; cy += p[1] }
+    const x = cx / pts.length
+    const y = cy / pts.length
+    const a = pts[0], b = pts[pts.length - 1]
+    const angle = Math.atan2(b[1] - a[1], b[0] - a[0])
+
+    if (total < 14) return [bracket(x, y, 7 * TILE_SCALE, false)]
+
+    // broad strokes become large shapes, small marks small ones
+    const size = Math.max(10, Math.min(13, 8 + total * 0.05)) * TILE_SCALE
+    const L = dist(a, b)
+    const m = pts[Math.floor(pts.length / 2)]
+    const dev = Math.abs((b[0] - a[0]) * (a[1] - m[1]) - (a[0] - m[0]) * (b[1] - a[1])) / Math.max(L, 1e-6)
+    const segs = splitCorners(pts)
+    const lastSeg = segs[segs.length - 1]
+    const hooked = segs.length > 1 && pathLength(lastSeg) < total * 0.22
+    const cornered = segs.length - (hooked ? 1 : 0) > 1
+
+    const shapes = []
+    if (cornered) shapes.push(kindTile("turning", x, y, size, angle))
+    // curved strokes become arcs around their group, see compose()
+    else if (dev / Math.max(L, 1) > 0.18) shapes.push({ ...ngon(x, y, size, 7, -Math.PI / 2), curved: true })
+    else
+    {
+        const c = Math.abs(Math.cos(angle)), s = Math.abs(Math.sin(angle))
+        const kind = c > 0.9 ? "horizontal" : s > 0.9 ? "vertical" : Math.cos(angle) < 0 ? "fallLeft" : "fallRight"
+        shapes.push(kindTile(kind, x, y, size, angle))
+    }
+    if (hooked)
+    {
+        const end = lastSeg[lastSeg.length - 1], start = lastSeg[0]
+        const hx = end[0] - start[0], hy = end[1] - start[1], hl = Math.hypot(hx, hy) || 1
+        shapes.push(bracket(x + hx / hl * (size + 6), y + hy / hl * (size + 6), 6 * TILE_SCALE, true))
+    }
+    else if (type.includes("㇏"))
+    {
+        shapes.push(bracket(x + size + 6, y + size * 0.6, 6 * TILE_SCALE, true))
+    }
+    return shapes
+}
+
+const STYLES = {
+    polygons: { make: polygonFor, title: "Polygons" },
+    stones: { make: stoneFor, title: "Stones" },
+    bars: { make: shapesFor, title: "Bars and arcs" },
+}
+let style = "polygons"
+
+function shapeLength(s)
+{
+    if (style !== "bars") return isJoint(s) ? 8 : 18
+    switch (s.kind)
+    {
+        case "bar": return Math.hypot(s.x1 - s.x0, s.y1 - s.y0) + T
+        case "arc": {
+            let span = s.ccw ? s.s - s.e : s.e - s.s
+            span = (span % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+            return span * s.r
+        }
+        default: return 10
+    }
+}
+
+function drawShape(ctx, s, t)
+{
+    if (t <= 0) return
+    switch (s.kind)
+    {
+        case "bar": {
+            const x1 = s.x0 + (s.x1 - s.x0) * t, y1 = s.y0 + (s.y1 - s.y0) * t
+            ctx.lineCap = "square"
+            ctx.beginPath()
+            ctx.moveTo(s.x0, s.y0)
+            ctx.lineTo(x1, y1)
+            ctx.stroke()
+            break
+        }
+        case "arc": {
+            let span = s.ccw ? s.s - s.e : s.e - s.s
+            span = (span % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+            const e = s.s + (s.ccw ? -1 : 1) * span * t
+            ctx.lineCap = "round"
+            ctx.beginPath()
+            ctx.arc(s.cx, s.cy, s.r, s.s, e, s.ccw)
+            ctx.stroke()
+            break
+        }
+        case "stone":
+        case "bead":
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.r * t, 0, 2 * Math.PI)
+            ctx.fill()
+            break
+        case "ring": {
+            if (style === "stones") break
+            const lw = ctx.lineWidth
+            ctx.lineWidth = T * 0.45
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.r * t, 0, 2 * Math.PI)
+            ctx.stroke()
+            ctx.lineWidth = lw
+            break
+        }
+        case "joint": {
+            const h = T * 0.8 * t
+            ctx.fillRect(s.x - h, s.y - h, h * 2, h * 2)
+            break
+        }
+        case "bracket": {
+            // two lines with a gap as wide as one of them, filling the square
+            const h = s.size * 0.8 * t
+            const line = 2 * h / 3
+            ctx.save()
+            ctx.translate(s.x, s.y)
+            ctx.rotate(s.rot)
+            for (let i = 0; i < 2; i++)
+            {
+                if (s.vertical) ctx.fillRect(-h + i * 2 * line, -h, line, 2 * h)
+                else ctx.fillRect(-h, -h + i * 2 * line, 2 * h, line)
+            }
+            ctx.restore()
+            break
+        }
+        case "line": {
+            const h = s.size * s.thick
+            ctx.fillRect(s.x - s.size, s.y - h / 2, 2 * s.size * t, h)
+            break
+        }
+        case "orbit": {
+            const lw = ctx.lineWidth
+            ctx.lineWidth = s.size * s.thick
+            ctx.lineCap = "round"
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.size, s.start, s.start + s.span * t)
+            ctx.stroke()
+            ctx.lineWidth = lw
+            break
+        }
+        case "knot":
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.size * t, 0, 2 * Math.PI)
+            ctx.fill()
+            break
+        case "link": {
+            const lw = ctx.lineWidth
+            const h = s.size * t
+            ctx.lineWidth = Math.max(1.4, s.size * 0.45)
+            ctx.lineCap = "round"
+            ctx.beginPath()
+            ctx.moveTo(s.x - Math.cos(s.angle) * s.size, s.y - Math.sin(s.angle) * s.size)
+            ctx.lineTo(s.x - Math.cos(s.angle) * s.size + Math.cos(s.angle) * 2 * h, s.y - Math.sin(s.angle) * s.size + Math.sin(s.angle) * 2 * h)
+            ctx.stroke()
+            ctx.lineWidth = lw
+            break
+        }
+        case "ngon": {
+            // hexagons are only drawn as their border, inset so the line stays inside the tile
+            const outline = s.sides === 6
+            const lw = s.size * 0.22
+            const r = (outline ? s.size - lw / 2 / Math.cos(Math.PI / s.sides) : s.size) * t
+            ctx.beginPath()
+            for (let i = 0; i < s.sides; i++)
+            {
+                const a = s.rot + i * 2 * Math.PI / s.sides
+                ctx.lineTo(s.x + Math.cos(a) * r, s.y + Math.sin(a) * r)
+            }
+            ctx.closePath()
+            if (outline)
+            {
+                const width = ctx.lineWidth
+                ctx.lineWidth = lw * t
+                ctx.lineJoin = "miter"
+                ctx.stroke()
+                ctx.lineWidth = width
+            }
+            else
+            {
+                ctx.fill()
+            }
+            break
+        }
+        case "square":
+            ctx.fillRect(s.x - s.size * t, s.y - s.size * t, s.size * 2 * t, s.size * 2 * t)
+            break
+        case "disc":
+        case "dot":
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.size * t, 0, 2 * Math.PI)
+            ctx.fill()
+            break
+        case "half":
+            ctx.beginPath()
+            ctx.arc(s.x, s.y, s.size * 1.15 * t, s.angle, s.angle + Math.PI)
+            ctx.closePath()
+            ctx.fill()
+            break
+        case "quarter": {
+            const r = s.size * 1.7 * t
+            ctx.beginPath()
+            ctx.moveTo(s.x - s.size * 0.6 * t, s.y - s.size * 0.6 * t)
+            ctx.arc(s.x - s.size * 0.6 * t, s.y - s.size * 0.6 * t, r, s.angle - Math.PI / 4, s.angle + Math.PI / 4)
+            ctx.closePath()
+            ctx.fill()
+            break
+        }
+        case "frame": {
+            const h = s.size * t, w = Math.min(4.5, h)
+            ctx.beginPath()
+            ctx.rect(s.x - h, s.y - h, h * 2, h * 2)
+            ctx.rect(s.x - h + w, s.y - h + w, (h - w) * 2, (h - w) * 2)
+            ctx.fill("evenodd")
+            break
+        }
+    }
+    if (s.kind === "ring" && style === "stones")
+    {
+        // ring of the stones style, drawn as a filled annulus so it combines like the other tiles
+        const r = s.size * t, w = Math.min(4.5, r)
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, r, 0, 2 * Math.PI)
+        ctx.arc(s.x, s.y, r - w, 0, 2 * Math.PI, true)
+        ctx.fill()
+    }
+}
+
+function buildGlyph(entry)
+{
+    if (style !== "bars") return stoneGlyph(entry)
+    const strokes = entry.strokes.map(st => {
+        const shapes = STYLES[style].make(st)
+        return { comps: st.comps, shapes, length: shapes.reduce((l, s) => l + shapeLength(s), 0) }
+    })
+    return { ...entry, strokes }
+}
+
+let glyphs = DATA.map(buildGlyph)
+
+// curated palettes, one row per palette and color scheme: background, main, secondary, accent
+const PALETTES = /*PALETTES*/null
+
+// every world comes with its palette
+let paletteIndex = Math.floor(hash01(worldSeed + "/palette") * PALETTES.light.length)
+
+function darkScheme()
+{
+    const theme = document.documentElement.dataset.theme
+    return theme ? theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+
+function palette()
+{
+    const [background, main, secondary, accent] = PALETTES[darkScheme() ? "dark" : "light"][paletteIndex]
+    return { background, roles: [main, secondary, accent] }
+}
+
+let highlight = null
+let showGhost = false
+
+/**
+ * Draws a glyph, `progress` in total stroke length units, Infinity for complete
+ */
+function render(canvas, glyph, progress)
+{
+    const ctx = canvas.getContext("2d")
+    const size = canvas.width
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    const { background, roles } = palette()
+    ctx.fillStyle = background
+    ctx.fillRect(0, 0, size, size)
+    const pad = size * 0.08
+    const k = (size - pad * 2) / BOX
+    ctx.setTransform(k, 0, 0, k, pad, pad)
+
+    if (showGhost && glyph.char)
+    {
+        ctx.globalAlpha = 0.14
+        ctx.fillStyle = roles[0]
+        ctx.font = `${BOX * 0.92}px "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif`
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(glyph.char, BOX / 2, BOX / 2 + 3)
+        ctx.globalAlpha = 1
+    }
+
+    const highlightColor = css("--accent")
+    ctx.lineWidth = T
+    ctx.lineJoin = "miter"
+    let left = progress
+    let tile = 0
+    outer:
+    for (const st of glyph.strokes)
+    {
+        const marked = highlight && st.comps.includes(highlight)
+        for (const s of st.shapes)
+        {
+            // roles are decided per root while composing; the bars style has none and picks per tile
+            const role = s.role ?? (isJoint(s) ? 0 : pickRole(hash01(worldSeed + "/" + (glyph.char ?? "") + "/" + tile++)))
+            ctx.strokeStyle = ctx.fillStyle = marked ? highlightColor : roles[role]
+            const len = shapeLength(s)
+            drawShape(ctx, s, Math.max(0, Math.min(1, left / len)))
+            left -= len
+            if (left <= 0) break outer
+        }
+        // a short pause between strokes, like lifting the brush
+        left -= 6
+    }
+
+}
+
+function setupCanvas(canvas, cssSize)
+{
+    const ratio = window.devicePixelRatio || 1
+    canvas.width = canvas.height = Math.round(cssSize * ratio)
+}
+
+const animations = new Map()
+
+function animate(canvas, glyph)
+{
+    if (reduceMotion)
+    {
+        render(canvas, glyph, Infinity)
+        return
+    }
+    const total = glyph.strokes.reduce((l, s) => l + s.length + 6, 0)
+    const speed = 260
+    const start = performance.now()
+    const id = {}
+    animations.set(canvas, id)
+    const step = now => {
+        if (animations.get(canvas) !== id) return
+        const p = (now - start) / 1000 * speed
+        render(canvas, glyph, p)
+        if (p < total) requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step)
+}
+
+// stroke vocabulary in the header, per style
+const RULES = {
+    stones: [
+        { title: "Horizontal stroke", text: "square tile", shapes: [{ kind: "square", x: 55, y: 55, size: 30 }] },
+        { title: "Vertical stroke", text: "round stone", shapes: [{ kind: "disc", x: 55, y: 55, size: 32 }] },
+        { title: "Falling left", text: "half disc, turned with the stroke", shapes: [{ kind: "half", x: 55, y: 45, size: 30, angle: Math.PI * 0.25 }] },
+        { title: "Falling right", text: "quarter disc", shapes: [{ kind: "quarter", x: 45, y: 45, size: 26, angle: Math.PI * 0.25 }] },
+        { title: "Turning stroke", text: "square frame", shapes: [{ kind: "frame", x: 55, y: 55, size: 30 }] },
+        { title: "Curved stroke", text: "ring", shapes: [{ kind: "ring", x: 55, y: 55, size: 32 }] },
+        { title: "Dot, hook or sweep", text: "a small pebble", shapes: [{ kind: "square", x: 45, y: 50, size: 22 }, { kind: "dot", x: 86, y: 86, size: 10 }] },
+        { title: "Stroke length", text: "sets the size, long strokes give big tiles", shapes: [{ kind: "disc", x: 36, y: 60, size: 28 }, { kind: "disc", x: 82, y: 70, size: 15 }, { kind: "disc", x: 84, y: 30, size: 8 }] },
+    ],
+    bars: [
+        { title: "Straight stroke", text: "square-ended bar, on the grid", shapes: [{ kind: "bar", x0: 20, y0: 55, x1: 90, y1: 55 }] },
+        { title: "Slant or curve", text: "arc through the stroke", shapes: [{ kind: "arc", cx: 90, cy: 20, r: 60, s: Math.PI * 0.95, e: Math.PI * 0.55, ccw: true }] },
+        { title: "Dot", text: "a stone", shapes: [{ kind: "stone", x: 55, y: 55, r: 14 }] },
+        { title: "Corner", text: "square joint", shapes: [{ kind: "bar", x0: 25, y0: 30, x1: 80, y1: 30 }, { kind: "bar", x0: 80, y0: 30, x1: 80, y1: 85 }, { kind: "joint", x: 80, y: 30 }] },
+        { title: "Hook", text: "a bead at the end", shapes: [{ kind: "bar", x0: 55, y0: 20, x1: 55, y1: 75 }, { kind: "bead", x: 40, y: 85, r: 9 }] },
+        { title: "Right sweep", text: "an open ring at the end", shapes: [{ kind: "arc", cx: 10, cy: 100, r: 70, s: -Math.PI * 0.42, e: -Math.PI * 0.08, ccw: false }, { kind: "ring", x: 79, y: 92, r: 10 }] },
+    ],
+}
+
+/**
+ * Vocabulary of the polygon style, as dealt for the current world
+ */
+function polygonRules()
+{
+    const sides = worldShapes()
+    const pointing = kind => kind === "fallLeft" || kind === "fallRight" ? ", pointing along the stroke" : ""
+    // a kind that is dealt a polygon, for the examples
+    const tile = Object.keys(sides).find(kind => sides[kind] !== LINE && kind !== "fallLeft" && kind !== "fallRight")
+    const example = (x, y, size) => kindTile(tile, x, y, size, 0)
+    return [
+        ...Object.entries(STROKE_KINDS).map(([kind, { title, angle }]) => sides[kind] === LINE
+            ? {
+                title,
+                text: "a line below its group",
+                shapes: [example(55, 44, 26), { kind: "line", x: 55, y: 88, size: 36, thick: 0.3 }]
+            }
+            : {
+                title,
+                text: POLYGON_NAMES[sides[kind]] + pointing(kind),
+                shapes: [kindTile(kind, 55, 55, 40, angle)]
+            }),
+        { title: "Curved stroke", text: "an arc around its group, in quarter turns", shapes: [example(55, 55, 22), { kind: "orbit", x: 55, y: 55, size: 40, thick: 0.25, start: Math.PI, span: Math.PI * 1.5 }] },
+        { title: "Dot", text: "a square of two horizontal lines", shapes: [bracket(55, 55, 30, false)] },
+        { title: "Hook or sweep", text: "a square of two vertical lines", shapes: [example(42, 48, 26), bracket(86, 84, 15, true)] },
+        { title: "Stroke length", text: "sets the size, long strokes give big tiles", shapes: [example(36, 60, 30), example(82, 72, 16), example(84, 30, 9)] },
+    ]
+}
+
+const rulesEl = document.getElementById("rules")
+let ruleCanvases = []
+
+function buildRules()
+{
+    rulesEl.textContent = ""
+    ruleCanvases = (style === "polygons" ? polygonRules() : RULES[style]).map(rule => {
+        const el = document.createElement("div")
+        el.className = "rule"
+        const canvas = document.createElement("canvas")
+        setupCanvas(canvas, 44)
+        const text = document.createElement("div")
+        text.innerHTML = `<b>${rule.title}</b><span>${rule.text}</span>`
+        el.append(canvas, text)
+        rulesEl.append(el)
+        // one stroke per shape, so crossing examples cancel like in the glyphs
+        return [canvas, { strokes: rule.shapes.map(sh => ({ comps: [], shapes: [sh], length: 0 })) }]
+    })
+}
+buildRules()
+
+// what the radicals stand for, as a name for the group
+const RADICAL_NAMES = {
+    "心": "heart", "宀": "roof", "金": "metal", "土": "earth", "女": "woman", "子": "child", "⻌": "walking",
+    "山": "mountain", "水": "water", "火": "fire", "木": "tree", "刂": "knife", "歹": "bones", "門": "gate", "戸": "door",
+    "礻": "altar", "攵": "striking", "又": "hand", "食": "eating", "王": "jewel", "刀": "knife", "人": "person",
+    "示": "altar", "彳": "step", "寸": "measure", "米": "rice",
+}
+
+const groupsEl = document.getElementById("groups")
+const cards = []
+
+function makeCard(index, showRadical)
+{
+    const glyph = glyphs[index]
+    const card = document.createElement("button")
+    card.type = "button"
+    card.className = "card"
+    card.setAttribute("aria-label", `Write the glyph for ${glyph.concept} again`)
+    const canvas = document.createElement("canvas")
+    const meta = document.createElement("div")
+    meta.className = "meta"
+    const rad = showRadical && glyph.radical !== glyph.char ? `<span class="rad">${glyph.radical}</span> ` : ""
+    meta.innerHTML = `<span class="concept">${glyph.concept}</span><span class="src">${rad}${glyph.char} · ${glyph.strokes.length}</span>`
+    card.append(canvas, meta)
+    const entry = [canvas, glyph]
+    cards.push(entry)
+    card.addEventListener("click", () => animate(canvas, entry[1]))
+    return card
+}
+
+function makeGroup(title, radical, indexes, showRadical)
+{
+    const section = document.createElement("section")
+    section.className = "group"
+    const head = document.createElement("div")
+    head.className = "group-head"
+    head.innerHTML = radical
+        ? `<h2><span class="radical">${radical}</span> ${title}</h2><span class="src">${indexes.length} glyphs</span>`
+        : `<h2>${title}</h2><span class="src">${indexes.length} glyphs</span>`
+    const grid = document.createElement("div")
+    grid.className = "grid"
+    indexes.forEach(i => grid.append(makeCard(i, showRadical)))
+    section.append(head, grid)
+    groupsEl.append(section)
+}
+
+// radicals shared by several glyphs get a group each, largest first; the rest share one group
+const byRadical = new Map()
+glyphs.forEach((g, i) => byRadical.set(g.radical, [...(byRadical.get(g.radical) ?? []), i]))
+const shared = [...byRadical].filter(([, list]) => list.length > 1).sort((a, b) => b[1].length - a[1].length)
+const single = [...byRadical].filter(([, list]) => list.length === 1).flatMap(([, list]) => list)
+for (const [radical, list] of shared)
+{
+    makeGroup(`${RADICAL_NAMES[radical] ?? ""} radical`, radical, list, false)
+}
+if (single.length)
+{
+    makeGroup("One of a kind", null, single, true)
+}
+
+function sizeAll()
+{
+    for (const [canvas] of cards)
+    {
+        setupCanvas(canvas, canvas.getBoundingClientRect().width || 140)
+    }
+}
+
+function redrawAll()
+{
+    for (const [canvas, glyph] of ruleCanvases) render(canvas, glyph, Infinity)
+    for (const [canvas, glyph] of cards)
+    {
+        animations.delete(canvas)
+        render(canvas, glyph, Infinity)
+    }
+}
+
+// components that occur in more than one glyph and have at least two strokes
+const counts = new Map()
+for (const g of glyphs)
+{
+    for (const comp of new Set(g.strokes.flatMap(s => s.comps)))
+    {
+        const strokes = g.strokes.filter(s => s.comps.includes(comp)).length
+        if (strokes >= 2) counts.set(comp, [...(counts.get(comp) ?? []), g.concept])
+    }
+}
+const chipsEl = document.getElementById("chips")
+const chips = [...counts].filter(([, list]) => list.length > 1).sort((a, b) => b[1].length - a[1].length)
+for (const [comp, list] of chips)
+{
+    const chip = document.createElement("button")
+    chip.type = "button"
+    chip.className = "chip"
+    chip.setAttribute("aria-pressed", "false")
+    chip.textContent = `${comp} · ${list.join(", ")}`
+    chip.addEventListener("click", () => {
+        highlight = highlight === comp ? null : comp
+        for (const c of chipsEl.children) c.setAttribute("aria-pressed", String(c === chip && highlight === comp))
+        redrawAll()
+    })
+    chipsEl.append(chip)
+}
+
+document.getElementById("replay").addEventListener("click", () => {
+    cards.forEach(([canvas, glyph], i) => setTimeout(() => animate(canvas, glyph), reduceMotion ? 0 : i * 60))
+})
+for (const input of document.querySelectorAll('input[name="style"]'))
+{
+    input.addEventListener("change", () => {
+        style = input.value
+        compositions.clear()
+        glyphs = DATA.map(buildGlyph)
+        cards.forEach(card => card[1] = glyphs.find(g => g.char === card[1].char))
+        buildRules()
+        redrawAll()
+    })
+}
+const swatchesEl = document.getElementById("swatches")
+
+function showPalette()
+{
+    const { background, roles } = palette()
+    const names = ["background", "main", "alternate", "accent"]
+    swatchesEl.innerHTML = `<span class="src">world ${worldSeed} · palette ${paletteIndex + 1} of ${PALETTES.light.length}</span>` +
+        [background, ...roles].map((c, i) =>
+            `<span class="swatch" style="background:${c}" title="${names[i]} ${c}"></span>`).join("")
+}
+
+document.getElementById("world").addEventListener("click", () => {
+    worldSeed = Math.floor(Math.random() * 1e6)
+    try
+    {
+        history.replaceState(null, "", "#seed-" + worldSeed)
+    }
+    catch (e)
+    {
+        // the link just doesn't follow
+    }
+    paletteIndex = Math.floor(hash01(worldSeed + "/palette") * PALETTES.light.length)
+    compositions.clear()
+    glyphs = DATA.map(buildGlyph)
+    cards.forEach(card => card[1] = glyphs.find(g => g.char === card[1].char))
+    buildRules()
+    showPalette()
+    redrawAll()
+})
+document.getElementById("palette").addEventListener("click", () => {
+    let next
+    do
+    {
+        next = Math.floor(Math.random() * PALETTES.light.length)
+    } while (PALETTES.light.length > 1 && next === paletteIndex)
+    paletteIndex = next
+    showPalette()
+    redrawAll()
+})
+document.getElementById("ghost").addEventListener("change", ev => {
+    showGhost = ev.target.checked
+    redrawAll()
+})
+
+sizeAll()
+showPalette()
+redrawAll()
+window.addEventListener("resize", () => { sizeAll(); redrawAll() })
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { showPalette(); redrawAll() })
+new MutationObserver(() => { showPalette(); redrawAll() }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+document.fonts?.ready.then(redrawAll)
+</script>
