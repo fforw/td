@@ -22,8 +22,8 @@ import {
 } from "three"
 import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
-import nameGenerator from "./name-generator";
 import { rng } from "./util"
+import { meepleNameGenerator } from "./name-generator";
 
 const TAU = Math.PI * 2
 
@@ -161,7 +161,7 @@ export interface Meeple
 export function randomTraits(): Pick<Meeple, "name" | "gait">
 {
     return {
-        name: nameGenerator(4),
+        name: meepleNameGenerator(4),
         gait: rng.next()
     }
 }
