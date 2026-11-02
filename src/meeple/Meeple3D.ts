@@ -6,6 +6,7 @@ import {
     DataTexture,
     Float32BufferAttribute,
     Group,
+    InstancedBufferAttribute,
     InstancedMesh,
     type Mesh,
     Matrix4,
@@ -18,6 +19,7 @@ import {
     SRGBColorSpace,
     type Camera,
     type Raycaster,
+    Vector2,
     Vector3
 } from "three"
 import { canEquip, type Character, checkClasses } from "./character"
@@ -63,6 +65,42 @@ const EYE_SIZE =0.9
  */
 const EYE_SPREAD = 0.4
 const EYE_DROP = 0.15
+
+/**
+ * Eye ellipses in the eye texture: centers of the left and right eye, inner radii of the white and width of the outline
+ * ring around it, in texture pixels
+ */
+const EYE_X = [36, 92]
+const EYE_Y = 32
+const EYE_RX = 21
+const EYE_RY = 23
+const EYE_RING = 4
+const EYE_OUTLINE = "#1a1a24"
+
+/**
+ * Minimum height of an eye on screen in CSS pixels for the meeple to blink. Smaller eyes are too coarse to show the
+ * lids.
+ */
+const BLINK_MIN_PIXELS = 14
+
+/**
+ * Range of the duration of a blink in seconds, 10 to 15 frames at 60 fps. Closing the lids takes the first third.
+ */
+const BLINK_MIN = 10 / 60
+const BLINK_MAX = 15 / 60
+const BLINK_CLOSE = 1 / 3
+
+/**
+ * Range of the pause between two blinks in seconds
+ */
+const BLINK_PAUSE_MIN = 10
+const BLINK_PAUSE_MAX = 30
+
+/**
+ * Factors on the pause between blinks for a gait of 0 and 1. The bouncy walkers blink more often.
+ */
+const WIDE_GAIT_BLINK = 1.2
+const NARROW_GAIT_BLINK = 0.8
 
 /**
  * Length of the longer side of an item sprite of ITEM_PIXELS in meeple units
@@ -209,16 +247,16 @@ function createEyeTexture(): CanvasTexture
     canvas.height = 64
     const ctx = canvas.getContext("2d")!
 
-    for (const x of [36, 92])
+    for (const x of EYE_X)
     {
-        ctx.fillStyle = "#1a1a24"
+        ctx.fillStyle = EYE_OUTLINE
         ctx.beginPath()
-        ctx.ellipse(x, 32, 25, 27, 0, 0, TAU)
+        ctx.ellipse(x, EYE_Y, EYE_RX + EYE_RING, EYE_RY + EYE_RING, 0, 0, TAU)
         ctx.fill()
 
         ctx.fillStyle = "#fff"
         ctx.beginPath()
-        ctx.ellipse(x, 32, 21, 23, 0, 0, TAU)
+        ctx.ellipse(x, EYE_Y, EYE_RX, EYE_RY, 0, 0, TAU)
         ctx.fill()
 
         ctx.fillStyle = "#4a6fb0"
@@ -283,13 +321,20 @@ function createEyeMaterial(): ShaderMaterial
         uniforms: {
             map: { value: createEyeTexture() },
             headRadius: { value: HEAD_RADIUS },
-            eyeSize: { value: HEAD_RADIUS * EYE_SIZE }
+            eyeSize: { value: HEAD_RADIUS * EYE_SIZE },
+            outline: { value: new Color(EYE_OUTLINE) },
+            // height of the drawing area in CSS pixels
+            viewportHeight: { value: 1 }
         },
         vertexShader: /* glsl */`
             attribute float side;
+            attribute float blink;
             uniform float headRadius;
             uniform float eyeSize;
+            uniform float viewportHeight;
             varying vec2 vUv;
+            varying vec3 vSkin;
+            varying float vBlink;
 
             #define EYE_LIFT ${EYE_LIFT.toFixed(2)}
             #define EYE_SPREAD ${EYE_SPREAD.toFixed(2)}
@@ -321,17 +366,49 @@ function createEyeMaterial(): ShaderMaterial
                 pos *= depth / pos.z;
 
                 gl_Position = projectionMatrix * vec4(pos, 1.0);
+
+                // only eyes large enough on screen blink
+                float pixels = eyeSize * scale * projectionMatrix[1][1] / -depth * viewportHeight * 0.5;
+                vBlink = pixels < ${BLINK_MIN_PIXELS.toFixed(1)} ? 0.0 : blink;
+                vSkin = instanceColor;
             }
         `,
         fragmentShader: /* glsl */`
             uniform sampler2D map;
+            uniform vec3 outline;
             varying vec2 vUv;
+            varying vec3 vSkin;
+            varying float vBlink;
+
+            #define PI 3.14159265
 
             void main()
             {
                 vec4 color = texture2D(map, vUv);
                 if (color.a < 0.5) discard;
                 gl_FragColor = vec4(color.rgb, 1.0);
+
+                if (vBlink > 0.0)
+                {
+                    // position in the white of the eye, from -1 to 1 on both axes, y up
+                    vec2 px = vec2(vUv.x * 128.0, (1.0 - vUv.y) * 64.0);
+                    float cx = vUv.x < 0.5 ? ${EYE_X[0].toFixed(1)} : ${EYE_X[1].toFixed(1)};
+                    vec2 q = vec2((px.x - cx) / ${EYE_RX.toFixed(1)}, (${EYE_Y.toFixed(1)} - px.y) / ${EYE_RY.toFixed(1)});
+
+                    // the lid turns down over the eyeball like a shell around the axis through its side corners. Its
+                    // edge is a great circle of the ball, which arches up while the lid is open less than halfway and
+                    // sags down after it.
+                    float rim = sqrt(max(0.001, 1.0 - q.x * q.x));
+                    float edge = rim * cos(vBlink * PI);
+                    // distance in pixels to the edge, across its slope, so the line keeps its width toward the corners
+                    float slope = -q.x / rim * cos(vBlink * PI) * ${(EYE_RY / EYE_RX).toFixed(3)};
+                    float dist = (q.y - edge) * ${EYE_RY.toFixed(1)} / sqrt(1.0 + slope * slope);
+                    if (dot(q, q) < 1.0 && dist > -${EYE_RING.toFixed(1)})
+                    {
+                        // skin above the edge, outlined like the eye
+                        gl_FragColor.rgb = q.y > edge ? vSkin : outline;
+                    }
+                }
                 #include <colorspace_fragment>
             }
         `
@@ -384,6 +461,17 @@ function createOutlineMaterial(color: Color): MeshBasicMaterial
     return material
 }
 
+function blinkPause(gait: number): number
+{
+    const factor = WIDE_GAIT_BLINK + (NARROW_GAIT_BLINK - WIDE_GAIT_BLINK) * gait
+    return (BLINK_PAUSE_MIN + rng.next() * (BLINK_PAUSE_MAX - BLINK_PAUSE_MIN)) * factor
+}
+
+function blinkDuration(): number
+{
+    return BLINK_MIN + rng.next() * (BLINK_MAX - BLINK_MIN)
+}
+
 export function walkSpeedMultiplier(meeple: Meeple) : number
 {
     const { gait } = meeple
@@ -425,6 +513,18 @@ export default class MeepleCrowd
     private readonly body: InstancedMesh
     private readonly head: InstancedMesh
     private readonly eyes: InstancedMesh
+    /**
+     * How far each meeple's lids are closed, from 0 to 1
+     */
+    private readonly blink: InstancedBufferAttribute
+    /**
+     * Time in seconds each meeple starts its next blink
+     */
+    private readonly nextBlink: number[] = []
+    /**
+     * Duration in seconds of each meeple's next blink
+     */
+    private readonly blinkDuration: number[] = []
     private readonly hair: Map<HairStyle, InstancedMesh>
     /**
      * Instanced item per loaded item sprite
@@ -454,8 +554,15 @@ export default class MeepleCrowd
             [HairStyle.SHORT, this.createPart(createShortHair(), shortHair, false)]
         ])
 
-        this.eyes = new InstancedMesh(createEyeGeometry(), createEyeMaterial(), capacity)
+        const eyeGeometry = createEyeGeometry()
+        this.blink = new InstancedBufferAttribute(new Float32Array(capacity), 1)
+        eyeGeometry.setAttribute("blink", this.blink)
+        const eyeMaterial = createEyeMaterial()
+        this.eyes = new InstancedMesh(eyeGeometry, eyeMaterial, capacity)
         this.eyes.frustumCulled = false
+        // the skin color of the lids
+        this.eyes.setColorAt(0, new Color())
+        this.eyes.onBeforeRender = renderer => eyeMaterial.uniforms.viewportHeight.value = renderer.getSize(tmpSize).y
         this.group.add(this.eyes)
 
         this.items = new Map()
@@ -543,14 +650,19 @@ export default class MeepleCrowd
         this.meeples.push(meeple)
         this.attention.push(0)
         this.itemStates.push([newItemState(), newItemState()])
+        // start somewhere into the first pause, so the crowd doesn't wait and then all start blinking together
+        this.nextBlink.push(this.lastTime + rng.next() * blinkPause(meeple.gait))
+        this.blinkDuration.push(blinkDuration())
 
         // only the new meeple's colors, rewriting all of them on every add makes building a crowd quadratic
         const { look } = meeple
         this.body.setColorAt(i, look.shirt)
         this.head.setColorAt(i, look.skin)
+        this.eyes.setColorAt(i, look.skin)
         this.body.count = this.head.count = this.eyes.count = i + 1
         this.body.instanceColor!.needsUpdate = true
         this.head.instanceColor!.needsUpdate = true
+        this.eyes.instanceColor!.needsUpdate = true
 
         // hair instances are packed per style in the order the meeples were added
         const hair = this.hair.get(look.hairStyle)
@@ -671,6 +783,8 @@ export default class MeepleCrowd
             this.head.setMatrixAt(i, part)
             this.eyes.setMatrixAt(i, part)
 
+            this.blink.setX(i, this.blinkAt(i, time))
+
             const hair = this.hair.get(look.hairStyle)
             if (hair)
             {
@@ -731,6 +845,36 @@ export default class MeepleCrowd
         {
             mesh.instanceMatrix.needsUpdate = true
         }
+        this.blink.needsUpdate = true
+    }
+
+    /**
+     * Returns how far the lids of meeple i are closed at the given time, starting its next blink when one is over
+     */
+    private blinkAt(i: number, time: number): number
+    {
+        // progress through the blink from 0 to 1
+        let t = (time - this.nextBlink[i]) / this.blinkDuration[i]
+        if (t >= 1 || time < this.nextBlink[i] - BLINK_PAUSE_MAX * WIDE_GAIT_BLINK)
+        {
+            // over, or the clock jumped back
+            this.nextBlink[i] = time + blinkPause(this.meeples[i].gait)
+            this.blinkDuration[i] = blinkDuration()
+            return 0
+        }
+        if (t < 0)
+        {
+            return 0
+        }
+        if (t < BLINK_CLOSE)
+        {
+            // ease in
+            t /= BLINK_CLOSE
+            return t * t
+        }
+        // ease out
+        t = (1 - t) / (1 - BLINK_CLOSE)
+        return t * t
     }
 }
 
@@ -748,6 +892,7 @@ const rollPivot = new Matrix4()
 const tmpPos = new Vector3()
 const tmpScale = new Vector3()
 const tmpColor = new Color()
+const tmpSize = new Vector2()
 const attach = new Vector3()
 const normal = new Vector3()
 const tangent = new Vector3()
