@@ -32,7 +32,12 @@ const TAU = Math.PI * 2
  */
 export const MEEPLE_SCALE = 0.3
 
-const HEAD_RAISE = 0.1
+/**
+ * How far below HEAD_Y the head of the shortest meeple sits, and how much higher the head of the tallest one is, in
+ * meeple units
+ */
+const HEAD_DROP = 0.05
+const HEAD_RAISE = 0.18
 
 /**
  * Thickness of the inverted hull outlines in meeple units
@@ -512,7 +517,7 @@ export default class MeepleCrowd
                 roll = s * WALK_ROLL * (WIDE_GAIT.roll + (NARROW_GAIT.roll - WIDE_GAIT.roll) * gait)
             }
 
-            const headY = (HEAD_Y + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
+            const headY = (HEAD_Y - HEAD_DROP + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
 
             // ease toward the camera and back
             const target = meeple.lookAtCamera ? 1 : 0

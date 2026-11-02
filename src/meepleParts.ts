@@ -7,7 +7,8 @@ const BODY_STRETCH = 1.15
 export const HEAD_RADIUS = 0.3
 
 /**
- * Head center height for a meeple of height 0. Like in 2D, the height only moves the head up.
+ * Head center height of the exported meeple, which the hair models are placed around. Like in 2D, the height of a
+ * meeple only moves its head up or down.
  */
 export const HEAD_Y = 0.78
 
