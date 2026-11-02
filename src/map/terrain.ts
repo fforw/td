@@ -1,6 +1,6 @@
 import Prando from "prando"
 import { createNoise2D, type NoiseFunction2D } from "simplex-noise"
-import { FaceType } from "../core/geometry"
+import { FaceType } from "./geometry"
 
 /*
  * Terrain from a virtual climate. The map stays flat, but every point has a height, temperature and moisture that

@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { FaceType } from "../../src/core/geometry"
+import { FaceType } from "../../src/map/geometry"
 import Terrain, { classify, SEA_LEVEL } from "../../src/map/terrain"
 
 

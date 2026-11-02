@@ -1,5 +1,5 @@
-import { Edge, Face, HalfEdge, Vertex } from "../core/geometry";
-import { rng } from "../core/util";
+import { Edge, Face, HalfEdge, Vertex } from "./geometry";
+import { rng } from "../util";
 
 function findInsideEdges(faces: Face[]): Set<Edge>
 {

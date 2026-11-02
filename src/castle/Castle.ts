@@ -1,7 +1,7 @@
-import { countNeighborsInSet, rng } from "../core/util"
-import type { Face, Vertex } from "../core/geometry"
-import { FaceType } from "../core/geometry"
-import Vector from "../core/vector"
+import { countNeighborsInSet, rng } from "../util"
+import type { Face, Vertex } from "../map/geometry"
+import { FaceType } from "../map/geometry"
+import Vector from "../math/vector"
 
 
 function ringSet(content: Face | Face[]): Set<Face>

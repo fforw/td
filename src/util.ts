@@ -1,5 +1,5 @@
 import Prando from "prando";
-import type { Face, FaceType } from "./geometry";
+import type { Face, FaceType } from "./map/geometry";
 
 
 export function clamp(v: number): number

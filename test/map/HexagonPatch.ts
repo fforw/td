@@ -1,8 +1,8 @@
 import { afterAll, assert, beforeAll, describe, it } from "vitest"
 
 import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
-import { resetRandom } from "../../src/core/util"
-import type { Face, HalfEdge, Vertex } from "../../src/core/geometry"
+import { resetRandom } from "../../src/util"
+import type { Face, HalfEdge, Vertex } from "../../src/map/geometry"
 
 
 /**
