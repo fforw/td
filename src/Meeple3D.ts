@@ -75,10 +75,11 @@ const WALK_ROLL = 0.12
 const WALK_PIVOT = 0.3
 
 /**
- * Factors on the rocking and the bounce of the walk for a gait of 0, a wide waddle, and 1, a narrow, bouncy step
+ * Factors on the rocking, the bounce and the speed of the walk for a gait of 0, a wide waddle, and 1, a narrow,
+ * bouncy step. The speed is fastest for a gait of 0.5 and slows toward both ends.
  */
-const WIDE_GAIT = { roll: 1.6, bounce: 1 }
-const NARROW_GAIT = { roll: 0.9, bounce: 1.9 }
+const WIDE_GAIT = { roll: 1.6, bounce: 1, speed: 0.75 }
+const NARROW_GAIT = { roll: 0.9, bounce: 1.9, speed: 0.85 }
 
 /**
  * Speed of turning toward the camera and back, in full turns per second
@@ -342,6 +343,13 @@ function createOutlineMaterial(color: Color): MeshBasicMaterial
     return material
 }
 
+export function walkSpeedMultiplier(meeple: Meeple) : number
+{
+    const { gait } = meeple
+    const extreme = gait < 0.5 ? WIDE_GAIT : NARROW_GAIT
+    return (1 + (extreme.speed - 1) * Math.abs(gait * 2 - 1))
+}
+
 
 /**
  * Instanced 3D meeples built from a few shared parts, like the 2D version. Each part type is one draw call (plus one
@@ -496,7 +504,8 @@ export default class MeepleCrowd
             if (this.walking)
             {
                 // the body is highest and rocked furthest over the foot it stands on
-                const s = Math.sin(time * WALK_SPEED + phase)
+                const speed = WALK_SPEED * walkSpeedMultiplier(meeple)
+                const s = Math.sin(time * speed + phase)
                 const bounceFactor = WIDE_GAIT.bounce + (NARROW_GAIT.bounce - WIDE_GAIT.bounce) * gait
                 bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
                 stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)
