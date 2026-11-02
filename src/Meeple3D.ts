@@ -20,7 +20,8 @@ import {
     type Raycaster,
     Vector3
 } from "three"
-import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
+import { type ItemName, ITEMS, type ItemSprite, itemSprite } from "./itemSprite"
+import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
 import { rng } from "./util"
 import { meepleNameGenerator } from "./name-generator";
@@ -60,6 +61,41 @@ const EYE_SIZE =0.9
  */
 const EYE_SPREAD = 0.4
 const EYE_DROP = 0.15
+
+/**
+ * Where an item is attached to the body: the height on the body from 0 at the bottom to 1 at the top, and the angle in
+ * radians around the vertical from the front toward the meeple's right
+ */
+const ITEM_HEIGHT = 0.45
+const ITEM_ANGLE = 0.6
+
+/**
+ * Distance in meeple units the item floats above the body surface
+ */
+const ITEM_LIFT = 0.05
+
+/**
+ * Point of the item sprites that lies on the attachment point, from the sprite center with its longer side 1 unit
+ * long. The Voxel Pack items have their handle in the lower left.
+ */
+const GRIP = new Vector3(-0.27, -0.27, 0)
+
+/**
+ * Length of the longer side of an item sprite in meeple units
+ */
+const ITEM_SIZE = 0.7
+
+/**
+ * Angle in radians the item is turned around the attachment point, counter-clockwise from the sprite as it is drawn
+ * when looking at the body from outside. The drawn items point up and to the right, so from 0.79 on they lean away
+ * from the head on the right side of the body.
+ */
+const ITEM_ROLL = 1.25
+
+/**
+ * Angle in radians the item swings around the attachment point with every step
+ */
+const ITEM_SWING = 0.25
 
 /**
  * Walk cycle speed in radians per second. Each cycle has two steps.
@@ -152,6 +188,10 @@ export interface Meeple
      * Turns the meeple toward the camera with its face up to the viewer, e.g. while the player interacts with it
      */
     lookAtCamera?: boolean
+    /**
+     * Item held in the right hand. Like the look, it must not change after the meeple was added.
+     */
+    item?: ItemName
 }
 
 
@@ -336,6 +376,32 @@ function hairGeometry(name: ModelName): BufferGeometry
 }
 
 
+function createItemPart(sprite: ItemSprite, gradientMap: DataTexture, capacity: number): InstancedMesh
+{
+    // the outline is part of the sprite, so the item needs no hull
+    const mesh = new InstancedMesh(sprite.geometry, new MeshToonMaterial({ map: sprite.texture, alphaTest: 0.5, gradientMap }), capacity)
+    mesh.castShadow = true
+    mesh.frustumCulled = false
+    mesh.count = 0
+    return mesh
+}
+
+
+/**
+ * Scales an item sprite and moves its grip to the origin
+ */
+const ITEM_SHAPE = new Matrix4()
+    .makeScale(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)
+    .multiply(new Matrix4().makeTranslation(-GRIP.x, -GRIP.y, -GRIP.z))
+
+/**
+ * Attachment point of the items on the body and the surface normal there, before the walk stretches the body
+ */
+const ITEM_POINT = new Vector3()
+const ITEM_NORMAL = new Vector3()
+bodySurface(ITEM_HEIGHT, ITEM_ANGLE, ITEM_POINT, ITEM_NORMAL)
+
+
 function createOutlineMaterial(color: Color): MeshBasicMaterial
 {
     const material = new MeshBasicMaterial({ color, side: BackSide })
@@ -386,6 +452,10 @@ export default class MeepleCrowd
     private readonly head: InstancedMesh
     private readonly eyes: InstancedMesh
     private readonly hair: Map<HairStyle, InstancedMesh>
+    /**
+     * Instanced item per loaded item sprite
+     */
+    private readonly items: Map<ItemName, InstancedMesh>
     private readonly outlines: InstancedMesh[] = []
 
     constructor(capacity: number)
@@ -409,6 +479,18 @@ export default class MeepleCrowd
         this.eyes = new InstancedMesh(createEyeGeometry(), createEyeMaterial(), capacity)
         this.eyes.frustumCulled = false
         this.group.add(this.eyes)
+
+        this.items = new Map()
+        for (const name of ITEMS)
+        {
+            const sprite = itemSprite(name)
+            if (sprite)
+            {
+                const mesh = createItemPart(sprite, gradientMap, capacity)
+                this.items.set(name, mesh)
+                this.group.add(mesh)
+            }
+        }
 
         for (const mesh of [this.body, this.head, this.eyes, ...this.hair.values()])
         {
@@ -454,6 +536,11 @@ export default class MeepleCrowd
         {
             throw new Error("Meeple capacity exceeded")
         }
+        const item = meeple.item && this.items.get(meeple.item)
+        if (meeple.item && !item)
+        {
+            throw new Error("Item not loaded: " + meeple.item)
+        }
         const i = this.meeples.length
         this.meeples.push(meeple)
         this.attention.push(0)
@@ -474,6 +561,12 @@ export default class MeepleCrowd
             const color = look.hairStyle === HairStyle.SHORT ? tmpColor.copy(look.hair).lerp(look.skin, 1 / 3) : look.hair
             hair.setColorAt(hair.count++, color)
             hair.instanceColor!.needsUpdate = true
+        }
+
+        // like the hair, items are packed per item in the order the meeples were added
+        if (item)
+        {
+            item.count++
         }
     }
 
@@ -498,6 +591,7 @@ export default class MeepleCrowd
     update(camera: Camera, time: number): void
     {
         const counts = new Map<HairStyle, number>()
+        const itemCounts = new Map<ItemName, number>()
         const step = Math.min(0.1, Math.max(0, time - this.lastTime)) * ATTENTION_SPEED
         this.lastTime = time
         const cam = camera.position
@@ -505,7 +599,7 @@ export default class MeepleCrowd
         this.meeples.forEach((meeple, i) => {
             const { position, look, phase, gait } = meeple
 
-            let bounce = 0, stretch = 1, roll = 0
+            let bounce = 0, stretch = 1, roll = 0, swing = 0
             if (this.walking)
             {
                 // the body is highest and rocked furthest over the foot it stands on
@@ -515,6 +609,7 @@ export default class MeepleCrowd
                 bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
                 stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)
                 roll = s * WALK_ROLL * (WIDE_GAIT.roll + (NARROW_GAIT.roll - WIDE_GAIT.roll) * gait)
+                swing = s * ITEM_SWING
             }
 
             const headY = (HEAD_Y - HEAD_DROP + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
@@ -555,7 +650,8 @@ export default class MeepleCrowd
                 figure.multiply(local)
             }
 
-            local.makeScale(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch))
+            const squeeze = 1 / Math.sqrt(stretch)
+            local.makeScale(squeeze, stretch, squeeze)
             this.body.setMatrixAt(i, part.multiplyMatrices(figure, local))
 
             local.makeRotationX(-headTilt).setPosition(0, headY, 0)
@@ -570,9 +666,30 @@ export default class MeepleCrowd
                 hair.setMatrixAt(n, part)
                 counts.set(look.hairStyle, n + 1)
             }
+
+            const item = meeple.item && this.items.get(meeple.item)
+            if (item)
+            {
+                // the attachment point moves with the stretch of the body, its normal by the inverse scale
+                normal.set(ITEM_NORMAL.x / squeeze, ITEM_NORMAL.y / stretch, ITEM_NORMAL.z / squeeze).normalize()
+                attach.set(ITEM_POINT.x * squeeze, ITEM_POINT.y * stretch, ITEM_POINT.z * squeeze)
+                    .addScaledVector(normal, ITEM_LIFT)
+
+                // lay the sprite onto the surface, its x axis horizontal, and turn it around the attachment point,
+                // swinging with the steps
+                tangent.crossVectors(UP, normal).normalize()
+                bitangent.crossVectors(normal, tangent)
+                local.makeBasis(tangent, bitangent, normal)
+                    .multiply(rollMatrix.makeRotationZ(ITEM_ROLL + swing))
+                    .setPosition(attach)
+                    .multiply(ITEM_SHAPE)
+                const n = itemCounts.get(meeple.item!) ?? 0
+                item.setMatrixAt(n, part.multiplyMatrices(figure, local))
+                itemCounts.set(meeple.item!, n + 1)
+            }
         })
 
-        for (const mesh of [this.body, this.head, this.eyes, ...this.hair.values()])
+        for (const mesh of [this.body, this.head, this.eyes, ...this.hair.values(), ...this.items.values()])
         {
             mesh.instanceMatrix.needsUpdate = true
         }
@@ -593,3 +710,7 @@ const rollPivot = new Matrix4()
 const tmpPos = new Vector3()
 const tmpScale = new Vector3()
 const tmpColor = new Color()
+const attach = new Vector3()
+const normal = new Vector3()
+const tangent = new Vector3()
+const bitangent = new Vector3()

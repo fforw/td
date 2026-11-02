@@ -267,3 +267,55 @@ export async function loadItemSprite(url: string, thickness: number, options: It
     }
 }
 
+
+const ITEM_DIR = import.meta.env.BASE_URL + "media/items/"
+
+/**
+ * Item sprites under media/items
+ */
+export const ITEMS = [
+    "sword_silver",
+    "axe_silver",
+    "pick_silver",
+    "hammer_silver",
+    "shovel_silver",
+    "hoe_silver",
+    "flail_silver",
+    "bow",
+    "bowArrow",
+    "arrow",
+    "apple"
+] as const
+
+export type ItemName = typeof ITEMS[number]
+
+/**
+ * Item thickness, two pixels of the 42 pixel sprites
+ */
+const ITEM_THICKNESS = 2 / 42
+
+const items = new Map<ItemName, ItemSprite>()
+
+
+/**
+ * Loads the given items, all by default
+ */
+export function loadItems(names: readonly ItemName[] = ITEMS): Promise<void>
+{
+    return Promise.all(
+        names.map(
+            name => loadItemSprite(ITEM_DIR + name + ".png", ITEM_THICKNESS).then(sprite => {
+                items.set(name, sprite)
+            })
+        )
+    ).then(() => undefined)
+}
+
+
+/**
+ * Returns the loaded item, or undefined if it was not loaded
+ */
+export function itemSprite(name: ItemName): ItemSprite | undefined
+{
+    return items.get(name)
+}

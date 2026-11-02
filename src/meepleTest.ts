@@ -17,6 +17,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./Meeple3D"
+import { ITEMS, loadItems } from "./itemSprite"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 import { attempts, cityNameGenerator, resetAttempts } from "./name-generator";
@@ -119,7 +120,7 @@ scene.add(ground)
 
 resetRandom(randomSeed())
 
-await loadModels(MEEPLE_MODELS)
+await Promise.all([loadModels(MEEPLE_MODELS), loadItems()])
 
 const crowd = new MeepleCrowd(GRID * GRID)
 const offset = (GRID - 1) * SPACING / 2
@@ -132,6 +133,8 @@ for (let y = 0; y < GRID; y++)
             facing: 0,
             look: randomLook(),
             phase: rng.next() * TAU,
+            // about half of the meeples hold something
+            item: rng.next() < 0.5 ? pick([...ITEMS]) : undefined,
             ...randomTraits()
         })
     }
@@ -243,7 +246,8 @@ function showInfo(meeple: Meeple): void
         `height:  ${look.height.toFixed(2)}`,
         `hair:    ${HairStyle[look.hairStyle].toLowerCase()} ${look.hair.getHexString()}`,
         `skin:    ${look.skin.getHexString()}`,
-        `shirt:   ${look.shirt.getHexString()}`
+        `shirt:   ${look.shirt.getHexString()}`,
+        `item:    ${meeple.item ?? "-"}`
     ].join("\n")
 }
 
