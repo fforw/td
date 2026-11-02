@@ -119,6 +119,7 @@ nextName:
             // the next letter is going to push us over the limit, retry...
             if (title.length === maxLength)
             {
+                attemptsCount++
                 continue nextName;
             }
 
