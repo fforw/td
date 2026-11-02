@@ -1,5 +1,5 @@
 import type { CastlePlan } from "../castle/castlePlan"
-import type { QuadPatch } from "./QuadPatch"
+import type { QuadPatch } from "../map/QuadPatch"
 
 /**
  * Asks the worker to build the patch at the given hexagon position

@@ -1,9 +1,9 @@
 import Castle from "../castle/Castle"
 import { planCastle } from "../castle/castlePlan"
-import HexagonPatch from "./HexagonPatch"
+import HexagonPatch from "../map/HexagonPatch"
 import type { MapRequest, MapResponse } from "./MapWorkerClient"
-import { packPatch, transferables } from "./QuadPatch"
-import Terrain from "./terrain"
+import { packPatch, transferables } from "../map/QuadPatch"
+import Terrain from "../map/terrain"
 import { patchSeed, resetRandom, rng } from "../math/random"
 
 
