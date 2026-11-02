@@ -90,9 +90,14 @@ export interface ItemAction<Step = ActionStep>
      */
     steps: readonly Step[]
     /**
-     * Transition from the last step back to READY
+     * Transition from the last step back to READY, or to IDLE with returnTo
      */
     out: Transition
+    /**
+     * Pose the action returns to, READY by default. From IDLE, the item is readied again if the meeple still wants
+     * it readied or keeps acting, e.g. to nock the next arrow.
+     */
+    returnTo?: "ready" | "idle"
     /**
      * Seconds to wait at READY before the action repeats, as long as the meeple keeps acting. Without it or when it is
      * negative, the action plays once.
@@ -101,7 +106,8 @@ export interface ItemAction<Step = ActionStep>
 }
 
 /**
- * How an item is held, readied and used. The order is always IDLE -> READY -> action steps -> READY -> IDLE.
+ * How an item is held, readied and used. The order is always IDLE -> READY -> action steps -> READY -> IDLE, or
+ * IDLE -> READY -> action steps -> IDLE with returnTo.
  */
 export interface ItemAnimation
 {
@@ -258,12 +264,13 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
 
     bow: {
 
-        // held up in front, the string drawn back toward the body
+        // held up in front with an arrow nocked, the string drawn back toward the body and released
         ready: {
             height: 0.6,
             angle: 0.1,
             lift: 0.2,
-            roll: 0.79
+            roll: 0.79,
+            image: "bowArrow"
         },
 
         action: {
@@ -272,8 +279,6 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
                 {
                     lift: 0.3,
                     swing: 0,
-                    // nock an arrow
-                    image: "bowArrow",
                     transition: {
                         duration: 0.4,
                         easing: "easeOut"
@@ -284,6 +289,8 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
                 {
                     lift: 0.15,
                     swing: 0,
+                    // the arrow is gone
+                    image: "bow",
                     transition: {
                         duration: 0.05,
                         easing: "easeOutBack"
@@ -295,7 +302,10 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
             out: {
                 duration: 0.3,
                 easing: "easeInOut"
-            }
+            },
+
+            // and nock the next one when readied again
+            returnTo: "idle"
 
         }
 
@@ -359,13 +369,14 @@ function pose(base: ItemPose, changes: Partial<ItemPose>): ItemPose
 export function resolveAnimation(def: ItemAnimationDef): ItemAnimation
 {
     const ready = pose(DEFAULT_READY, def.ready ?? {})
-    const { steps, out, repeat } = { ...DEFAULT_ACTION, ...def.action }
+    const { steps, out, returnTo, repeat } = { ...DEFAULT_ACTION, ...def.action }
     return {
         idle: pose(DEFAULT_IDLE, def.idle ?? {}),
         ready: { ...ready, transition: def.ready?.transition ?? DEFAULT_READY_TRANSITION },
         action: {
             steps: steps.map(step => ({ ...pose(ready, step), transition: step.transition, hold: step.hold ?? 0 })),
             out,
+            returnTo,
             repeat
         }
     }
@@ -510,7 +521,7 @@ export function advanceItem(animation: ItemAnimation, state: ItemState, ready: b
                 }
                 break
             case "action":
-                if (!finish(state, "ready", actionDuration(action), time))
+                if (!finish(state, action.returnTo ?? "ready", actionDuration(action), time))
                 {
                     return
                 }
@@ -586,7 +597,7 @@ export function itemPose(animation: ItemAnimation, state: ItemState, time: numbe
                 rest -= step.hold
                 from = step
             }
-            return blendPose(from, ready, ease(action.out, rest), out)
+            return blendPose(from, action.returnTo === "idle" ? idle : ready, ease(action.out, rest), out)
         }
     }
 }

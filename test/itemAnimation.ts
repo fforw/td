@@ -204,6 +204,25 @@ describe("advanceItem and itemPose", function () {
         assert(image(3.5) === undefined)
     })
 
+    it("returns to IDLE and readies again if still wanted", function () {
+        const animation = { ...ONCE, action: { ...ONCE.action, returnTo: "idle" as const } }
+        const state = newItemState()
+        actItem(animation, state)
+        run(animation, state, true, 0)
+        // action from 0.5 to 3, the out transition blends toward IDLE
+        assert(near(run(animation, state, true, 2.5), 1.5))
+        assert(phase(state) === "action")
+        run(animation, state, true, 3)
+        assert(phase(state) === "readying" && state.since === 3)
+        assert(run(animation, state, true, 3.5) === 1)
+
+        // without the ready flag it stays at IDLE
+        actItem(animation, state)
+        run(animation, state, false, 4)
+        run(animation, state, false, 6.5)
+        assert(phase(state) === "idle")
+    })
+
     it("plays the action again when acting again", function () {
         const state = newItemState()
         actItem(ONCE, state)
