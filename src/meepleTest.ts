@@ -17,7 +17,8 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./Meeple3D"
-import { ITEMS, loadItems } from "./itemSprite"
+import { canEquip, canHaveClass, type Character, CLASSES, type ClassName, ITEM_TYPES, type ItemType, type Stats } from "./character"
+import { type ItemName, ITEMS, loadItems } from "./itemSprite"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 import { attempts, cityNameGenerator, resetAttempts } from "./name-generator";
@@ -77,6 +78,64 @@ function randomLook(): MeepleLook
 }
 
 
+function randomStats(): Stats
+{
+    return {
+        hp: rng.nextInt(5, 20),
+        // one in ten has the magic for a wizard
+        mp: rng.next() < 0.1 ? rng.nextInt(CLASSES.wizard.min.mp, 12) : rng.nextInt(0, CLASSES.wizard.min.mp - 1),
+        str: rng.nextInt(1, 10),
+        dex: rng.nextInt(1, 10)
+    }
+}
+
+
+const CLASS_NAMES = Object.keys(CLASSES) as ClassName[]
+
+function randomCharacter(): Character
+{
+    const stats = randomStats()
+    // one or sometimes two of the classes the stats allow, in random order. Anyone can be a peasant, and anyone who
+    // can be a wizard is one first.
+    const classes = CLASS_NAMES
+        .filter(name => canHaveClass(stats, name))
+        .map(name => ({ name, order: name === "wizard" ? -1 : rng.next() }))
+        .sort((a, b) => a.order - b.order)
+        .map(c => c.name)
+    return { stats, classes: classes.slice(0, rng.next() < 0.2 ? 2 : 1) }
+}
+
+
+/**
+ * Items, without the sprites only drawn instead of another item
+ */
+const HELD_ITEMS = ITEMS.filter(item => ITEM_TYPES[item])
+
+function itemsOf(types: readonly ItemType[]): ItemName[]
+{
+    return HELD_ITEMS.filter(item => types.includes(ITEM_TYPES[item]!))
+}
+
+
+/**
+ * Items for the first class: peasants hold a tool or something else half of the time, all others an item of the first
+ * type their class lists. A quarter also hold something their classes allow in the left hand.
+ */
+function randomItems(character: Character): Pick<Meeple, "item" | "leftItem">
+{
+    const first = character.classes[0]
+    const types: readonly ItemType[] = CLASSES[first].equip
+    const item = first === "peasant"
+        ? rng.next() < 0.5 ? pick(itemsOf(types)) : undefined
+        : pick(itemsOf(types.slice(0, 1)))
+    const left = HELD_ITEMS.filter(other => canEquip(character, item, other) === null)
+    return {
+        item,
+        leftItem: left.length && rng.next() < 0.25 ? pick(left) : undefined
+    }
+}
+
+
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
 const renderer = new WebGLRenderer({ canvas, antialias: true })
@@ -122,6 +181,12 @@ resetRandom(randomSeed())
 
 await Promise.all([loadModels(MEEPLE_MODELS), loadItems()])
 
+function randomEquipped(): Pick<Meeple, "character" | "item" | "leftItem">
+{
+    const character = randomCharacter()
+    return { character, ...randomItems(character) }
+}
+
 const crowd = new MeepleCrowd(GRID * GRID)
 const offset = (GRID - 1) * SPACING / 2
 for (let y = 0; y < GRID; y++)
@@ -133,10 +198,8 @@ for (let y = 0; y < GRID; y++)
             facing: 0,
             look: randomLook(),
             phase: rng.next() * TAU,
-            // about half of the meeples hold something in the right hand, a quarter in the left
-            item: rng.next() < 0.5 ? pick([...ITEMS]) : undefined,
-            leftItem: rng.next() < 0.25 ? pick([...ITEMS]) : undefined,
-            ...randomTraits()
+            ...randomTraits(),
+            ...randomEquipped()
         })
     }
 }
@@ -268,6 +331,8 @@ function showInfo(meeple: Meeple): void
         `hair:    ${HairStyle[look.hairStyle].toLowerCase()} ${look.hair.getHexString()}`,
         `skin:    ${look.skin.getHexString()}`,
         `shirt:   ${look.shirt.getHexString()}`,
+        `classes: ${meeple.character?.classes.join(", ") ?? "-"}`,
+        `stats:   ${Object.entries(meeple.character?.stats ?? {}).map(([k, v]) => k + " " + v).join(", ")}`,
         `item:    ${meeple.item ?? "-"}`,
         `left:    ${meeple.leftItem ?? "-"}`
     ].join("\n")
