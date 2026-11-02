@@ -1,4 +1,4 @@
-import { countNeighborsInSet } from "../util"
+import { countNeighborsInSet } from "../map/neighbors"
 import type Castle from "./Castle"
 import { getNeighbors } from "./Castle"
 import type { Face, HalfEdge, Point, Vertex } from "../map/geometry"

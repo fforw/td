@@ -26,7 +26,7 @@ import { marchingSquaresPatch } from "./map/marchingSquares"
 import PatchWorld from "./map/PatchWorld"
 import type { QuadPatch } from "./map/QuadPatch"
 import { FACE_SIZE, GROUND_COLORS, instanceModel, loadModels, type ModelName, SCALE } from "./render/scene3d"
-import { patchSeed, randomSeed } from "./util"
+import { patchSeed, randomSeed } from "./math/random"
 
 /*
  * Endless map of packed patches, built by the map worker around the point the camera looks at.

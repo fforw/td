@@ -1,6 +1,6 @@
 import "./style.css"
 import HexagonPatch, { PATCH_SIZE } from "./map/HexagonPatch"
-import { randomSeed, resetRandom } from "./util"
+import { randomSeed, resetRandom } from "./math/random"
 import Castle from "./castle/Castle"
 import type { Face } from "./map/geometry"
 import { FaceType } from "./map/geometry"

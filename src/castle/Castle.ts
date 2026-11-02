@@ -1,4 +1,5 @@
-import { countNeighborsInSet, rng } from "../util"
+import { rng } from "../math/random"
+import { countNeighborsInSet } from "../map/neighbors"
 import type { Face, Vertex } from "../map/geometry"
 import { FaceType } from "../map/geometry"
 import Vector from "../math/vector"

@@ -4,7 +4,7 @@ import HexagonPatch from "./HexagonPatch"
 import type { MapRequest, MapResponse } from "./MapWorkerClient"
 import { packPatch, transferables } from "./QuadPatch"
 import Terrain from "./terrain"
-import { patchSeed, resetRandom, rng } from "../util"
+import { patchSeed, resetRandom, rng } from "../math/random"
 
 
 /**

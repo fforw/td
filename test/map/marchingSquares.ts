@@ -4,7 +4,7 @@ import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import marchingSquares, { GROUND_PRIORITY, marchingSquaresPatch } from "../../src/map/marchingSquares"
 import PatchWorld from "../../src/map/PatchWorld"
 import { packPatch } from "../../src/map/QuadPatch"
-import { resetRandom, rng } from "../../src/util"
+import { resetRandom, rng } from "../../src/math/random"
 import type { Face } from "../../src/map/geometry"
 
 

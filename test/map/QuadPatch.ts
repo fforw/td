@@ -4,7 +4,7 @@ import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { FaceType, type Face, type HalfEdge } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceOf, next, packPatch, prev, type QuadPatch } from "../../src/map/QuadPatch"
-import { patchSeed, resetRandom } from "../../src/util"
+import { patchSeed, resetRandom } from "../../src/math/random"
 
 
 const SEED = 4711

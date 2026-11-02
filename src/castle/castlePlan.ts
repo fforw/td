@@ -4,7 +4,8 @@ import type { Face, Point } from "../map/geometry"
 import { FaceType } from "../map/geometry"
 import { squareFace, wallPaths } from "./plan"
 import { SCALE } from "../map/scale"
-import { connectsTo, rng } from "../util"
+import { rng } from "../math/random"
+import { connectsTo } from "../map/neighbors"
 import Vector3 from "../math/Vector3"
 
 /*

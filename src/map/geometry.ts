@@ -1,4 +1,4 @@
-import { rng } from "../util";
+import { rng } from "../math/random";
 
 let vertexCounter = 1000;
 

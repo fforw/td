@@ -21,7 +21,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import HexagonPatch from "./map/HexagonPatch"
-import { randomSeed, resetRandom, rng } from "./util"
+import { randomSeed, resetRandom, rng } from "./math/random"
 import Castle from "./castle/Castle"
 import { createCastle } from "./castle/castle3d"
 import { planCastle, toWorld } from "./castle/castlePlan"
