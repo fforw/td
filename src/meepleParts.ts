@@ -1,4 +1,4 @@
-import { BufferGeometry, SphereGeometry } from "three"
+import { BufferGeometry, SphereGeometry, type Vector3 } from "three"
 
 // plain geometry builders without enums or DOM access, so scripts/exportMeeple.ts can run them in Node
 
@@ -23,6 +23,25 @@ export function createBodyGeometry(): BufferGeometry
     geometry.scale(1, BODY_STRETCH, 1)
     geometry.translate(0, BODY_RADIUS * BODY_STRETCH, 0)
     return geometry
+}
+
+
+/**
+ * Sets a point on the surface of the body and the surface normal there, for a meeple facing +z.
+ *
+ * @param height height on the body from 0 at the bottom to 1 at the top
+ * @param angle  angle in radians around the vertical, from the front toward the meeple's right, which is -x
+ * @param point  receives the point
+ * @param normal receives the normal
+ */
+export function bodySurface(height: number, angle: number, point: Vector3, normal: Vector3): void
+{
+    const sinLat = height * 2 - 1
+    const cosLat = Math.sqrt(1 - sinLat * sinLat)
+    const x = -Math.sin(angle) * cosLat
+    const z = Math.cos(angle) * cosLat
+    point.set(x * BODY_RADIUS, (sinLat + 1) * BODY_RADIUS * BODY_STRETCH, z * BODY_RADIUS)
+    normal.set(x, sinLat / BODY_STRETCH, z).normalize()
 }
 
 
