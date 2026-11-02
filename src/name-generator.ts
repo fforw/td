@@ -103,6 +103,7 @@ function nameGenerator(dataSet: Chain, minLength: number, maxLength : number, ex
 {
     const { order, alphabet, rows } = dataSet;
 
+nextName:
     for (;;)
     {
         const context = new Array<number>(order).fill(BOUNDARY);
@@ -113,6 +114,12 @@ function nameGenerator(dataSet: Chain, minLength: number, maxLength : number, ex
             if (s === BOUNDARY)
             {
                 break;
+            }
+
+            // the next letter is going to push us over the limit, retry...
+            if (title.length === maxLength)
+            {
+                continue nextName;
             }
 
             const letter = alphabet[s - 1];
@@ -126,7 +133,7 @@ function nameGenerator(dataSet: Chain, minLength: number, maxLength : number, ex
         attemptsCount++
 
         const name = title.join("");
-        if (name.length >= minLength && name.length <= maxLength && exclusions.indexOf(name) < 0)
+        if (name.length >= minLength && exclusions.indexOf(name) < 0)
         {
             return name;
         }
