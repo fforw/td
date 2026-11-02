@@ -17,7 +17,6 @@ export function clamp(v: number): number
 export function randomSeed(override: number | null = null): number
 {
     const seed = Math.round(typeof override === "number" ? override : Math.random() * 0xffffffff)
-    console.log("SEED", seed)
     return seed
 }
 
@@ -26,6 +25,8 @@ export let rng = new Prando(randomSeed() )
 
 export function resetRandom(seed: number): void
 {
+    console.log("SEED", seed)
+
     rng = new Prando(seed)
 }
 
