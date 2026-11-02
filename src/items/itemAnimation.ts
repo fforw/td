@@ -43,7 +43,10 @@ export interface ItemPose
     image?: ItemName
 }
 
+type EasingCurve = "Quad" | "Cubic" | "Quart" | "Quint" | "Sine" | "Expo" | "Circ"
+
 export type EasingName = "linear" | "easeIn" | "easeOut" | "easeInOut" | "easeInBack" | "easeOutBack"
+    | `easeIn${EasingCurve}` | `easeOut${EasingCurve}` | `easeInOut${EasingCurve}`
 
 /**
  * Easing functions from 0 at t = 0 to 1 at t = 1
@@ -56,7 +59,33 @@ export const EASINGS: Record<EasingName, (t: number) => number> = {
     // pulls back a little before it goes
     easeInBack: t => t * t * (2.7 * t - 1.7),
     // overshoots a little and comes back
-    easeOutBack: t => 1 + (t - 1) * (t - 1) * (2.7 * (t - 1) + 1.7)
+    easeOutBack: t => 1 + (t - 1) * (t - 1) * (2.7 * (t - 1) + 1.7),
+
+    // Robert Penner's easing equations (BSD License, http://robertpenner.com/easing/). The In variants accelerate
+    // from zero velocity, the Out variants decelerate to zero velocity and the InOut variants accelerate until
+    // halfway, then decelerate.
+    easeInQuad: t => t * t,
+    easeOutQuad: t => t * (2 - t),
+    easeInOutQuad: t => t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) ** 2,
+    easeInCubic: t => t ** 3,
+    easeOutCubic: t => 1 - (1 - t) ** 3,
+    easeInOutCubic: t => t < 0.5 ? 4 * t ** 3 : 1 - 4 * (1 - t) ** 3,
+    easeInQuart: t => t ** 4,
+    easeOutQuart: t => 1 - (1 - t) ** 4,
+    easeInOutQuart: t => t < 0.5 ? 8 * t ** 4 : 1 - 8 * (1 - t) ** 4,
+    easeInQuint: t => t ** 5,
+    easeOutQuint: t => 1 - (1 - t) ** 5,
+    easeInOutQuint: t => t < 0.5 ? 16 * t ** 5 : 1 - 16 * (1 - t) ** 5,
+    easeInSine: t => 1 - Math.cos(t * Math.PI / 2),
+    easeOutSine: t => Math.sin(t * Math.PI / 2),
+    easeInOutSine: t => (1 - Math.cos(t * Math.PI)) / 2,
+    // the exponential curves only come close to their ends, so these are set exactly
+    easeInExpo: t => t <= 0 ? 0 : 2 ** (10 * (t - 1)),
+    easeOutExpo: t => t >= 1 ? 1 : 1 - 2 ** (-10 * t),
+    easeInOutExpo: t => t <= 0 ? 0 : t >= 1 ? 1 : t < 0.5 ? 2 ** (20 * t - 10) / 2 : 1 - 2 ** (10 - 20 * t) / 2,
+    easeInCirc: t => 1 - Math.sqrt(1 - t * t),
+    easeOutCirc: t => Math.sqrt(1 - (1 - t) ** 2),
+    easeInOutCirc: t => t < 0.5 ? (1 - Math.sqrt(1 - 4 * t * t)) / 2 : (1 + Math.sqrt(1 - 4 * (1 - t) ** 2)) / 2
 }
 
 export interface Transition
