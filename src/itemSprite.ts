@@ -217,6 +217,10 @@ export interface ItemSprite
      * Length of the longer side in pixels, including the outline
      */
     pixels: number
+    /**
+     * Factor on the size the sprite's pixels give it
+     */
+    scale: number
 }
 
 
@@ -269,7 +273,8 @@ export async function loadItemSprite(url: string, thickness: number, options: It
     return {
         geometry: extrudeSprite(image, thickness / pixels),
         texture: createSpriteTexture(image),
-        pixels
+        pixels,
+        scale: 1
     }
 }
 
@@ -307,6 +312,13 @@ const ITEM_THICKNESS = 2
  */
 export const ITEM_PIXELS = 44
 
+/**
+ * Items drawn larger than their pixels, with larger pixels
+ */
+const ITEM_SCALES: Partial<Record<ItemName, number>> = {
+    staff: 1.2
+}
+
 const items = new Map<ItemName, ItemSprite>()
 
 
@@ -318,6 +330,7 @@ export function loadItems(names: readonly ItemName[] = ITEMS): Promise<void>
     return Promise.all(
         names.map(
             name => loadItemSprite(ITEM_DIR + name + ".png", ITEM_THICKNESS).then(sprite => {
+                sprite.scale = ITEM_SCALES[name] ?? 1
                 items.set(name, sprite)
             })
         )

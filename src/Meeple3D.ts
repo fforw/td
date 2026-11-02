@@ -461,7 +461,7 @@ export default class MeepleCrowd
                 // one per hand
                 const mesh = createItemPart(sprite, gradientMap, capacity * 2)
                 this.items.set(name, mesh)
-                this.itemSizes.set(name, ITEM_SIZE * sprite.pixels / ITEM_PIXELS)
+                this.itemSizes.set(name, ITEM_SIZE * sprite.pixels / ITEM_PIXELS * sprite.scale)
                 this.group.add(mesh)
             }
         }
