@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 import { Vector3 } from "three"
 
-import { bodySurface } from "../src/meepleParts"
+import { bodySurface } from "../src/meeple/meepleParts"
 
 
 function surface(height: number, angle: number): { point: Vector3, normal: Vector3 }

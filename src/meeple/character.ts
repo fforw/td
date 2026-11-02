@@ -1,4 +1,4 @@
-import type { ItemName } from "./itemSprite"
+import type { ItemName } from "../items/itemSprite"
 
 // stats, classes and the rules for what a character can equip. Plain data without three.js, like the item animations.
 

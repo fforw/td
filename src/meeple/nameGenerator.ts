@@ -1,4 +1,4 @@
-import { rng } from "./util";
+import { rng } from "../core/util";
 
 /**
  * Symbol 0 marks the boundary of a name: it pads the context at the start and is the

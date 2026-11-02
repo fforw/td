@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
-import { FaceType } from "../src/geometry"
-import Terrain, { classify, SEA_LEVEL } from "../src/terrain"
+import { FaceType } from "../src/core/geometry"
+import Terrain, { classify, SEA_LEVEL } from "../src/map/terrain"
 
 
 const never = () => 0.99

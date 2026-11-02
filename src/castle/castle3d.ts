@@ -1,6 +1,6 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Object3D, Vector3 } from "three"
 import type { CastlePlan, GatePlan, HousePlan } from "./castlePlan"
-import { model, template } from "./scene3d"
+import { model, template } from "../render/scene3d"
 
 /*
  * 3D objects of a castle plan

@@ -1,5 +1,5 @@
-import type { Face, HalfEdge, Vertex } from "./geometry"
-import { FaceType } from "./geometry"
+import type { Face, HalfEdge, Vertex } from "../core/geometry"
+import { FaceType } from "../core/geometry"
 import type PatchWorld from "./PatchWorld"
 import { SLOT_SHIFT } from "./PatchWorld"
 import { faceOf, next, prev } from "./QuadPatch"

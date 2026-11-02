@@ -20,15 +20,15 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import HexagonPatch from "./HexagonPatch"
-import { randomSeed, resetRandom, rng } from "./util"
-import Castle from "./Castle"
-import { createCastle } from "./castle3d"
-import { planCastle, toWorld } from "./castlePlan"
-import type { Face } from "./geometry"
-import { FaceType } from "./geometry"
-import marchingSquares from "./marchingSquares"
-import { FACE_SIZE, GROUND_COLORS, loadModels, model, type ModelName, SCALE } from "./scene3d"
+import HexagonPatch from "./map/HexagonPatch"
+import { randomSeed, resetRandom, rng } from "./core/util"
+import Castle from "./castle/Castle"
+import { createCastle } from "./castle/castle3d"
+import { planCastle, toWorld } from "./castle/castlePlan"
+import type { Face } from "./core/geometry"
+import { FaceType } from "./core/geometry"
+import marchingSquares from "./map/marchingSquares"
+import { FACE_SIZE, GROUND_COLORS, loadModels, model, type ModelName, SCALE } from "./render/scene3d"
 
 const TAU = Math.PI * 2;
 

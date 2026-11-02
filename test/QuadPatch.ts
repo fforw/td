@@ -1,10 +1,10 @@
 import { afterAll, assert, beforeAll, describe, it } from "vitest"
 
-import HexagonPatch, { PATCH_SIZE } from "../src/HexagonPatch"
-import { FaceType, type Face, type HalfEdge } from "../src/geometry"
-import PatchWorld, { SLOT_SHIFT } from "../src/PatchWorld"
-import { faceOf, next, packPatch, prev, type QuadPatch } from "../src/QuadPatch"
-import { patchSeed, resetRandom } from "../src/util"
+import HexagonPatch, { PATCH_SIZE } from "../src/map/HexagonPatch"
+import { FaceType, type Face, type HalfEdge } from "../src/core/geometry"
+import PatchWorld, { SLOT_SHIFT } from "../src/map/PatchWorld"
+import { faceOf, next, packPatch, prev, type QuadPatch } from "../src/map/QuadPatch"
+import { patchSeed, resetRandom } from "../src/core/util"
 
 
 const SEED = 4711

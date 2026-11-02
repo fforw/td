@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, type Stats } from "../src/character"
+import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, type Stats } from "../src/meeple/character"
 
 
 const STRONG: Stats = { hp: 20, mp: 20, str: 10, dex: 10 }

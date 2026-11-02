@@ -18,15 +18,15 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { createCastle } from "./castle3d"
-import { FaceType } from "./geometry"
-import { PATCH_SIZE } from "./HexagonPatch"
-import MapWorkerClient, { type BuiltPatch } from "./MapWorkerClient"
-import { marchingSquaresPatch } from "./marchingSquares"
-import PatchWorld from "./PatchWorld"
-import type { QuadPatch } from "./QuadPatch"
-import { FACE_SIZE, GROUND_COLORS, instanceModel, loadModels, type ModelName, SCALE } from "./scene3d"
-import { patchSeed, randomSeed } from "./util"
+import { createCastle } from "./castle/castle3d"
+import { FaceType } from "./core/geometry"
+import { PATCH_SIZE } from "./map/HexagonPatch"
+import MapWorkerClient, { type BuiltPatch } from "./map/MapWorkerClient"
+import { marchingSquaresPatch } from "./map/marchingSquares"
+import PatchWorld from "./map/PatchWorld"
+import type { QuadPatch } from "./map/QuadPatch"
+import { FACE_SIZE, GROUND_COLORS, instanceModel, loadModels, type ModelName, SCALE } from "./render/scene3d"
+import { patchSeed, randomSeed } from "./core/util"
 
 /*
  * Endless map of packed patches, built by the map worker around the point the camera looks at.

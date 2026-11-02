@@ -16,12 +16,12 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./Meeple3D"
-import { canEquip, canHaveClass, type Character, CLASSES, type ClassName, ITEM_TYPES, type ItemType, type Stats } from "./character"
-import { type ItemName, ITEMS, loadItems } from "./itemSprite"
-import { loadModels } from "./scene3d"
-import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
-import { attempts, cityNameGenerator, resetAttempts } from "./nameGenerator";
+import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
+import { canEquip, canHaveClass, type Character, CLASSES, type ClassName, ITEM_TYPES, type ItemType, type Stats } from "./meeple/character"
+import { type ItemName, ITEMS, loadItems } from "./items/itemSprite"
+import { loadModels } from "./render/scene3d"
+import { randomSeed, resetRandom, rng, weightedRandom } from "./core/util"
+import { attempts, cityNameGenerator, resetAttempts } from "./meeple/nameGenerator";
 
 const TAU = Math.PI * 2
 

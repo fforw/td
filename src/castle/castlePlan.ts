@@ -1,11 +1,11 @@
 import type Castle from "./Castle"
 import { filterNeighbors, getNeighbors } from "./Castle"
-import type { Face, Point } from "./geometry"
-import { FaceType } from "./geometry"
+import type { Face, Point } from "../core/geometry"
+import { FaceType } from "../core/geometry"
 import { squareFace, wallPaths } from "./plan"
-import { SCALE } from "./scale"
-import { connectsTo, rng } from "./util"
-import Vector3 from "./Vector3"
+import { SCALE } from "../core/scale"
+import { connectsTo, rng } from "../core/util"
+import Vector3 from "../core/Vector3"
 
 /*
  * Layout of the castle in world units, worked out on the faces of a patch. It doesn't depend on any 3D objects, so the

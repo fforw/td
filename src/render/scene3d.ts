@@ -1,12 +1,12 @@
 import { InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, type Object3D } from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
-import { FaceType } from "./geometry"
+import { FaceType } from "../core/geometry"
 
 /*
  * Map scale, models and ground colors shared by the 3D views
  */
 
-export { FACE_SIZE, SCALE } from "./scale"
+export { FACE_SIZE, SCALE } from "../core/scale"
 
 const MEDIA = import.meta.env.BASE_URL + "media/"
 

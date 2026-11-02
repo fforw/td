@@ -1,4 +1,4 @@
-import type { Face, HalfEdge, Vertex } from "./geometry"
+import type { Face, HalfEdge, Vertex } from "../core/geometry"
 import type HexagonPatch from "./HexagonPatch"
 
 /**

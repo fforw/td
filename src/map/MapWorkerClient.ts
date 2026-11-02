@@ -1,4 +1,4 @@
-import type { CastlePlan } from "./castlePlan"
+import type { CastlePlan } from "../castle/castlePlan"
 import type { QuadPatch } from "./QuadPatch"
 
 /**

@@ -7,7 +7,7 @@
 import { writeFileSync } from "node:fs"
 import { Group, Mesh, MeshBasicMaterial } from "three"
 import { OBJExporter } from "three/addons/exporters/OBJExporter.js"
-import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_Y } from "../src/meepleParts.ts"
+import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_Y } from "../src/meeple/meepleParts.ts"
 
 const out = process.argv[2] ?? "meeple.obj"
 

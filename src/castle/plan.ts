@@ -1,8 +1,8 @@
-import { countNeighborsInSet } from "./util"
+import { countNeighborsInSet } from "../core/util"
 import type Castle from "./Castle"
 import { getNeighbors } from "./Castle"
-import type { Face, HalfEdge, Point, Vertex } from "./geometry"
-import { FaceType } from "./geometry"
+import type { Face, HalfEdge, Point, Vertex } from "../core/geometry"
+import { FaceType } from "../core/geometry"
 
 const TAU = Math.PI * 2;
 

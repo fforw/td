@@ -1,10 +1,10 @@
 import "./style.css"
-import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
-import { randomSeed, resetRandom } from "./util"
-import Castle from "./Castle"
-import type { Face } from "./geometry"
-import { FaceType } from "./geometry"
-import { squareFace, TAU_8TH, wallPaths } from "./plan"
+import HexagonPatch, { PATCH_SIZE } from "./map/HexagonPatch"
+import { randomSeed, resetRandom } from "./core/util"
+import Castle from "./castle/Castle"
+import type { Face } from "./core/geometry"
+import { FaceType } from "./core/geometry"
+import { squareFace, TAU_8TH, wallPaths } from "./castle/plan"
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 const TAU = Math.PI * 2;
