@@ -1,7 +1,7 @@
 // Extracts sampled strokes and the component tree of the source characters from the KanjiVG SVGs in kanjivg/ into
 // strokes.json:
 //
-//     node examples/glyphs/extract.mjs
+//     node public/examples/glyphs/extract.mjs
 import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"

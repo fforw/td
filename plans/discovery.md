@@ -292,7 +292,7 @@ the language over the campaign.
 
 ### 2.6 Glyph construction
 
-The prototype is `examples/glyphs/` (open `index.html`, `#seed-123`
+The prototype is `public/examples/glyphs/` (open `index.html`, `#seed-123`
 reopens a world). Glyphs are built from the stroke data of a source
 kanji per concept (KanjiVG, CC BY-SA 3.0), but never show the kanji.
 

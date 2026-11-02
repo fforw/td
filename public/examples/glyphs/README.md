@@ -12,8 +12,8 @@ Open `index.html` in a browser; a `#seed-123` link reopens a world.
 To rebuild after changing the source characters or the page:
 
 ```bash
-node examples/glyphs/extract.mjs
-node examples/glyphs/build.mjs
+node public/examples/glyphs/extract.mjs
+node public/examples/glyphs/build.mjs
 ```
 
 The KanjiVG SVGs, `strokes.json` and the glyphs derived from them are licensed
