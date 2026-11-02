@@ -1,10 +1,10 @@
 # Treasure & Dread - implementation plan
 
-A campaign starts at a castle with a dramatic situation. Heroes are sent
-out to discover neighboring patches, and what they find fills the story:
-dungeons, temples, treasure, people. Some patches lead into sub-levels
-(houses, dungeons) with their own maps and contents. What the player
-takes and whom they leave alive comes back later as threats.
+A campaign starts at a castle with a dramatic situation. Explorers are
+sent out to discover neighboring patches, and what they find fills the
+story: dungeons, temples, treasure, people. Some patches lead into
+sub-levels (houses, dungeons) with their own maps and contents. What the
+player takes and whom they leave alive comes back later as threats.
 
 This plan builds on the packed patch pipeline: the map worker generates
 `QuadPatch`es, `PatchWorld` connects them along seams on the main thread.
@@ -160,35 +160,54 @@ subtitle on top of that.
 
 ### 1.2 Missions
 
-- A mission is a hero plus a target patch adjacent to a discovered patch.
+- A mission is an explorer plus a target patch adjacent to a discovered
+  patch.
 - On start: roll the target's kind, weighted by the story director (see
   2.4), mark it `targeted`, generate it into the simulation set.
 - The route may go through any discovered patch, not only the one next to
   the target.
-- Success: A* cost -> day bucket. Thresholds are multiples of the cost of
-  crossing one patch on open ground (`PATCH_SIZE` faces times the
-  cheapest cost), so they survive changes of `PATCH_SIZE`/`FACE_SIZE`.
+- Success: A* cost, scaled by the explorer's efficiency (1.3) -> day
+  bucket. Thresholds are multiples of the cost of crossing one patch on
+  open ground (`PATCH_SIZE` faces times the cheapest cost), so they
+  survive changes of `PATCH_SIZE`/`FACE_SIZE`.
   The patch becomes `discovered` with `parent` set.
 - Failure: "can't get from here to there". Costs the days to the furthest
   point the search reached, so failing isn't a free probe.
-- The mission keeps its route and timing; foes track along it (3.2).
+- Explorers leave no tracks or witnesses, so a discovery mission never
+  creates a threat by itself (see 4.2).
 - The first *successful* discovery is a DUNGEON. This is the first case
   of director steering, not a separate rule.
 
-### 1.3 Heroes
+### 1.3 Explorers and heroes
+
+Discovery and adventure are split between two kinds of people.
+
+Explorers are a caste of their own, modeled after the youth scouts in
+FIFA's career mode: you assign them, wait, and they report back.
+
+- They are just there and work for the castle; no recruiting, no pay,
+  no loyalty to manage.
+- Expert sneakers: they are never caught, never fight, and leave no
+  witnesses or tracks. Their only job is discovery.
+- Each explorer has an efficiency that scales a mission's days and the
+  failure cost down. It grows with experience, from every mission,
+  failed ones included, so seasoned explorers are worth sparing for
+  long or hard targets.
+- Like scouts, they report back to the castle after each mission; their
+  position is not state, every mission starts at the castle.
+
+Heroes do everything that happens inside a discovered patch:
 
 - Heroes come out of the generated meeple population.
-- Attribute for wisdom/exploration: scales the failure cost down, and
-  inside levels finds hidden traps and passages. The Explorer class is a
-  hero with a high value.
-- Keep classes distinct: the Explorer is cheap at failing, not best at
-  everything.
+- Attribute for wisdom: inside levels finds hidden traps and passages.
+- They enter levels, take treasure and fight, and are the ones who get
+  seen, followed and hated (phase 4).
 
 ### 1.4 Patch map UI
 
 - Hex map of discovered and targeted patches with their kinds.
-- Pick a hero and a neighboring unknown patch to start a mission; show
-  running missions and their remaining days.
+- Pick an explorer and a neighboring unknown patch to start a mission;
+  show running missions and their remaining days.
 
 ### 1.5 Time
 
@@ -354,7 +373,7 @@ Glyphs are built from the stroke data of a source kanji per concept
   then walks to the anchor, aligns and performs the action.
 - Interactions per kind: open, disarm, use, rest. House functions
   (crafting, storage, healing) are fixture kinds.
-- Traps can be hidden; detection uses the wisdom/exploration attribute.
+- Traps can be hidden; detection uses the hero's wisdom attribute.
 
 ### 3.3 Mobiles
 
@@ -406,12 +425,13 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 - Witnesses: surviving mobiles that saw the hero.
 - Identity: a recognizable hero, a dropped item, a castle banner.
-- Tracks: the mission route, readable depending on terrain (clear in
-  snow and mud, faint on rock and paved ground) and decaying over days.
+- Tracks: the routes heroes travel (explorers leave none), readable
+  depending on terrain (clear in snow and mud, faint on rock and paved
+  ground) and decaying over days.
 - Resulting state: knows the castle (comes straight at it), has a trail
   (follows it, then searches), knows nothing (searches outward).
-- Player countermeasures: silence witnesses, detour over rock, cover
-  tracks with the Explorer, lead them off with a hero as bait.
+- Player countermeasures: silence witnesses, detour over rock, lead
+  them off with a hero as bait.
 
 ### 4.3 Search
 
@@ -437,8 +457,7 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 ## Open questions
 
-- Does a hero stay at the discovered patch or return to the castle? If
-  they stay, hero position is state and the next mission starts there.
+- How many explorers does a campaign get, and can more appear?
 - PLOT/HOUSE: ground types for appearance, with buildings as fixtures on
   top, or do they stay coupled?
 - Dungeon walls as faces (like the castle, costs a ring of faces per
