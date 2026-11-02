@@ -208,7 +208,7 @@ function setFacingMode(mode: number): void
     crowd.meeples.forEach(m => m.facing = mode === 1 ? rng.next() * TAU : 0)
 }
 
-// e.g. ?facing=camera&walk&ahead&look=24,30
+// e.g. ?facing=camera&walk&ahead&ready&act&look=24,30
 const params = new URLSearchParams(location.search)
 const facingParam = FACING_MODES.indexOf(params.get("facing") ?? "")
 setFacingMode(facingParam < 0 ? 1 : facingParam)
@@ -221,6 +221,26 @@ checkbox("walk", () => crowd.walking, v => {
 // moving only makes sense with the walk animation
 const aheadBox = checkbox("walk ahead", () => walkAhead, v => walkAhead = v)
 aheadBox.disabled = !crowd.walking
+
+// items
+function setReady(ready: boolean): void
+{
+    crowd.meeples.forEach(m => m.ready = ready)
+}
+
+let acting = false
+function setActing(act: boolean): void
+{
+    acting = act
+    crowd.meeples.forEach(m => act ? crowd.act(m) : crowd.stopActing(m))
+}
+
+setReady(params.has("ready"))
+setActing(params.has("act"))
+checkbox("ready items", () => !!crowd.meeples[0].ready, setReady)
+// tools repeat their action while acting, other items act once
+checkbox("act", () => acting, setActing)
+
 for (const index of (params.get("look") ?? "").split(",").filter(Boolean))
 {
     crowd.meeples[+index].lookAtCamera = true

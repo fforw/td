@@ -20,6 +20,7 @@ import {
     type Raycaster,
     Vector3
 } from "three"
+import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "./itemAnimation"
 import { type ItemName, ITEMS, type ItemSprite, itemSprite } from "./itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
@@ -63,39 +64,9 @@ const EYE_SPREAD = 0.4
 const EYE_DROP = 0.15
 
 /**
- * Where an item is attached to the body: the height on the body from 0 at the bottom to 1 at the top, and the angle in
- * radians around the vertical from the front toward the meeple's right
- */
-const ITEM_HEIGHT = 0.45
-const ITEM_ANGLE = 0.6
-
-/**
- * Distance in meeple units the item floats above the body surface
- */
-const ITEM_LIFT = 0.05
-
-/**
- * Point of the item sprites that lies on the attachment point, from the sprite center with its longer side 1 unit
- * long. The Voxel Pack items have their handle in the lower left.
- */
-const GRIP = new Vector3(-0.27, -0.27, 0)
-
-/**
  * Length of the longer side of an item sprite in meeple units
  */
 const ITEM_SIZE = 0.7
-
-/**
- * Angle in radians the item is turned around the attachment point, counter-clockwise from the sprite as it is drawn
- * when looking at the body from outside. The drawn items point up and to the right, so from 0.79 on they lean away
- * from the head on the right side of the body.
- */
-const ITEM_ROLL = 1.25
-
-/**
- * Angle in radians the item swings around the attachment point with every step, for the widest gait
- */
-const ITEM_SWING = 0.25
 
 /**
  * Walk cycle speed in radians per second. Each cycle has two steps.
@@ -192,6 +163,10 @@ export interface Meeple
      * Item held in the right hand. Like the look, it must not change after the meeple was added.
      */
     item?: ItemName
+    /**
+     * Holds the item readied. Acting readies it as well.
+     */
+    ready?: boolean
 }
 
 
@@ -387,21 +362,6 @@ function createItemPart(sprite: ItemSprite, gradientMap: DataTexture, capacity: 
 }
 
 
-/**
- * Scales an item sprite and moves its grip to the origin
- */
-const ITEM_SHAPE = new Matrix4()
-    .makeScale(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)
-    .multiply(new Matrix4().makeTranslation(-GRIP.x, -GRIP.y, -GRIP.z))
-
-/**
- * Attachment point of the items on the body and the surface normal there, before the walk stretches the body
- */
-const ITEM_POINT = new Vector3()
-const ITEM_NORMAL = new Vector3()
-bodySurface(ITEM_HEIGHT, ITEM_ANGLE, ITEM_POINT, ITEM_NORMAL)
-
-
 function createOutlineMaterial(color: Color): MeshBasicMaterial
 {
     const material = new MeshBasicMaterial({ color, side: BackSide })
@@ -445,6 +405,7 @@ export default class MeepleCrowd
      * How far each meeple has turned toward the camera, from 0 to 1
      */
     private readonly attention: number[] = []
+    private readonly itemStates: ItemState[] = []
     private lastTime = 0
 
     private readonly capacity: number
@@ -544,6 +505,7 @@ export default class MeepleCrowd
         const i = this.meeples.length
         this.meeples.push(meeple)
         this.attention.push(0)
+        this.itemStates.push(newItemState())
 
         // only the new meeple's colors, rewriting all of them on every add makes building a crowd quadratic
         const { look } = meeple
@@ -568,6 +530,25 @@ export default class MeepleCrowd
         {
             item.count++
         }
+    }
+
+    /**
+     * Readies the meeple's item and uses it, again and again if the item's action repeats, until stopActing()
+     */
+    act(meeple: Meeple): void
+    {
+        if (meeple.item)
+        {
+            actItem(itemAnimation(meeple.item), this.itemStates[this.meeples.indexOf(meeple)])
+        }
+    }
+
+    /**
+     * Stops using the meeple's item after the current action
+     */
+    stopActing(meeple: Meeple): void
+    {
+        stopActing(this.itemStates[this.meeples.indexOf(meeple)])
     }
 
     /**
@@ -609,7 +590,8 @@ export default class MeepleCrowd
                 bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
                 stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)
                 roll = s * WALK_ROLL * (WIDE_GAIT.roll + (NARROW_GAIT.roll - WIDE_GAIT.roll) * gait)
-                swing = s * ITEM_SWING * (WIDE_GAIT.swing + (NARROW_GAIT.swing - WIDE_GAIT.swing) * gait)
+                // the item's pose sets how far it swings
+                swing = s * (WIDE_GAIT.swing + (NARROW_GAIT.swing - WIDE_GAIT.swing) * gait)
             }
 
             const headY = (HEAD_Y - HEAD_DROP + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
@@ -670,19 +652,26 @@ export default class MeepleCrowd
             const item = meeple.item && this.items.get(meeple.item)
             if (item)
             {
+                const animation = itemAnimation(meeple.item!)
+                const state = this.itemStates[i]
+                advanceItem(animation, state, !!meeple.ready, time)
+                const { pivot, height, angle, lift } = itemPose(animation, state, time, pose)
+
                 // the attachment point moves with the stretch of the body, its normal by the inverse scale
-                normal.set(ITEM_NORMAL.x / squeeze, ITEM_NORMAL.y / stretch, ITEM_NORMAL.z / squeeze).normalize()
-                attach.set(ITEM_POINT.x * squeeze, ITEM_POINT.y * stretch, ITEM_POINT.z * squeeze)
-                    .addScaledVector(normal, ITEM_LIFT)
+                bodySurface(height, angle, attach, normal)
+                normal.set(normal.x / squeeze, normal.y / stretch, normal.z / squeeze).normalize()
+                attach.set(attach.x * squeeze, attach.y * stretch, attach.z * squeeze)
+                    .addScaledVector(normal, lift)
 
                 // lay the sprite onto the surface, its x axis horizontal, and turn it around the attachment point,
                 // swinging with the steps
                 tangent.crossVectors(UP, normal).normalize()
                 bitangent.crossVectors(normal, tangent)
                 local.makeBasis(tangent, bitangent, normal)
-                    .multiply(rollMatrix.makeRotationZ(ITEM_ROLL + swing))
+                    .multiply(rollMatrix.makeRotationZ(pose.roll + swing * pose.swing))
                     .setPosition(attach)
-                    .multiply(ITEM_SHAPE)
+                    // scale the sprite and move its pivot to the attachment point
+                    .multiply(itemShape.makeTranslation(-pivot[0] * ITEM_SIZE, -pivot[1] * ITEM_SIZE, 0).scale(itemScale))
                 const n = itemCounts.get(meeple.item!) ?? 0
                 item.setMatrixAt(n, part.multiplyMatrices(figure, local))
                 itemCounts.set(meeple.item!, n + 1)
@@ -714,3 +703,6 @@ const attach = new Vector3()
 const normal = new Vector3()
 const tangent = new Vector3()
 const bitangent = new Vector3()
+const pose: ItemPose = { pivot: [0, 0], height: 0, angle: 0, lift: 0, roll: 0, swing: 0 }
+const itemShape = new Matrix4()
+const itemScale = new Vector3(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)
