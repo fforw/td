@@ -19,8 +19,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./Meeple3D"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
+import { attempts, cityNameGenerator, resetAttempts } from "./name-generator";
 
 const TAU = Math.PI * 2
+
+const DEBUG_NAMES = 0
 
 /**
  * Meeples per row and column of the test grid, like the 2D sprite sheet
@@ -135,6 +138,22 @@ for (let y = 0; y < GRID; y++)
 }
 scene.add(crowd.group)
 
+if (DEBUG_NAMES)
+{
+
+    console.log("NAMES", crowd.meeples.map(m => m.name).join(", "), "attempts/name", attempts() / 100)
+
+    resetAttempts()
+
+    let cities = crowd.meeples.map(m => cityNameGenerator(rng.nextInt(5, 8)));
+
+    cities.sort((a, b) => {
+
+        return a.length - b.length
+    })
+
+    console.log("CITIES", cities.join(", "), "attempts/name", attempts() / 100)
+}
 
 // controls to compare the tricks
 
