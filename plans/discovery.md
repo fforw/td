@@ -68,6 +68,26 @@ interface PatchNode
   TEMPLE, EMPTY (terrain only).
 - `BuiltPatch.castle` becomes a per-kind feature plan.
 
+### 0.5 Campaign start
+
+The game is called "Treasure & Dread". Every campaign gets a generated
+subtitle on top of that.
+
+- Subtitle: "<Word> of <castle name>", e.g. "Oaths of Velmarra". The
+  castle name comes from `cityNameGenerator`; the word from a weighted
+  list (Tidings, Trails, Tales, Trespasses, Debts, Deeds, Oaths, ... common;
+  Tombs, Dread, Ashes, ... rare). No other place names in the subtitle.
+- Everything derives from the seed, picked with the seeded rng, so a
+  seed always gives the same castle and subtitle.
+- Start screen: logo, subtitle and a preview of the generated castle
+  patch behind it. Reroll draws a new seed; play creates the campaign
+  record. Nothing is saved before play.
+- The campaign record holds seed, subtitle, castle name and the patch
+  nodes.
+- Keep the subtitle generator separate from the castle code, so it can
+  later name a key figure instead ("The Oath of Kenrik", via
+  `meepleNameGenerator`).
+
 ## Phase 1 - Discovery
 
 ### 1.1 Movement cost and pathfinding
