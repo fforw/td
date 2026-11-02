@@ -16,7 +16,7 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook } from "./Meeple3D"
+import MeepleCrowd, { HairStyle, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits } from "./Meeple3D"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 
@@ -128,7 +128,8 @@ for (let y = 0; y < GRID; y++)
             position: new Vector3(x * SPACING - offset, 0, y * SPACING - offset),
             facing: 0,
             look: randomLook(),
-            phase: rng.next() * TAU
+            phase: rng.next() * TAU,
+            ...randomTraits()
         })
     }
 }

@@ -22,6 +22,8 @@ import {
 } from "three"
 import { createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
+import nameGenerator from "./name-generator";
+import { rng } from "./util"
 
 const TAU = Math.PI * 2
 
@@ -63,7 +65,7 @@ const WALK_SPEED = 5.5
  * Height of a step bounce in meeple units, and how much the body stretches with it
  */
 const WALK_BOUNCE = 0.07
-const WALK_STRETCH = 0.05
+const WALK_STRETCH = 0.2
 
 /**
  * Angle in radians the meeple rocks from side to side around its facing direction while walking, and the height of
@@ -71,6 +73,12 @@ const WALK_STRETCH = 0.05
  */
 const WALK_ROLL = 0.12
 const WALK_PIVOT = 0.3
+
+/**
+ * Factors on the rocking and the bounce of the walk for a gait of 0, a wide waddle, and 1, a narrow, bouncy step
+ */
+const WIDE_GAIT = { roll: 1.6, bounce: 1 }
+const NARROW_GAIT = { roll: 0.9, bounce: 1.9 }
 
 /**
  * Speed of turning toward the camera and back, in full turns per second
@@ -129,10 +137,27 @@ export interface Meeple
      * Phase offset of the walk animation
      */
     phase: number
+    name: string
+    /**
+     * Walking style from 0 to 1. 0 rocks wider from side to side, 1 is narrower with a higher bounce.
+     */
+    gait: number
     /**
      * Turns the meeple toward the camera with its face up to the viewer, e.g. while the player interacts with it
      */
     lookAtCamera?: boolean
+}
+
+
+/**
+ * Random traits of a new meeple besides its look
+ */
+export function randomTraits(): Pick<Meeple, "name" | "gait">
+{
+    return {
+        name: nameGenerator(4),
+        gait: rng.next()
+    }
 }
 
 
@@ -465,16 +490,17 @@ export default class MeepleCrowd
         const cam = camera.position
 
         this.meeples.forEach((meeple, i) => {
-            const { position, look, phase } = meeple
+            const { position, look, phase, gait } = meeple
 
             let bounce = 0, stretch = 1, roll = 0
             if (this.walking)
             {
                 // the body is highest and rocked furthest over the foot it stands on
                 const s = Math.sin(time * WALK_SPEED + phase)
-                bounce = Math.abs(s) * WALK_BOUNCE
-                stretch = 1 + s * WALK_STRETCH
-                roll = s * WALK_ROLL
+                const bounceFactor = WIDE_GAIT.bounce + (NARROW_GAIT.bounce - WIDE_GAIT.bounce) * gait
+                bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
+                stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)
+                roll = s * WALK_ROLL * (WIDE_GAIT.roll + (NARROW_GAIT.roll - WIDE_GAIT.roll) * gait)
             }
 
             const headY = (HEAD_Y + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
