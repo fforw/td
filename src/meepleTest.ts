@@ -16,7 +16,7 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits } from "./Meeple3D"
+import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits } from "./Meeple3D"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 
@@ -200,6 +200,26 @@ const hint = document.createElement("div")
 hint.textContent = "click a meeple to make it look at you"
 ui.append(hint)
 
+// the meeple whose looking at the camera was toggled last
+const info = document.createElement("div")
+info.style.whiteSpace = "pre"
+ui.append(document.createElement("hr"))
+ui.append(info)
+
+function showInfo(meeple: Meeple): void
+{
+    const { name, gait, look, lookAtCamera } = meeple
+    info.textContent = [
+        `${name} (#${crowd.meeples.indexOf(meeple)})`,
+        `looking: ${lookAtCamera ? "yes" : "no"}`,
+        `gait:    ${gait.toFixed(2)}`,
+        `height:  ${look.height.toFixed(2)}`,
+        `hair:    ${HairStyle[look.hairStyle].toLowerCase()} ${look.hair.getHexString()}`,
+        `skin:    ${look.skin.getHexString()}`,
+        `shirt:   ${look.shirt.getHexString()}`
+    ].join("\n")
+}
+
 // a click without dragging toggles looking at the camera, like a player interacting with a meeple
 const raycaster = new Raycaster()
 let downX = 0, downY = 0
@@ -220,6 +240,7 @@ canvas.addEventListener("pointerup", ev => {
         if (meeple)
         {
             meeple.lookAtCamera = !meeple.lookAtCamera
+            showInfo(meeple)
         }
     }
 })
