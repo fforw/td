@@ -93,7 +93,7 @@ const ITEM_SIZE = 0.7
 const ITEM_ROLL = 1.25
 
 /**
- * Angle in radians the item swings around the attachment point with every step
+ * Angle in radians the item swings around the attachment point with every step, for the widest gait
  */
 const ITEM_SWING = 0.25
 
@@ -116,11 +116,11 @@ const WALK_ROLL = 0.12
 const WALK_PIVOT = 0.3
 
 /**
- * Factors on the rocking, the bounce and the speed of the walk for a gait of 0, a wide waddle, and 1, a narrow,
- * bouncy step. The speed is fastest for a gait of 0.5 and slows toward both ends.
+ * Factors on the rocking, the bounce, the speed and the item swing of the walk for a gait of 0, a wide waddle, and 1,
+ * a narrow, bouncy step. The speed is fastest for a gait of 0.5 and slows toward both ends.
  */
-const WIDE_GAIT = { roll: 1.6, bounce: 1, speed: 0.75 }
-const NARROW_GAIT = { roll: 0.9, bounce: 1.9, speed: 0.85 }
+const WIDE_GAIT = { roll: 1.6, bounce: 1, speed: 0.75, swing: 1 }
+const NARROW_GAIT = { roll: 0.9, bounce: 1.9, speed: 0.85, swing: 0.35 }
 
 /**
  * Speed of turning toward the camera and back, in full turns per second
@@ -609,7 +609,7 @@ export default class MeepleCrowd
                 bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
                 stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)
                 roll = s * WALK_ROLL * (WIDE_GAIT.roll + (NARROW_GAIT.roll - WIDE_GAIT.roll) * gait)
-                swing = s * ITEM_SWING
+                swing = s * ITEM_SWING * (WIDE_GAIT.swing + (NARROW_GAIT.swing - WIDE_GAIT.swing) * gait)
             }
 
             const headY = (HEAD_Y - HEAD_DROP + look.height * HEAD_RAISE) * (stretch * 0.5 + 0.5)
