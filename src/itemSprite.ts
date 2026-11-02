@@ -51,6 +51,35 @@ export function solidifySprite(image: SpriteImage, threshold = SOLID_ALPHA, grow
 
 
 /**
+ * Returns a copy of a solidified sprite with a pixel outline around it, sideways and up and down. The image grows by
+ * the outline width on every side, so an outline at the border is not cut off.
+ *
+ * @param image sprite from solidifySprite()
+ * @param width outline width in pixels
+ * @param color outline color as RGB
+ */
+export function outlineSprite(image: SpriteImage, width = 1, color: readonly number[] = OUTLINE_COLOR): SpriteImage
+{
+    const w = image.width + width * 2
+    const h = image.height + width * 2
+    const data = new Uint8ClampedArray(w * h * 4)
+    for (let y = 0; y < image.height; y++)
+    {
+        const row = image.data.subarray(y * image.width * 4, (y + 1) * image.width * 4)
+        data.set(row, ((y + width) * w + width) * 4)
+    }
+    growSolid(data, w, h, width, [...color, 255])
+    return { width: w, height: h, data }
+}
+
+
+/**
+ * Default outline color, black like the 2D outlines
+ */
+export const OUTLINE_COLOR = [0, 0, 0]
+
+
+/**
  * Grows the solid area of the pixels in place, sideways and up and down.
  *
  * @param data   RGBA pixels with an alpha of 0 or 255
@@ -190,9 +219,17 @@ export interface ItemSprite
 export interface ItemSpriteOptions
 {
     /**
-     * Pixels to grow the solid area by
+     * Pixels to grow the solid area by before the outline is added
      */
     grow?: number
+    /**
+     * Outline width in pixels, 0 for none
+     */
+    outline?: number
+    /**
+     * Outline color as RGB
+     */
+    outlineColor?: readonly number[]
 }
 
 
@@ -200,12 +237,12 @@ export interface ItemSpriteOptions
  * Loads a sprite and turns it into a solid item.
  *
  * @param url       sprite image
- * @param thickness thickness in units, with the longer side of the sprite 1 unit long
- * @param options   grow options
+ * @param thickness thickness in units, with the longer side of the sprite including its outline 1 unit long
+ * @param options   grow and outline options
  */
 export async function loadItemSprite(url: string, thickness: number, options: ItemSpriteOptions = {}): Promise<ItemSprite>
 {
-    const { grow = 0 } = options
+    const { grow = 0, outline = 1, outlineColor = OUTLINE_COLOR } = options
 
     const response = await fetch(url)
     // the canvas stores premultiplied colors, so the faintest edge pixels come back a few levels off. Not worth
@@ -219,7 +256,11 @@ export async function loadItemSprite(url: string, thickness: number, options: It
     ctx.drawImage(bitmap, 0, 0)
     bitmap.close()
 
-    const image = solidifySprite(ctx.getImageData(0, 0, canvas.width, canvas.height), SOLID_ALPHA, grow)
+    let image = solidifySprite(ctx.getImageData(0, 0, canvas.width, canvas.height), SOLID_ALPHA, grow)
+    if (outline > 0)
+    {
+        image = outlineSprite(image, outline, outlineColor)
+    }
     return {
         geometry: extrudeSprite(image, thickness),
         texture: createSpriteTexture(image)

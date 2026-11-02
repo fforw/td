@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 import { Vector3 } from "three"
 
-import { extrudeSprite, solidifySprite, type SpriteImage } from "../src/itemSprite"
+import { extrudeSprite, outlineSprite, solidifySprite, type SpriteImage } from "../src/itemSprite"
 
 
 /**
@@ -94,6 +94,42 @@ describe("solidifySprite", function () {
                 assert(image.data[i * 4] === 12)
             }
         }
+    })
+})
+
+
+describe("outlineSprite", function () {
+
+    it("surrounds the sprite and grows the image so the outline is not cut off", function () {
+        const image = outlineSprite(solidifySprite(sprite(
+            "# ",
+            "##"
+        )), 1, [1, 2, 3])
+        assert(image.width === 4 && image.height === 4)
+        assert.deepEqual(alphaRows(image), [
+            " #  ",
+            "### ",
+            "####",
+            " ## "
+        ])
+
+        // the sprite keeps its colors, the outline is drawn in the given color
+        const color = (x: number, y: number) => Array.from(image.data.subarray((y * 4 + x) * 4, (y * 4 + x) * 4 + 4))
+        assert.deepEqual(color(1, 1), [0, 0, 0, 255])
+        assert.deepEqual(color(2, 2), [3, 0, 0, 255])
+        assert.deepEqual(color(1, 0), [1, 2, 3, 255])
+        assert.deepEqual(color(3, 2), [1, 2, 3, 255])
+        assert.deepEqual(color(2, 1), [1, 2, 3, 255])
+    })
+
+    it("draws wider outlines", function () {
+        assert.deepEqual(alphaRows(outlineSprite(solidifySprite(sprite("#")), 2)), [
+            "  #  ",
+            " ### ",
+            "#####",
+            " ### ",
+            "  #  "
+        ])
     })
 })
 
