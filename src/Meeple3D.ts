@@ -164,7 +164,11 @@ export interface Meeple
      */
     item?: ItemName
     /**
-     * Holds the item readied. Acting readies it as well.
+     * Item held in the left hand, animated like in the right one, but mirrored. It must not change either.
+     */
+    leftItem?: ItemName
+    /**
+     * Holds the items readied. Acting readies them as well.
      */
     ready?: boolean
 }
@@ -405,7 +409,10 @@ export default class MeepleCrowd
      * How far each meeple has turned toward the camera, from 0 to 1
      */
     private readonly attention: number[] = []
-    private readonly itemStates: ItemState[] = []
+    /**
+     * Animation states of the right and the left hand
+     */
+    private readonly itemStates: [ItemState, ItemState][] = []
     private lastTime = 0
 
     private readonly capacity: number
@@ -447,7 +454,8 @@ export default class MeepleCrowd
             const sprite = itemSprite(name)
             if (sprite)
             {
-                const mesh = createItemPart(sprite, gradientMap, capacity)
+                // one per hand
+                const mesh = createItemPart(sprite, gradientMap, capacity * 2)
                 this.items.set(name, mesh)
                 this.group.add(mesh)
             }
@@ -497,22 +505,25 @@ export default class MeepleCrowd
         {
             throw new Error("Meeple capacity exceeded")
         }
-        if (meeple.item)
+        for (const item of [meeple.item, meeple.leftItem])
         {
-            // the held item and the images its animation draws instead
-            const { idle, ready, action } = itemAnimation(meeple.item)
-            for (const name of [meeple.item, ...[idle, ready, ...action.steps].map(p => p.image)])
+            if (item)
             {
-                if (name && !this.items.has(name))
+                // the held item and the images its animation draws instead
+                const { idle, ready, action } = itemAnimation(item)
+                for (const name of [item, ...[idle, ready, ...action.steps].map(p => p.image)])
                 {
-                    throw new Error("Item not loaded: " + name)
+                    if (name && !this.items.has(name))
+                    {
+                        throw new Error("Item not loaded: " + name)
+                    }
                 }
             }
         }
         const i = this.meeples.length
         this.meeples.push(meeple)
         this.attention.push(0)
-        this.itemStates.push(newItemState())
+        this.itemStates.push([newItemState(), newItemState()])
 
         // only the new meeple's colors, rewriting all of them on every add makes building a crowd quadratic
         const { look } = meeple
@@ -534,22 +545,21 @@ export default class MeepleCrowd
     }
 
     /**
-     * Readies the meeple's item and uses it, again and again if the item's action repeats, until stopActing()
+     * Readies the meeple's items and uses them, again and again if an item's action repeats, until stopActing()
      */
     act(meeple: Meeple): void
     {
-        if (meeple.item)
-        {
-            actItem(itemAnimation(meeple.item), this.itemStates[this.meeples.indexOf(meeple)])
-        }
+        const states = this.itemStates[this.meeples.indexOf(meeple)]
+        const items = [meeple.item, meeple.leftItem]
+        items.forEach((item, hand) => item && actItem(itemAnimation(item), states[hand]))
     }
 
     /**
-     * Stops using the meeple's item after the current action
+     * Stops using the meeple's items after their current actions
      */
     stopActing(meeple: Meeple): void
     {
-        stopActing(this.itemStates[this.meeples.indexOf(meeple)])
+        this.itemStates[this.meeples.indexOf(meeple)].forEach(stopActing)
     }
 
     /**
@@ -650,14 +660,18 @@ export default class MeepleCrowd
                 counts.set(look.hairStyle, n + 1)
             }
 
-            if (meeple.item)
-            {
-                const animation = itemAnimation(meeple.item)
-                const state = this.itemStates[i]
+            const items = [meeple.item, meeple.leftItem]
+            items.forEach((item, hand) => {
+                if (!item)
+                {
+                    return
+                }
+                const animation = itemAnimation(item)
+                const state = this.itemStates[i][hand]
                 advanceItem(animation, state, !!meeple.ready, time)
                 const { pivot, height, angle, lift } = itemPose(animation, state, time, pose)
                 // the drawn image can change with the pose
-                const image = pose.image ?? meeple.item
+                const image = pose.image ?? item
 
                 // the attachment point moves with the stretch of the body, its normal by the inverse scale
                 bodySurface(height, angle, attach, normal)
@@ -666,20 +680,26 @@ export default class MeepleCrowd
                     .addScaledVector(normal, lift)
 
                 // lay the sprite onto the surface, its x axis horizontal, and turn it around the attachment point,
-                // swinging with the steps
+                // swinging with the steps. The hands swing in turn.
                 tangent.crossVectors(UP, normal).normalize()
                 bitangent.crossVectors(normal, tangent)
                 local.makeBasis(tangent, bitangent, normal)
-                    .multiply(rollMatrix.makeRotationZ(pose.roll + swing * pose.swing))
+                    .multiply(rollMatrix.makeRotationZ(pose.roll + (hand ? -swing : swing) * pose.swing))
                     .setPosition(attach)
                     // scale the sprite and move its pivot to the attachment point
                     .multiply(itemShape.makeTranslation(-pivot[0] * ITEM_SIZE, -pivot[1] * ITEM_SIZE, 0).scale(itemScale))
+                if (hand)
+                {
+                    // mirror onto the left side, which mirrors the image as well. Flipping the sprite through its
+                    // thickness keeps its look and turns the faces outward again.
+                    local.premultiply(MIRROR_X).multiply(MIRROR_Z)
+                }
 
                 // the instances are packed per image anew every frame
                 const n = itemCounts.get(image) ?? 0
                 this.items.get(image)!.setMatrixAt(n, part.multiplyMatrices(figure, local))
                 itemCounts.set(image, n + 1)
-            }
+            })
         })
 
         for (const [name, mesh] of this.items)
@@ -714,4 +734,6 @@ const tangent = new Vector3()
 const bitangent = new Vector3()
 const pose: ItemPose = { pivot: [0, 0], height: 0, angle: 0, lift: 0, roll: 0, swing: 0 }
 const itemShape = new Matrix4()
+const MIRROR_X = new Matrix4().makeScale(-1, 1, 1)
+const MIRROR_Z = new Matrix4().makeScale(1, 1, -1)
 const itemScale = new Vector3(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)

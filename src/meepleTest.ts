@@ -133,8 +133,9 @@ for (let y = 0; y < GRID; y++)
             facing: 0,
             look: randomLook(),
             phase: rng.next() * TAU,
-            // about half of the meeples hold something
+            // about half of the meeples hold something in the right hand, a quarter in the left
             item: rng.next() < 0.5 ? pick([...ITEMS]) : undefined,
+            leftItem: rng.next() < 0.25 ? pick([...ITEMS]) : undefined,
             ...randomTraits()
         })
     }
@@ -267,7 +268,8 @@ function showInfo(meeple: Meeple): void
         `hair:    ${HairStyle[look.hairStyle].toLowerCase()} ${look.hair.getHexString()}`,
         `skin:    ${look.skin.getHexString()}`,
         `shirt:   ${look.shirt.getHexString()}`,
-        `item:    ${meeple.item ?? "-"}`
+        `item:    ${meeple.item ?? "-"}`,
+        `left:    ${meeple.leftItem ?? "-"}`
     ].join("\n")
 }
 
