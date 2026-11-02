@@ -21,7 +21,7 @@ import {
     Vector3
 } from "three"
 import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "./itemAnimation"
-import { type ItemName, ITEMS, type ItemSprite, itemSprite } from "./itemSprite"
+import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "./itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
 import { rng } from "./util"
@@ -64,7 +64,7 @@ const EYE_SPREAD = 0.4
 const EYE_DROP = 0.15
 
 /**
- * Length of the longer side of an item sprite in meeple units
+ * Length of the longer side of an item sprite of ITEM_PIXELS in meeple units
  */
 const ITEM_SIZE = 0.7
 
@@ -424,6 +424,10 @@ export default class MeepleCrowd
      * Instanced item per loaded item sprite
      */
     private readonly items: Map<ItemName, InstancedMesh>
+    /**
+     * Length of the longer side of each item in meeple units
+     */
+    private readonly itemSizes = new Map<ItemName, number>()
     private readonly outlines: InstancedMesh[] = []
 
     constructor(capacity: number)
@@ -457,6 +461,7 @@ export default class MeepleCrowd
                 // one per hand
                 const mesh = createItemPart(sprite, gradientMap, capacity * 2)
                 this.items.set(name, mesh)
+                this.itemSizes.set(name, ITEM_SIZE * sprite.pixels / ITEM_PIXELS)
                 this.group.add(mesh)
             }
         }
@@ -672,6 +677,7 @@ export default class MeepleCrowd
                 const { pivot, height, angle, lift } = itemPose(animation, state, time, pose)
                 // the drawn image can change with the pose
                 const image = pose.image ?? item
+                const size = this.itemSizes.get(image)!
 
                 // the attachment point moves with the stretch of the body, its normal by the inverse scale
                 bodySurface(height, angle, attach, normal)
@@ -687,7 +693,7 @@ export default class MeepleCrowd
                     .multiply(rollMatrix.makeRotationZ(pose.roll + (hand ? -swing : swing) * pose.swing))
                     .setPosition(attach)
                     // scale the sprite and move its pivot to the attachment point
-                    .multiply(itemShape.makeTranslation(-pivot[0] * ITEM_SIZE, -pivot[1] * ITEM_SIZE, 0).scale(itemScale))
+                    .multiply(itemShape.makeTranslation(-pivot[0] * size, -pivot[1] * size, 0).scale(itemScale.setScalar(size)))
                 if (hand)
                 {
                     // mirror onto the left side, which mirrors the image as well. Flipping the sprite through its
@@ -736,4 +742,4 @@ const pose: ItemPose = { pivot: [0, 0], height: 0, angle: 0, lift: 0, roll: 0, s
 const itemShape = new Matrix4()
 const MIRROR_X = new Matrix4().makeScale(-1, 1, 1)
 const MIRROR_Z = new Matrix4().makeScale(1, 1, -1)
-const itemScale = new Vector3(ITEM_SIZE, ITEM_SIZE, ITEM_SIZE)
+const itemScale = new Vector3()

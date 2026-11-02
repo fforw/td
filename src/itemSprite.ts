@@ -213,6 +213,10 @@ export interface ItemSprite
 {
     geometry: BufferGeometry
     texture: DataTexture
+    /**
+     * Length of the longer side in pixels, including the outline
+     */
+    pixels: number
 }
 
 
@@ -237,7 +241,7 @@ export interface ItemSpriteOptions
  * Loads a sprite and turns it into a solid item.
  *
  * @param url       sprite image
- * @param thickness thickness in units, with the longer side of the sprite including its outline 1 unit long
+ * @param thickness thickness in pixels
  * @param options   grow and outline options
  */
 export async function loadItemSprite(url: string, thickness: number, options: ItemSpriteOptions = {}): Promise<ItemSprite>
@@ -261,9 +265,11 @@ export async function loadItemSprite(url: string, thickness: number, options: It
     {
         image = outlineSprite(image, outline, outlineColor)
     }
+    const pixels = Math.max(image.width, image.height)
     return {
-        geometry: extrudeSprite(image, thickness),
-        texture: createSpriteTexture(image)
+        geometry: extrudeSprite(image, thickness / pixels),
+        texture: createSpriteTexture(image),
+        pixels
     }
 }
 
@@ -290,9 +296,15 @@ export const ITEMS = [
 export type ItemName = typeof ITEMS[number]
 
 /**
- * Item thickness, two pixels of the 42 pixel sprites
+ * Item thickness in pixels
  */
-const ITEM_THICKNESS = 2 / 42
+const ITEM_THICKNESS = 2
+
+/**
+ * Size in pixels of most item sprites, including their outline. Larger sprites are drawn larger, so all items have
+ * pixels of the same size.
+ */
+export const ITEM_PIXELS = 44
 
 const items = new Map<ItemName, ItemSprite>()
 
