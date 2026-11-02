@@ -141,13 +141,13 @@ scene.add(crowd.group)
 const ui = document.getElementById("ui")!
 ui.style.cssText = "position:absolute;top:8px;left:8px;padding:8px;background:#000a;font:12px monospace;display:grid;gap:4px"
 
-function slider(label: string, max: number, get: () => number, set: (v: number) => void): void
+function slider(label: string, min: number, max: number, get: () => number, set: (v: number) => void): void
 {
     const row = document.createElement("label")
     row.textContent = label + " "
     const input = document.createElement("input")
     input.type = "range"
-    input.min = "0"
+    input.min = String(min)
     input.max = String(max)
     input.step = "0.01"
     input.value = String(get())
@@ -168,8 +168,8 @@ function checkbox(label: string, get: () => boolean, set: (v: boolean) => void):
     return input
 }
 
-slider("lean", 0.8, () => crowd.lean, v => crowd.lean = v)
-slider("head tilt", 0.8, () => crowd.headTilt, v => crowd.headTilt = v)
+slider("lean", 0, 0.8, () => crowd.lean, v => crowd.lean = v)
+slider("head tilt", -0.3, 1, () => crowd.headTilt, v => crowd.headTilt = v)
 checkbox("outlines", () => crowd.outlinesVisible, v => crowd.outlinesVisible = v)
 
 const FACING_MODES = ["camera", "random", "spin"]

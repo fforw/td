@@ -170,7 +170,7 @@ export function randomTraits(): Pick<Meeple, "name" | "gait">
 function createGradientMap(): DataTexture
 {
     // three hard shading steps like the shadow and body tone of the 2D sprites
-    const tex = new DataTexture(new Uint8Array([110, 190, 255]), 3, 1, RedFormat)
+    const tex = new DataTexture(new Uint8Array([90, 180, 255]), 3, 1, RedFormat)
     tex.minFilter = tex.magFilter = NearestFilter
     tex.needsUpdate = true
     return tex
@@ -370,9 +370,9 @@ export default class MeepleCrowd
      */
     lean = 0
     /**
-     * Extra angle in radians the head tilts up
+     * Extra angle in radians the head tilts up, negative to tilt it down toward the feet
      */
-    headTilt = 0.27
+    headTilt = 0.29
     walking = false
 
     /**
