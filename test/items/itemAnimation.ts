@@ -16,7 +16,7 @@ import {
     newItemState,
     resolveAnimation,
     stopActing
-} from "../src/items/itemAnimation"
+} from "../../src/items/itemAnimation"
 
 
 function newPose(): ItemPose

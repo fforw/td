@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 import { Vector3 } from "three"
 
-import { extrudeSprite, outlineSprite, solidifySprite, type SpriteImage } from "../src/items/itemSprite"
+import { extrudeSprite, outlineSprite, solidifySprite, type SpriteImage } from "../../src/items/itemSprite"
 
 
 /**
