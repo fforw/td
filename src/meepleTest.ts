@@ -16,7 +16,7 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits } from "./Meeple3D"
+import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, randomTraits, walkSpeedMultiplier } from "./Meeple3D"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
 
@@ -156,7 +156,7 @@ function slider(label: string, max: number, get: () => number, set: (v: number) 
     ui.append(row)
 }
 
-function checkbox(label: string, get: () => boolean, set: (v: boolean) => void): void
+function checkbox(label: string, get: () => boolean, set: (v: boolean) => void): HTMLInputElement
 {
     const row = document.createElement("label")
     const input = document.createElement("input")
@@ -165,6 +165,7 @@ function checkbox(label: string, get: () => boolean, set: (v: boolean) => void):
     input.addEventListener("change", () => set(input.checked))
     row.append(input, " " + label)
     ui.append(row)
+    return input
 }
 
 slider("lean", 0.8, () => crowd.lean, v => crowd.lean = v)
@@ -185,12 +186,19 @@ function setFacingMode(mode: number): void
     crowd.meeples.forEach(m => m.facing = mode === 1 ? rng.next() * TAU : 0)
 }
 
-// e.g. ?facing=camera&walk&look=24,30
+// e.g. ?facing=camera&walk&ahead&look=24,30
 const params = new URLSearchParams(location.search)
 const facingParam = FACING_MODES.indexOf(params.get("facing") ?? "")
 setFacingMode(facingParam < 0 ? 1 : facingParam)
 crowd.walking = params.has("walk")
-checkbox("walk", () => crowd.walking, v => crowd.walking = v)
+let walkAhead = params.has("ahead")
+checkbox("walk", () => crowd.walking, v => {
+    crowd.walking = v
+    aheadBox.disabled = !v
+})
+// moving only makes sense with the walk animation
+const aheadBox = checkbox("walk ahead", () => walkAhead, v => walkAhead = v)
+aheadBox.disabled = !crowd.walking
 for (const index of (params.get("look") ?? "").split(",").filter(Boolean))
 {
     crowd.meeples[+index].lookAtCamera = true
@@ -252,6 +260,22 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
+/**
+ * Walking speed in world units per second for a meeple with a walk speed multiplier of 1
+ */
+const WALK_AHEAD_SPEED = MEEPLE_SCALE * 0.6
+
+/**
+ * Size of the square the meeples walk in, twice the area of the grid they start in. Leaving it on one side brings
+ * them back on the other.
+ */
+const FIELD = GRID * SPACING * Math.SQRT2
+
+function wrap(v: number): number
+{
+    return ((v + FIELD / 2) % FIELD + FIELD) % FIELD - FIELD / 2
+}
+
 const viewDirection = new Vector3()
 const timer = new Timer()
 renderer.setAnimationLoop(t => {
@@ -268,6 +292,17 @@ renderer.setAnimationLoop(t => {
         const view = camera.getWorldDirection(viewDirection)
         const facing = Math.atan2(-view.x, -view.z)
         crowd.meeples.forEach(m => m.facing = facing)
+    }
+    if (crowd.walking && walkAhead)
+    {
+        // limit the step after the tab was in the background
+        const dt = Math.min(0.1, timer.getDelta())
+        for (const m of crowd.meeples)
+        {
+            const step = WALK_AHEAD_SPEED * walkSpeedMultiplier(m) * dt
+            m.position.x = wrap(m.position.x + Math.sin(m.facing) * step)
+            m.position.z = wrap(m.position.z + Math.cos(m.facing) * step)
+        }
     }
     controls.update()
     crowd.update(camera, time)
