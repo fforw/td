@@ -26,7 +26,7 @@ import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { type ModelName, template } from "./scene3d"
 import { rng } from "./util"
-import { meepleNameGenerator } from "./name-generator";
+import { meepleNameGenerator } from "./nameGenerator";
 
 const TAU = Math.PI * 2
 

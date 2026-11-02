@@ -21,7 +21,7 @@ import { canEquip, canHaveClass, type Character, CLASSES, type ClassName, ITEM_T
 import { type ItemName, ITEMS, loadItems } from "./itemSprite"
 import { loadModels } from "./scene3d"
 import { randomSeed, resetRandom, rng, weightedRandom } from "./util"
-import { attempts, cityNameGenerator, resetAttempts } from "./name-generator";
+import { attempts, cityNameGenerator, resetAttempts } from "./nameGenerator";
 
 const TAU = Math.PI * 2
 
