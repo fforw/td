@@ -290,7 +290,8 @@ export const ITEMS = [
     "bow",
     "bowArrow",
     "arrow",
-    "apple"
+    "apple",
+    "staff"
 ] as const
 
 export type ItemName = typeof ITEMS[number]

@@ -311,6 +311,62 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
 
     },
 
+    staff: {
+
+        // a wizard's staff, planted on the ground like a walking stick, raised and struck down to cast
+        idle: {
+            pivot: [-0.15, -0.13],
+            height: 0.5,
+            angle: 1.1,
+            roll: 0.79,
+            swing: 0.1
+        },
+
+        ready: {
+            pivot: [-0.15, -0.13],
+            height: 0.55,
+            angle: 0.4,
+            lift: 0.15,
+            roll: 1.2,
+        },
+
+        action: {
+
+            steps: [
+                {
+                    height: 0.7,
+                    lift: 0.1,
+                    swing: 0,
+                    transition: {
+                        duration: 0.35,
+                        easing: "easeOut"
+                    },
+                    hold: 0.1,
+                    roll: 1.3,
+                },
+
+                {
+                    height: 0.45,
+                    lift: 0.15,
+                    swing: 0,
+                    transition: {
+                        duration: 0.08,
+                        easing: "easeIn"
+                    },
+                    hold: 0.3,
+                    roll: 1,
+                }
+
+            ],
+
+            out: {
+                duration: 0.4,
+                easing: "easeInOut"
+            }
+        }
+
+    },
+
     apple: {
 
         // a bite, raised up to the head
