@@ -25,7 +25,7 @@ import { attempts, cityNameGenerator, resetAttempts } from "./meeple/nameGenerat
 
 const TAU = Math.PI * 2
 
-const DEBUG_NAMES = 0
+const DEBUG_NAMES = 1
 
 /**
  * Meeples per row and column of the test grid, like the 2D sprite sheet
