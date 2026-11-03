@@ -1,5 +1,6 @@
-import { type Campaign, type Explorer, overworld, type PatchKind, type PatchNode } from "./campaign"
+import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
 import CastleScene from "./castleScene"
+import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
 import { advanceDay, frontier, missionDays, startMission } from "./missions"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { price } from "./tavern"
@@ -24,6 +25,11 @@ const KIND_NAMES: Record<PatchKind, string> = {
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg"
+
+/**
+ * Size of the icons and labels on the patch map relative to the patch depth
+ */
+const LABEL_SIZE = 0.28
 
 /**
  * Most report lines shown
@@ -88,6 +94,8 @@ export default class GameView
     /** null where the browser has no WebGL */
     private castle: CastleScene | null
 
+    private images: PatchImages
+
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
     private readonly popup = el("div", { className: "popup", hidden: true })
@@ -103,6 +111,7 @@ export default class GameView
         this.campaign = campaign
         this.store = store
         this.castle = this.createCastle()
+        this.images = this.createImages()
 
         this.popup.addEventListener("click", ev => {
             // a click on the backdrop closes the popup
@@ -140,6 +149,16 @@ export default class GameView
             this.popup
         )
         return castle
+    }
+
+    private createImages(): PatchImages
+    {
+        return new PatchImages(this.campaign.seed, () => {
+            if (!this.popup.hidden)
+            {
+                this.render()
+            }
+        })
     }
 
     private openTavern(): void
@@ -239,6 +258,8 @@ export default class GameView
                             {
                                 this.castle?.dispose()
                                 this.castle = this.createCastle()
+                                this.images.dispose()
+                                this.images = this.createImages()
                             }
                             this.changed()
                         },
@@ -251,7 +272,7 @@ export default class GameView
 
     private renderMap(): Element
     {
-        const { campaign } = this
+        const { campaign, images } = this
         const nodes = Object.values(overworld(campaign).patches)
         const targets = frontier(campaign).map(key => {
             const [q, r] = key.split("/").map(Number)
@@ -259,26 +280,26 @@ export default class GameView
         })
 
         const all = [...nodes, ...targets]
-        const minQ = Math.min(...all.map(p => p.q))
-        const maxQ = Math.max(...all.map(p => p.q))
-        const minR = Math.min(...all.map(p => p.r))
-        const maxR = Math.max(...all.map(p => p.r))
+        const [x0, y0] = images.center(Math.min(...all.map(p => p.q)), Math.min(...all.map(p => p.r)))
+        const [x1, y1] = images.center(Math.max(...all.map(p => p.q)), Math.max(...all.map(p => p.r)))
+        const pad = PATCH_DEPTH * 0.05
 
         const map = svg("svg", {
             class: "patch-map",
-            viewBox: (minQ - 0.1) + " " + (minR - 0.1) + " " + (maxQ - minQ + 1.2) + " " + (maxR - minR + 1.2)
+            viewBox: [
+                x0 - PATCH_WIDTH / 2 - pad,
+                y0 - PATCH_DEPTH / 2 - pad,
+                x1 - x0 + PATCH_WIDTH + pad * 2,
+                y1 - y0 + PATCH_DEPTH + pad * 2
+            ].join(" ")
         })
 
-        for (const node of nodes)
-        {
-            map.append(this.renderNode(node))
-        }
-
+        // unknown and targeted patches as plain tiles below the jagged edges of the known ones
         for (const { key, q, r } of targets)
         {
             const cell = svg("g", { class: "patch frontier" + (key === this.selected ? " selected" : "") },
-                svg("rect", { x: q + 0.04, y: r + 0.04, width: 0.92, height: 0.92, rx: 0.08 }),
-                svg("text", { x: q + 0.5, y: r + 0.5 }, "?")
+                this.tile(q, r),
+                this.label(q, r, "?")
             )
             cell.addEventListener("click", () => {
                 this.selected = key === this.selected ? null : key
@@ -286,21 +307,51 @@ export default class GameView
             })
             map.append(cell)
         }
+
+        const known = nodes.filter(node => node.state === "discovered")
+        for (const node of nodes)
+        {
+            if (node.state === "targeted")
+            {
+                const mission = campaign.missions.find(m => m.target === patchKey(node.q, node.r))
+                map.append(svg("g", { class: "patch targeted" },
+                    svg("title", {}, "Explorer on the way"),
+                    this.tile(node.q, node.r),
+                    this.label(node.q, node.r, "⏳" + (mission ? mission.endDay - campaign.day : ""))
+                ))
+            }
+        }
+        for (const { q, r, kind } of known)
+        {
+            const image = images.get(q, r)
+            map.append(svg("g", { class: "patch discovered " + kind.toLowerCase() },
+                svg("title", {}, KIND_NAMES[kind]),
+                image
+                    ? svg("image", { href: image.href, x: image.x, y: image.y, width: image.width, height: image.height })
+                    : this.tile(q, r)
+            ))
+        }
+        // icons last, so no neighboring patch image covers them
+        for (const { q, r, kind } of known)
+        {
+            map.append(svg("g", { class: "patch icon" }, this.label(q, r, KIND_ICONS[kind])))
+        }
         return map
     }
 
-    private renderNode(node: PatchNode): Element
+    /**
+     * Rectangle of a patch for patches without an image
+     */
+    private tile(q: number, r: number): SVGElement
     {
-        const { q, r, kind, state } = node
-        const discovered = state === "discovered"
-        const mission = this.campaign.missions.find(m => m.target === q + "/" + r)
-        return svg("g", { class: "patch " + (discovered ? "discovered " + kind.toLowerCase() : "targeted") },
-            svg("title", {}, discovered ? KIND_NAMES[kind] : "Explorer on the way"),
-            svg("rect", { x: q + 0.04, y: r + 0.04, width: 0.92, height: 0.92, rx: 0.08 }),
-            svg("text", { x: q + 0.5, y: r + 0.5 },
-                discovered ? KIND_ICONS[kind] : "⏳" + (mission ? mission.endDay - this.campaign.day : "")
-            )
-        )
+        const [x, y] = this.images.center(q, r)
+        return svg("rect", { x: x - PATCH_WIDTH / 2, y: y - PATCH_DEPTH / 2, width: PATCH_WIDTH, height: PATCH_DEPTH })
+    }
+
+    private label(q: number, r: number, text: string): SVGElement
+    {
+        const [x, y] = this.images.center(q, r)
+        return svg("text", { x, y, "font-size": PATCH_DEPTH * LABEL_SIZE }, text)
     }
 
     private renderTavern(): HTMLElement
