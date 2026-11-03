@@ -47,8 +47,3 @@ music.play().catch(() => {
     window.addEventListener("pointerdown", startOnGesture)
     window.addEventListener("keydown", startOnGesture)
 })
-
-const fixed = document.createElement("a")
-fixed.href = "index.html?seed=" + seed
-fixed.appendChild(document.createTextNode("seed"))
-document.getElementById("footer")!.appendChild(fixed)
