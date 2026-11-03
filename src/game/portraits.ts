@@ -45,6 +45,12 @@ const GRADIENT_LOW = "#303030"
 const GRADIENT_HIGH = "#e4e4e4"
 
 /**
+ * Color and width in pixels of the line marking the top of the tallest meeple
+ */
+const MARK_COLOR = "#303030"
+const MARK_WIDTH = 2
+
+/**
  * Mixed into the campaign seed for the looks of explorers
  */
 const LOOK_SALT = 0x100c
@@ -82,8 +88,9 @@ function screenY(camera: PerspectiveCamera, y: number): number
 
 /**
  * Puts the rendered meeple onto the height gradient. The gradient stands behind the meeple in the scene, from the feet
- * to the top of the head of a meeple of height 1, so the shot taken at the real head height shows how tall the meeple
- * is: the head of the tallest meeple reaches the light end, smaller ones stay lower and darker.
+ * to the top of the head of a meeple of height 1, which a dark line marks. The shot is taken at the real head height,
+ * so it shows how tall the meeple is: the tallest meeple's head reaches the line at the light end, smaller ones stay
+ * lower and darker.
  */
 function withBackground(rendered: HTMLCanvasElement, camera: PerspectiveCamera, look: MeepleLook): string
 {
@@ -91,12 +98,16 @@ function withBackground(rendered: HTMLCanvasElement, camera: PerspectiveCamera, 
     canvas.width = canvas.height = SIZE
     const ctx = canvas.getContext("2d")!
 
-    const top = headHeight({ ...look, height: 1 }) + HEAD_RADIUS * MEEPLE_SCALE
-    const gradient = ctx.createLinearGradient(0, screenY(camera, top), 0, screenY(camera, 0))
+    const top = screenY(camera, headHeight({ ...look, height: 1 }) + HEAD_RADIUS * MEEPLE_SCALE)
+    const gradient = ctx.createLinearGradient(0, top, 0, screenY(camera, 0))
     gradient.addColorStop(0, GRADIENT_HIGH)
     gradient.addColorStop(1, GRADIENT_LOW)
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, SIZE, SIZE)
+
+    // a line at the top of the tallest meeple's head, the mark smaller meeples stay below
+    ctx.fillStyle = MARK_COLOR
+    ctx.fillRect(0, top - MARK_WIDTH / 2, SIZE, MARK_WIDTH)
 
     ctx.drawImage(rendered, 0, 0)
     return canvas.toDataURL()
