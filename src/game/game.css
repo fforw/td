@@ -45,6 +45,33 @@
     display: block;
 }
 
+#game .compass
+{
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    width: 5rem;
+    height: 5rem;
+    border: 2px solid #2a1d14;
+    border-radius: 50%;
+    background: rgba(232, 224, 212, 0.85);
+    pointer-events: none;
+}
+
+#game .compass span
+{
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font: bold 0.9rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    color: #2a1d14;
+}
+
+#game .compass span.north
+{
+    color: #c0244e;
+    font-size: 1.1rem;
+}
+
 #game .no-3d
 {
     position: absolute;
@@ -144,6 +171,15 @@
     background: transparent;
     color: #e8e0d4;
     font-size: 1.1rem;
+}
+
+#game .map-north
+{
+    position: absolute;
+    top: 0.5rem;
+    left: 0.75rem;
+    font: bold 0.9rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    color: #c0244e;
 }
 
 #game .patch-map

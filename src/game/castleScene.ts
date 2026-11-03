@@ -45,6 +45,17 @@ const SIGN_SIZE = 0.7
 const SIGN_HOVER = 1.25
 
 /**
+ * Cardinal directions with their angle clockwise from north. North is -z in the world and up on the patch map, east
+ * is +x.
+ */
+const DIRECTIONS: [string, number][] = [["N", 0], ["E", Math.PI / 2], ["S", Math.PI], ["W", Math.PI * 1.5]]
+
+/**
+ * Distance of the compass letters from its center, in percent of its size
+ */
+const COMPASS_RADIUS = 36
+
+/**
  * Pointer movement in pixels up to which a press counts as a click, not as dragging the camera
  */
 const CLICK_DISTANCE = 4
@@ -105,6 +116,11 @@ export default class CastleScene
 {
     readonly element: HTMLCanvasElement
 
+    /** shows where the cardinal directions are from the camera's point of view */
+    readonly compass: HTMLElement
+    private readonly compassLetters: HTMLElement[]
+    private heading = NaN
+
     private readonly renderer: WebGLRenderer
     private readonly scene = new Scene()
     private readonly camera: PerspectiveCamera
@@ -137,6 +153,17 @@ export default class CastleScene
         const canvas = document.createElement("canvas")
         canvas.className = "castle-scene"
         this.element = canvas
+
+        this.compass = document.createElement("div")
+        this.compass.className = "compass"
+        this.compass.title = "Compass"
+        this.compassLetters = DIRECTIONS.map(([name]) => {
+            const letter = document.createElement("span")
+            letter.textContent = name
+            letter.className = name === "N" ? "north" : ""
+            this.compass.append(letter)
+            return letter
+        })
 
         const renderer = new WebGLRenderer({ canvas, antialias: true })
         renderer.setPixelRatio(window.devicePixelRatio)
@@ -307,6 +334,26 @@ export default class CastleScene
     }
 
     /**
+     * Places the compass letters for the current view. Looking north, north is up; with the camera turned by the
+     * azimuth angle around its target, north turns by the same angle clockwise on the screen.
+     */
+    private updateCompass(): void
+    {
+        const heading = this.controls.getAzimuthalAngle()
+        if (heading === this.heading)
+        {
+            return
+        }
+        this.heading = heading
+        DIRECTIONS.forEach(([, angle], i) => {
+            const a = angle + heading
+            const { style } = this.compassLetters[i]
+            style.left = (50 + Math.sin(a) * COMPASS_RADIUS) + "%"
+            style.top = (50 - Math.cos(a) * COMPASS_RADIUS) + "%"
+        })
+    }
+
+    /**
      * Stops rendering and frees the renderer and the map worker
      */
     dispose(): void
@@ -330,6 +377,7 @@ export default class CastleScene
         this.renderer.setAnimationLoop(running ? () => {
             this.resize()
             this.controls.update()
+            this.updateCompass()
             this.renderer.render(this.scene, this.camera)
         } : null)
     }

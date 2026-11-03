@@ -134,7 +134,7 @@ export default class GameView
             console.error("No 3D view", e)
         }
         this.root.replaceChildren(
-            castle ? castle.element : el("p", { className: "no-3d" }, "The 3D view needs WebGL."),
+            ...(castle ? [castle.element, castle.compass] : [el("p", { className: "no-3d" }, "The 3D view needs WebGL.")]),
             this.hud,
             this.info,
             this.popup
@@ -207,6 +207,7 @@ export default class GameView
                         title: "Back to the castle",
                         onclick: () => this.closeTavern()
                     }, "✕"),
+                    el("span", { className: "map-north", title: "North is up, like N on the compass" }, "N ↑"),
                     this.renderMap(),
                     this.renderTavern()
                 )
