@@ -74,3 +74,22 @@ export function weightedRandom<T>(choices : WeightedChoice<T>[]) : (rnd? : numbe
         return resolve(choices[last][1]);
     }
 }
+
+
+/**
+ * Runs the given function with the random sequence of the given seed and restores the previous sequence afterwards,
+ * so generators that use the shared rng can be made reproducible without disturbing it.
+ */
+export function withSeed<T>(seed: number, fn: () => T): T
+{
+    const prev = rng
+    rng = new Prando(seed)
+    try
+    {
+        return fn()
+    }
+    finally
+    {
+        rng = prev
+    }
+}
