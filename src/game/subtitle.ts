@@ -6,7 +6,7 @@ import { cityNameGenerator, meepleNameGenerator } from "../meeple/nameGenerator"
  * names only one of them.
  */
 const PATTERNS = [
-    "The Rise of {city}",
+    "The Trials of {city}",
     "The Fall of {city}",
     "Debts of {city}",
     "The Curse of {city}",
@@ -16,12 +16,10 @@ const PATTERNS = [
     "The Shadow over {city}",
     "Ashes of {city}",
     "The Oath of {name}",
-    "The Revenge of {name}",
-    "The Return of {name}",
-    "The Folly of {name}",
+    "{name}'s Fate",
+    "{name}'s Folly",
     "The Greed of {name}",
-    "The Daughter of {name}",
-    "The Last Wish of {name}"
+    "The Daughter of {name}"
 ]
 
 export interface Subtitle
