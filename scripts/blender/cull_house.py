@@ -153,8 +153,6 @@ def bake(house, closed):
         face.material_index = face[material_layer]
     bm.faces.layers.int.remove(material_layer)
 
-    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
-
     # origin at the middle of the footprint, on the ground
     xs = [v.co.x for v in bm.verts]
     ys = [v.co.y for v in bm.verts]
