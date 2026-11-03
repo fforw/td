@@ -20,6 +20,9 @@ interior, dungeon) is a level with:
   patch, a dungeon three hexagon patches around a shared corner, the
   most compact cluster with room to grow in every direction.
 - its own generator in the worker, picked by level kind.
+- Sub-levels are generated on a patch layout with ample space. Faces
+  outside the level get a new face type NONE, which bounds the drawable
+  world; the packed patch format stays as it is.
 - its own scale (world units per quad) and theme (see 0.4). The
   overworld is miniature, a meeple is as big as a house; inside the
   house the same quads are room-sized.
@@ -125,7 +128,8 @@ The game is called "Treasure & Dread". Every campaign gets a generated
 subtitle on top of that.
 
 - The campaign starts by picking its opening situation (see phase 2).
-- Subtitle: "<Word> of <castle name>", e.g. "Debts of Velmarra". The
+- Subtitle: "[The] <Word> of <castle name>", e.g. "Debts of Velmarra"
+  or "The Rise of Blatopia". The
   castle name comes from `cityNameGenerator`; the word from a weighted
   list per situation, so the subtitle hints at the opening story. No
   other place names in the subtitle.
@@ -138,11 +142,30 @@ subtitle on top of that.
   glyphs of the world. Each palette has a row per color scheme, used
   by `prefers-color-scheme`: background, main, secondary, accent.
 - Start screen: logo, subtitle and a preview of the generated castle
-  patch behind it. Reroll draws a new seed; play creates the campaign
-  record. Nothing is saved before play.
+  patch behind it, e.g. "Treasure & Dread: The Rise of Blatopia". Reroll
+  draws a new seed; play creates the campaign record and goes straight
+  into the discovery loop. Nothing is saved before play.
 - Keep the subtitle generator separate from the castle code, so it can
   later name a key figure instead ("The Oath of Kenrik", via
   `meepleNameGenerator`).
+
+### 0.7 Saves
+
+- The campaign record lives in `localStorage` for now. A server may
+  come later, so all storage goes through one small interface.
+- Dev tooling, after the fixtures in qlive-framework: in dev builds a
+  button exports the current save as a JSON download, and a saved file
+  can be loaded back into the game. Saves worth keeping go into the
+  repo as fixtures, to reopen a situation during development and to run
+  tests on it.
+- The save carries `generatorVersion`; a fixture from an older generator
+  is refused instead of loaded with shifted faces.
+
+### 0.8 Game page
+
+- The game is `index.html`: title screen (0.6), then the discovery loop.
+- The current 2D view moves from `index.html` to its own page (e.g.
+  `2d.html`), like `3d.html`, `meeple.html` and `world.html`.
 
 ## Phase 1 - Discovery
 
@@ -166,7 +189,7 @@ subtitle on top of that.
   2.4), mark it `targeted`, generate it into the simulation set.
 - The route may go through any discovered patch, not only the one next to
   the target.
-- Success: A* cost, scaled by the explorer's efficiency (1.3) -> day
+- Success: A* cost, scaled by the explorer's speed (1.3) -> day
   bucket. Thresholds are multiples of the cost of crossing one patch on
   open ground (`PATCH_SIZE` faces times the cheapest cost), so they
   survive changes of `PATCH_SIZE`/`FACE_SIZE`.
@@ -185,14 +208,16 @@ Discovery and adventure are split between two kinds of people.
 Explorers are a caste of their own, modeled after the youth scouts in
 FIFA's career mode: you assign them, wait, and they report back.
 
-- They are just there and work for the castle; no recruiting, no pay,
-  no loyalty to manage.
+- They cost resources (see 5.1 for which), but there is no pay or
+  loyalty to manage afterwards.
+- At the start the player picks one of two or three offered explorers,
+  which differ in speed and wisdom. Wisdom decides how much of a patch
+  the report reveals, e.g. hidden features or the kind of a neighbor.
 - Expert sneakers: they are never caught, never fight, and leave no
   witnesses or tracks. Their only job is discovery.
-- Each explorer has an efficiency that scales a mission's days and the
-  failure cost down. It grows with experience, from every mission,
-  failed ones included, so seasoned explorers are worth sparing for
-  long or hard targets.
+- Speed scales a mission's days and the failure cost down. It grows
+  with experience, from every mission, failed ones included, so
+  seasoned explorers are worth sparing for long or hard targets.
 - Like scouts, they report back to the castle after each mission; their
   position is not state, every mission starts at the castle.
 
@@ -388,6 +413,10 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 - The premise is a stereotype; it decides inhabitants, fixtures and
   theme.
+- Walls are faces, like the castle walls, drawn thinner than their
+  face where that looks better. Sub-levels have the space for the ring
+  of faces (0.1), so walls on half edges aren't worth a change of the
+  packed patch format.
 - Rooms: take the most square faces as seeds (`faceRatio`, like house
   placement in `Castle.ts`), spaced apart, grow each into a compact
   region with a size limit, wall it in, connect rooms by carved
@@ -409,6 +438,16 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 - Single small patch, generator per house kind; fixtures for the house
   functions; portal back to the overworld face.
+
+### 3.6 Plots and buildings
+
+- PLOT and HOUSE stay face types. A PLOT is a site set aside for the
+  next building, so the player always has a plan where to build; a
+  HOUSE is a built one, turned from a PLOT through the overlay.
+- What a HOUSE does is its facility kind: resource production or
+  processing of raw materials (5.1). The facility is a fixture on the
+  HOUSE, so the face type stays semantic and the theme picks the model
+  per facility.
 
 ## Phase 4 - Threats
 
@@ -455,13 +494,21 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Defenses are overlay edits (WALL, GATE) that raise path costs or cut
   routes. Terrain that blocked the heroes also protects the castle.
 
+## Phase 5 - Economy
+
+### 5.1 Resources
+
+Still to be designed: who needs what and who produces what.
+
+- Resources the castle produces and stores.
+- Facilities (3.6) that produce raw materials or process them.
+- Consumers: explorers (1.3), new buildings, heroes, defenses, paying
+  off threats (4.5).
+
 ## Open questions
 
-- How many explorers does a campaign get, and can more appear?
-- PLOT/HOUSE: ground types for appearance, with buildings as fixtures on
-  top, or do they stay coupled?
-- Dungeon walls as faces (like the castle, costs a ring of faces per
-  room) or on edges (keeps space, needs a wall flag per half edge in the
-  packed patch)?
-- Where saves live (localStorage, file export).
-- Which view hosts the game: `world.html` (3D) or a separate patch map.
+- The economy (phase 5): resources, facilities, and what explorers and
+  buildings cost.
+- What wisdom reveals in an explorer's report, exactly.
+- Does the game run in the 3D view of `world.html` with the patch map as
+  an overlay, or is the patch map a view of its own?
