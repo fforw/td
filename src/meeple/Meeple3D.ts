@@ -142,6 +142,14 @@ const ATTENTION_SPEED = 3
  */
 const MAX_LOOK_UP = 1.0
 
+/**
+ * Returns the height of the head center of a standing meeple above its feet, in world units
+ */
+export function headHeight(look: MeepleLook): number
+{
+    return (HEAD_Y - HEAD_DROP + look.height * HEAD_RAISE) * MEEPLE_SCALE
+}
+
 export enum HairStyle
 {
     CURLY,
