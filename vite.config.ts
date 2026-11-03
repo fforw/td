@@ -1,5 +1,6 @@
 import { resolve } from "node:path"
 import { powerAssert } from "rollup-plugin-power-assert"
+import { loadEnv } from "vite"
 import { defineConfig } from "vitest/config"
 import glsl from "vite-plugin-glsl"
 
@@ -7,6 +8,8 @@ const TEST_PATTERN = "test/**/*.{js,ts}"
 
 export default defineConfig(({ mode }) => {
     const PRODUCTION = mode === "production"
+    // options from the environment or from .env files, e.g. DISABLE_MUSIC=1 in .env.local
+    const env = loadEnv(mode, import.meta.dirname, "")
     return {
         // relative URLs so the build works from any sub-directory
         base: "./",
@@ -21,7 +24,8 @@ export default defineConfig(({ mode }) => {
         define: {
             __PROD: JSON.stringify(PRODUCTION),
             __DEV: JSON.stringify(!PRODUCTION),
-            __STATS: JSON.stringify(!!process.env.STATS)
+            __STATS: JSON.stringify(!!process.env.STATS),
+            __DISABLE_MUSIC: JSON.stringify(env.DISABLE_MUSIC === "1")
         },
 
         // shared modules of workers are split into chunks, which needs ES module workers

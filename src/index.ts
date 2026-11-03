@@ -78,7 +78,14 @@ function startOnGesture(ev: Event): void
     }
 }
 
-music.play().catch(() => {
-    window.addEventListener("pointerdown", startOnGesture)
-    window.addEventListener("keydown", startOnGesture)
-})
+if (__DISABLE_MUSIC)
+{
+    soundButton.hidden = true
+}
+else
+{
+    music.play().catch(() => {
+        window.addEventListener("pointerdown", startOnGesture)
+        window.addEventListener("keydown", startOnGesture)
+    })
+}
