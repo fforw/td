@@ -58,6 +58,31 @@
     pointer-events: none;
 }
 
+#game .compass .needle
+{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#game .compass .needle polygon
+{
+    stroke: #2a1d14;
+    stroke-width: 3;
+    stroke-linejoin: round;
+}
+
+#game .compass .needle .north
+{
+    fill: #c0244e;
+}
+
+#game .compass .needle .south
+{
+    fill: none;
+}
+
 #game .compass span
 {
     position: absolute;
