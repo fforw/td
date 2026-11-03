@@ -41,7 +41,9 @@ def clear_scene():
 def setup_snapping(scene):
     tools = scene.tool_settings
     tools.use_snap = True
-    tools.snap_elements_base = {"GRID"}
+    # absolute increments snap moves to the viewport grid like the "Grid" target does, but only increments use the
+    # rotation increment; with "Grid", rotations snap points onto the grid and end up at odd angles
+    tools.snap_elements_base = {"INCREMENT"}
     tools.use_snap_grid_absolute = True
     tools.use_snap_translate = True
     tools.use_snap_rotate = True
