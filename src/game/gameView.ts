@@ -1,4 +1,5 @@
 import { type Campaign, type Explorer, overworld, type PatchKind, type PatchNode } from "./campaign"
+import CastleScene from "./castleScene"
 import { advanceDay, frontier, missionDays, startMission } from "./missions"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { price } from "./tavern"
@@ -50,6 +51,12 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 
+function present(children: Child[]): (Node | string)[]
+{
+    return children.filter(child => child !== null && child !== false)
+}
+
+
 function svg(tag: string, attrs: Record<string, string | number>, ...children: Child[]): SVGElement
 {
     const elem = document.createElementNS(SVG_NS, tag)
@@ -69,13 +76,21 @@ function svg(tag: string, attrs: Record<string, string | number>, ...children: C
 
 
 /**
- * Patch map with the tavern and running missions next to it. Small state, so every change renders everything again.
+ * The castle in 3D with the HUD over it, running missions and reports in a corner, and the tavern as a popup with the
+ * patch map. The DOM parts are small, so every change renders them all again; the 3D scene stays.
  */
 export default class GameView
 {
     private readonly root: HTMLElement
     private campaign: Campaign
     private readonly store: SaveStore
+
+    /** null where the browser has no WebGL */
+    private castle: CastleScene | null
+
+    private readonly hud = el("div", { className: "hud" })
+    private readonly info = el("div", { className: "info" })
+    private readonly popup = el("div", { className: "popup", hidden: true })
 
     /** frontier patch picked as the next mission target */
     private selected: string | null = null
@@ -87,6 +102,56 @@ export default class GameView
         this.root = root
         this.campaign = campaign
         this.store = store
+        this.castle = this.createCastle()
+
+        this.popup.addEventListener("click", ev => {
+            // a click on the backdrop closes the popup
+            if (ev.target === this.popup)
+            {
+                this.closeTavern()
+            }
+        })
+        window.addEventListener("keydown", ev => {
+            if (ev.key === "Escape" && !this.popup.hidden)
+            {
+                this.closeTavern()
+            }
+        })
+
+        this.render()
+    }
+
+    private createCastle(): CastleScene | null
+    {
+        let castle: CastleScene | null = null
+        try
+        {
+            castle = new CastleScene(this.campaign.seed, () => this.openTavern())
+            castle.setRunning(true)
+        }
+        catch (e)
+        {
+            console.error("No 3D view", e)
+        }
+        this.root.replaceChildren(
+            castle ? castle.element : el("p", { className: "no-3d" }, "The 3D view needs WebGL."),
+            this.hud,
+            this.info,
+            this.popup
+        )
+        return castle
+    }
+
+    private openTavern(): void
+    {
+        this.popup.hidden = false
+        this.render()
+    }
+
+    private closeTavern(): void
+    {
+        this.popup.hidden = true
+        this.selected = null
         this.render()
     }
 
@@ -129,44 +194,58 @@ export default class GameView
     private render(): void
     {
         const { campaign } = this
-        this.root.replaceChildren(
-            this.renderHud(),
-            el("div", { className: "main" },
-                this.renderMap(),
-                el("div", { className: "side" },
-                    this.renderTavern(),
-                    this.renderMissions(),
-                    this.renderReports()
+        this.hud.replaceChildren(...present(this.renderHud()))
+        this.info.replaceChildren(...present([this.renderMissions(), this.renderReports()]))
+        this.info.hidden = this.info.childElementCount === 0
+        if (!this.popup.hidden)
+        {
+            this.popup.replaceChildren(
+                el("div", { className: "dialog" },
+                    el("button", {
+                        type: "button",
+                        className: "close",
+                        title: "Back to the castle",
+                        onclick: () => this.closeTavern()
+                    }, "✕"),
+                    this.renderMap(),
+                    this.renderTavern()
                 )
             )
-        )
+        }
         document.title = campaign.castleName + ", day " + campaign.day + " - Treasure & Dread"
     }
 
-    private renderHud(): HTMLElement
+    private renderHud(): Child[]
     {
         const { campaign } = this
-        return el("div", { className: "hud" },
+        return [
             el("span", { className: "castle" }, campaign.subtitle),
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
             el("button", { type: "button", className: "end-day", onclick: () => this.endDay() }, "End day"),
+            el("button", { type: "button", onclick: () => this.openTavern() }, "🍺 Tavern"),
             __DEV && el("span", { className: "dev" },
                 el("button", { type: "button", onclick: () => exportSave(campaign) }, "Export"),
                 el("button", {
                     type: "button",
                     onclick: () => importSave().then(
                         loaded => {
+                            const newCastle = loaded.seed !== this.campaign.seed
                             this.campaign = loaded
                             this.selected = null
                             this.reports = []
+                            if (newCastle)
+                            {
+                                this.castle?.dispose()
+                                this.castle = this.createCastle()
+                            }
                             this.changed()
                         },
                         e => alert(e.message)
                     )
                 }, "Import")
             )
-        )
+        ]
     }
 
     private renderMap(): Element

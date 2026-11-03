@@ -36,15 +36,38 @@
     font-size: 1rem;
 }
 
+#game .castle-scene
+{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#game .no-3d
+{
+    position: absolute;
+    top: 50%;
+    width: 100%;
+    margin: 0;
+    text-align: center;
+    color: #bbb;
+}
+
 /* leaves room for the sound button in the top right corner */
 #game .hud
 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 1.25rem;
     padding: 0.5rem 4rem 0.5rem 1rem;
-    background: #2a1d14;
+    background: rgba(42, 29, 20, 0.85);
 }
 
 #game .hud .castle
@@ -65,31 +88,76 @@
     margin-left: auto;
 }
 
-#game .main
+#game .info
 {
-    flex: 1;
+    position: absolute;
+    left: 1rem;
+    bottom: 1rem;
+    max-width: min(24rem, calc(100% - 2rem));
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    background: rgba(42, 29, 20, 0.85);
+}
+
+#game .info[hidden],
+#game .popup[hidden]
+{
+    display: none;
+}
+
+#game .info section + section
+{
+    margin-top: 1rem;
+}
+
+#game .popup
+{
+    position: absolute;
+    inset: 0;
+    z-index: 2;
     display: flex;
-    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#game .dialog
+{
+    position: relative;
+    display: flex;
+    gap: 1rem;
+    width: min(60rem, 100%);
+    height: min(36rem, 100%);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: #333;
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+}
+
+#game .dialog .close
+{
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.2rem 0.5rem;
+    background: transparent;
+    color: #e8e0d4;
+    font-size: 1.1rem;
 }
 
 #game .patch-map
 {
     flex: 1;
     min-width: 0;
-    height: 100%;
+    min-height: 0;
 }
 
-#game .side
+#game .tavern
 {
     width: 20rem;
     overflow-y: auto;
-    padding: 1rem;
-    background: #333;
-}
-
-#game .side section + section
-{
-    margin-top: 1.5rem;
+    padding-top: 1.5rem;
 }
 
 #game .hint
@@ -212,20 +280,16 @@
 
 @media (max-width: 700px)
 {
-    #game .main
+    #game .dialog
     {
         flex-direction: column;
+        height: 100%;
     }
 
-    #game .patch-map
-    {
-        height: auto;
-        flex: 1;
-    }
-
-    #game .side
+    #game .tavern
     {
         width: auto;
-        max-height: 45vh;
+        max-height: 50%;
+        padding-top: 0;
     }
 }
