@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => {
             rolldownOptions: {
                 input: {
                     main: resolve(import.meta.dirname, "index.html"),
+                    "2d": resolve(import.meta.dirname, "index2d.html"),
                     test: resolve(import.meta.dirname, "test.html"),
                     "3d": resolve(import.meta.dirname, "3d.html"),
                     meeple: resolve(import.meta.dirname, "meeple.html"),

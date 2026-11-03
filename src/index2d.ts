@@ -217,7 +217,7 @@ const paint = () => {
     if (!fixed)
     {
         fixed = document.createElement("a")
-        fixed.href = "index.html?seed=" + seed
+        fixed.href = "index2d.html?seed=" + seed
         fixed.appendChild(document.createTextNode("seed"))
         const footer = document.getElementById("footer")!
         footer.appendChild(document.createTextNode(""))
@@ -225,7 +225,7 @@ const paint = () => {
     }
     else
     {
-        fixed.href = "index.html?seed=" + seed
+        fixed.href = "index2d.html?seed=" + seed
     }
 
     resetRandom(seed)
