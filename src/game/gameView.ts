@@ -213,6 +213,11 @@ export default class GameView
     private render(): void
     {
         const { campaign } = this
+        this.castle?.show(
+            Object.values(overworld(campaign).patches)
+                .filter(node => node.state === "discovered")
+                .map(({ q, r }): [number, number] => [q, r])
+        )
         this.hud.replaceChildren(...present(this.renderHud()))
         this.info.replaceChildren(...present([this.renderMissions(), this.renderReports()]))
         this.info.hidden = this.info.childElementCount === 0

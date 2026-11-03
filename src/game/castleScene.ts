@@ -27,7 +27,7 @@ import { FACE_SIZE, loadModels } from "../render/scene3d"
 import MapWorkerClient, { type BuiltPatch } from "../worker/MapWorkerClient"
 
 /*
- * 3D view of the castle patch and its neighbors, the home screen of the game
+ * 3D view of the castle and all known patches around it, the home screen of the game
  */
 
 /**
@@ -138,6 +138,11 @@ export default class CastleScene
 
     private running = false
 
+    /** keys of the patches shown or being built */
+    private readonly patches = new Set<string>()
+
+    private readonly models: Promise<void>
+
     private readonly grounds = new Map<number, Mesh>()
 
     /** canvas size the renderer was last set to */
@@ -148,7 +153,7 @@ export default class CastleScene
      * @param seed      campaign seed, the same the castle and its surroundings are generated from
      * @param onTavern  called when the tavern is clicked
      */
-    constructor(seed: number, private readonly onTavern: () => void)
+    constructor(private readonly seed: number, private readonly onTavern: () => void)
     {
         const canvas = document.createElement("canvas")
         canvas.className = "castle-scene"
@@ -190,7 +195,7 @@ export default class CastleScene
         controls.enableDamping = true
         controls.maxPolarAngle = Math.PI * 0.45
         controls.minDistance = 3
-        controls.maxDistance = 30
+        controls.maxDistance = 60
         controls.screenSpacePanning = false
         this.controls = controls
 
@@ -211,31 +216,27 @@ export default class CastleScene
 
         this.listen(canvas)
 
-        loadModels().then(() => this.build(seed))
+        this.models = loadModels()
     }
 
     /**
-     * Builds the castle patch and its eight neighbors, the castle first.
+     * Shows the given patches, building the ones not shown yet, closest to the castle first. Patches are only ever
+     * added; what is known stays known.
+     *
+     * @param patches   grid positions of the known patches
      */
-    private build(seed: number): void
+    show(patches: [number, number][]): void
     {
-        const patches: [number, number][] = [[0, 0]]
-        for (let r = -1; r <= 1; r++)
+        const missing = patches.filter(([q, r]) => !this.patches.has(q + "/" + r))
+        missing.sort(([q0, r0], [q1, r1]) => Math.hypot(q0, r0) - Math.hypot(q1, r1))
+        for (const [q, r] of missing)
         {
-            for (let q = -1; q <= 1; q++)
-            {
-                if (q || r)
-                {
-                    patches.push([q, r])
-                }
-            }
-        }
-
-        for (const [q, r] of patches)
-        {
-            this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0).then(
-                result => this.addPatch(result),
-                err => console.error("Building patch " + q + "/" + r + " failed", err)
+            const key = q + "/" + r
+            this.patches.add(key)
+            const built = this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, FACE_SIZE, q === 0 && r === 0)
+            Promise.all([built, this.models]).then(
+                ([result]) => this.addPatch(result),
+                err => console.error("Building patch " + key + " failed", err)
             )
         }
     }
