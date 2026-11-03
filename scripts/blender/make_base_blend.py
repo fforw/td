@@ -45,6 +45,8 @@ def setup_snapping(scene):
     # rotation increment; with "Grid", rotations snap points onto the grid and end up at odd angles
     tools.snap_elements_base = {"INCREMENT"}
     tools.use_snap_grid_absolute = True
+    # snap the origins; the default "closest" snaps bounding box corners, which sit off the grid for walls and roofs
+    tools.snap_target = "ACTIVE"
     tools.use_snap_translate = True
     tools.use_snap_rotate = True
     tools.snap_angle_increment_3d = math.radians(90)
