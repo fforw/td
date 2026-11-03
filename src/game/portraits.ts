@@ -37,6 +37,12 @@ const DISTANCE = 0.72
 const LOOK_BELOW = 0.035
 
 /**
+ * Colors of the background gradient, whose position behind the head shows how tall the meeple is
+ */
+const GRADIENT_LOW = "#8c8c8c"
+const GRADIENT_HIGH = "#e4e4e4"
+
+/**
  * Mixed into the campaign seed for the looks of explorers
  */
 const LOOK_SALT = 0x100c
@@ -60,6 +66,38 @@ export function explorerSitter(seed: number, id: number): Sitter
         look: randomLook(),
         facing: FACINGS[rng.nextInt(0, FACINGS.length - 1)]
     }))
+}
+
+
+/**
+ * Returns the y pixel of a point at the given height on the meeple's axis
+ */
+function screenY(camera: PerspectiveCamera, y: number): number
+{
+    return (1 - new Vector3(0, y, 0).project(camera).y) / 2 * SIZE
+}
+
+
+/**
+ * Puts the rendered meeple onto the height gradient, which is as tall as the portrait. The camera follows the head, so
+ * the head stays in place and the gradient moves instead: a meeple of height 1 has its head at the light top end of
+ * the gradient, smaller ones correspondingly lower, down to the dark bottom end for height 0.
+ */
+function withBackground(rendered: HTMLCanvasElement, camera: PerspectiveCamera, look: MeepleLook): string
+{
+    const canvas = document.createElement("canvas")
+    canvas.width = canvas.height = SIZE
+    const ctx = canvas.getContext("2d")!
+
+    const top = screenY(camera, headHeight(look)) - (1 - look.height) * SIZE
+    const gradient = ctx.createLinearGradient(0, top, 0, top + SIZE)
+    gradient.addColorStop(0, GRADIENT_HIGH)
+    gradient.addColorStop(1, GRADIENT_LOW)
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, SIZE, SIZE)
+
+    ctx.drawImage(rendered, 0, 0)
+    return canvas.toDataURL()
 }
 
 
@@ -139,7 +177,7 @@ export default class Portraits
         scene.add(crowd.group)
 
         this.renderer.render(scene, camera)
-        const image = this.renderer.domElement.toDataURL()
+        const image = withBackground(this.renderer.domElement, camera, look)
 
         crowd.group.traverse(obj => {
             const mesh = obj as Mesh
