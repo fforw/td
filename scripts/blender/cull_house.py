@@ -45,11 +45,16 @@ ROOF_RIDGE_PROBE = Vector((-0.6, 0, ROOF_BASE + 0.2))
 WALL_END_DISTANCE = 0.15
 
 
-def roof_top_z(x):
+# roof surface of templates made before tag_templates.py stored it
+DEFAULT_ROOF_TOP = 0.626, 0.574
+
+
+def roof_top_z(piece, x):
     """
     Height of the roof surface over the tile, from the ridge at x=-0.5 down to the eave
     """
-    return 0.626 - 0.574 * (x + 0.5)
+    top, slope = piece.data.get("tpl_roof_top", DEFAULT_ROOF_TOP)
+    return top - slope * (x + 0.5)
 
 
 def inside_wall(piece, point):
@@ -60,7 +65,7 @@ def inside_wall(piece, point):
 def inside_roof(piece, point):
     p = piece.matrix_world.inverted() @ point
     z = p.z - ROOF_BASE
-    return -0.5 <= p.x <= 0.5 and abs(p.y) <= 0.5 and 0 <= z <= roof_top_z(p.x)
+    return -0.5 <= p.x <= 0.5 and abs(p.y) <= 0.5 and 0 <= z <= roof_top_z(piece, p.x)
 
 
 def kind(obj):

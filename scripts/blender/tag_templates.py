@@ -27,6 +27,7 @@ PIECES = [
     "wall", "wallWindowShutters", "wallWindowGlass", "wallDoor",
     "wallWood", "wallWoodDoor", "wallWoodWindowShutters", "wallWoodDetailDiagonal", "wallWoodDetailCross",
     "roof", "roofLeft", "roofRight",
+    "roofHigh", "roofHighLeft", "roofHighRight",
 ]
 
 COLLECTION = "templates"
@@ -55,8 +56,14 @@ WALL_SHIFT = 0.9
 # the roof sits on top of the walls
 ROOF_LIFT = 1.0
 
-# the underside of a roof slope runs from (x=-0.4, z=0.45) down to the eave
-ROOF_UNDERSIDE_X, ROOF_UNDERSIDE_Z, ROOF_UNDERSIDE_SLOPE = -0.4, 0.45, -0.5
+# roof profiles in the kit frame: the underside runs from (x=-0.4, z=underside) down to the eave, the top from the
+# ridge (x=-0.5, z=top) down; both fall by "slope" per unit. High roofs rise a whole tile, so they can be stacked in
+# rows on the grid for wide houses.
+ROOF_UNDERSIDE_X = -0.4
+ROOF_PROFILES = {
+    "roof": {"underside": 0.45, "top": 0.626, "slope": 0.5, "top_slope": 0.574},
+    "roofHigh": {"underside": 0.9, "top": 1.141, "slope": 1.0, "top_slope": 1.0},
+}
 
 # faces of the wall top and bottom, joints etc. must lie within this distance of their plane
 PLANE_EPS = 0.011
@@ -153,11 +160,15 @@ def wall_side(face):
     return EXTERIOR
 
 
-def roof_underside_z(x):
-    return ROOF_UNDERSIDE_Z + ROOF_UNDERSIDE_SLOPE * (x - ROOF_UNDERSIDE_X)
+def roof_profile(piece):
+    return ROOF_PROFILES["roofHigh" if piece.startswith("roofHigh") else "roof"]
 
 
-def roof_side(face):
+def roof_underside_z(profile, x):
+    return profile["underside"] - profile["slope"] * (x - ROOF_UNDERSIDE_X)
+
+
+def roof_side(face, profile):
     n = face.normal
     c = face.calc_center_median()
     xs = [v.co.x for v in face.verts]
@@ -172,7 +183,8 @@ def roof_side(face):
     if n.z < -0.3:
         # undersides reaching past the wall line can be seen from below the eave
         return SOFFIT if max(xs) > 0.45 else INTERIOR
-    if all(v.co.x <= 0.45 and abs(v.co.y) <= 0.48 and v.co.z <= roof_underside_z(v.co.x) + 0.01 for v in face.verts):
+    if all(v.co.x <= 0.45 and abs(v.co.y) <= 0.48 and v.co.z <= roof_underside_z(profile, v.co.x) + 0.01
+           for v in face.verts):
         return INTERIOR
     return EXTERIOR
 
@@ -238,10 +250,10 @@ def build_template(piece):
     bm, materials = import_baked(piece)
 
     tag_layer = bm.faces.layers.int.new("side")
-    classify = roof_side if kind == "roof" else wall_side
+    profile = roof_profile(piece) if kind == "roof" else None
     for face in bm.faces:
         face.normal_update()
-        face[tag_layer] = classify(face)
+        face[tag_layer] = roof_side(face, profile) if profile else wall_side(face)
 
     opening = find_openings(bm) if kind == "wall" else None
     if opening:
@@ -263,6 +275,9 @@ def build_template(piece):
     bm.to_mesh(mesh)
     bm.free()
     mesh["tpl_kind"] = kind
+    if profile:
+        # cull_house.py tests probes against the roof's top surface
+        mesh["tpl_roof_top"] = profile["top"], profile["top_slope"]
 
     colors = mesh.color_attributes.get("sideColor") or mesh.color_attributes.new("sideColor", "FLOAT_COLOR", "CORNER")
     sides = mesh.attributes["side"].data
