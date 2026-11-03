@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { assert, describe, it } from "vitest"
 
-import { createCampaign } from "../../src/game/campaign"
+import { type Campaign, createCampaign, SAVE_VERSION, START_HEROES } from "../../src/game/campaign"
 import { advanceDay, startMission } from "../../src/game/missions"
 import { parseSave, serializeSave } from "../../src/game/storage"
 
@@ -49,4 +49,21 @@ describe("Save fixtures", () => {
             assert(campaign.day === day + 1)
         })
     }
+})
+
+
+describe("Save migration", () => {
+
+    it("gives version 1 saves local heroes", () => {
+
+        const campaign = createCampaign(9) as Partial<Campaign>
+        delete campaign.heroes
+        delete campaign.jobs
+        campaign.saveVersion = 1
+
+        const migrated = parseSave(JSON.stringify(campaign))
+        assert(migrated.saveVersion === SAVE_VERSION)
+        assert(migrated.heroes.length === START_HEROES)
+        assert.deepEqual(migrated.jobs, [])
+    })
 })

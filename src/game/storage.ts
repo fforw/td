@@ -1,4 +1,5 @@
-import { type Campaign, GENERATOR_VERSION, SAVE_VERSION } from "./campaign"
+import { type Campaign, GENERATOR_VERSION, SAVE_VERSION, START_HEROES } from "./campaign"
+import { createHeroes } from "./heroes"
 
 /**
  * Where campaigns are kept. Only localStorage for now; a server can implement the same interface later.
@@ -12,12 +13,29 @@ export interface SaveStore
 
 
 /**
- * Parses a saved campaign and refuses saves of another format or generator version, which would load with shifted
- * patch contents.
+ * Brings saves of older formats up to date, one version at a time
+ */
+const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
+    // version 2 added local heroes
+    1: campaign => {
+        campaign.heroes = createHeroes(campaign, START_HEROES)
+        campaign.jobs = []
+    }
+}
+
+
+/**
+ * Parses a saved campaign, migrating older formats, and refuses saves of unknown formats or of another generator
+ * version, which would load with shifted patch contents.
  */
 export function parseSave(json: string): Campaign
 {
     const campaign = JSON.parse(json) as Campaign
+    while (campaign.saveVersion < SAVE_VERSION && MIGRATIONS[campaign.saveVersion])
+    {
+        MIGRATIONS[campaign.saveVersion](campaign)
+        campaign.saveVersion++
+    }
     if (campaign.saveVersion !== SAVE_VERSION)
     {
         throw new Error("Save format " + campaign.saveVersion + " is not supported, expected " + SAVE_VERSION)

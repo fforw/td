@@ -1,6 +1,7 @@
 import { assert, describe, it } from "vitest"
 
-import { createCampaign, overworld, START_GOLD } from "../../src/game/campaign"
+import { createCampaign, overworld, START_GOLD, START_HEROES } from "../../src/game/campaign"
+import { isAway, jobDays, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, startMission } from "../../src/game/missions"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
 
@@ -105,5 +106,52 @@ describe("Tavern", () => {
             assert(campaign.tavern.every(e => e.leavesOn > campaign.day))
         }
         assert(campaign.tavern.every(e => firstIds.indexOf(e.id) < 0))
+    })
+})
+
+
+describe("Heroes", () => {
+
+    it("starts with local heroes beyond peasants", () => {
+
+        const campaign = createCampaign(21)
+        assert(campaign.heroes.length === START_HEROES)
+        assert(campaign.heroes.every(hero => hero.character.classes.some(name => name !== "peasant")))
+        assert(campaign.heroes.every(hero => campaign.tavern.every(e => e.id !== hero.id)))
+    })
+
+    it("sends a hero to a known patch and back", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        const days = jobDays("1/0")
+        startJob(campaign, hero.id, "1/0")
+        assert(isAway(campaign, hero))
+
+        for (let i = 0; i < days; i++)
+        {
+            advanceDay(campaign)
+        }
+        assert(!isAway(campaign, hero))
+        assert(hero.experience === 1)
+    })
+
+    it("only takes jobs at known patches other than the castle", () => {
+
+        const campaign = createCampaign(21)
+        const id = campaign.heroes[0].id
+        for (const target of ["0/0", "2/0"])
+        {
+            let error: Error | null = null
+            try
+            {
+                startJob(campaign, id, target)
+            }
+            catch (e)
+            {
+                error = e as Error
+            }
+            assert(error !== null)
+        }
     })
 })

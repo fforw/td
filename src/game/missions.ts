@@ -1,5 +1,6 @@
 import { type Campaign, type Explorer, overworld, patchKey } from "./campaign"
 import { NEIGHBORS, randomKind } from "./patchKinds"
+import { finishJobs } from "./heroes"
 import { price, returnToTavern, updateTavern } from "./tavern"
 
 /**
@@ -45,9 +46,18 @@ function parseKey(key: string): [number, number]
  */
 export function missionDays(explorer: Explorer, target: string): number
 {
+    return travelDays(target, explorer.speed)
+}
+
+
+/**
+ * Days to get from the castle to the patch at the given speed
+ */
+export function travelDays(target: string, speed: number): number
+{
     const [q, r] = parseKey(target)
     const distance = Math.max(Math.abs(q), Math.abs(r))
-    return Math.max(1, Math.ceil(distance * DAYS_PER_PATCH / explorer.speed))
+    return Math.max(1, Math.ceil(distance * DAYS_PER_PATCH / speed))
 }
 
 
@@ -114,7 +124,8 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
 
 
 /**
- * Advances the game by one day: missions that are due report back, then the tavern crowd changes.
+ * Advances the game by one day: missions that are due report back, the tavern crowd changes and heroes come home
+ * from finished jobs.
  */
 export function advanceDay(campaign: Campaign): void
 {
@@ -126,6 +137,7 @@ export function advanceDay(campaign: Campaign): void
     campaign.missions = campaign.missions.filter(m => m.endDay > day)
 
     updateTavern(campaign)
+    finishJobs(campaign)
 
     for (const mission of due)
     {

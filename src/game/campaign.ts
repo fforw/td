@@ -1,5 +1,7 @@
 import { withSeed } from "../math/random"
 import { createSubtitle } from "./subtitle"
+import type { Character } from "../meeple/character"
+import { createHeroes } from "./heroes"
 import { startPatches } from "./patchKinds"
 import { arrivals } from "./tavern"
 
@@ -12,9 +14,14 @@ export const GENERATOR_VERSION = 1
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export const START_GOLD = 1000
+
+/**
+ * Local heroes a campaign starts with
+ */
+export const START_HEROES = 3
 
 export const OVERWORLD = "overworld"
 
@@ -61,6 +68,28 @@ export interface Mission
 }
 
 /**
+ * Gifted local born in the castle, who takes on special jobs and learns from them
+ */
+export interface Hero
+{
+    id: number
+    name: string
+    /** stats and classes, at least one beyond peasant */
+    character: Character
+    /** number of jobs done */
+    experience: number
+}
+
+export interface Job
+{
+    heroId: number
+    /** known patch key in the overworld */
+    target: string
+    startDay: number
+    endDay: number
+}
+
+/**
  * Persistent game state. Plain JSON, so it can be saved as is.
  */
 export interface Campaign
@@ -77,7 +106,10 @@ export interface Campaign
     /** explorers loitering in the tavern */
     tavern: Explorer[]
     missions: Mission[]
-    /** id for the next explorer */
+    /** local heroes, on a job or at home */
+    heroes: Hero[]
+    jobs: Job[]
+    /** id for the next explorer or hero */
     nextId: number
 }
 
@@ -119,9 +151,12 @@ export function createCampaign(seed: number): Campaign
         },
         tavern: [],
         missions: [],
+        heroes: [],
+        jobs: [],
         nextId: 1
     }
 
     campaign.tavern = arrivals(campaign, 3)
+    campaign.heroes = createHeroes(campaign, START_HEROES)
     return campaign
 }
