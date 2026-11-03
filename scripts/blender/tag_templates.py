@@ -10,6 +10,8 @@ template meshes in place, so linked copies in hand-placed houses pick up the cha
 Every face gets an integer face attribute "side" (see TAGS) that cull_house.py uses to drop faces that cannot be
 seen once the pieces are assembled, and a "sideColor" color attribute to inspect the tags in the viewport.
 
+Decoration templates (DECOR) hang on the outside of a wall tile and keep all their faces.
+
 Wall templates with see-through openings (windows, door windows) get a dark backing quad in the middle of the wall,
 so the openings do not show the background once the inside of the house is gone.
 """
@@ -28,9 +30,14 @@ PIECES = [
     "wallWood", "wallWoodDoor", "wallWoodWindowShutters", "wallWoodDetailDiagonal", "wallWoodDetailCross",
     "roof", "roofLeft", "roofRight",
     "roofHigh", "roofHighLeft", "roofHighRight",
+    "bannerGreen", "bannerRed",
 ]
 
+# pieces hung on the outside of a wall; they sit in the wall's frame, but are never culled and do not count as walls
+DECOR = {"bannerGreen", "bannerRed"}
+
 COLLECTION = "templates"
+PALETTE_ROWS = {"wall": -4, "roof": -8, "decor": -12}
 
 TAGS = ["exterior", "interior", "joint_neg", "joint_pos", "top", "bottom", "ridge", "soffit"]
 EXTERIOR, INTERIOR, JOINT_NEG, JOINT_POS, TOP, BOTTOM, RIDGE, SOFFIT = range(len(TAGS))
@@ -245,15 +252,24 @@ def template_collection():
     return collection
 
 
+def piece_kind(piece):
+    if piece in DECOR:
+        return "decor"
+    return "roof" if piece.startswith("roof") else "wall"
+
+
 def build_template(piece):
-    kind = "roof" if piece.startswith("roof") else "wall"
+    kind = piece_kind(piece)
     bm, materials = import_baked(piece)
 
     tag_layer = bm.faces.layers.int.new("side")
     profile = roof_profile(piece) if kind == "roof" else None
     for face in bm.faces:
         face.normal_update()
-        face[tag_layer] = roof_side(face, profile) if profile else wall_side(face)
+        if kind == "decor":
+            face[tag_layer] = EXTERIOR
+        else:
+            face[tag_layer] = roof_side(face, profile) if profile else wall_side(face)
 
     opening = find_openings(bm) if kind == "wall" else None
     if opening:
@@ -261,7 +277,7 @@ def build_template(piece):
         face = add_backing(bm, opening, len(materials) - 1)
         face[tag_layer] = EXTERIOR
 
-    shift = Vector((WALL_SHIFT, 0, 0)) if kind == "wall" else Vector((0, 0, ROOF_LIFT))
+    shift = Vector((0, 0, ROOF_LIFT)) if kind == "roof" else Vector((WALL_SHIFT, 0, 0))
     bmesh.ops.translate(bm, vec=shift, verts=bm.verts)
 
     name = piece + "_tpl"
@@ -291,9 +307,9 @@ def build_template(piece):
         obj = bpy.data.objects.new(name, mesh)
         template_collection().objects.link(obj)
     obj.data = mesh
-    # palette rows below the origin, one for walls and one for roofs
-    same_kind = [p for p in PIECES if p.startswith("roof") == (kind == "roof")]
-    obj.location = (same_kind.index(piece) * 2, -4 if kind == "wall" else -8, 0)
+    # palette rows below the origin, one for each kind
+    same_kind = [p for p in PIECES if piece_kind(p) == kind]
+    obj.location = (same_kind.index(piece) * 2, PALETTE_ROWS[kind], 0)
 
     counts = {tag: 0 for tag in TAGS}
     for item in sides:

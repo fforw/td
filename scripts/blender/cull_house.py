@@ -4,7 +4,8 @@ Bakes a hand-placed house into one mesh without the faces that cannot be seen fr
 Build a house in its own collection from linked copies of the templates made by tag_templates.py (Alt+D). Every piece
 has its tile's center as origin: snap it to the tile inside the house and rotate it so that its +X side points out of
 the house for walls, or down the slope for roofs. Pieces may also be mirrored or scaled (e.g. half-width slopes for a
-narrow wing). Other meshes in the collection are baked as they are.
+narrow wing). Decorations like banners go on the wall's tile like the wall and keep all their faces. Other meshes in
+the collection are baked as they are.
 
 Make the house collection active in the outliner and run the script. It writes "<house>_baked" into its own
 collection next to the house, and leaves the house itself untouched, so it can be edited and baked again.
@@ -96,7 +97,7 @@ def dropped_tags(piece, walls, roofs, closed):
         top = M @ WALL_TOP_PROBE
         if covered(top, roofs, inside_roof, piece) or covered(top, walls, inside_wall, piece):
             drop.add(TOP)
-    else:
+    elif kind(piece) == "roof":
         if closed:
             drop.add(BOTTOM)
         if DROP_SOFFIT:
