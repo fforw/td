@@ -51,6 +51,8 @@ interface Campaign
     seed: number
     subtitle: string
     castleName: string
+    gold: number
+    day: number
     levels: Map<string, LevelRecord>
     arcs: Arc[]                    // see phase 2
     generatorVersion: number
@@ -205,21 +207,26 @@ subtitle on top of that.
 
 Discovery and adventure are split between two kinds of people.
 
-Explorers are a caste of their own, modeled after the youth scouts in
-FIFA's career mode: you assign them, wait, and they report back.
+Explorers are a caste of their own, a fickle bunch loitering in the
+TAVERN (3.6). You pay one to go look somewhere, wait, and they report
+back.
 
-- They cost resources (see 5.1 for which), but there is no pay or
-  loyalty to manage afterwards.
-- At the start the player picks one of two or three offered explorers,
-  which differ in speed and wisdom. Wisdom decides how much of a patch
-  the report reveals, e.g. hidden features or the kind of a neighbor.
+- Hiring is per mission and costs gold (5.1). No upkeep or loyalty
+  beyond that.
+- The TAVERN offers a few explorers at a time, at the start two or
+  three. They differ in speed and wisdom, and their price follows.
+  Wisdom decides how much of a patch the report reveals, e.g. hidden
+  features or the kind of a neighbor.
+- Fickle: the crowd changes over the days. Explorers come and go, and
+  one who reported back hangs around for a while before moving on.
 - Expert sneakers: they are never caught, never fight, and leave no
   witnesses or tracks. Their only job is discovery.
 - Speed scales a mission's days and the failure cost down. It grows
-  with experience, from every mission, failed ones included, so
-  seasoned explorers are worth sparing for long or hard targets.
-- Like scouts, they report back to the castle after each mission; their
-  position is not state, every mission starts at the castle.
+  with experience, from every mission, failed ones included, and so
+  does their price; a seasoned explorer is worth hiring for long or
+  hard targets while they are still around.
+- They report back to the TAVERN after each mission; their position is
+  not state, every mission starts at the castle.
 
 Heroes do everything that happens inside a discovered patch:
 
@@ -448,6 +455,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   processing of raw materials (5.1). The facility is a fixture on the
   HOUSE, so the face type stays semantic and the theme picks the model
   per facility.
+- The first facility kind is the TAVERN. Every castle has one from the
+  start; it is where explorers are hired (1.3).
 
 ## Phase 4 - Threats
 
@@ -500,6 +509,9 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 Still to be designed: who needs what and who produces what.
 
+- Gold coins first: one simple countable valuable. A campaign starts
+  with 1000 gold. Hiring explorers costs gold; for now there is no
+  spending limit, the balance may go negative.
 - Resources the castle produces and stores.
 - Facilities (3.6) that produce raw materials or process them.
 - Consumers: explorers (1.3), new buildings, heroes, defenses, paying
@@ -507,7 +519,7 @@ Still to be designed: who needs what and who produces what.
 
 ## Open questions
 
-- The economy (phase 5): resources, facilities, and what explorers and
+- The economy (phase 5) beyond gold: resources, facilities, and what
   buildings cost.
 - What wisdom reveals in an explorer's report, exactly.
 - Does the game run in the 3D view of `world.html` with the patch map as
