@@ -48,7 +48,7 @@ const GRADIENT_HIGH = "#e4e4e4"
  * Color and width in pixels of the line marking the top of the tallest meeple
  */
 const MARK_COLOR = "#303030"
-const MARK_WIDTH = 2
+const MARK_WIDTH = 3.5
 
 /**
  * Mixed into the campaign seed for the looks of explorers
