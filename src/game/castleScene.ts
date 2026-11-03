@@ -119,7 +119,6 @@ export default class CastleScene
     /** shows where the cardinal directions are from the camera's point of view */
     readonly compass: HTMLElement
     private readonly compassLetters: HTMLElement[]
-    private readonly needle: SVGSVGElement
     private heading = NaN
 
     private readonly renderer: WebGLRenderer
@@ -165,14 +164,16 @@ export default class CastleScene
             this.compass.append(letter)
             return letter
         })
-        // north half filled black, south half as an outline, in a 100 x 100 box around the compass center
-        this.needle = document.createElementNS("http://www.w3.org/2000/svg", "svg")
-        this.needle.setAttribute("viewBox", "0 0 100 100")
-        this.needle.classList.add("needle")
-        this.needle.innerHTML =
-            '<polygon class="north" points="50,26 60,50 40,50"/>' +
-            '<polygon class="south" points="50,74 60,50 40,50"/>'
-        this.compass.prepend(this.needle)
+        // the needle always points up, the way the camera looks, and the letters turn around it; it marks the view
+        // direction like a HUD rather than working like a real compass. Filled half up, outlined half down, in a
+        // 100 x 100 box around the compass center.
+        const needle = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+        needle.setAttribute("viewBox", "0 0 100 100")
+        needle.classList.add("needle")
+        needle.innerHTML =
+            '<polygon class="ahead" points="50,26 58,50 42,50"/>' +
+            '<polygon class="behind" points="50,74 58,50 42,50"/>'
+        this.compass.prepend(needle)
 
         const renderer = new WebGLRenderer({ canvas, antialias: true })
         renderer.setPixelRatio(window.devicePixelRatio)
@@ -354,7 +355,6 @@ export default class CastleScene
             return
         }
         this.heading = heading
-        this.needle.style.transform = "rotate(" + heading + "rad)"
         DIRECTIONS.forEach(([, angle], i) => {
             const a = angle + heading
             const { style } = this.compassLetters[i]

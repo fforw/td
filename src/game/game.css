@@ -73,12 +73,12 @@
     stroke-linejoin: round;
 }
 
-#game .compass .needle .north
+#game .compass .needle .ahead
 {
     fill: #2a1d14;
 }
 
-#game .compass .needle .south
+#game .compass .needle .behind
 {
     fill: none;
 }
