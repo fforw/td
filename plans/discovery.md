@@ -232,7 +232,14 @@ back.
 
 Heroes do everything that happens inside a discovered patch:
 
-- Heroes come out of the generated meeple population.
+- Heroes start out as local heroes: gifted individuals born in the
+  castle, meeples with a class beyond peasant. They live there, are
+  small-time at the beginning and take on special jobs from the
+  castle. They are not hired per job like explorers.
+- They learn from their jobs. Later events bring new heroes or make
+  others leave.
+- A job targets a known patch other than the castle. Until levels
+  exist, it is the trip there and back and a report.
 - Attribute for wisdom: inside levels finds hidden traps and passages.
 - They enter levels, take treasure and fight, and are the ones who get
   seen, followed and hated (phase 4).
