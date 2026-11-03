@@ -200,8 +200,10 @@ subtitle on top of that.
   point the search reached, so failing isn't a free probe.
 - Explorers leave no tracks or witnesses, so a discovery mission never
   creates a threat by itself (see 4.2).
-- The first *successful* discovery is a DUNGEON. This is the first case
-  of director steering, not a separate rule.
+- The castle and its eight neighbors are known from the start: the 3D
+  view shows them, and what is shown is known. Knowing a patch means
+  knowing its kind, so the first DUNGEON is one of these neighbors, the
+  first case of director steering. Missions start one ring further out.
 
 ### 1.3 Explorers and heroes
 
