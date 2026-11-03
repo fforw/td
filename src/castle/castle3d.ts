@@ -458,10 +458,12 @@ export function createCastle(plan: CastlePlan): Group
 {
     const group = new Group()
 
-    for (const house of plan.houses)
-    {
-        group.add(createHouse(house))
-    }
+    plan.houses.forEach((house, index) => {
+        const obj = createHouse(house)
+        // lets clicks find out which house of the plan they hit
+        obj.userData.house = index
+        group.add(obj)
+    })
 
     const fountain = model("fountain")
     fountain.scale.setScalar(MARKET_FOUNTAIN_SCALE)
