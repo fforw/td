@@ -12,7 +12,7 @@ describe("Saves", () => {
     it("round-trips a campaign", () => {
 
         const campaign = createCampaign(9)
-        startMission(campaign, campaign.tavern[0].id, "-1/0")
+        startMission(campaign, campaign.tavern[0].id, "-2/0")
         advanceDay(campaign)
         assert.deepEqual(parseSave(serializeSave(campaign)), campaign)
     })

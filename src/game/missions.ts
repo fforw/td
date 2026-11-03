@@ -1,5 +1,5 @@
-import { patchSeed, rng, weightedRandom, withSeed } from "../math/random"
-import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
+import { type Campaign, type Explorer, overworld, patchKey } from "./campaign"
+import { NEIGHBORS, randomKind } from "./patchKinds"
 import { price, returnToTavern, updateTavern } from "./tavern"
 
 /**
@@ -7,21 +7,6 @@ import { price, returnToTavern, updateTavern } from "./tavern"
  * use A* (plan 1.1).
  */
 const DAYS_PER_PATCH = 3
-
-/**
- * Mixed into the seed of a patch for its kind roll
- */
-const KIND_SALT = 0x6b1d
-
-const NEIGHBORS = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
-
-const KIND_CHOICES = weightedRandom<PatchKind>([
-    [5, "EMPTY"],
-    [2, "DUNGEON"],
-    [2, "TREASURE"],
-    [1, "TEMPLE"]
-])
-
 
 /**
  * Returns the keys of all unknown patches next to a discovered one, the possible mission targets.
@@ -93,21 +78,6 @@ function parentOf(campaign: Campaign, q: number, r: number): string
 
 
 /**
- * Rolls the kind of a patch a mission targets. The first discovery is always a DUNGEON (plan 1.2).
- */
-function rollKind(campaign: Campaign, q: number, r: number): PatchKind
-{
-    const { patches } = overworld(campaign)
-    const first = Object.values(patches).every(node => node.kind === "CASTLE")
-    if (first)
-    {
-        return "DUNGEON"
-    }
-    return withSeed(patchSeed(campaign.seed ^ KIND_SALT, q, r), () => KIND_CHOICES(rng.next()))
-}
-
-
-/**
  * Hires an explorer from the tavern and sends them to an unknown patch next to a discovered one. The kind of the
  * target is rolled now, but only shown once the explorer reports back.
  */
@@ -127,7 +97,7 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
     overworld(campaign).patches[target] = {
         q,
         r,
-        kind: rollKind(campaign, q, r),
+        kind: randomKind(campaign.seed, q, r),
         state: "targeted",
         parent: parentOf(campaign, q, r)
     }

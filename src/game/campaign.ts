@@ -1,5 +1,6 @@
 import { withSeed } from "../math/random"
 import { createSubtitle } from "./subtitle"
+import { startPatches } from "./patchKinds"
 import { arrivals } from "./tavern"
 
 /**
@@ -100,8 +101,6 @@ export function createCampaign(seed: number): Campaign
 {
     const { text, castleName, characterName } = withSeed(seed, createSubtitle)
 
-    const castle: PatchNode = { q: 0, r: 0, kind: "CASTLE", state: "discovered", parent: null }
-
     const campaign: Campaign = {
         saveVersion: SAVE_VERSION,
         generatorVersion: GENERATOR_VERSION,
@@ -115,7 +114,7 @@ export function createCampaign(seed: number): Campaign
             [OVERWORLD]: {
                 id: OVERWORLD,
                 kind: "OVERWORLD",
-                patches: { [patchKey(0, 0)]: castle }
+                patches: Object.fromEntries(startPatches(seed).map(node => [patchKey(node.q, node.r), node]))
             }
         },
         tavern: [],

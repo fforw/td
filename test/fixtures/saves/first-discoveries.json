@@ -19,6 +19,34 @@
                     "state": "discovered",
                     "parent": null
                 },
+                "-1/-1": {
+                    "q": -1,
+                    "r": -1,
+                    "kind": "DUNGEON",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
+                "0/-1": {
+                    "q": 0,
+                    "r": -1,
+                    "kind": "TEMPLE",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
+                "1/-1": {
+                    "q": 1,
+                    "r": -1,
+                    "kind": "EMPTY",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
+                "-1/0": {
+                    "q": -1,
+                    "r": 0,
+                    "kind": "EMPTY",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
                 "1/0": {
                     "q": 1,
                     "r": 0,
@@ -26,12 +54,40 @@
                     "state": "discovered",
                     "parent": "0/0"
                 },
-                "-1/-1": {
+                "-1/1": {
                     "q": -1,
-                    "r": -1,
+                    "r": 1,
+                    "kind": "EMPTY",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
+                "0/1": {
+                    "q": 0,
+                    "r": 1,
                     "kind": "DUNGEON",
                     "state": "discovered",
                     "parent": "0/0"
+                },
+                "1/1": {
+                    "q": 1,
+                    "r": 1,
+                    "kind": "DUNGEON",
+                    "state": "discovered",
+                    "parent": "0/0"
+                },
+                "2/0": {
+                    "q": 2,
+                    "r": 0,
+                    "kind": "EMPTY",
+                    "state": "targeted",
+                    "parent": "1/-1"
+                },
+                "-2/-2": {
+                    "q": -2,
+                    "r": -2,
+                    "kind": "EMPTY",
+                    "state": "targeted",
+                    "parent": "-1/-1"
                 }
             }
         }
@@ -62,22 +118,41 @@
             "leavesOn": 7
         },
         {
-            "id": 1,
-            "name": "Marinh",
-            "speed": 1.57,
-            "wisdom": 1,
-            "experience": 1,
-            "leavesOn": 6
-        },
-        {
-            "id": 2,
-            "name": "Ditas",
-            "speed": 1.29,
-            "wisdom": 3,
-            "experience": 1,
-            "leavesOn": 8
+            "id": 7,
+            "name": "Hyunmi",
+            "speed": 1.4,
+            "wisdom": 5,
+            "experience": 0,
+            "leavesOn": 10
         }
     ],
-    "missions": [],
-    "nextId": 7
+    "missions": [
+        {
+            "explorer": {
+                "id": 1,
+                "name": "Marinh",
+                "speed": 1.43,
+                "wisdom": 1,
+                "experience": 0,
+                "leavesOn": 4
+            },
+            "target": "2/0",
+            "startDay": 1,
+            "endDay": 6
+        },
+        {
+            "explorer": {
+                "id": 2,
+                "name": "Ditas",
+                "speed": 1.17,
+                "wisdom": 3,
+                "experience": 0,
+                "leavesOn": 3
+            },
+            "target": "-2/-2",
+            "startDay": 1,
+            "endDay": 7
+        }
+    ],
+    "nextId": 8
 }

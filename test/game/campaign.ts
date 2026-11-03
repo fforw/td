@@ -19,11 +19,18 @@ describe("Campaign", () => {
         assert(a.day === 1)
     })
 
-    it("starts with the castle and its eight neighbors as targets", () => {
+    it("starts with the castle and its eight neighbors known, one of them a dungeon", () => {
 
-        const campaign = createCampaign(1)
-        assert.deepEqual(Object.keys(overworld(campaign).patches), ["0/0"])
-        assert(frontier(campaign).length === 8)
+        for (const seed of [1, 2, 3, 4, 5])
+        {
+            const campaign = createCampaign(seed)
+            const nodes = Object.values(overworld(campaign).patches)
+            assert(nodes.length === 9)
+            assert(nodes.every(node => node.state === "discovered"))
+            assert(nodes.filter(node => node.kind === "CASTLE").length === 1)
+            assert(nodes.some(node => node.kind === "DUNGEON"))
+            assert(frontier(campaign).length === 16)
+        }
     })
 })
 
@@ -34,14 +41,14 @@ describe("Missions", () => {
 
         const campaign = createCampaign(7)
         const explorer = campaign.tavern[0]
-        const days = missionDays(explorer, "1/0")
+        const days = missionDays(explorer, "2/0")
         const cost = price(explorer)
 
-        startMission(campaign, explorer.id, "1/0")
+        startMission(campaign, explorer.id, "2/0")
 
-        const node = overworld(campaign).patches["1/0"]
+        const node = overworld(campaign).patches["2/0"]
         assert(node.state === "targeted")
-        assert(node.parent === "0/0")
+        assert(node.parent !== null && node.parent.startsWith("1/"))
         assert(campaign.gold === START_GOLD - cost)
         assert(campaign.tavern.indexOf(explorer) < 0)
 
@@ -51,19 +58,12 @@ describe("Missions", () => {
             assert(node.state === "targeted")
         }
         advanceDay(campaign)
-        assert(overworld(campaign).patches["1/0"].state === "discovered")
+        assert(overworld(campaign).patches["2/0"].state === "discovered")
         assert(campaign.missions.length === 0)
 
         const back = campaign.tavern.find(e => e.id === explorer.id)!
         assert(back.experience === 1)
         assert(back.speed > 0)
-    })
-
-    it("makes the first discovery a dungeon", () => {
-
-        const campaign = createCampaign(3)
-        startMission(campaign, campaign.tavern[0].id, "0/1")
-        assert(overworld(campaign).patches["0/1"].kind === "DUNGEON")
     })
 
     it("only targets unknown patches next to discovered ones", () => {
@@ -73,7 +73,7 @@ describe("Missions", () => {
         let error: Error | null = null
         try
         {
-            startMission(campaign, id, "2/0")
+            startMission(campaign, id, "3/0")
         }
         catch (e)
         {
@@ -86,7 +86,7 @@ describe("Missions", () => {
 
         const campaign = createCampaign(5)
         campaign.gold = 10
-        startMission(campaign, campaign.tavern[0].id, "1/1")
+        startMission(campaign, campaign.tavern[0].id, "2/2")
         assert(campaign.gold < 0)
     })
 })
