@@ -1,9 +1,11 @@
 """
 Imports Fantasy Town Kit pieces as house templates whose faces know which side of the building they are on.
 
-Run from Blender's text editor. Each piece becomes one mesh "<piece>_tpl" in the "templates" collection, in the kit's
-1x1x1 tile frame (walls on the -X tile edge with the outside facing +X, roof slopes with the ridge at -X and the eave
-at +X). Rerunning updates the template meshes in place, so linked copies in hand-placed houses pick up the changes.
+Run from Blender's text editor. Each piece becomes one mesh "<piece>_tpl" in the "templates" collection, in a 1x1x1
+tile frame around the origin: walls stand on the +X tile edge with the outside facing +X, roof slopes sit one unit up
+with the ridge at -X and the eave at +X. So a wall and the roof above it share their tile's center as origin, and
+houses can be assembled by snapping origins to the grid and rotating in 90 degree steps. Rerunning updates the
+template meshes in place, so linked copies in hand-placed houses pick up the changes.
 
 Every face gets an integer face attribute "side" (see TAGS) that cull_house.py uses to drop faces that cannot be
 seen once the pieces are assembled, and a "sideColor" color attribute to inspect the tags in the viewport.
@@ -43,9 +45,15 @@ TAG_COLORS = [
     (0.9, 0.1, 0.1, 1),  # soffit
 ]
 
-# wall panels are slabs between -0.475 and -0.425 with posts out to -0.5 and -0.4; everything behind the middle
-# plane is inside the house, including the mirrored window frames and door panels
+# in the kit, wall panels are slabs between -0.475 and -0.425 with posts out to -0.5 and -0.4; everything behind the
+# middle plane is inside the house, including the mirrored window frames and door panels
 WALL_MIDDLE = -0.45
+
+# moves the kit's walls from the -X tile edge of the tile outside the house to the +X edge of the tile inside
+WALL_SHIFT = 0.9
+
+# the roof sits on top of the walls
+ROOF_LIFT = 1.0
 
 # the underside of a roof slope runs from (x=-0.4, z=0.45) down to the eave
 ROOF_UNDERSIDE_X, ROOF_UNDERSIDE_Z, ROOF_UNDERSIDE_SLOPE = -0.4, 0.45, -0.5
@@ -225,7 +233,7 @@ def template_collection():
     return collection
 
 
-def build_template(piece, index):
+def build_template(piece):
     kind = "roof" if piece.startswith("roof") else "wall"
     bm, materials = import_baked(piece)
 
@@ -240,6 +248,9 @@ def build_template(piece, index):
         materials.append(backing_material())
         face = add_backing(bm, opening, len(materials) - 1)
         face[tag_layer] = EXTERIOR
+
+    shift = Vector((WALL_SHIFT, 0, 0)) if kind == "wall" else Vector((0, 0, ROOF_LIFT))
+    bmesh.ops.translate(bm, vec=shift, verts=bm.verts)
 
     name = piece + "_tpl"
     mesh = bpy.data.meshes.get(name)
@@ -264,10 +275,10 @@ def build_template(piece, index):
     if obj is None:
         obj = bpy.data.objects.new(name, mesh)
         template_collection().objects.link(obj)
-        row = 1 if kind == "roof" else 0
-        obj.location = (index * 1.5, row * 3, 0)
-    else:
-        obj.data = mesh
+    obj.data = mesh
+    # palette rows below the origin, one for walls and one for roofs
+    same_kind = [p for p in PIECES if p.startswith("roof") == (kind == "roof")]
+    obj.location = (same_kind.index(piece) * 2, -4 if kind == "wall" else -8, 0)
 
     counts = {tag: 0 for tag in TAGS}
     for item in sides:
@@ -278,7 +289,7 @@ def build_template(piece, index):
 def main():
     if bpy.context.object and bpy.context.object.mode != "OBJECT":
         bpy.ops.object.mode_set(mode="OBJECT")
-    report = {piece: build_template(piece, i) for i, piece in enumerate(PIECES)}
+    report = {piece: build_template(piece) for piece in PIECES}
     for material in list(bpy.data.materials):
         if material.users == 0 and "." in material.name:
             bpy.data.materials.remove(material)

@@ -1,10 +1,10 @@
 """
 Bakes a hand-placed house into one mesh without the faces that cannot be seen from outside.
 
-Build a house in its own collection from linked copies of the templates made by tag_templates.py (Alt+D), snapped to
-the tile grid. Walls go inside the footprint with the outside facing out, roofs sit on top of the walls, pieces may
-be rotated, mirrored or scaled (e.g. half-width slopes for a narrow wing). Other meshes in the collection are baked
-as they are.
+Build a house in its own collection from linked copies of the templates made by tag_templates.py (Alt+D). Every piece
+has its tile's center as origin: snap it to the tile inside the house and rotate it so that its +X side points out of
+the house for walls, or down the slope for roofs. Pieces may also be mirrored or scaled (e.g. half-width slopes for a
+narrow wing). Other meshes in the collection are baked as they are.
 
 Make the house collection active in the outliner and run the script. It writes "<house>_baked" into its own
 collection next to the house, and leaves the house itself untouched, so it can be edited and baked again.
@@ -29,13 +29,17 @@ EXPORT_DIR = None
 
 EXTERIOR, INTERIOR, JOINT_NEG, JOINT_POS, TOP, BOTTOM, RIDGE, SOFFIT = range(8)
 
-# probe points in the template frame (see tag_templates.py), just beyond the face they test
-WALL_END_NEG = Vector((-0.45, -0.5, 0.5))
-WALL_END_POS = Vector((-0.45, 0.5, 0.5))
-WALL_TOP_PROBE = Vector((-0.45, 0, 1.05))
-ROOF_JOINT_NEG_PROBE = Vector((-0.25, -0.75, 0.2))
-ROOF_JOINT_POS_PROBE = Vector((-0.25, 0.75, 0.2))
-ROOF_RIDGE_PROBE = Vector((-0.6, 0, 0.2))
+# template frames (see tag_templates.py): wall panels between x=0.4 and 0.5, roofs from z=1 up
+WALL_X = 0.4, 0.5
+ROOF_BASE = 1.0
+
+# probe points in the template frame, just beyond the face they test
+WALL_END_NEG = Vector((0.45, -0.5, 0.5))
+WALL_END_POS = Vector((0.45, 0.5, 0.5))
+WALL_TOP_PROBE = Vector((0.45, 0, 1.05))
+ROOF_JOINT_NEG_PROBE = Vector((-0.25, -0.75, ROOF_BASE + 0.2))
+ROOF_JOINT_POS_PROBE = Vector((-0.25, 0.75, ROOF_BASE + 0.2))
+ROOF_RIDGE_PROBE = Vector((-0.6, 0, ROOF_BASE + 0.2))
 
 # wall ends closer than this meet, in line or at a corner
 WALL_END_DISTANCE = 0.15
@@ -50,12 +54,13 @@ def roof_top_z(x):
 
 def inside_wall(piece, point):
     p = piece.matrix_world.inverted() @ point
-    return -0.5 <= p.x <= -0.4 and abs(p.y) <= 0.5 and 0 <= p.z <= 1
+    return WALL_X[0] <= p.x <= WALL_X[1] and abs(p.y) <= 0.5 and 0 <= p.z <= 1
 
 
 def inside_roof(piece, point):
     p = piece.matrix_world.inverted() @ point
-    return -0.5 <= p.x <= 0.5 and abs(p.y) <= 0.5 and 0 <= p.z <= roof_top_z(p.x)
+    z = p.z - ROOF_BASE
+    return -0.5 <= p.x <= 0.5 and abs(p.y) <= 0.5 and 0 <= z <= roof_top_z(p.x)
 
 
 def kind(obj):
