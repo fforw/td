@@ -1,7 +1,8 @@
-import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
+import { type Campaign, type Explorer, type Hero, overworld, type PatchKind, patchKey } from "./campaign"
+import { isAway, jobDays, jobTargets, startJob } from "./heroes"
 import CastleScene from "./castleScene"
 import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
-import Portraits, { explorerSitter } from "./portraits"
+import Portraits, { meepleSitter } from "./portraits"
 import { advanceDay, frontier, missionDays, startMission } from "./missions"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { price } from "./tavern"
@@ -193,8 +194,19 @@ export default class GameView
         const { campaign } = this
         const { patches } = overworld(campaign)
         const due = campaign.missions.filter(m => m.endDay <= campaign.day + 1)
+        const done = campaign.jobs.filter(j => j.endDay <= campaign.day + 1)
 
         advanceDay(campaign)
+
+        for (const { heroId, target } of done)
+        {
+            const hero = campaign.heroes.find(h => h.id === heroId)!
+            const { kind } = patches[target]
+            this.reports.unshift(
+                "Day " + campaign.day + ": " + hero.name + " is back from " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
+                " at " + target
+            )
+        }
 
         for (const { explorer, target } of due)
         {
@@ -206,6 +218,16 @@ export default class GameView
         }
         this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
         this.changed()
+    }
+
+    private sendHero(hero: Hero): void
+    {
+        if (this.selected)
+        {
+            startJob(this.campaign, hero.id, this.selected)
+            this.selected = null
+            this.changed()
+        }
     }
 
     private hire(explorer: Explorer): void
@@ -314,10 +336,7 @@ export default class GameView
                 this.tile(q, r),
                 this.label(q, r, "?")
             )
-            cell.addEventListener("click", () => {
-                this.selected = key === this.selected ? null : key
-                this.render()
-            })
+            cell.addEventListener("click", () => this.select(key))
             map.append(cell)
         }
 
@@ -334,22 +353,43 @@ export default class GameView
                 ))
             }
         }
+        const jobs = jobTargets(campaign)
         for (const { q, r, kind } of known)
         {
+            const key = patchKey(q, r)
             const image = images.get(q, r)
-            map.append(svg("g", { class: "patch discovered " + kind.toLowerCase() },
+            const cell = svg("g", { class: "patch discovered " + kind.toLowerCase() + (jobs.includes(key) ? " job" : "") },
                 svg("title", {}, KIND_NAMES[kind]),
                 image
                     ? svg("image", { href: image.href, x: image.x, y: image.y, width: image.width, height: image.height })
                     : this.tile(q, r)
-            ))
+            )
+            if (jobs.includes(key))
+            {
+                cell.addEventListener("click", () => this.select(key))
+            }
+            map.append(cell)
         }
-        // icons last, so no neighboring patch image covers them
+        // icons and the selection last, so no neighboring patch image covers them
         for (const { q, r, kind } of known)
         {
             map.append(svg("g", { class: "patch icon" }, this.label(q, r, KIND_ICONS[kind])))
         }
+        const picked = known.find(({ q, r }) => patchKey(q, r) === this.selected)
+        if (picked)
+        {
+            map.append(svg("g", { class: "patch picked" }, this.tile(picked.q, picked.r)))
+        }
         return map
+    }
+
+    /**
+     * Picks a patch as the target for an explorer or a hero, or drops it when picked again
+     */
+    private select(key: string): void
+    {
+        this.selected = key === this.selected ? null : key
+        this.render()
     }
 
     /**
@@ -370,10 +410,13 @@ export default class GameView
     private renderTavern(): HTMLElement
     {
         const { campaign, selected } = this
+        // an unknown patch is for explorers, a known one for heroes
+        const explore = selected !== null && !overworld(campaign).patches[selected]
+        const job = selected !== null && jobTargets(campaign).includes(selected)
         return el("section", { className: "tavern" },
             el("h3", {}, "🍺 Tavern"),
             el("p", { className: "hint" },
-                selected ? "Hire someone to look at " + selected + "." : "Pick a ? on the map to send an explorer."
+                explore ? "Hire someone to look at " + selected + "." : "Pick a ? on the map to send an explorer."
             ),
             campaign.tavern.length === 0 && el("p", {}, "Nobody is around today."),
             ...campaign.tavern.map(explorer => el("div", { className: "explorer" },
@@ -387,33 +430,59 @@ export default class GameView
                 ),
                 el("button", {
                     type: "button",
-                    disabled: !selected,
+                    disabled: !explore,
                     onclick: () => this.hire(explorer)
-                }, "🪙 " + price(explorer) + (selected ? " · " + missionDays(explorer, selected) + "d" : ""))
-            ))
+                }, "🪙 " + price(explorer) + (explore ? " · " + missionDays(explorer, selected) + "d" : ""))
+            )),
+            el("h3", {}, "🛡️ Local heroes"),
+            el("p", { className: "hint" },
+                job ? "Give someone a job at " + selected + "." : "Pick a known patch on the map for a job."
+            ),
+            ...campaign.heroes.map(hero => {
+                const away = campaign.jobs.find(j => j.heroId === hero.id)
+                const { stats, classes } = hero.character
+                return el("div", { className: "explorer" },
+                    this.renderPortrait(hero),
+                    el("span", { className: "name" }, hero.name + " · " + classes.join(", ")),
+                    el("span", { className: "stats" },
+                        "hp " + stats.hp + " · mp " + stats.mp + " · str " + stats.str + " · dex " + stats.dex +
+                        (hero.experience ? " · " + hero.experience + (hero.experience === 1 ? " job" : " jobs") : "") +
+                        (away ? " · away, back in " + (away.endDay - campaign.day) + "d" : "")
+                    ),
+                    el("button", {
+                        type: "button",
+                        disabled: !job || isAway(campaign, hero),
+                        onclick: () => this.sendHero(hero)
+                    }, job ? "Send · " + jobDays(selected) + "d" : "Send")
+                )
+            })
         )
     }
 
-    private renderPortrait(explorer: Explorer): HTMLElement
+    private renderPortrait({ id, name }: Explorer | Hero): HTMLElement
     {
         const { seed } = this.campaign
-        const src = this.portraits.get(seed + "/" + explorer.id, () => explorerSitter(seed, explorer.id))
+        const src = this.portraits.get(seed + "/" + id, () => meepleSitter(seed, id))
         return src
-            ? el("img", { className: "portrait", src, alt: explorer.name })
+            ? el("img", { className: "portrait", src, alt: name })
             : el("span", { className: "portrait" })
     }
 
     private renderMissions(): HTMLElement | null
     {
         const { campaign } = this
-        if (campaign.missions.length === 0)
+        if (campaign.missions.length === 0 && campaign.jobs.length === 0)
         {
             return null
         }
         return el("section", { className: "missions" },
             el("h3", {}, "Missions"),
             ...campaign.missions.map(({ explorer, target, endDay }) => el("div", {},
-                explorer.name + " → " + target + ", back in " + (endDay - campaign.day) + "d"
+                "🧭 " + explorer.name + " → " + target + ", back in " + (endDay - campaign.day) + "d"
+            )),
+            ...campaign.jobs.map(({ heroId, target, endDay }) => el("div", {},
+                "🛡️ " + campaign.heroes.find(h => h.id === heroId)!.name + " → " + target +
+                ", back in " + (endDay - campaign.day) + "d"
             ))
         )
     }

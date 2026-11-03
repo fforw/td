@@ -310,9 +310,28 @@
     fill: #e8e0d4;
 }
 
-.patch.frontier
+.patch.frontier,
+.patch.job
 {
     cursor: pointer;
+}
+
+.patch.picked rect
+{
+    fill: none;
+    stroke: #c0244e;
+    stroke-width: 16;
+    pointer-events: none;
+}
+
+#game .tavern h3 + .hint
+{
+    margin-top: 0;
+}
+
+#game .tavern .explorer + h3
+{
+    margin-top: 1.5rem;
 }
 
 .patch.frontier rect

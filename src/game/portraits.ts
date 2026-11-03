@@ -65,10 +65,10 @@ export interface Sitter
 
 
 /**
- * Returns the look and the head turn of an explorer. Both follow from the seed and the explorer's id, so they don't
+ * Returns the look and the head turn of an explorer or hero. Both follow from the seed and the id, so they don't
  * need to be saved.
  */
-export function explorerSitter(seed: number, id: number): Sitter
+export function meepleSitter(seed: number, id: number): Sitter
 {
     return withSeed(patchSeed(seed ^ LOOK_SALT, id, 0), () => ({
         look: randomLook(),
