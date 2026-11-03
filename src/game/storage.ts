@@ -1,0 +1,132 @@
+import { type Campaign, GENERATOR_VERSION, SAVE_VERSION } from "./campaign"
+
+/**
+ * Where campaigns are kept. Only localStorage for now; a server can implement the same interface later.
+ */
+export interface SaveStore
+{
+    load(): Campaign | null
+    save(campaign: Campaign): void
+    clear(): void
+}
+
+
+/**
+ * Parses a saved campaign and refuses saves of another format or generator version, which would load with shifted
+ * patch contents.
+ */
+export function parseSave(json: string): Campaign
+{
+    const campaign = JSON.parse(json) as Campaign
+    if (campaign.saveVersion !== SAVE_VERSION)
+    {
+        throw new Error("Save format " + campaign.saveVersion + " is not supported, expected " + SAVE_VERSION)
+    }
+    if (campaign.generatorVersion !== GENERATOR_VERSION)
+    {
+        throw new Error("Save was made with generator " + campaign.generatorVersion + ", this is " + GENERATOR_VERSION)
+    }
+    return campaign
+}
+
+
+export function serializeSave(campaign: Campaign): string
+{
+    return JSON.stringify(campaign, null, 4)
+}
+
+
+const STORAGE_KEY = "td.campaign"
+
+export class LocalSaveStore implements SaveStore
+{
+    load(): Campaign | null
+    {
+        let json: string | null = null
+        try
+        {
+            json = localStorage.getItem(STORAGE_KEY)
+        }
+        catch (e)
+        {
+            console.warn("Can't read the save", e)
+        }
+        if (json === null)
+        {
+            return null
+        }
+        try
+        {
+            return parseSave(json)
+        }
+        catch (e)
+        {
+            console.warn("Ignoring the save", e)
+            return null
+        }
+    }
+
+    save(campaign: Campaign): void
+    {
+        try
+        {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(campaign))
+        }
+        catch (e)
+        {
+            console.warn("Can't write the save", e)
+        }
+    }
+
+    clear(): void
+    {
+        try
+        {
+            localStorage.removeItem(STORAGE_KEY)
+        }
+        catch (e)
+        {
+            console.warn("Can't remove the save", e)
+        }
+    }
+}
+
+
+/**
+ * Offers the campaign as a JSON download, named after the castle and day, to keep it as a fixture under
+ * test/fixtures/saves/.
+ */
+export function exportSave(campaign: Campaign): void
+{
+    const blob = new Blob([serializeSave(campaign)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "save-" + campaign.castleName.toLowerCase().replace(/\W+/g, "-") + "-day" + campaign.day + ".json"
+    a.click()
+    // the download may not have read the url yet when click() returns
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+
+/**
+ * Lets the user pick a saved JSON file and resolves to the campaign in it.
+ */
+export function importSave(): Promise<Campaign>
+{
+    return new Promise((resolve, reject) => {
+        const input = document.createElement("input")
+        input.type = "file"
+        input.accept = "application/json,.json"
+        input.addEventListener("change", () => {
+            const file = input.files?.[0]
+            if (!file)
+            {
+                reject(new Error("No file picked"))
+                return
+            }
+            file.text().then(json => resolve(parseSave(json)), reject)
+        })
+        input.click()
+    })
+}
