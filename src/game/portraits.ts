@@ -10,7 +10,8 @@ import {
 } from "three"
 import { patchSeed, rng, withSeed } from "../math/random"
 import { randomLook } from "../meeple/look"
-import MeepleCrowd, { headHeight, MEEPLE_MODELS, type MeepleLook } from "../meeple/Meeple3D"
+import MeepleCrowd, { headHeight, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook } from "../meeple/Meeple3D"
+import { HEAD_RADIUS } from "../meeple/meepleParts"
 import { loadModels } from "../render/scene3d"
 
 /*
@@ -30,16 +31,17 @@ const FACINGS = [-Math.PI / 4, 0, Math.PI / 4]
 const FOV = 24
 
 /**
- * Distance of the camera from the head and how far below the head center it looks, in world units. Frames the head
- * with the hair and the upper part of the body.
+ * Distance of the camera from the head and how far above the head center it looks, in world units. Frames the head
+ * a bit below the middle, with room for the hair, and the upper part of the body.
  */
 const DISTANCE = 0.72
-const LOOK_BELOW = 0.035
+const LOOK_ABOVE = 0.01
 
 /**
- * Colors of the background gradient, whose position behind the head shows how tall the meeple is
+ * Colors of the background gradient at the feet and at the top of the head of the tallest meeple. The portraits only
+ * show the upper part of it, which sits lower behind smaller meeples.
  */
-const GRADIENT_LOW = "#8c8c8c"
+const GRADIENT_LOW = "#303030"
 const GRADIENT_HIGH = "#e4e4e4"
 
 /**
@@ -79,9 +81,9 @@ function screenY(camera: PerspectiveCamera, y: number): number
 
 
 /**
- * Puts the rendered meeple onto the height gradient, which is as tall as the portrait. The camera follows the head, so
- * the head stays in place and the gradient moves instead: a meeple of height 1 has its head at the light top end of
- * the gradient, smaller ones correspondingly lower, down to the dark bottom end for height 0.
+ * Puts the rendered meeple onto the height gradient. The gradient stands behind the meeple in the scene, from the feet
+ * to the top of the head of a meeple of height 1, so the shot taken at the real head height shows how tall the meeple
+ * is: the head of the tallest meeple reaches the light end, smaller ones stay lower and darker.
  */
 function withBackground(rendered: HTMLCanvasElement, camera: PerspectiveCamera, look: MeepleLook): string
 {
@@ -89,8 +91,8 @@ function withBackground(rendered: HTMLCanvasElement, camera: PerspectiveCamera, 
     canvas.width = canvas.height = SIZE
     const ctx = canvas.getContext("2d")!
 
-    const top = screenY(camera, headHeight(look)) - (1 - look.height) * SIZE
-    const gradient = ctx.createLinearGradient(0, top, 0, top + SIZE)
+    const top = headHeight({ ...look, height: 1 }) + HEAD_RADIUS * MEEPLE_SCALE
+    const gradient = ctx.createLinearGradient(0, screenY(camera, top), 0, screenY(camera, 0))
     gradient.addColorStop(0, GRADIENT_HIGH)
     gradient.addColorStop(1, GRADIENT_LOW)
     ctx.fillStyle = gradient
@@ -167,7 +169,7 @@ export default class Portraits
         const head = headHeight(look)
         const camera = new PerspectiveCamera(FOV, 1, 0.01, 10)
         camera.position.set(0, head, DISTANCE)
-        camera.lookAt(new Vector3(0, head - LOOK_BELOW, 0))
+        camera.lookAt(new Vector3(0, head + LOOK_ABOVE, 0))
 
         // no items, and the head neither tilted nor leaning, since the camera is at head height
         const crowd = new MeepleCrowd(1)
