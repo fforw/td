@@ -1,6 +1,7 @@
 import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
 import CastleScene from "./castleScene"
 import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
+import Portraits, { explorerSitter } from "./portraits"
 import { advanceDay, frontier, missionDays, startMission } from "./missions"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { price } from "./tavern"
@@ -95,6 +96,13 @@ export default class GameView
     private castle: CastleScene | null
 
     private images: PatchImages
+
+    private readonly portraits = new Portraits(() => {
+        if (!this.popup.hidden)
+        {
+            this.render()
+        }
+    })
 
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
@@ -369,6 +377,7 @@ export default class GameView
             ),
             campaign.tavern.length === 0 && el("p", {}, "Nobody is around today."),
             ...campaign.tavern.map(explorer => el("div", { className: "explorer" },
+                this.renderPortrait(explorer),
                 el("span", { className: "name" }, explorer.name),
                 el("span", { className: "stats" },
                     "speed " + explorer.speed.toFixed(2) + " · wisdom " + explorer.wisdom +
@@ -383,6 +392,15 @@ export default class GameView
                 }, "🪙 " + price(explorer) + (selected ? " · " + missionDays(explorer, selected) + "d" : ""))
             ))
         )
+    }
+
+    private renderPortrait(explorer: Explorer): HTMLElement
+    {
+        const { seed } = this.campaign
+        const src = this.portraits.get(seed + "/" + explorer.id, () => explorerSitter(seed, explorer.id))
+        return src
+            ? el("img", { className: "portrait", src, alt: explorer.name })
+            : el("span", { className: "portrait" })
     }
 
     private renderMissions(): HTMLElement | null
