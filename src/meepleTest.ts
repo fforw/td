@@ -18,7 +18,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
 import { randomLook } from "./meeple/look"
-import { canEquip, canHaveClass, type Character, CLASSES, type ClassName, ITEM_TYPES, type ItemType, type Stats } from "./meeple/character"
+import { canEquip, type Character, CLASSES, ITEM_TYPES, type ItemType, randomCharacter } from "./meeple/character"
 import { type ItemName, ITEMS, loadItems } from "./items/itemSprite"
 import { loadModels } from "./render/scene3d"
 import { randomSeed, resetRandom, rng } from "./math/random"
@@ -37,34 +37,6 @@ const SPACING = MEEPLE_SCALE * 1.2
 function pick<T>(array: T[]): T
 {
     return array[rng.nextInt(0, array.length - 1)]
-}
-
-
-function randomStats(): Stats
-{
-    return {
-        hp: rng.nextInt(5, 20),
-        // one in ten has the magic for a wizard
-        mp: rng.next() < 0.1 ? rng.nextInt(CLASSES.wizard.min.mp, 12) : rng.nextInt(0, CLASSES.wizard.min.mp - 1),
-        str: rng.nextInt(1, 10),
-        dex: rng.nextInt(1, 10)
-    }
-}
-
-
-const CLASS_NAMES = Object.keys(CLASSES) as ClassName[]
-
-function randomCharacter(): Character
-{
-    const stats = randomStats()
-    // one or sometimes two of the classes the stats allow, in random order. Anyone can be a peasant, and anyone who
-    // can be a wizard is one first.
-    const classes = CLASS_NAMES
-        .filter(name => canHaveClass(stats, name))
-        .map(name => ({ name, order: name === "wizard" ? -1 : rng.next() }))
-        .sort((a, b) => a.order - b.order)
-        .map(c => c.name)
-    return { stats, classes: classes.slice(0, rng.next() < 0.2 ? 2 : 1) }
 }
 
 

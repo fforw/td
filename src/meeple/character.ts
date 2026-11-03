@@ -1,4 +1,5 @@
 import type { ItemName } from "../items/itemSprite"
+import { rng } from "../math/random"
 
 // stats, classes and the rules for what a character can equip. Plain data without three.js, like the item animations.
 
@@ -145,4 +146,38 @@ export function canEquip(character: Character, right?: ItemName, left?: ItemName
         }
     }
     return null
+}
+
+
+/**
+ * Returns random base stats from the shared random sequence
+ */
+export function randomStats(): Stats
+{
+    return {
+        hp: rng.nextInt(5, 20),
+        // one in ten has the magic for a wizard
+        mp: rng.next() < 0.1 ? rng.nextInt(CLASSES.wizard.min.mp, 12) : rng.nextInt(0, CLASSES.wizard.min.mp - 1),
+        str: rng.nextInt(1, 10),
+        dex: rng.nextInt(1, 10)
+    }
+}
+
+
+const CLASS_NAMES = Object.keys(CLASSES) as ClassName[]
+
+/**
+ * Returns a random character from the shared random sequence
+ */
+export function randomCharacter(): Character
+{
+    const stats = randomStats()
+    // one or sometimes two of the classes the stats allow, in random order. Anyone can be a peasant, and anyone who
+    // can be a wizard is one first.
+    const classes = CLASS_NAMES
+        .filter(name => canHaveClass(stats, name))
+        .map(name => ({ name, order: name === "wizard" ? -1 : rng.next() }))
+        .sort((a, b) => a.order - b.order)
+        .map(c => c.name)
+    return { stats, classes: classes.slice(0, rng.next() < 0.2 ? 2 : 1) }
 }
