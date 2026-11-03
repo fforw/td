@@ -165,13 +165,13 @@ export default class CastleScene
             this.compass.append(letter)
             return letter
         })
-        // north half filled, south half as an outline, in a 100 x 100 box around the compass center
+        // north half filled black, south half as an outline, in a 100 x 100 box around the compass center
         this.needle = document.createElementNS("http://www.w3.org/2000/svg", "svg")
         this.needle.setAttribute("viewBox", "0 0 100 100")
         this.needle.classList.add("needle")
         this.needle.innerHTML =
-            '<polygon class="north" points="50,26 62,50 38,50"/>' +
-            '<polygon class="south" points="50,74 62,50 38,50"/>'
+            '<polygon class="north" points="50,26 60,50 40,50"/>' +
+            '<polygon class="south" points="50,74 60,50 40,50"/>'
         this.compass.prepend(this.needle)
 
         const renderer = new WebGLRenderer({ canvas, antialias: true })
