@@ -1,4 +1,5 @@
-# td
+# Treasure & Dread
 
-Castle and road generation on a relaxed hexagon/quad mesh, built on
-simple-starter (TypeScript/vite).
+Game WIP.
+
+
