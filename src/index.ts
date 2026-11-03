@@ -1,19 +1,54 @@
 import "./style.css"
 import "./game/title.css"
-import { randomSeed, resetRandom } from "./math/random"
-import { createSubtitle } from "./game/subtitle"
+import "./game/game.css"
+import { randomSeed } from "./math/random"
+import { type Campaign, createCampaign } from "./game/campaign"
+import GameView from "./game/gameView"
+import { LocalSaveStore } from "./game/storage"
+
+const store = new LocalSaveStore()
+
+const title = document.getElementById("title")!
+const game = document.getElementById("game")!
+const subtitle = title.querySelector(".subtitle")!
+const continueButton = title.querySelector<HTMLButtonElement>(".continue")!
+
+/**
+ * Campaign shown on the title screen, created from its seed but not saved before play
+ */
+let preview: Campaign
+
+function showPreview(seed: number): void
+{
+    preview = createCampaign(seed)
+    subtitle.textContent = preview.subtitle
+    document.title = "Treasure & Dread: " + preview.subtitle
+    history.replaceState(null, "", "?seed=" + seed)
+}
+
+function play(campaign: Campaign): void
+{
+    store.save(campaign)
+    title.hidden = true
+    game.hidden = false
+    new GameView(game, campaign, store)
+}
 
 const seedParam = new URLSearchParams(location.search).get("seed")
-const seed = randomSeed(seedParam ? +seedParam : null)
-resetRandom(seed)
+showPreview(randomSeed(seedParam ? +seedParam : null))
 
-const subtitle = createSubtitle()
+const saved = store.load()
+if (saved)
+{
+    continueButton.hidden = false
+    continueButton.textContent = "Continue: " + saved.subtitle
+    continueButton.addEventListener("click", () => play(saved))
+}
+title.querySelector(".play")!.addEventListener("click", () => play(preview))
+title.querySelector(".reroll")!.addEventListener("click", () => showPreview(randomSeed()))
 
-document.title = "Treasure & Dread: " + subtitle.text
-document.querySelector("#title .subtitle")!.textContent = subtitle.text
-
-const music = document.querySelector<HTMLAudioElement>("#title audio")!
-const soundButton = document.querySelector<HTMLButtonElement>("#title .sound")!
+const music = document.querySelector<HTMLAudioElement>("audio")!
+const soundButton = document.getElementById("sound")!
 
 music.addEventListener("play", () => soundButton.textContent = "🔊")
 music.addEventListener("pause", () => soundButton.textContent = "🔇")

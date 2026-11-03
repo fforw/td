@@ -11,9 +11,15 @@
         <img src="media/treasure-and-dread-small.png" alt="Treasure &amp; Dread">
         <h2 class="subtitle"></h2>
     </div>
-    <button class="sound" type="button" title="Music on/off">🔇</button>
-    <audio src="media/kmacleod-action-strike-162016.mp3" loop preload="auto"></audio>
+    <div class="menu">
+        <button type="button" class="continue" hidden>Continue</button>
+        <button type="button" class="play">New game</button>
+        <button type="button" class="reroll" title="Another castle">Reroll</button>
+    </div>
 </div>
+<div id="game" hidden></div>
+<button id="sound" type="button" title="Music on/off">🔇</button>
+<audio src="media/kmacleod-action-strike-162016.mp3" loop preload="auto"></audio>
 <script type="module" src="/src/index.ts"></script>
 </body>
 </html>

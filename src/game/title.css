@@ -3,8 +3,15 @@
     position: absolute;
     inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2vh;
+}
+
+#title[hidden]
+{
+    display: none;
 }
 
 /* keeps the logo's aspect ratio at 80% of the screen height, or narrower on portrait screens */
@@ -41,7 +48,7 @@
     color: #2a1d14;
 }
 
-#title .sound
+#sound
 {
     position: absolute;
     top: 0.5rem;
@@ -52,4 +59,33 @@
     background: rgba(0, 0, 0, 0.4);
     font-size: 1.5rem;
     cursor: pointer;
+    z-index: 1;
+}
+
+#title .menu
+{
+    display: flex;
+    gap: 1rem;
+}
+
+#title .menu button
+{
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: #e8e0d4;
+    color: #2a1d14;
+    font: italic 1.25rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    cursor: pointer;
+}
+
+#title .menu button.play
+{
+    background: #c0244e;
+    color: #fff;
+}
+
+#title .menu button[hidden]
+{
+    display: none;
 }
