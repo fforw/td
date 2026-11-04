@@ -30,6 +30,7 @@ export const GROUND_PRIORITY: FaceType[] = [
     FaceType.DIRT,
     FaceType.PLOT,
     FaceType.HOUSE,
+    FaceType.TAVERN,
     FaceType.WATER,
     FaceType.MARKET,
     FaceType.WALL,

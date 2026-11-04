@@ -639,6 +639,13 @@ export default class Castle
 
         buildMarket(center)
 
+        // the first house that is left, as the roads and the market above build over some of them
+        const tavern = best.find(pc => pc[0].type === FaceType.HOUSE)
+        if (tavern)
+        {
+            tavern[0].type = FaceType.TAVERN
+        }
+
         for (let i = 0; i < castle.length; i++)
         {
             const ring = castle[i]

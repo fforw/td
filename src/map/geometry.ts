@@ -128,6 +128,7 @@ export class FaceType
     static MARKET = new FaceType({ color: "#555"})
     static PLOT = new FaceType({ color: "#552755", })
     static HOUSE = new FaceType({ color: "#ab2c79", occupied: true })
+    static TAVERN = new FaceType({ color: "#2450ff", occupied: true })
     static SNOW = new FaceType({ color: "#b8c4cc", })
     static PRAIRIE = new FaceType({ color: "#7a6f22", })
     static SWAMP = new FaceType({ color: "#2b3518", })
