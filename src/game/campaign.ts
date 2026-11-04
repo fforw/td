@@ -30,14 +30,33 @@ export const OVERWORLD = "overworld"
  */
 export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE" | "NONE"
 
+/**
+ * All an explorer can tell about a patch they only passed through
+ */
+export type Impression = "safe" | "dangerous"
+
 export interface PatchNode
 {
     q: number
     r: number
+    /** only known to the player once the patch is discovered */
     kind: PatchKind
-    state: "targeted" | "discovered"
-    /** key of the patch it was discovered from, null for the castle */
+    /** a patch that was only passed through still counts as unknown, it never affects the story */
+    state: "targeted" | "discovered" | "passed"
+    /** key of the patch it was discovered from, null for the castle and patches not discovered yet */
     parent: string | null
+    /** noted by an explorer passing through, stays when the patch gets targeted */
+    impression?: Impression
+}
+
+/**
+ * Unknown patch on the route of a mission
+ */
+export interface PassedPatch
+{
+    q: number
+    r: number
+    kind: PatchKind
 }
 
 export interface LevelRecord
@@ -70,6 +89,8 @@ export interface Mission
     endDay: number
     /** no way to all points of interest, the explorer comes back with nothing */
     failed?: boolean
+    /** unknown patches on the way, noted when the explorer reports back */
+    passed?: PassedPatch[]
 }
 
 /**

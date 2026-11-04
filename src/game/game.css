@@ -316,6 +316,11 @@
     cursor: pointer;
 }
 
+.patch.passed rect
+{
+    stroke-dasharray: 24 16;
+}
+
 .patch.picked rect
 {
     fill: none;

@@ -1,4 +1,4 @@
-import { type Campaign, type Explorer, type Hero, overworld, type PatchKind, patchKey } from "./campaign"
+import { type Campaign, type Explorer, type Hero, type Impression, type Mission, overworld, type PatchKind, patchKey } from "./campaign"
 import { isAway, jobDays, jobTargets, startJob } from "./heroes"
 import CastleScene from "./castleScene"
 import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
@@ -6,6 +6,7 @@ import Portraits, { meepleSitter } from "./portraits"
 import { advanceDay, frontier, startMission } from "./missions"
 import SimWorld from "./SimWorld"
 import { exportSave, importSave, type SaveStore } from "./storage"
+import { impressionOf } from "./patchKinds"
 import { price } from "./tavern"
 
 /**
@@ -27,6 +28,16 @@ const KIND_NAMES: Record<PatchKind, string> = {
     TREASURE: "Treasure",
     TEMPLE: "Temple",
     NONE: "Wilderness"
+}
+
+const IMPRESSION_ICONS: Record<Impression, string> = {
+    safe: "🌿",
+    dangerous: "⚠️"
+}
+
+const IMPRESSION_NAMES: Record<Impression, string> = {
+    safe: "Looked safe",
+    dangerous: "Looked dangerous"
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg"
@@ -83,6 +94,21 @@ function svg(tag: string, attrs: Record<string, string | number>, ...children: C
         }
     }
     return elem
+}
+
+
+/**
+ * Returns what an explorer has to tell about the unknown patches on the way, for the end of a report line
+ */
+function passedNote({ passed }: Mission): string
+{
+    if (!passed)
+    {
+        return ""
+    }
+    const dangerous = passed.filter(({ kind }) => impressionOf(kind) === "dangerous").length
+    return ", passing " + passed.length + " unknown " + (passed.length === 1 ? "patch" : "patches") +
+        (dangerous ? " (" + dangerous + " looked dangerous)" : "")
 }
 
 
@@ -214,17 +240,18 @@ export default class GameView
             )
         }
 
-        for (const { explorer, target, failed } of due)
+        for (const mission of due)
         {
+            const { explorer, target, failed } = mission
             if (failed)
             {
-                this.reports.unshift("Day " + campaign.day + ": " + explorer.name + " found no way to " + target)
+                this.reports.unshift("Day " + campaign.day + ": " + explorer.name + " found no way to " + target + passedNote(mission))
                 continue
             }
             const { kind, q, r } = patches[target]
             this.reports.unshift(
                 "Day " + campaign.day + ": " + explorer.name + " found " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
-                " at " + q + "/" + r
+                " at " + q + "/" + r + passedNote(mission)
             )
         }
         this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
@@ -355,12 +382,27 @@ export default class GameView
         // unknown and targeted patches as plain tiles below the jagged edges of the known ones
         for (const { key, q, r } of targets)
         {
-            const cell = svg("g", { class: "patch frontier" + (key === this.selected ? " selected" : "") },
+            const { impression } = overworld(campaign).patches[key] ?? {}
+            const cell = svg("g", { class: "patch frontier" + (impression ? " passed" : "") + (key === this.selected ? " selected" : "") },
+                impression ? svg("title", {}, IMPRESSION_NAMES[impression]) : null,
                 this.tile(q, r),
-                this.label(q, r, "?")
+                this.label(q, r, impression ? IMPRESSION_ICONS[impression] : "?")
             )
             cell.addEventListener("click", () => this.select(key))
             map.append(cell)
+        }
+
+        // passed on the way, too far out to be a target yet
+        for (const { q, r, state, impression } of nodes)
+        {
+            if (state === "passed" && impression && !targets.some(t => t.q === q && t.r === r))
+            {
+                map.append(svg("g", { class: "patch passed" },
+                    svg("title", {}, IMPRESSION_NAMES[impression]),
+                    this.tile(q, r),
+                    this.label(q, r, IMPRESSION_ICONS[impression])
+                ))
+            }
         }
 
         const known = nodes.filter(node => node.state === "discovered")

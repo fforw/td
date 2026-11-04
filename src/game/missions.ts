@@ -1,6 +1,6 @@
 import type { Route } from "../map/route"
-import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
-import { NEIGHBORS } from "./patchKinds"
+import { type Campaign, type Explorer, overworld, type PassedPatch, type PatchKind, patchKey } from "./campaign"
+import { impressionOf, NEIGHBORS } from "./patchKinds"
 import { finishJobs } from "./heroes"
 import { price, returnToTavern, updateTavern } from "./tavern"
 
@@ -33,6 +33,10 @@ const FASTER_SPEEDS = [1.5, 2]
 export interface MissionRoute extends Route
 {
     kind: PatchKind
+    /**
+     * Unknown patches the route crosses on the way
+     */
+    passed: PassedPatch[]
 }
 
 /**
@@ -49,7 +53,7 @@ export function frontier(campaign: Campaign): string[]
             for (const [dq, dr] of NEIGHBORS)
             {
                 const key = patchKey(node.q + dq, node.r + dr)
-                if (!patches[key])
+                if (!patches[key] || patches[key].state === "passed")
                 {
                     keys.add(key)
                 }
@@ -138,12 +142,15 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
     }
 
     const [q, r] = parseKey(target)
-    overworld(campaign).patches[target] = {
+    const { patches } = overworld(campaign)
+    const impression = patches[target]?.impression
+    patches[target] = {
         q,
         r,
         kind: route.kind,
         state: "targeted",
-        parent: parentOf(campaign, q, r)
+        parent: parentOf(campaign, q, r),
+        ...(impression ? { impression } : {})
     }
 
     campaign.gold -= price(explorer)
@@ -153,7 +160,8 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
         target,
         startDay: campaign.day,
         endDay: campaign.day + missionDays(explorer, route.cost),
-        ...(route.reachable ? {} : { failed: true })
+        ...(route.reachable ? {} : { failed: true }),
+        ...(route.passed.length ? { passed: route.passed } : {})
     })
 }
 
@@ -176,14 +184,29 @@ export function advanceDay(campaign: Campaign): void
 
     for (const mission of due)
     {
-        if (mission.failed)
+        for (const { q, r, kind } of mission.passed ?? [])
         {
-            // still unknown, it can be tried again once more of the map is known
-            delete patches[mission.target]
+            const key = patchKey(q, r)
+            if (!patches[key])
+            {
+                patches[key] = { q, r, kind, state: "passed", parent: null, impression: impressionOf(kind) }
+            }
+        }
+
+        const node = patches[mission.target]
+        if (!mission.failed)
+        {
+            node.state = "discovered"
+        }
+        else if (node.impression)
+        {
+            // still unknown, it can be tried again
+            node.state = "passed"
+            node.parent = null
         }
         else
         {
-            patches[mission.target].state = "discovered"
+            delete patches[mission.target]
         }
         returnToTavern(campaign, mission.explorer)
     }

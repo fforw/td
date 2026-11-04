@@ -1,12 +1,12 @@
 import { assert, describe, it } from "vitest"
 
-import { createCampaign, overworld, START_GOLD, START_HEROES } from "../../src/game/campaign"
+import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
 import { isAway, jobDays, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
 
 
-const ROUTE: MissionRoute = { reachable: true, cost: 100, kind: "EMPTY" }
+const ROUTE: MissionRoute = { reachable: true, cost: 100, kind: "EMPTY", passed: [] }
 
 
 describe("Campaign", () => {
@@ -76,7 +76,7 @@ describe("Missions", () => {
         const explorer = campaign.tavern[0]
         const days = missionDays(explorer, 300)
 
-        startMission(campaign, explorer.id, "2/0", { reachable: false, cost: 300, kind: "DUNGEON" })
+        startMission(campaign, explorer.id, "2/0", { reachable: false, cost: 300, kind: "DUNGEON", passed: [] })
         assert(frontier(campaign).indexOf("2/0") < 0)
 
         for (let i = 0; i < days; i++)
@@ -88,6 +88,41 @@ describe("Missions", () => {
 
         const back = campaign.tavern.find(e => e.id === explorer.id)!
         assert(back.experience === 1)
+    })
+
+    it("only notes patches passed on the way, without discovering them", () => {
+
+        const campaign = createCampaign(7)
+        const explorer = campaign.tavern[0]
+        const { patches } = overworld(campaign)
+        const passed: PassedPatch[] = [{ q: 2, r: 0, kind: "DUNGEON" }, { q: 3, r: 0, kind: "TEMPLE" }]
+
+        startMission(campaign, explorer.id, "2/1", { ...ROUTE, passed })
+        assert(!("2/0" in patches))
+
+        advanceDay(campaign)
+        assert(patches["2/0"].state === "passed")
+        assert(patches["2/0"].impression === "dangerous")
+        assert(patches["3/0"].impression === "safe")
+        assert(patches["2/1"].state === "discovered")
+
+        // still a target, and only a real visit discovers it
+        assert(frontier(campaign).indexOf("2/0") >= 0)
+        assert(campaign.tavern.length > 0)
+        startMission(campaign, campaign.tavern[0].id, "2/0", { ...ROUTE, kind: "DUNGEON" })
+        assert(overworld(campaign).patches["2/0"].state === "targeted")
+    })
+
+    it("remembers the impression of a target that can't be reached", () => {
+
+        const campaign = createCampaign(7)
+        const { patches } = overworld(campaign)
+        patches["2/0"] = { q: 2, r: 0, kind: "DUNGEON", state: "passed", parent: null, impression: "dangerous" }
+
+        startMission(campaign, campaign.tavern[0].id, "2/0", { reachable: false, cost: 0, kind: "DUNGEON", passed: [] })
+        advanceDay(campaign)
+        assert(patches["2/0"].state === "passed")
+        assert(patches["2/0"].impression === "dangerous")
     })
 
     it("takes a coarse number of days, which good explorers bump down", () => {

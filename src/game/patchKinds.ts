@@ -1,5 +1,5 @@
 import { patchSeed, rng, weightedRandom, withSeed } from "../math/random"
-import type { PatchKind, PatchNode } from "./campaign"
+import type { Impression, PatchKind, PatchNode } from "./campaign"
 
 /**
  * Mixed into the seed of a patch for its kind roll, and into the campaign seed for the start
@@ -28,6 +28,16 @@ const KIND_CHOICES = weightedRandom<PatchKind>([
 export function randomKind(seed: number, q: number, r: number): PatchKind
 {
     return withSeed(patchSeed(seed ^ KIND_SALT, q, r), () => KIND_CHOICES(rng.next()))
+}
+
+
+/**
+ * What an explorer passing through makes of a patch. Only dungeons count as dangerous until there are threats to
+ * look out for.
+ */
+export function impressionOf(kind: PatchKind): Impression
+{
+    return kind === "DUNGEON" ? "dangerous" : "safe"
 }
 
 
