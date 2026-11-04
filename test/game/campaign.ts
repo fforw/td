@@ -2,8 +2,11 @@ import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, START_GOLD, START_HEROES } from "../../src/game/campaign"
 import { isAway, jobDays, startJob } from "../../src/game/heroes"
-import { advanceDay, frontier, missionDays, startMission } from "../../src/game/missions"
+import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
+
+
+const ROUTE: MissionRoute = { reachable: true, cost: 100, kind: "EMPTY" }
 
 
 describe("Campaign", () => {
@@ -42,10 +45,10 @@ describe("Missions", () => {
 
         const campaign = createCampaign(7)
         const explorer = campaign.tavern[0]
-        const days = missionDays(explorer, "2/0")
+        const days = missionDays(explorer, ROUTE.cost)
         const cost = price(explorer)
 
-        startMission(campaign, explorer.id, "2/0")
+        startMission(campaign, explorer.id, "2/0", ROUTE)
 
         const node = overworld(campaign).patches["2/0"]
         assert(node.state === "targeted")
@@ -67,6 +70,46 @@ describe("Missions", () => {
         assert(back.speed > 0)
     })
 
+    it("leaves the target unknown if there is no route", () => {
+
+        const campaign = createCampaign(7)
+        const explorer = campaign.tavern[0]
+        const days = missionDays(explorer, 300)
+
+        startMission(campaign, explorer.id, "2/0", { reachable: false, cost: 300, kind: "DUNGEON" })
+        assert(frontier(campaign).indexOf("2/0") < 0)
+
+        for (let i = 0; i < days; i++)
+        {
+            advanceDay(campaign)
+        }
+        assert(overworld(campaign).patches["2/0"] === undefined)
+        assert(frontier(campaign).indexOf("2/0") >= 0)
+
+        const back = campaign.tavern.find(e => e.id === explorer.id)!
+        assert(back.experience === 1)
+    })
+
+    it("takes a coarse number of days, which good explorers bump down", () => {
+
+        const explorer = (speed: number) => ({ id: 1, name: "", speed, wisdom: 1, experience: 0, leavesOn: 9 })
+
+        const slow = explorer(1)
+        const costs = [0, 50, 100, 150, 180, 181, 255, 256, 330, 331, 800]
+        for (const cost of costs)
+        {
+            assert(missionDays(slow, cost) % 2 === 1)
+        }
+        assert(missionDays(slow, 0) === 1)
+        assert(missionDays(slow, 180) === 1)
+        assert(missionDays(slow, 181) === 3)
+        assert(missionDays(slow, 256) === 5)
+
+        assert(missionDays(explorer(1.5), 256) === 3)
+        assert(missionDays(explorer(2), 256) === 1)
+        assert(missionDays(explorer(2.5), 0) === 1)
+    })
+
     it("only targets unknown patches next to discovered ones", () => {
 
         const campaign = createCampaign(3)
@@ -74,7 +117,7 @@ describe("Missions", () => {
         let error: Error | null = null
         try
         {
-            startMission(campaign, id, "3/0")
+            startMission(campaign, id, "3/0", ROUTE)
         }
         catch (e)
         {
@@ -87,7 +130,7 @@ describe("Missions", () => {
 
         const campaign = createCampaign(5)
         campaign.gold = 10
-        startMission(campaign, campaign.tavern[0].id, "2/2")
+        startMission(campaign, campaign.tavern[0].id, "2/2", ROUTE)
         assert(campaign.gold < 0)
     })
 })

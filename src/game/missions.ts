@@ -1,13 +1,39 @@
-import { type Campaign, type Explorer, overworld, patchKey } from "./campaign"
-import { NEIGHBORS, randomKind } from "./patchKinds"
+import type { Route } from "../map/route"
+import { type Campaign, type Explorer, overworld, type PatchKind, patchKey } from "./campaign"
+import { NEIGHBORS } from "./patchKinds"
 import { finishJobs } from "./heroes"
 import { price, returnToTavern, updateTavern } from "./tavern"
 
 /**
- * Days per patch of distance from the castle for an explorer of speed 1. Stands in for the path cost until missions
- * use A* (plan 1.1).
+ * Days per patch of distance from the castle for a job of a hero
  */
 const DAYS_PER_PATCH = 3
+
+/**
+ * Highest route cost of a mission that takes the fewest days, and the route cost per further step of days. Measured on
+ * generated worlds: the median route to the first targets costs about 120 and every ring further out adds about 85,
+ * routes around a lake can land a few steps later.
+ */
+const FIRST_STEP_COST = 180
+const STEP_COST = 75
+
+/**
+ * Days per step. Mission days are always 1, 3, 5, ...
+ */
+const DAYS_PER_STEP = 2
+
+/**
+ * Speeds at which an explorer gets a mission done one step earlier
+ */
+const FASTER_SPEEDS = [1.5, 2]
+
+/**
+ * Route of a mission and the kind of the target patch, which only shows after the patch got built
+ */
+export interface MissionRoute extends Route
+{
+    kind: PatchKind
+}
 
 /**
  * Returns the keys of all unknown patches next to a discovered one, the possible mission targets.
@@ -42,11 +68,14 @@ function parseKey(key: string): [number, number]
 
 
 /**
- * Days a mission of the given explorer to the given patch takes
+ * Days a mission of the given explorer takes for a route of the given cost, the way back included. A failed mission
+ * takes as long as what the explorer tried, so failing isn't free.
  */
-export function missionDays(explorer: Explorer, target: string): number
+export function missionDays(explorer: Pick<Explorer, "speed">, cost: number): number
 {
-    return travelDays(target, explorer.speed)
+    const steps = Math.max(0, Math.ceil((cost - FIRST_STEP_COST) / STEP_COST))
+    const faster = FASTER_SPEEDS.filter(speed => explorer.speed >= speed).length
+    return 1 + Math.max(0, steps - faster) * DAYS_PER_STEP
 }
 
 
@@ -89,9 +118,14 @@ function parentOf(campaign: Campaign, q: number, r: number): string
 
 /**
  * Hires an explorer from the tavern and sends them to an unknown patch next to a discovered one. The kind of the
- * target is rolled now, but only shown once the explorer reports back.
+ * target is known now, but only shown once the explorer reports back.
+ *
+ * @param campaign      campaign
+ * @param explorerId    id of the explorer
+ * @param target        key of the target patch
+ * @param route         route to the target
  */
-export function startMission(campaign: Campaign, explorerId: number, target: string): void
+export function startMission(campaign: Campaign, explorerId: number, target: string, route: MissionRoute): void
 {
     const explorer = campaign.tavern.find(e => e.id === explorerId)
     if (!explorer)
@@ -107,7 +141,7 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
     overworld(campaign).patches[target] = {
         q,
         r,
-        kind: randomKind(campaign.seed, q, r),
+        kind: route.kind,
         state: "targeted",
         parent: parentOf(campaign, q, r)
     }
@@ -118,7 +152,8 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
         explorer,
         target,
         startDay: campaign.day,
-        endDay: campaign.day + missionDays(explorer, target)
+        endDay: campaign.day + missionDays(explorer, route.cost),
+        ...(route.reachable ? {} : { failed: true })
     })
 }
 
@@ -141,7 +176,15 @@ export function advanceDay(campaign: Campaign): void
 
     for (const mission of due)
     {
-        patches[mission.target].state = "discovered"
+        if (mission.failed)
+        {
+            // still unknown, it can be tried again once more of the map is known
+            delete patches[mission.target]
+        }
+        else
+        {
+            patches[mission.target].state = "discovered"
+        }
         returnToTavern(campaign, mission.explorer)
     }
 }

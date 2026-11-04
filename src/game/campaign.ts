@@ -68,6 +68,8 @@ export interface Mission
     target: string
     startDay: number
     endDay: number
+    /** no way to all points of interest, the explorer comes back with nothing */
+    failed?: boolean
 }
 
 /**

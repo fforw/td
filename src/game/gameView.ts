@@ -3,7 +3,8 @@ import { isAway, jobDays, jobTargets, startJob } from "./heroes"
 import CastleScene from "./castleScene"
 import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
 import Portraits, { meepleSitter } from "./portraits"
-import { advanceDay, frontier, missionDays, startMission } from "./missions"
+import { advanceDay, frontier, startMission } from "./missions"
+import SimWorld from "./SimWorld"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { price } from "./tavern"
 
@@ -100,6 +101,8 @@ export default class GameView
 
     private images: PatchImages
 
+    private sim: SimWorld
+
     private readonly portraits = new Portraits(() => {
         if (!this.popup.hidden)
         {
@@ -123,6 +126,7 @@ export default class GameView
         this.store = store
         this.castle = this.createCastle()
         this.images = this.createImages()
+        this.sim = new SimWorld(campaign.seed)
 
         this.popup.addEventListener("click", ev => {
             // a click on the backdrop closes the popup
@@ -210,8 +214,13 @@ export default class GameView
             )
         }
 
-        for (const { explorer, target } of due)
+        for (const { explorer, target, failed } of due)
         {
+            if (failed)
+            {
+                this.reports.unshift("Day " + campaign.day + ": " + explorer.name + " found no way to " + target)
+                continue
+            }
             const { kind, q, r } = patches[target]
             this.reports.unshift(
                 "Day " + campaign.day + ": " + explorer.name + " found " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
@@ -234,11 +243,21 @@ export default class GameView
 
     private hire(explorer: Explorer): void
     {
-        if (this.selected)
+        const { campaign, selected } = this
+        if (selected)
         {
-            startMission(this.campaign, explorer.id, this.selected)
-            this.selected = null
-            this.changed()
+            this.sim.route(campaign, selected).then(
+                route => {
+                    // the route takes a moment, in which a click or the end of the day may have changed things
+                    if (campaign === this.campaign && campaign.tavern.includes(explorer) && frontier(campaign).includes(selected))
+                    {
+                        startMission(campaign, explorer.id, selected, route)
+                        this.selected = null
+                        this.changed()
+                    }
+                },
+                e => console.error("No route to " + selected, e)
+            )
         }
     }
 
@@ -297,6 +316,8 @@ export default class GameView
                                 this.castle = this.createCastle()
                                 this.images.dispose()
                                 this.images = this.createImages()
+                                this.sim.dispose()
+                                this.sim = new SimWorld(loaded.seed)
                             }
                             this.changed()
                         },
@@ -434,7 +455,7 @@ export default class GameView
                     type: "button",
                     disabled: !explore,
                     onclick: () => this.hire(explorer)
-                }, "🪙 " + price(explorer) + (explore ? " · " + missionDays(explorer, selected) + "d" : ""))
+                }, "🪙 " + price(explorer))
             )),
             el("h3", {}, "🛡️ Local heroes"),
             el("p", { className: "hint" },
