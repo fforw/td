@@ -18,7 +18,7 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { createCastle } from "../castle/castle3d"
+import { createCastle, tavernHeight } from "../castle/castle3d"
 import type { CastlePlan } from "../castle/castlePlan"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
@@ -59,29 +59,6 @@ const COMPASS_RADIUS = 36
  * Pointer movement in pixels up to which a press counts as a click, not as dragging the camera
  */
 const CLICK_DISTANCE = 4
-
-
-/**
- * Picks the tavern among the houses of the castle: the one closest to the market fountain. Every castle has one
- * (plan 3.6); later the castle planner places it as a fixture.
- *
- * @return index of the house in the plan, -1 for a castle without houses
- */
-export function tavernHouse(plan: CastlePlan): number
-{
-    const [fx, fz] = plan.fountain
-    let best = -1
-    let bestDistance = Infinity
-    plan.houses.forEach(({ x, z }, index) => {
-        const distance = Math.hypot(x - fx, z - fz)
-        if (distance < bestDistance)
-        {
-            best = index
-            bestDistance = distance
-        }
-    })
-    return best
-}
 
 
 function createSign(icon: string): Sprite
@@ -272,16 +249,14 @@ export default class CastleScene
     private createCastle(plan: CastlePlan): Object3D
     {
         const castle = createCastle(plan)
-        const index = tavernHouse(plan)
-        const house = castle.children.find(obj => obj.userData.house === index)
-        if (house)
+        const tavern = castle.children.find(obj => obj.userData.tavern)
+        if (tavern && plan.tavern)
         {
-            const { side } = plan.houses[index]
             const sign = createSign("🍺")
-            sign.position.set(house.position.x, side * 2 + SIGN_SIZE * 0.7, house.position.z)
+            sign.position.set(tavern.position.x, tavernHeight(plan.tavern) + SIGN_SIZE * 0.7, tavern.position.z)
             castle.add(sign)
             this.sign = sign
-            this.tavern = [house, sign]
+            this.tavern = [tavern, sign]
         }
 
         const [fx, fz] = plan.fountain
