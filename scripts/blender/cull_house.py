@@ -25,6 +25,9 @@ from mathutils import Vector
 
 DROP_SOFFIT = False
 
+# share of the faces the baked house keeps, 1 keeps them all; at 0.7 window bars go and cracks open along the posts
+DECIMATE_RATIO = 0.85
+
 # set to a directory to also export the baked house as <house>.glb
 EXPORT_DIR = None
 
@@ -149,6 +152,25 @@ def export_material():
     return material
 
 
+def decimate(mesh, ratio):
+    """
+    Replaces the mesh with its decimated version, which a temporary object in the always visible scene collection
+    evaluates. The modifier cannot be applied, as the baked object of a previous run still shares the mesh.
+    """
+    obj = bpy.data.objects.new("_decimate", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    modifier = obj.modifiers.new("Decimate", "DECIMATE")
+    modifier.decimate_type = "COLLAPSE"
+    modifier.ratio = ratio
+    evaluated = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+    bm = bmesh.new()
+    bm.from_mesh(evaluated)
+    bm.to_mesh(mesh)
+    bm.free()
+    bpy.data.meshes.remove(evaluated)
+    bpy.data.objects.remove(obj)
+
+
 def bake(house, closed):
     objects = [o for o in house.all_objects if o.type == "MESH"]
     walls = [o for o in objects if kind(o) == "wall"]
@@ -156,7 +178,7 @@ def bake(house, closed):
 
     bm = bmesh.new()
     materials = []
-    before = after = 0
+    before = 0
     for obj in objects:
         part = bmesh.new()
         part.from_mesh(obj.data)
@@ -182,7 +204,6 @@ def bake(house, closed):
         for face in part.faces:
             face[material_layer] = slots[face.material_index] if slots else 0
 
-        after += len(part.faces)
         mesh = bpy.data.meshes.new("part")
         part.to_mesh(mesh)
         part.free()
@@ -212,6 +233,9 @@ def bake(house, closed):
     for attribute in ("side", "sideColor"):
         if attribute in mesh.attributes:
             mesh.attributes.remove(mesh.attributes[attribute])
+    if DECIMATE_RATIO < 1:
+        decimate(mesh, DECIMATE_RATIO)
+    # after decimating, which would blend the colors across material borders
     write_colors(mesh)
 
     collection = bpy.data.collections.get(name)
@@ -224,8 +248,11 @@ def bake(house, closed):
         collection.objects.link(obj)
     obj.data = mesh
     obj.location = origin
+    # the setting replaces hand-added modifiers, which would decimate the house twice
+    for modifier in [m for m in obj.modifiers if m.type == "DECIMATE"]:
+        obj.modifiers.remove(modifier)
 
-    return obj, before, after
+    return obj, before, len(mesh.polygons)
 
 
 def export(obj):
