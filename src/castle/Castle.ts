@@ -578,37 +578,6 @@ export default class Castle
             }
         })
 
-        const plotCandidates : PlotCandidate[] = faces.filter( face => {
-            const ring = findInRings(castle, face)
-            if (ring >= 0 && all.has(face))
-            {
-                // inside the castle
-                if (ring < castle.length - 3)
-                {
-                    // we register every second ring as potential candidate
-                    if ((ring & 1) !== 0)
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false
-        }).map(c => [c,faceRatio(c)]);
-
-        // we sort starting with the smallest face ratio ..
-        plotCandidates.sort((a,b) => {
-            return a[1] - b[1]
-        })
-
-        // .. and take the best 50% of faces
-        const best= plotCandidates.slice(0, Math.floor(plotCandidates.length * 0.5))
-
-        // and turn 3/4 of those into houses, the others into plots
-        best.forEach(pc => {
-            let n = rng.next()
-            pc[0].type = n < 0.75 ? FaceType.HOUSE : FaceType.PLOT
-        })
-
         moat.forEach(f => f.type = FaceType.GRASS)
 
         const c = randomConnections()
@@ -639,7 +608,38 @@ export default class Castle
 
         buildMarket(center)
 
-        // the first house that is left, as the roads and the market above build over some of them
+        const plotCandidates : PlotCandidate[] = faces.filter( face => {
+            const ring = findInRings(castle, face)
+            if (ring >= 0 && all.has(face))
+            {
+                // inside the castle, on the faces the roads and the market left free
+                if (ring < castle.length - 3 && face.type !== FaceType.PAVED && face.type !== FaceType.MARKET)
+                {
+                    // we register every second ring as potential candidate
+                    if ((ring & 1) !== 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false
+        }).map(c => [c,faceRatio(c)]);
+
+        // we sort starting with the smallest face ratio ..
+        plotCandidates.sort((a,b) => {
+            return a[1] - b[1]
+        })
+
+        // .. and take the best 50% of faces
+        const best= plotCandidates.slice(0, Math.floor(plotCandidates.length * 0.5))
+
+        // and turn 3/4 of those into houses, the others into plots
+        best.forEach(pc => {
+            let n = rng.next()
+            pc[0].type = n < 0.75 ? FaceType.HOUSE : FaceType.PLOT
+        })
+
+        // the first house is the tavern
         const tavern = best.find(pc => pc[0].type === FaceType.HOUSE)
         if (tavern)
         {
