@@ -1,12 +1,16 @@
 import { assert, describe, it } from "vitest"
 
+import Castle from "../../src/castle/Castle"
+import { planCastle } from "../../src/castle/castlePlan"
 import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { FaceType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
+import { placePois } from "../../src/map/pointsOfInterest"
 import { faceCount, packPatch, type QuadPatch } from "../../src/map/QuadPatch"
-import { DEFAULT_COSTS, findRoute, globalFace, packPath, unpackPath } from "../../src/map/route"
+import { borderConnected, DEFAULT_COSTS, findRoute, globalFace, packPath, unpackPath } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
-import { patchSeed, resetRandom } from "../../src/math/random"
+import Terrain from "../../src/map/terrain"
+import { patchSeed, resetRandom, rng } from "../../src/math/random"
 
 
 const { GRASS, WATER, SWAMP, TREE, TREE2, FOREST_FLOOR, SAND, SNOW, WALL, HOUSE, ROCK, GATE } = FaceType
@@ -202,5 +206,75 @@ describe("Paths", () => {
         assert(!reachable)
         assert(paths.length === 1)
         assert(paths[0].length === cost + 1)
+    })
+})
+
+
+describe("Points of interest", () => {
+
+    it("falls back to NONE if a patch has no room for them", () => {
+
+        assert.deepEqual(placePois(plainPatch(0, 0, WATER), "DUNGEON"), { kind: "NONE", pois: [] })
+    })
+
+    it("places them where they connect to the border", () => {
+
+        const patch = plainPatch(0, 0, GRASS)
+        const { kind, pois } = placePois(patch, "TEMPLE")
+        assert(kind === "TEMPLE")
+        assert(pois.length === 1)
+        assert(borderConnected(patch).has(pois[0]))
+    })
+
+    it("avoids pockets cut off from the border", () => {
+
+        const patch = plainPatch(0, 0, WATER)
+        const pocket = innerFace(patch)
+        patch.faceType[pocket] = GRASS.index
+        assert(!borderConnected(patch).has(pocket))
+        assert(placePois(patch, "TREASURE").kind === "NONE")
+    })
+
+    it("has none on empty patches", () => {
+
+        assert.deepEqual(placePois(plainPatch(0, 0, GRASS), "EMPTY"), { kind: "EMPTY", pois: [] })
+    })
+
+    it("always lets the castle center reach the world around it", () => {
+
+        for (const seed of [1, 2, 3, 4, 5, 6, 7, 8])
+        {
+            const terrain = new Terrain(seed)
+            const world = new PatchWorld()
+            let start = -1
+            for (const [q, r] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]])
+            {
+                resetRandom(patchSeed(seed, q * PATCH_SIZE, r * PATCH_SIZE))
+                const patch = new HexagonPatch(q * PATCH_SIZE, r * PATCH_SIZE, FACE_SIZE)
+                const faces = patch.build()
+                const random = () => rng.next()
+                for (const face of faces)
+                {
+                    const [x, y] = face.centroid
+                    face.type = terrain.faceType(x, y, random)
+                }
+                let center = -1
+                if (q === 0 && r === 0)
+                {
+                    const castle = new Castle(faces)
+                    planCastle(faces, castle)
+                    center = faces.indexOf(castle.centerFace)
+                }
+                const slot = world.add(packPatch(patch, faces))
+                if (center >= 0)
+                {
+                    start = globalFace(slot, center)
+                }
+            }
+
+            const castleSlot = world.findSlot(0, 0)
+            const others = [0, 1, 2, 3, 4].filter(slot => slot !== castleSlot)
+            assert(others.some(slot => findRoute(world, start, slot, [], [castleSlot]).reachable), "seed " + seed)
+        }
     })
 })

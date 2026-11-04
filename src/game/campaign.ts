@@ -25,7 +25,10 @@ export const START_HEROES = 3
 
 export const OVERWORLD = "overworld"
 
-export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE"
+/**
+ * NONE is what a patch falls back to when its generator found no room for its points of interest
+ */
+export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE" | "NONE"
 
 export interface PatchNode
 {

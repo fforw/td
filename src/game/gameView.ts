@@ -15,7 +15,8 @@ const KIND_ICONS: Record<PatchKind, string> = {
     EMPTY: "🌲",
     DUNGEON: "💀",
     TREASURE: "💰",
-    TEMPLE: "⛩️"
+    TEMPLE: "⛩️",
+    NONE: "🌲"
 }
 
 const KIND_NAMES: Record<PatchKind, string> = {
@@ -23,7 +24,8 @@ const KIND_NAMES: Record<PatchKind, string> = {
     EMPTY: "Wilderness",
     DUNGEON: "Dungeon",
     TREASURE: "Treasure",
-    TEMPLE: "Temple"
+    TEMPLE: "Temple",
+    NONE: "Wilderness"
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg"
