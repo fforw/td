@@ -28,6 +28,20 @@ const BASE_WIDTH = 0.45
 const COST_WIDTH = 0.22
 
 /**
+ * Wavelengths in map units and amounts as fractions of the width of the slow and fast changes of the line width along a
+ * line, like the changing pressure on a pen
+ */
+const PRESSURE_SLOW = 163
+const PRESSURE_SLOW_AMOUNT = 0.31
+const PRESSURE_FAST = 101
+const PRESSURE_FAST_AMOUNT = 0.17
+
+/**
+ * Line widths per pixel the segments get grouped by, every width being one stroke call
+ */
+const WIDTH_STEPS = 6
+
+/**
  * Widths in pixels of the bands along the coast, drawn from the outside in and alternating with the water color
  */
 const SHORE_WIDTHS = [26, 21, 14, 10, 5]
@@ -176,6 +190,7 @@ export default function drawOldMap(
     const prando = new Prando(seed)
     const wobbleX = createNoise2D(() => prando.next())
     const wobbleY = createNoise2D(() => prando.next())
+    const pressure = createNoise2D(() => prando.next())
 
     const screenX = (x: number, y: number) => (
         x +
@@ -232,7 +247,14 @@ export default function drawOldMap(
         const sx1 = screenX(x1, y1)
         const sy1 = screenY(x1, y1)
 
-        const lineWidth = inkWidth(edge)
+        const mx = (x0 + x1) / 2
+        const my = (y0 + y1) / 2
+        const pressed = inkWidth(edge) * (
+            1 +
+            pressure(mx / PRESSURE_SLOW, my / PRESSURE_SLOW) * PRESSURE_SLOW_AMOUNT +
+            pressure(my / PRESSURE_FAST, mx / PRESSURE_FAST) * PRESSURE_FAST_AMOUNT
+        )
+        const lineWidth = Math.round(pressed * WIDTH_STEPS) / WIDTH_STEPS
         let path = lines.get(lineWidth)
         if (!path)
         {
