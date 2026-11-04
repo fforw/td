@@ -1,7 +1,10 @@
 import Castle from "../castle/Castle"
 import { planCastle } from "../castle/castlePlan"
 import HexagonPatch from "../map/HexagonPatch"
-import type { MapRequest, MapResponse } from "./MapWorkerClient"
+import PatchWorld from "../map/PatchWorld"
+import { placePois } from "../map/pointsOfInterest"
+import { findRoute, globalFace, packPath } from "../map/route"
+import type { BuiltPatch, MapRequest, MapResponse, PatchRequest, RouteRequest, RouteResult } from "./MapWorkerClient"
 import { packPatch, transferables } from "../map/QuadPatch"
 import Terrain from "../map/terrain"
 import { patchSeed, resetRandom, rng } from "../math/random"
@@ -13,39 +16,76 @@ import { patchSeed, resetRandom, rng } from "../math/random"
 let terrain: Terrain | null = null
 let terrainSeed = NaN
 
+/**
+ * Patches routes can be found on, sent back by the main thread
+ */
+const world = new PatchWorld()
 
-function respond(response: MapResponse): void
+
+function buildPatch({ q, r, seed, size, castle, kind }: PatchRequest): BuiltPatch
 {
-    postMessage(response, { transfer: response.error === undefined ? transferables(response.result.patch) : [] })
+    resetRandom(patchSeed(seed, q, r))
+    const patch = new HexagonPatch(q, r, size)
+    const faces = patch.build()
+
+    if (seed !== terrainSeed)
+    {
+        terrain = new Terrain(seed)
+        terrainSeed = seed
+    }
+    const random = () => rng.next()
+    for (const face of faces)
+    {
+        const [x, y] = face.centroid
+        face.type = terrain!.faceType(x, y, random)
+    }
+
+    // the castle changes the face types, so it has to be built before packing
+    const builtCastle = castle ? new Castle(faces) : null
+    const plan = builtCastle && planCastle(faces, builtCastle)
+    const packed = packPatch(patch, faces)
+    const content = placePois(packed, kind ?? (castle ? "CASTLE" : "EMPTY"), builtCastle ? faces.indexOf(builtCastle.centerFace) : -1)
+    return { patch: packed, castle: plan, ...content }
+}
+
+
+function route({ start, target, goals, through }: RouteRequest): RouteResult
+{
+    const startSlot = world.findSlot(start.q, start.r)
+    const { reachable, cost, paths } = findRoute(
+        world,
+        globalFace(startSlot, start.face),
+        world.findSlot(target.q, target.r),
+        goals,
+        through.map(([q, r]) => world.findSlot(q, r))
+    )
+    return { reachable, cost, paths: paths.map(path => packPath(world, path)) }
 }
 
 
 onmessage = (ev: MessageEvent<MapRequest>) => {
-    const { id, q, r, seed, size, castle } = ev.data
+    const { data } = ev
+    if (data.type === "add")
+    {
+        world.add(data.patch)
+        return
+    }
+
+    const { id } = data
     try
     {
-        resetRandom(patchSeed(seed, q, r))
-        const patch = new HexagonPatch(q, r, size)
-        const faces = patch.build()
-
-        if (seed !== terrainSeed)
+        if (data.type === "patch")
         {
-            terrain = new Terrain(seed)
-            terrainSeed = seed
+            const result = buildPatch(data)
+            postMessage({ id, result } satisfies MapResponse, { transfer: transferables(result.patch) })
         }
-        const random = () => rng.next()
-        for (const face of faces)
+        else
         {
-            const [x, y] = face.centroid
-            face.type = terrain!.faceType(x, y, random)
+            postMessage({ id, result: route(data) } satisfies MapResponse)
         }
-
-        // the castle changes the face types, so it has to be built before packing
-        const plan = castle ? planCastle(faces, new Castle(faces)) : null
-        respond({ id, result: { patch: packPatch(patch, faces), castle: plan } })
     }
     catch (e)
     {
-        respond({ id, error: String(e instanceof Error ? e.stack ?? e.message : e) })
+        postMessage({ id, error: String(e instanceof Error ? e.stack ?? e.message : e) } satisfies MapResponse)
     }
 }
