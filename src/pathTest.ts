@@ -26,11 +26,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { createCastle } from "./castle/castle3d"
 import { missionDays } from "./game/missions"
 import type { PatchKind } from "./game/campaign"
-import { impressionOf, randomKind, startPatches } from "./game/patchKinds"
+import { impressionOf, startPatches } from "./game/patchKinds"
 import { PATCH_SIZE } from "./map/HexagonPatch"
 import PatchWorld, { SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, next } from "./map/QuadPatch"
-import { globalFace, pathPatches, unpackPath } from "./map/route"
+import { globalFace, unpackPath } from "./map/route"
 import { randomSeed } from "./math/random"
 import { createGround, createModels } from "./render/patchMeshes"
 import { FACE_SIZE, loadModels, SCALE } from "./render/scene3d"
@@ -157,9 +157,9 @@ let client = new MapWorkerClient()
 let world = new PatchWorld()
 
 /**
- * Kinds of the patches known from the start of a campaign, the others are rolled
+ * Kinds of the patches known from the start of a campaign, the worker rolls the others
  */
-let startKinds = new Map<string, PatchKind>()
+let startKinds: Record<string, PatchKind> = {}
 
 const loaded = new Map<string, Promise<LoadedPatch>>()
 const bySlot = new Map<number, LoadedPatch>()
@@ -184,12 +184,6 @@ function patchKey(q: number, r: number): string
 }
 
 
-function kindOf(q: number, r: number): PatchKind
-{
-    return startKinds.get(patchKey(q, r)) ?? randomKind(seed, q, r)
-}
-
-
 function updateGround(entry: LoadedPatch): void
 {
     if (entry.ground)
@@ -203,7 +197,7 @@ function updateGround(entry: LoadedPatch): void
 
 
 /**
- * Shows a patch. Its ground and models only get created now, most patches just have to exist for the search.
+ * Shows a patch. Its ground and models only get created now, hidden ones may never need them again.
  */
 function show(entry: LoadedPatch): void
 {
@@ -249,7 +243,7 @@ function createLabel(q: number, r: number): Sprite
 
 
 /**
- * Builds the patch at the given grid position, shows it and gives the worker a copy for finding routes on
+ * Builds the patch at the given grid position for showing it. The worker builds the patches for finding routes itself.
  */
 function load(q: number, r: number): Promise<LoadedPatch>
 {
@@ -257,11 +251,8 @@ function load(q: number, r: number): Promise<LoadedPatch>
     let patch = loaded.get(key)
     if (!patch)
     {
-        const owner = client
-        patch = owner.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0, kindOf(q, r)).then(
+        patch = client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0).then(
             built => {
-                owner.addPatch(built.patch)
-
                 const slot = world.add(built.patch)
                 const group = new Group()
                 group.add(createLabel(q, r))
@@ -455,18 +446,12 @@ async function plan(q: number, r: number, known: number): Promise<void>
     clearOverlay()
     status.textContent = "Planning " + patchKey(q, r) + " ..."
 
-    const through = rings(Math.max(known, Math.abs(q), Math.abs(r)) + 1)
-    const [target, castle] = await Promise.all([
-        load(q, r),
-        load(0, 0),
-        ...through.map(([pq, pr]) => load(pq, pr))
-    ])
-    const entries = await Promise.all(through.map(([pq, pr]) => load(pq, pr)))
     const result = await owner.findRoute({
-        start: { q: 0, r: 0, face: castle.built.pois[0] },
-        target: { q: q * PATCH_SIZE, r: r * PATCH_SIZE },
-        goals: target.built.pois,
-        through: through.map(([pq, pr]) => [pq * PATCH_SIZE, pr * PATCH_SIZE])
+        seed,
+        size: FACE_SIZE,
+        target: { q, r },
+        kinds: startKinds,
+        radius: Math.max(known, Math.abs(q), Math.abs(r)) + 1
     })
     if (current !== generation)
     {
@@ -474,58 +459,58 @@ async function plan(q: number, r: number, known: number): Promise<void>
     }
 
     const { reachable, cost } = result
-    const paths = result.paths.map(path => unpackPath(world, path))
-    const color = reachable ? ROUTE_COLOR : FAILED_COLOR
-    const start = globalFace(castle.slot, castle.built.pois[0])
-
-    // only show the patches the route goes through, the others just had to be built for the search
     const isKnown = (pq: number, pr: number) => Math.max(Math.abs(pq), Math.abs(pr)) <= known
-    const passed = new Map<string, LoadedPatch>()
-    const shown = new Set([target])
-    for (const [hq, hr] of result.paths.flatMap(pathPatches))
-    {
-        const pq = hq / PATCH_SIZE
-        const pr = hr / PATCH_SIZE
-        const entry = entries[through.findIndex(([aq, ar]) => aq === pq && ar === pr)]
-        shown.add(entry)
-        if (!isKnown(pq, pr) && !(pq === q && pr === r))
-        {
-            passed.set(patchKey(pq, pr), entry)
-        }
-    }
+    const passed = result.patches.filter(patch => !isKnown(patch.q, patch.r) && !(patch.q === q && patch.r === r))
+
+    // only show the patches the route goes through
+    const positions = new Map<string, [number, number]>([[patchKey(q, r), [q, r]]])
+    result.patches.forEach(patch => positions.set(patchKey(patch.q, patch.r), [patch.q, patch.r]))
     if (!reachable)
     {
         // no route to show, so show what's in the way: everything between the castle and the target
-        through.forEach(([pq, pr], i) => {
-            if (
-                pq >= Math.min(0, q) - 1 && pq <= Math.max(0, q) + 1 &&
-                pr >= Math.min(0, r) - 1 && pr <= Math.max(0, r) + 1
-            )
+        for (let pr = Math.min(0, r) - 1; pr <= Math.max(0, r) + 1; pr++)
+        {
+            for (let pq = Math.min(0, q) - 1; pq <= Math.max(0, q) + 1; pq++)
             {
-                shown.add(entries[i])
+                positions.set(patchKey(pq, pr), [pq, pr])
             }
-        })
+        }
     }
+    const shown = await Promise.all([...positions.values()].map(([pq, pr]) => load(pq, pr)))
+    if (current !== generation)
+    {
+        return
+    }
+
+    const target = await load(q, r)
+    const castle = await load(0, 0)
+    const paths = result.paths.map(path => unpackPath(world, path))
+    const color = reachable ? ROUTE_COLOR : FAILED_COLOR
+    const start = globalFace(castle.slot, result.start)
+
     bySlot.forEach(entry => entry.group.visible = false)
     shown.forEach(show)
 
     overlay = new Group()
     overlay.add(createOutline(target, TARGET_COLOR))
-    passed.forEach(entry => overlay!.add(createOutline(entry, impressionOf(entry.built.kind) === "safe" ? SAFE_COLOR : DANGEROUS_COLOR)))
+    for (const patch of passed)
+    {
+        overlay.add(createOutline(await load(patch.q, patch.r), impressionOf(patch.kind) === "safe" ? SAFE_COLOR : DANGEROUS_COLOR))
+    }
     paths.forEach(path => overlay!.add(createPath(path, color)))
     overlay.add(createMarker(faceCenter(start), START_COLOR))
-    target.built.pois.forEach(face => overlay!.add(createMarker(faceCenter(globalFace(target.slot, face)), TARGET_COLOR)))
+    result.goals.forEach(face => overlay!.add(createMarker(faceCenter(globalFace(target.slot, face)), TARGET_COLOR)))
     paths.forEach(path => overlay!.add(createMarker(faceCenter(path[path.length - 1]), color)))
     scene.add(overlay)
 
     const faces = Math.max(...paths.map(path => path.length - 1))
     status.textContent = [
-        patchKey(q, r) + ": " + target.built.kind + ", " + target.built.pois.length + " points of interest, " + known +
+        patchKey(q, r) + ": " + result.kind + ", " + result.goals.length + " points of interest, " + known +
         (known === 1 ? " known ring" : " known rings"),
         (reachable ? "route" : "NO ROUTE, closest point") + ": cost " + cost + ", " + faces + " faces",
         "days by speed: " + SPEEDS.map(speed => speed + " -> " + missionDays({ speed }, cost)).join(", ") +
         (reachable ? "" : " (failed)"),
-        "passed, still unknown: " + ([...passed].map(([key, { built }]) => key + " looked " + impressionOf(built.kind)).join(", ") || "none")
+        "passed, still unknown: " + (passed.map(patch => patchKey(patch.q, patch.r) + " looked " + impressionOf(patch.kind)).join(", ") || "none")
     ].join("\n")
 
     frame(faceCenter(start), new Vector3(q * PATCH_WIDTH, 0, r * PATCH_DEPTH))
@@ -568,7 +553,7 @@ function newWorld(newSeed: number): void
     client.terminate()
     client = new MapWorkerClient()
     world = new PatchWorld()
-    startKinds = new Map(startPatches(seed).map(node => [patchKey(node.q, node.r), node.kind]))
+    startKinds = Object.fromEntries(startPatches(seed).map(node => [patchKey(node.q, node.r), node.kind]))
 
     bySlot.forEach(entry => {
         scene.remove(entry.group)

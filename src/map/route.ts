@@ -307,20 +307,6 @@ export function packPath(world: PatchWorld, path: readonly number[]): Int32Array
 
 
 /**
- * Returns the hexagon positions of the patches in a path packed by packPath()
- */
-export function pathPatches(packed: Int32Array): [number, number][]
-{
-    const patches: [number, number][] = []
-    for (let i = 0; i < packed.length; i += 3 + packed[i + 2])
-    {
-        patches.push([packed[i], packed[i + 1]])
-    }
-    return patches
-}
-
-
-/**
  * Returns the global face ids of a path packed by packPath()
  */
 export function unpackPath(world: PatchWorld, packed: Int32Array): number[]

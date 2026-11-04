@@ -1,53 +1,36 @@
+import RouteFinder from "../game/RouteFinder"
 import { generatePatch } from "../map/generatePatch"
-import PatchWorld from "../map/PatchWorld"
-import { placePois } from "../map/pointsOfInterest"
-import { findRoute, globalFace, packPath } from "../map/route"
-import type { BuiltPatch, MapRequest, MapResponse, PatchRequest, RouteRequest, RouteResult } from "./MapWorkerClient"
+import type { MapRequest, MapResponse, RouteRequest } from "./MapWorkerClient"
 import { transferables } from "../map/QuadPatch"
 
 
 /**
- * Patches routes can be found on, sent back by the main thread
+ * Finds the routes of the current world seed
  */
-const world = new PatchWorld()
+let finder: RouteFinder | null = null
+let finderSeed = NaN
 
 
-function buildPatch({ q, r, seed, size, castle, kind }: PatchRequest): BuiltPatch
+function route({ seed, size, target, kinds, radius }: RouteRequest)
 {
-    const { patch, castle: plan, castleFace } = generatePatch(q, r, seed, size, castle)
-    return { patch, castle: plan, ...placePois(patch, kind ?? (castle ? "CASTLE" : "EMPTY"), castleFace) }
-}
-
-
-function route({ start, target, goals, through }: RouteRequest): RouteResult
-{
-    const startSlot = world.findSlot(start.q, start.r)
-    const { reachable, cost, paths } = findRoute(
-        world,
-        globalFace(startSlot, start.face),
-        world.findSlot(target.q, target.r),
-        goals,
-        through.map(([q, r]) => world.findSlot(q, r))
-    )
-    return { reachable, cost, paths: paths.map(path => packPath(world, path)) }
+    if (seed !== finderSeed)
+    {
+        finder = new RouteFinder(seed, size)
+        finderSeed = seed
+    }
+    return finder!.find({ target, kinds, radius })
 }
 
 
 onmessage = (ev: MessageEvent<MapRequest>) => {
     const { data } = ev
-    if (data.type === "add")
-    {
-        world.add(data.patch)
-        return
-    }
-
     const { id } = data
     try
     {
         if (data.type === "patch")
         {
-            const result = buildPatch(data)
-            postMessage({ id, result } satisfies MapResponse, { transfer: transferables(result.patch) })
+            const { patch, castle } = generatePatch(data.q, data.r, data.seed, data.size, data.castle)
+            postMessage({ id, result: { patch, castle } } satisfies MapResponse, { transfer: transferables(patch) })
         }
         else
         {

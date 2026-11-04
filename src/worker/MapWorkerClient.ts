@@ -1,8 +1,6 @@
 import type { CastlePlan } from "../castle/castlePlan"
-import type { PatchKind } from "../game/campaign"
-import type { PatchContent } from "../map/pointsOfInterest"
+import type { RouteQuery, RouteResult } from "../game/RouteFinder"
 import type { QuadPatch } from "../map/QuadPatch"
-import type { Route } from "../map/route"
 
 /**
  * Asks the worker to build the patch at the given hexagon position
@@ -25,59 +23,35 @@ export interface PatchRequest
      * Build a castle around the face closest to the world origin
      */
     castle: boolean
-    /**
-     * Kind the patch is meant to be
-     */
-    kind?: PatchKind
 }
 
 /**
- * Gives the worker a copy of a patch to find routes on. Requests are handled in order, so a route request sent later
- * sees the patch.
+ * Asks the worker for the route of a mission. The worker builds the patches it needs for that itself, in grid positions
+ * with the castle at 0/0.
  */
-export interface AddPatchRequest
-{
-    type: "add"
-    patch: QuadPatch
-}
-
-/**
- * Asks the worker for the route from a face to the given goals. Patches are addressed by hexagon position, since the
- * slots in the worker are its own.
- */
-export interface RouteRequest
+export interface RouteRequest extends RouteQuery
 {
     id: number
     type: "route"
-    start: { q: number, r: number, face: number }
-    target: { q: number, r: number }
     /**
-     * Local faces in the target patch to reach
+     * World seed
      */
-    goals: number[]
+    seed: number
     /**
-     * Hexagon positions of the patches the route may use
+     * Hexagon size in map units
      */
-    through: [number, number][]
+    size: number
 }
 
-export type MapRequest = PatchRequest | AddPatchRequest | RouteRequest
+export type MapRequest = PatchRequest | RouteRequest
 
 /**
- * Packed patch together with the plan of the castle built on it, if any, and its kind and points of interest
+ * Packed patch together with the plan of the castle built on it, if any
  */
-export interface BuiltPatch extends PatchContent
+export interface BuiltPatch
 {
     patch: QuadPatch
     castle: CastlePlan | null
-}
-
-/**
- * Route with its paths packed by packPath()
- */
-export interface RouteResult extends Route
-{
-    paths: Int32Array<ArrayBuffer>[]
 }
 
 export type MapResponse =
@@ -152,27 +126,17 @@ export default class MapWorkerClient
      * @param seed      world seed
      * @param size      hexagon size in map units
      * @param castle    build a castle around the face closest to the world origin
-     * @param kind      kind the patch is meant to be, the result says what it ended up as
      *
-     * @return packed patch, castle plan, kind and points of interest
+     * @return packed patch and castle plan
      */
-    buildPatch(q: number, r: number, seed: number, size: number, castle = false, kind?: PatchKind): Promise<BuiltPatch>
+    buildPatch(q: number, r: number, seed: number, size: number, castle = false): Promise<BuiltPatch>
     {
-        return this.request(id => ({ id, type: "patch", q, r, seed, size, castle, kind }))
+        return this.request(id => ({ id, type: "patch", q, r, seed, size, castle }))
     }
 
 
     /**
-     * Sends a copy of the patch to the worker for finding routes on, the given one stays valid.
-     */
-    addPatch(patch: QuadPatch): void
-    {
-        this.worker.postMessage({ type: "add", patch } satisfies MapRequest)
-    }
-
-
-    /**
-     * Finds a route on the patches added before.
+     * Finds the route of a mission. Requests are answered in order, so far targets hold up what comes after them.
      */
     findRoute(request: Omit<RouteRequest, "id" | "type">): Promise<RouteResult>
     {
