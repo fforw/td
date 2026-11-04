@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🏰 ⚔️ 🛡️ path</title>
+    <style>
+        #ui
+        {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            padding: 8px;
+            background: #000c;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        #ui label
+        {
+            margin-right: 8px;
+        }
+        #ui input
+        {
+            width: 4em;
+        }
+        #ui p
+        {
+            margin: 8px 0 0;
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+<canvas id="screen">
+    <p>
+        Your browser has no support for canvas elements.
+    </p>
+</canvas>
+<div id="ui">
+    <form id="plan">
+        <label>q <input id="q" type="number" step="1" value="2" required></label>
+        <label>r <input id="r" type="number" step="1" value="0" required></label>
+        <label title="Rings around the castle that count as discovered, 1 if empty like at the start of a campaign">
+            known rings <input id="known" type="number" step="1" min="1">
+        </label>
+        <button type="submit">Plan</button>
+    </form>
+    <p id="status"></p>
+</div>
+<div id="footer">
+    <a href="3d.html">3D</a>
+    <a href="world.html">world</a>
+    <a class="github" href="https://github.com/fforw/td">github</a>
+</div>
+<script type="module" src="/src/pathTest.ts"></script>
+</body>
+</html>
