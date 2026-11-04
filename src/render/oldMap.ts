@@ -78,7 +78,7 @@ export interface MapView
 function inkWidth({ type, other }: InkEdge): number
 {
     const cost = DEFAULT_COSTS[type.index]
-    const otherCost = other ? DEFAULT_COSTS[other.index] : cost
+    const otherCost = DEFAULT_COSTS[other.index]
     if (cost === Infinity || otherCost === Infinity)
     {
         return IMPASSABLE_WIDTH

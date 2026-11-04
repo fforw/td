@@ -1,204 +1,144 @@
 import { assert, describe, it } from "vitest"
 
 import { FaceType } from "../../src/map/geometry"
-import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
-import { createManuscriptMap, generalize, inkEdges, marchRegions, placeSymbols, regionOf, regionOutlines } from "../../src/map/mapRegions"
-import { packPatch, type QuadPatch } from "../../src/map/QuadPatch"
-import { FACE_SIZE } from "../../src/map/scale"
-import { patchSeed, resetRandom } from "../../src/math/random"
+import { createManuscriptMap, type InkEdge, type MapArea, regionOf } from "../../src/map/mapRegions"
+import Terrain from "../../src/map/terrain"
 
 
-const { GRASS, PRAIRIE, HOUSE, TREE, TREE2, WALL, WATER } = FaceType
+const { GRASS, PRAIRIE, ROCK, SAND, TREE, TREE2, WALL, WATER } = FaceType
+
+const AREA: MapArea = { x: 0, y: 0, width: 200, height: 100 }
+const STEP = 10
 
 
 /**
- * Builds a patch of nothing but the given face type
+ * Returns a terrain with the given face type function
  */
-function plainPatch(q: number, r: number, type: FaceType): QuadPatch
+function terrainOf(faceType: (x: number, y: number) => FaceType): Pick<Terrain, "faceType">
 {
-    resetRandom(patchSeed(4711, q, r))
-    const patch = new HexagonPatch(q * PATCH_SIZE, r * PATCH_SIZE, FACE_SIZE)
-    const faces = patch.build()
-    faces.forEach(face => face.type = type)
-    return packPatch(patch, faces)
+    return { faceType }
 }
 
 
 /**
- * Returns the given local face and all faces within the given number of steps from it
+ * Returns the area enclosed by the outlines, with holes counting negative
  */
-function faceArea(patch: QuadPatch, start: number, steps: number): number[]
+function outlineArea(loops: number[][]): number
 {
-    const area = new Set([start])
-    for (let i = 0; i < steps; i++)
+    let sum = 0
+    for (const loop of loops)
     {
-        for (const face of [...area])
+        for (let i = 0; i < loop.length; i += 2)
         {
-            for (let h = face * 4; h < face * 4 + 4; h++)
-            {
-                if (patch.twin[h] >= 0)
-                {
-                    area.add(patch.twin[h] >> 2)
-                }
-            }
+            const j = (i + 2) % loop.length
+            sum += loop[i] * loop[j + 1] - loop[j] * loop[i + 1]
         }
     }
-    return [...area]
+    return sum / 2
 }
 
 
-/**
- * Returns a local face far from the border of the patch
- */
-function innerFace(patch: QuadPatch): number
+function between(edge: InkEdge, a: FaceType, b: FaceType): boolean
 {
-    const near = new Set<number>()
-    for (let h = 0; h < patch.twin.length; h++)
-    {
-        if (patch.twin[h] < 0)
-        {
-            faceArea(patch, h >> 2, 4).forEach(face => near.add(face))
-        }
-    }
-    return patch.faceType.findIndex((_, face) => !near.has(face))
+    return edge.type === a && edge.other === b || edge.type === b && edge.other === a
 }
 
 
-function count(patch: QuadPatch, type: FaceType): number
-{
-    return patch.faceType.filter(i => i === type.index).length
-}
+describe("regionOf", function () {
 
-
-describe("mapRegions", function () {
-
-    it("puts face types of the same travel cost into one region", function () {
+    it("merges face types of the same cost", function () {
         assert.equal(regionOf(PRAIRIE), GRASS)
         assert.equal(regionOf(TREE2), TREE)
-        assert.equal(regionOf(HOUSE), GRASS)
         assert.equal(regionOf(WATER), WATER)
     })
+})
 
-    it("removes lone trees and clearings but keeps the given patches", function () {
-        const grassland = plainPatch(0, 0, GRASS)
-        const forest = plainPatch(0, 0, TREE)
-        grassland.faceType[innerFace(grassland)] = TREE.index
-        forest.faceType[innerFace(forest)] = GRASS.index
 
-        assert.equal(count(generalize([grassland]).getPatch(0), TREE), 0)
-        assert.equal(count(generalize([forest]).getPatch(0), GRASS), 0)
-        assert.equal(count(grassland, TREE), 1)
-        assert.equal(count(forest, GRASS), 1)
+describe("createManuscriptMap", function () {
+
+    it("has one outline around a single region and no ink", function () {
+        const map = createManuscriptMap(terrainOf(() => GRASS), AREA, STEP, [], 1)
+        assert.deepEqual([...map.outlines.keys()], [GRASS])
+        assert.equal(map.ink.length, 0)
+        assert.closeTo(outlineArea(map.outlines.get(GRASS)!), 20000, 1e-6)
     })
 
-    it("removes small areas but keeps large ones", function () {
-        const pond = plainPatch(0, 0, GRASS)
-        const lake = plainPatch(0, 0, GRASS)
-        faceArea(pond, innerFace(pond), 1).forEach(face => pond.faceType[face] = WATER.index)
-        const area = faceArea(lake, innerFace(lake), 3)
-        area.forEach(face => lake.faceType[face] = WATER.index)
-
-        assert.equal(count(generalize([pond]).getPatch(0), WATER), 0)
-        assert.ok(count(generalize([lake]).getPatch(0), WATER) >= area.length / 2)
+    it("draws one region for face types of the same cost", function () {
+        const map = createManuscriptMap(terrainOf(x => x < 100 ? GRASS : PRAIRIE), AREA, STEP, [], 1)
+        assert.deepEqual([...map.outlines.keys()], [GRASS])
+        assert.equal(map.ink.length, 0)
     })
 
-    it("keeps walls and doesn't spread them", function () {
-        const patch = plainPatch(0, 0, GRASS)
-        const face = innerFace(patch)
-        patch.faceType[face] = WALL.index
-
-        const regions = generalize([patch]).getPatch(0).faceType
-        assert.equal(regions[face], WALL.index)
-        assert.equal(regions.filter(i => i === WALL.index).length, 1)
-    })
-
-    it("only inks the boundaries of regions", function () {
-        const patches = [plainPatch(0, 0, GRASS), plainPatch(1, 0, GRASS)]
-        const plain = inkEdges(marchRegions(generalize(patches), 2))
-        assert.ok(plain.every(edge => edge.type === GRASS && edge.other === null))
-
-        const lake = plainPatch(0, 0, GRASS)
-        faceArea(lake, innerFace(lake), 3).forEach(face => lake.faceType[face] = WATER.index)
-        const shore = inkEdges(marchRegions(generalize([lake]), 1)).filter(edge => edge.other !== null)
-        assert.ok(shore.length > 0)
-        assert.ok(shore.every(edge => (edge.type === WATER) !== (edge.other === WATER)))
-
-        // the shore is closed, every point of it is the end of an even number of edges
-        const ends = new Map<string, number>()
-        for (const { x0, y0, x1, y1 } of shore)
+    it("finds the boundary between raster points", function () {
+        const map = createManuscriptMap(terrainOf(x => x < 104 ? GRASS : WATER), AREA, STEP, [], 1)
+        assert.equal(map.ink.length, 10)
+        for (const edge of map.ink)
         {
-            for (const key of [x0 + "," + y0, x1 + "," + y1])
-            {
-                ends.set(key, (ends.get(key) ?? 0) + 1)
-            }
+            assert.ok(between(edge, GRASS, WATER))
+            assert.closeTo(edge.x0, 104, STEP / 8)
+            assert.closeTo(edge.x1, 104, STEP / 8)
         }
-        assert.ok([...ends.values()].every(n => n % 2 === 0))
+        assert.closeTo(outlineArea(map.outlines.get(GRASS)!), 10400, 100)
+        assert.closeTo(outlineArea(map.outlines.get(WATER)!), 9600, 100)
     })
 
-    it("doesn't ink the seam between patches of the same region", function () {
-        const single = inkEdges(marchRegions(generalize([plainPatch(0, 0, GRASS)]), 1))
-        const pair = inkEdges(marchRegions(generalize([plainPatch(0, 0, GRASS), plainPatch(1, 0, GRASS)]), 2))
-        assert.ok(pair.length < single.length * 2)
+    it("cuts holes into the region around an island", function () {
+        const island = (x: number, y: number) => Math.hypot(x - 100, y - 50) < 30
+        const map = createManuscriptMap(terrainOf((x, y) => island(x, y) ? SAND : WATER), AREA, STEP, [], 1)
+        assert.equal(map.outlines.get(SAND)!.length, 1)
+        assert.equal(map.outlines.get(WATER)!.length, 2)
+        assert.closeTo(outlineArea(map.outlines.get(SAND)!), Math.PI * 900, 150)
+        assert.closeTo(outlineArea(map.outlines.get(SAND)!) + outlineArea(map.outlines.get(WATER)!), 20000, 1e-6)
     })
 
-    it("traces outlines with the area of the triangles", function () {
-        const patch = plainPatch(0, 0, GRASS)
-        faceArea(patch, innerFace(patch), 3).forEach(face => patch.faceType[face] = WATER.index)
-        const triangles = marchRegions(generalize([patch]), 1)
-        const outlines = regionOutlines(triangles)
+    it("fills the whole area where three regions meet", function () {
+        const type = (x: number, y: number) => y < 47 ? (x < 103 ? GRASS : WATER) : ROCK
+        const map = createManuscriptMap(terrainOf(type), AREA, STEP, [], 1)
+        let sum = 0
+        map.outlines.forEach(loops => sum += outlineArea(loops))
+        assert.closeTo(sum, 20000, 1e-6)
+        assert.ok(map.ink.some(edge => between(edge, GRASS, WATER)))
+        assert.ok(map.ink.some(edge => between(edge, GRASS, ROCK)))
+        assert.ok(map.ink.some(edge => between(edge, WATER, ROCK)))
+    })
 
-        const loopArea = (loop: number[]) => {
-            let area = 0
-            for (let i = 0; i < loop.length; i += 2)
-            {
-                const j = (i + 2) % loop.length
-                area += loop[i] * loop[j + 1] - loop[j] * loop[i + 1]
-            }
-            return area / 2
-        }
+    it("fills the whole area where the same regions touch on opposite corners", function () {
+        const type = (x: number, y: number) => (x < 103) === (y < 47) ? GRASS : WATER
+        const map = createManuscriptMap(terrainOf(type), AREA, STEP, [], 1)
+        let sum = 0
+        map.outlines.forEach(loops => sum += outlineArea(loops))
+        assert.closeTo(sum, 20000, 1e-6)
+    })
 
-        triangles.forEach((list, type) => {
-            let area = 0
-            for (let i = 0; i < list.length; i += 6)
-            {
-                area += Math.abs((list[i + 2] - list[i]) * (list[i + 5] - list[i + 1]) - (list[i + 3] - list[i + 1]) * (list[i + 4] - list[i])) / 2
-            }
-            const outlined = outlines.get(type)!.reduce((sum, loop) => sum + loopArea(loop), 0)
-            assert.closeTo(outlined, area, 0.001)
+    it("places symbols apart from each other and only inside of their region", function () {
+        const area = { x: 0, y: 0, width: 2000, height: 2000 }
+        const map = createManuscriptMap(terrainOf(x => x < 1000 ? TREE : GRASS), area, STEP, [], 1)
+        assert.ok(map.symbols.length >= 4, "symbols " + map.symbols.length)
+        map.symbols.forEach((a, i) => {
+            assert.equal(a.type, TREE)
+            assert.ok(a.x < 1000)
+            map.symbols.slice(i + 1).forEach(b => assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 240))
         })
-
-        assert.equal(outlines.get(WATER)!.length, 1)
-        // land with a hole: the outer loop and the one around the lake run in opposite directions
-        assert.equal(outlines.get(GRASS)!.length, 2)
-        assert.ok(outlines.get(GRASS)!.some(loop => loopArea(loop) < 0))
     })
 
-    it("places spaced symbols of the real face types", function () {
-        const patch = plainPatch(0, 0, TREE2)
-        const face = innerFace(patch)
-        faceArea(patch, face, 8).forEach(f => patch.faceType[f] = TREE.index)
-
-        const symbols = placeSymbols([patch], generalize([patch]), 4711)
-        assert.ok(symbols.some(s => s.type === TREE))
-        assert.ok(symbols.some(s => s.type === TREE2))
-        for (let i = 0; i < symbols.length; i++)
-        {
-            for (let j = i + 1; j < symbols.length; j++)
-            {
-                assert.ok(Math.hypot(symbols[i].x - symbols[j].x, symbols[i].y - symbols[j].y) >= 90)
-            }
-        }
+    it("sorts symbols from north to south with points of interest on top", function () {
+        const area = { x: 0, y: 0, width: 2000, height: 2000 }
+        const castle = { x: 1000, y: 100, type: WALL }
+        const { symbols } = createManuscriptMap(terrainOf(() => TREE), area, STEP, [castle], 1)
+        assert.equal(symbols[symbols.length - 1], castle)
+        const trees = symbols.slice(0, -1)
+        trees.forEach((tree, i) => {
+            assert.ok(i === 0 || trees[i - 1].y <= tree.y)
+            assert.ok(Math.hypot(tree.x - castle.x, tree.y - castle.y) >= 240)
+        })
     })
 
-    it("has no symbols on open land and a castle on top of the walls", function () {
-        const patch = plainPatch(0, 0, GRASS)
-        const { symbols } = createManuscriptMap([patch], 4711)
-        assert.equal(symbols.length, 0)
-
-        const face = innerFace(patch)
-        faceArea(patch, face, 1).forEach(f => patch.faceType[f] = WALL.index)
-        const castle = createManuscriptMap([patch], 4711).symbols
-        assert.equal(castle.length, 1)
-        assert.equal(castle[0].type, WALL)
+    it("depends on the seed only", function () {
+        const area = { x: -1000, y: -1000, width: 2000, height: 2000 }
+        const a = createManuscriptMap(new Terrain(4711), area, 25, [], 1)
+        const b = createManuscriptMap(new Terrain(4711), area, 25, [], 1)
+        const c = createManuscriptMap(new Terrain(4712), area, 25, [], 1)
+        assert.deepEqual(a, b)
+        assert.notDeepEqual(a.ink, c.ink)
     })
 })

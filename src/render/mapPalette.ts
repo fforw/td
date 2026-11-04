@@ -30,8 +30,7 @@ export const SEPIA = {
         [FaceType.TREE, "#d2bb86"],
         [FaceType.SWAMP, "#b5a06c"],
         [FaceType.ROCK, "#78634d"],
-        [FaceType.WATER, "#8c8d96"],
-        [FaceType.WALL, "#494039"]
+        [FaceType.WATER, "#8c8d96"]
     ]),
     /**
      * Atlas sprite per face type and the size of its largest variant in map units. The others keep their size relative

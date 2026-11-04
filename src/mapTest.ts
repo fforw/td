@@ -1,9 +1,9 @@
 import "./style.css"
 import { PATCH_DEPTH, PATCH_WIDTH } from "./game/patchImages"
-import { PATCH_SIZE } from "./map/HexagonPatch"
+import { FaceType } from "./map/geometry"
 import { createManuscriptMap } from "./map/mapRegions"
-import type { QuadPatch } from "./map/QuadPatch"
-import { FACE_SIZE } from "./map/scale"
+import { FACE_SIZE, SCALE } from "./map/scale"
+import Terrain from "./map/terrain"
 import { randomSeed } from "./math/random"
 import { loadMapAtlas } from "./render/mapAtlas"
 import { loadMapPaper } from "./render/mapPaper"
@@ -11,11 +11,21 @@ import drawOldMap from "./render/oldMap"
 import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
- * Test page for the old map: the patches around the castle, all at once. "seed" sets the world seed, "rings" how many
- * patches to show in every direction of the castle.
+ * Test page for the old map around the castle. "seed" sets the world seed, "rings" how many patches to show in every
+ * direction of the castle.
  */
 
 const DEFAULT_RINGS = 3
+
+/**
+ * Distance of the raster points of the map in pixels
+ */
+const RASTER_PIXELS = 8
+
+/**
+ * Map units to scan around the view, as the wobble of the map must not show the open border of the raster
+ */
+const AREA_MARGIN = 30
 
 const params = new URLSearchParams(location.search)
 
@@ -36,34 +46,12 @@ const assets = Promise.all([loadMapAtlas(), loadMapPaper()])
 let generation = 0
 
 
-function patchCenter(patch: QuadPatch): [number, number]
-{
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (let i = 0; i < patch.positions.length; i += 3)
-    {
-        minX = Math.min(minX, patch.positions[i])
-        maxX = Math.max(maxX, patch.positions[i])
-        minY = Math.min(minY, patch.positions[i + 1])
-        maxY = Math.max(maxY, patch.positions[i + 1])
-    }
-    return [(minX + maxX) / 2, (minY + maxY) / 2]
-}
-
-
 async function show(seed: number): Promise<void>
 {
     const current = ++generation
     seedLink.href = "map.html?seed=" + seed + "&rings=" + rings
 
-    const requests = []
-    for (let r = -rings; r <= rings; r++)
-    {
-        for (let q = -rings; q <= rings; q++)
-        {
-            requests.push(client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0))
-        }
-    }
-    const patches = (await Promise.all(requests)).map(built => built.patch)
+    const { castle } = await client.buildPatch(0, 0, seed, FACE_SIZE, true)
     const [atlas, paper] = await assets
     if (current !== generation)
     {
@@ -79,12 +67,19 @@ async function show(seed: number): Promise<void>
     canvas.style.height = height + "px"
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
 
-    // zoomed in just enough to not show the open, jagged border of the patches
+    const cx = castle!.fountain[0] / SCALE
+    const cy = castle!.fountain[1] / SCALE
     const scale = Math.max(width / (2 * rings * PATCH_WIDTH), height / (2 * rings * PATCH_DEPTH))
-    const [cx, cy] = patchCenter(patches[patches.length >> 1])
     const view = { x: cx - width / 2 / scale, y: cy - height / 2 / scale, scale }
 
-    drawOldMap(ctx, createManuscriptMap(patches, seed), view, width, height, atlas, paper, seed, ratio)
+    const area = {
+        x: view.x - AREA_MARGIN,
+        y: view.y - AREA_MARGIN,
+        width: width / scale + AREA_MARGIN * 2,
+        height: height / scale + AREA_MARGIN * 2
+    }
+    const map = createManuscriptMap(new Terrain(seed), area, RASTER_PIXELS / scale, [{ x: cx, y: cy, type: FaceType.WALL }], seed)
+    drawOldMap(ctx, map, view, width, height, atlas, paper, seed, ratio)
 }
 
 
