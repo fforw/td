@@ -210,6 +210,27 @@ describe("Paths", () => {
 })
 
 
+describe("Lazy routes", () => {
+
+    it("lets a patch bring in more patches once the search gets there", () => {
+
+        const world = new PatchWorld()
+        const a = world.add(plainPatch(0, 0, GRASS))
+        const start = globalFace(a, innerFace(world.getPatch(a)))
+        const b = world.add(plainPatch(2, 0, GRASS))
+
+        const entered: number[] = []
+        const route = findRoute(world, start, b, [], [a], undefined, slot => {
+            entered.push(slot)
+            return slot === a ? [world.add(plainPatch(1, 0, GRASS))] : []
+        })
+        assert(route.reachable)
+        assert(entered[0] === a)
+        assert(new Set(entered).size === entered.length)
+    })
+})
+
+
 describe("Points of interest", () => {
 
     it("falls back to NONE if a patch has no room for them", () => {

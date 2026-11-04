@@ -145,6 +145,15 @@ export function globalFace(slot: number, face: number): number
 
 
 /**
+ * Returns the slot of the patch of the given global face
+ */
+export function slotOf(face: number): number
+{
+    return face >> FACE_SHIFT
+}
+
+
+/**
  * Returns the center of the given patch in map units
  */
 function patchCenter(world: PatchWorld, slot: number): [number, number]
@@ -171,6 +180,8 @@ function patchCenter(world: PatchWorld, slot: number): [number, number]
  * @param goals     local faces in the target patch to reach. Without goals, reaching any face of the patch is enough
  * @param through   slots of the patches the route may use, besides the target patch
  * @param costs     cost table
+ * @param enter     called the first time the search gets to a patch, can connect more patches to the world and returns
+ *                  the slots of those the route may use now
  *
  * @return route
  */
@@ -180,7 +191,8 @@ export function findRoute(
     target: number,
     goals: readonly number[],
     through: readonly number[],
-    costs: CostTable = DEFAULT_COSTS
+    costs: CostTable = DEFAULT_COSTS,
+    enter?: (slot: number) => readonly number[]
 ): TracedRoute
 {
     const allowed = new Set(through).add(target)
@@ -200,6 +212,7 @@ export function findRoute(
     const heap = new FaceHeap()
     heap.push(0, start)
     const done = new Set<number>()
+    const entered = new Set<number>()
 
     const [targetX, targetY] = patchCenter(world, target)
     const position = [0, 0, 0]
@@ -215,6 +228,13 @@ export function findRoute(
             continue
         }
         done.add(face)
+
+        const slot = slotOf(face)
+        if (enter && !entered.has(slot))
+        {
+            entered.add(slot)
+            enter(slot).forEach(other => allowed.add(other))
+        }
         const cost = reached.get(face)!
 
         // faces finish in order of their cost, so the last goal is the farthest one
