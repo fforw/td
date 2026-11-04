@@ -39,6 +39,12 @@ const STAIN_RESOLUTION = 2
 const STAIN_SCALE = 260
 
 /**
+ * Largest random change of the size of a symbol as a fraction, and of its rotation in radians. The castle stays as it is.
+ */
+const SYMBOL_SIZE_JITTER = 0.2
+const SYMBOL_ROTATION_JITTER = 0.06
+
+/**
  * View onto the map: the map position at the top left corner of the canvas and pixels per map unit
  */
 export interface MapView
@@ -289,13 +295,25 @@ export default function drawOldMap(
             let sprite = sprites.get(frame)
             if (!sprite)
             {
-                sprite = symbolSprite(atlas, frame, frame.w * scale * pixelRatio, frame.h * scale * pixelRatio)
+                // in the largest size it can have, so that no symbol gets scaled up
+                const largestScale = scale * (1 + SYMBOL_SIZE_JITTER) * pixelRatio
+                sprite = symbolSprite(atlas, frame, frame.w * largestScale, frame.h * largestScale)
                 sprites.set(frame, sprite)
             }
 
-            const width = frame.w * scale
-            const height = frame.h * scale
-            ctx.drawImage(sprite, screenX(x, y) - width * frame.pivotX, screenY(x, y) - height * frame.pivotY, width, height)
+            const jitter = type !== FaceType.WALL
+            const size = jitter ? 1 + prando.next(-SYMBOL_SIZE_JITTER, SYMBOL_SIZE_JITTER) : 1
+            const width = frame.w * scale * size
+            const height = frame.h * scale * size
+
+            ctx.save()
+            ctx.translate(screenX(x, y), screenY(x, y))
+            if (jitter)
+            {
+                ctx.rotate(prando.next(-SYMBOL_ROTATION_JITTER, SYMBOL_ROTATION_JITTER))
+            }
+            ctx.drawImage(sprite, -width * frame.pivotX, -height * frame.pivotY, width, height)
+            ctx.restore()
         }
     }
 
