@@ -60,6 +60,11 @@ export interface GatePlan
     width: number
 }
 
+/**
+ * Size of the tavern relative to the houses
+ */
+const TAVERN_SCALE = 2
+
 export interface HousePlan
 {
     x: number
@@ -74,6 +79,23 @@ export interface HousePlan
     angle: number
     wood: boolean
     highRoof: boolean
+}
+
+/**
+ * The tavern building of a castle
+ */
+export interface TavernPlan
+{
+    x: number
+    z: number
+    /**
+     * Width of the building
+     */
+    side: number
+    /**
+     * Angle in the 2D plan
+     */
+    angle: number
 }
 
 export type StallModel = "stall" | "stallRed" | "stallGreen"
@@ -102,6 +124,10 @@ export interface CastlePlan
     walls: number[][]
     gates: GatePlan[]
     houses: HousePlan[]
+    /**
+     * The tavern, missing in castles too small to have one
+     */
+    tavern?: TavernPlan
     /**
      * Position of the fountain in the center of the market
      */
@@ -371,6 +397,7 @@ export function planCastle(faces: Face[], castle: Castle): CastlePlan
     alignGatesToWalls(gates, paths)
 
     const houses: HousePlan[] = []
+    let tavern: TavernPlan | undefined
     const stalls: StallPlan[] = []
     const center = toWorld(centerFace.centroid)
     for (const face of faces)
@@ -388,6 +415,16 @@ export function planCastle(faces: Face[], castle: Castle): CastlePlan
                 highRoof: rng.next() < 0.4
             })
         }
+        else if (face.type === FaceType.TAVERN)
+        {
+            const [pt, size, angle] = squareFace(face)
+            tavern = {
+                x: pt[0] * SCALE,
+                z: pt[1] * SCALE,
+                side: size * TAVERN_SCALE * SCALE / Math.SQRT2,
+                angle
+            }
+        }
         else if (face.type === FaceType.MARKET && face !== centerFace && !connectsTo(face, centerFace) && rng.next() >= 0.7)
         {
             const model = STALLS[Math.floor(rng.next() * STALLS.length)]
@@ -400,6 +437,7 @@ export function planCastle(faces: Face[], castle: Castle): CastlePlan
         walls: paths.map(path => path.flatMap(pt => [pt.x, pt.z])),
         gates: gates.map(({ center, road, width }) => ({ x: center.x, z: center.z, roadX: road.x, roadZ: road.z, width })),
         houses,
+        tavern,
         fountain: [center.x, center.z],
         stalls
     }

@@ -17,6 +17,7 @@ export const MODELS = {
     gateway: "castle/wall-doorway.glb",
     gateTower: "castle/tower-hexagon-base.glb",
     gateTowerRoof: "castle/tower-hexagon-roof.glb",
+    tavern: "castle/tavern.glb",
 
     houseBlock: "town/wallBlock.glb",
     houseWoodBlock: "town/wallWoodBlock.glb",

@@ -1,5 +1,5 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, type Object3D, Vector3 } from "three"
-import type { CastlePlan, GatePlan, HousePlan } from "./castlePlan"
+import type { CastlePlan, GatePlan, HousePlan, TavernPlan } from "./castlePlan"
 import { model, template } from "../render/scene3d"
 
 /*
@@ -11,6 +11,12 @@ const TAU = Math.PI * 2
 const WALL_HEIGHT = 0.6
 const WALL_THICKNESS = 0.4
 const TOWER_SIZE = 0.66
+
+/**
+ * Size of the tavern model in its own units
+ */
+const TAVERN_MODEL_WIDTH = 4.25
+const TAVERN_MODEL_HEIGHT = 4.19
 
 /**
  * Minimum change of direction for a wall corner to get a tower
@@ -134,6 +140,23 @@ function createHouse(plan: HousePlan): Object3D
     house.position.set(x, 0, z)
     house.rotation.y = toRotationY(angle)
     return house
+}
+
+function createTavern({ x, z, side, angle }: TavernPlan): Object3D
+{
+    const tavern = model("tavern")
+    tavern.scale.setScalar(side / TAVERN_MODEL_WIDTH)
+    tavern.position.set(x, 0, z)
+    tavern.rotation.y = toRotationY(angle)
+    return tavern
+}
+
+/**
+ * Height of the tavern of the given plan
+ */
+export function tavernHeight({ side }: TavernPlan): number
+{
+    return side * TAVERN_MODEL_HEIGHT / TAVERN_MODEL_WIDTH
 }
 
 function createTower(pt: Vector3, gate: boolean): Object3D
@@ -464,6 +487,13 @@ export function createCastle(plan: CastlePlan): Group
         obj.userData.house = index
         group.add(obj)
     })
+
+    if (plan.tavern)
+    {
+        const tavern = createTavern(plan.tavern)
+        tavern.userData.tavern = true
+        group.add(tavern)
+    }
 
     const fountain = model("fountain")
     fountain.scale.setScalar(MARKET_FOUNTAIN_SCALE)
