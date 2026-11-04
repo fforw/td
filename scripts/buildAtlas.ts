@@ -80,7 +80,14 @@ for (const { name, x, y, img } of [...bins].sort((a, b) => a.name < b.name ? -1 
         pivotX: fraction(pivot.x, w),
         pivotY: fraction(pivot.y, h)
     }
-    atlas.blit({ src: img, x: x + PADDING, y: y + PADDING })
+
+    // blit would blend with the transparent black of the atlas, which darkens everything partly transparent
+    for (let row = 0; row < h; row++)
+    {
+        const start = row * w * 4
+        const target = ((y + PADDING + row) * width + x + PADDING) * 4
+        atlas.bitmap.data.set(img.bitmap.data.subarray(start, start + w * 4), target)
+    }
 }
 
 mkdirSync(OUTPUT_DIR, { recursive: true })

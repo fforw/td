@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs"
+import { Jimp } from "jimp"
 import { assert, describe, it } from "vitest"
 
 import { type AtlasFrame, spritesOf } from "../../src/render/mapAtlas"
@@ -32,6 +33,23 @@ describe("mapAtlas", function () {
     it("has all sprites of the palette", function () {
         const sprites = spritesOf(frames)
         SEPIA.symbols.forEach(({ sprite }) => assert.ok(sprites.has(sprite), sprite))
+    })
+
+    it("keeps the pixels of the images as they are", async function () {
+        const atlas = await Jimp.read("public/media/map/atlas.png")
+        for (const [name, { x, y, w, h }] of Object.entries(frames))
+        {
+            const image = await Jimp.read("atlas-src/" + name + ".png")
+            for (let row = 0; row < h; row++)
+            {
+                const start = row * w * 4
+                const target = ((y + row) * width + x) * 4
+                assert.ok(
+                    image.bitmap.data.subarray(start, start + w * 4).equals(atlas.bitmap.data.subarray(target, target + w * 4)),
+                    name + " row " + row
+                )
+            }
+        }
     })
 
     it("keeps frames apart and inside of the image", function () {
