@@ -12,6 +12,8 @@
         "@power-assert/runtime": "^0.3.2",
         "@types/node": "^26.6.5",
         "@types/three": "^0.186.0",
+        "bin-pack": "^1.0.2",
+        "jimp": "^1.6.1",
         "rollup-plugin-power-assert": "^0.2.2",
         "typescript": "^7.0.2",
         "typescript6": "npm:typescript@6",
@@ -26,6 +28,7 @@
         "preview": "vite preview --outDir docs",
         "typecheck": "tsc",
         "export-meeple": "node scripts/exportMeeple.ts",
+        "build-atlas": "node scripts/buildAtlas.ts",
         "test": "vitest run",
         "test:watch": "vitest"
     },
