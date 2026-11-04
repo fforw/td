@@ -42,6 +42,11 @@ ROOF_JOINT_NEG_PROBE = Vector((-0.25, -0.75, ROOF_BASE + 0.2))
 ROOF_JOINT_POS_PROBE = Vector((-0.25, 0.75, ROOF_BASE + 0.2))
 ROOF_RIDGE_PROBE = Vector((-0.6, 0, ROOF_BASE + 0.2))
 
+# the export replaces the materials with this one and the face colors in this attribute, which makes a house one draw
+# call; the kit's materials only differ in their color
+COLOR_ATTRIBUTE = "Color"
+EXPORT_MATERIAL = "houseColors"
+
 # wall ends closer than this meet, in line or at a corner
 WALL_END_DISTANCE = 0.15
 
@@ -109,6 +114,41 @@ def dropped_tags(piece, walls, roofs, closed):
     return drop
 
 
+def material_color(material):
+    """
+    Returns the linear base color of the given material
+    """
+    bsdf = material.node_tree.nodes.get("Principled BSDF") if material.use_nodes else None
+    return tuple(bsdf.inputs["Base Color"].default_value if bsdf else material.diffuse_color)
+
+
+def write_colors(mesh):
+    """
+    Writes the color of each face's material into the corners of the face
+    """
+    attribute = mesh.color_attributes.get(COLOR_ATTRIBUTE)
+    if attribute is not None:
+        mesh.color_attributes.remove(attribute)
+    attribute = mesh.color_attributes.new(COLOR_ATTRIBUTE, "FLOAT_COLOR", "CORNER")
+    colors = [material_color(material) for material in mesh.materials]
+    for poly in mesh.polygons:
+        for loop in poly.loop_indices:
+            attribute.data[loop].color = colors[poly.material_index]
+    mesh.color_attributes.active_color = attribute
+
+
+def export_material():
+    material = bpy.data.materials.get(EXPORT_MATERIAL)
+    if material is None:
+        material = bpy.data.materials.new(EXPORT_MATERIAL)
+        material.use_nodes = True
+        bsdf = material.node_tree.nodes["Principled BSDF"]
+        bsdf.inputs["Base Color"].default_value = 1, 1, 1, 1
+        bsdf.inputs["Metallic"].default_value = 0
+        bsdf.inputs["Roughness"].default_value = 1
+    return material
+
+
 def bake(house, closed):
     objects = [o for o in house.all_objects if o.type == "MESH"]
     walls = [o for o in objects if kind(o) == "wall"]
@@ -172,6 +212,7 @@ def bake(house, closed):
     for attribute in ("side", "sideColor"):
         if attribute in mesh.attributes:
             mesh.attributes.remove(mesh.attributes[attribute])
+    write_colors(mesh)
 
     collection = bpy.data.collections.get(name)
     if collection is None:
@@ -188,15 +229,23 @@ def bake(house, closed):
 
 
 def export(obj):
+    """
+    Exports a copy with one material and vertex colors. The baked house keeps its materials for the viewport.
+    """
     import os
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    bpy.context.view_layer.objects.active = obj
-    location = obj.location.copy()
-    obj.location = (0, 0, 0)
     path = os.path.join(EXPORT_DIR, obj.name.removesuffix("_baked") + ".glb")
-    bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_format="GLB", export_attributes=False)
-    obj.location = location
+    mesh = obj.data.copy()
+    mesh.materials.clear()
+    mesh.materials.append(export_material())
+    copy = bpy.data.objects.new(obj.name + "_export", mesh)
+    obj.users_collection[0].objects.link(copy)
+    bpy.ops.object.select_all(action="DESELECT")
+    copy.select_set(True)
+    bpy.context.view_layer.objects.active = copy
+    bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_format="GLB", export_attributes=False,
+                              export_texcoords=False, export_vertex_color="ACTIVE")
+    bpy.data.objects.remove(copy)
+    bpy.data.meshes.remove(mesh)
     return path
 
 
