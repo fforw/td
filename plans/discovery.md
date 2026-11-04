@@ -171,17 +171,32 @@ subtitle on top of that.
 
 ## Phase 1 - Discovery
 
-### 1.1 Movement cost and pathfinding
+### 1.1 Movement cost and routes
 
-- Cost per `FaceType`; impassable defaults to the existing `occupied`
-  flag (WATER, ROCK, TREE, WALL, HOUSE, ...). GATE is passable.
-- A* over faces of a level's `PatchWorld`, crossing seams via `twin()`.
-  Heuristic: centroid distance times the cheapest cost.
+- Constant cost per `FaceType`, summed over all faces entered: 1 by
+  default, SAND 1.5, SNOW 2, forests 3, SWAMP 4. WATER, ROCK, WALL,
+  HOUSE and TAVERN are impassable. Passing is separate from `occupied`,
+  which is about what can be placed on a face: nothing gets built in a
+  forest, but people walk through it. An impassable THICKET may follow.
+- A route leads from the center of the castle to all points of interest
+  of the target and costs as much as the farthest one. If any can't be
+  reached, there is no route.
+- Dijkstra over the faces of a level's `PatchWorld`, crossing seams via
+  `twin()`. It reaches several goals, so a heuristic has little to offer.
+- It runs in the map worker. The worker hands over what it builds, so
+  `SimWorld` sends every patch back as a copy, which is cheap for typed
+  arrays. Patches are addressed by q/r between threads, slots stay
+  private to each `PatchWorld`.
 - Portals are extra edges between levels; routes across levels search
-  over portals on top of per-level A*.
+  over portals on top of the per-level search.
 - Cost tables are per traveller, so hero traits (ranger, dwarf) and
   foes can use their own.
-- Main thread first; move into the worker if it gets slow.
+
+Generators own their points of interest: they make sure these connect
+to the border of the patch, a patch without room for them falls back to
+kind NONE. Whether the border can be reached from outside depends on
+the neighbors, which is what makes a mission fail. The castle has one
+point of interest, its center, where every route starts.
 
 ### 1.2 Missions
 
@@ -189,15 +204,23 @@ subtitle on top of that.
   patch.
 - On start: roll the target's kind, weighted by the story director (see
   2.4), mark it `targeted`, generate it into the simulation set.
-- The route may go through any discovered patch, not only the one next to
-  the target.
-- Success: A* cost, scaled by the explorer's speed (1.3) -> day
-  bucket. Thresholds are multiples of the cost of crossing one patch on
-  open ground (`PATCH_SIZE` faces times the cheapest cost), so they
-  survive changes of `PATCH_SIZE`/`FACE_SIZE`.
-  The patch becomes `discovered` with `parent` set.
-- Failure: "can't get from here to there". Costs the days to the furthest
-  point the search reached, so failing isn't a free probe.
+- The route may go through any patch, known or not. Explorers get through
+  unknown land unnoticed, even an enemy kingdom. Passing through is not
+  discovering: only a patch an explorer was sent to is discovered and can
+  affect the story. A patch passed on the way only gets a note on the map,
+  "looked safe" or "looked dangerous", and stays a possible target.
+- Explorers are freakishly good at this, so missions are no realistic
+  journeys: a route cost maps to a few neat day steps of 1, 3, 5, ...,
+  the way back included. The first targets take 1 day, every ring
+  further out one step more. The limits are measured on generated
+  worlds.
+- Nothing shows the days before a mission, the tavern only shows speed
+  and experience. A coarse hint may follow.
+- Success: the patch becomes `discovered` with `parent` set.
+- Failure: "can't get from here to there". Takes the days to the
+  reachable point closest to the target, so failing isn't free. The
+  patch stays unknown and can be tried again once more of the map is
+  known.
 - Explorers leave no tracks or witnesses, so a discovery mission never
   creates a threat by itself (see 4.2).
 - The castle and its eight neighbors are known from the start: the 3D
@@ -223,10 +246,10 @@ back.
   one who reported back hangs around for a while before moving on.
 - Expert sneakers: they are never caught, never fight, and leave no
   witnesses or tracks. Their only job is discovery.
-- Speed scales a mission's days and the failure cost down. It grows
-  with experience, from every mission, failed ones included, and so
-  does their price; a seasoned explorer is worth hiring for long or
-  hard targets while they are still around.
+- Good speed gets a mission done one or two day steps earlier, down to
+  1 day. It grows with experience, from every mission, failed ones
+  included, and so does their price; a seasoned explorer is worth hiring
+  for long or hard targets while they are still around.
 - They report back to the TAVERN after each mission; their position is
   not state, every mission starts at the castle.
 
@@ -507,7 +530,7 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 ### 4.5 Warning and defense
 
-- Threats show up with an ETA in days from the A* cost, giving the
+- Threats show up with an ETA in days from the route cost, giving the
   player time to intercept, fortify or pay off.
 - Defenses are overlay edits (WALL, GATE) that raise path costs or cut
   routes. Terrain that blocked the heroes also protects the castle.
