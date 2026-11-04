@@ -639,11 +639,12 @@ export default class Castle
             pc[0].type = n < 0.75 ? FaceType.HOUSE : FaceType.PLOT
         })
 
-        // the first house is the tavern
-        const tavern = best.find(pc => pc[0].type === FaceType.HOUSE)
+        // the house or plot closest to the market is the tavern
+        const marketDistance = ({ centroid: [x, y] }: Face) => Math.hypot(x - center.centroid[0], y - center.centroid[1])
+        const tavern = best.map(pc => pc[0]).sort((a, b) => marketDistance(a) - marketDistance(b))[0]
         if (tavern)
         {
-            tavern[0].type = FaceType.TAVERN
+            tavern.type = FaceType.TAVERN
         }
 
         for (let i = 0; i < castle.length; i++)
