@@ -183,10 +183,12 @@ subtitle on top of that.
   reached, there is no route.
 - Dijkstra over the faces of a level's `PatchWorld`, crossing seams via
   `twin()`. It reaches several goals, so a heuristic has little to offer.
-- It runs in the map worker. The worker hands over what it builds, so
-  `SimWorld` sends every patch back as a copy, which is cheap for typed
-  arrays. Patches are addressed by q/r between threads, slots stay
-  private to each `PatchWorld`.
+- It runs in the map worker, which builds the patches it needs itself
+  once the search gets there, so a route doesn't cost more patches than
+  it reaches. `SimWorld` only sends one request with what the worker
+  can't know: the kinds of known patches. Patches are addressed by q/r
+  between threads, slots stay private to each `PatchWorld`. The overlay
+  of 0.3 has to reach the worker as messages once it exists.
 - Portals are extra edges between levels; routes across levels search
   over portals on top of the per-level search.
 - Cost tables are per traveller, so hero traits (ranger, dwarf) and
