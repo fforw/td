@@ -72,8 +72,8 @@ const GATE_THICKNESS = 0.85
  */
 const GATE_CLEARANCE = 2
 
-const MARKET_FOUNTAIN_SCALE = 0.3
-const MARKET_STALL_SCALE = 0.36
+const MARKET_FOUNTAIN_SCALE = 0.2
+const MARKET_STALL_SCALE = 0.2
 
 /**
  * Height of the fountain above the ground, high enough to stay above debug grid lines
