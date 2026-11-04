@@ -56,12 +56,12 @@ const INK_ALPHA = 0.6
  * Pixels per noise pixel of the stains on the paper
  */
 const STAIN_RESOLUTION = 2
-const STAIN_SCALE = 260
+const STAIN_SCALE = 400
 
 /**
  * Largest random change of the size of a symbol as a fraction, and of its rotation in radians. The castle stays as it is.
  */
-const SYMBOL_SIZE_JITTER = 0.2
+const SYMBOL_SIZE_JITTER = 0.1
 const SYMBOL_ROTATION_JITTER = 0.06
 
 /**
