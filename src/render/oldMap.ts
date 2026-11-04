@@ -1,0 +1,303 @@
+import { createNoise2D } from "simplex-noise"
+import Prando from "prando"
+import { FaceType } from "../map/geometry"
+import type { InkEdge, OldMap } from "../map/mapRegions"
+import { DEFAULT_COSTS } from "../map/route"
+import { deckleMask } from "./deckle"
+import type { AtlasFrame, MapAtlas } from "./mapAtlas"
+import { SEPIA } from "./mapPalette"
+
+/**
+ * Wavelengths and amplitudes in map units of the wobble of all points on the map. Fills and lines move together, so the
+ * straight edges of the marching squares look drawn by hand without getting out of line.
+ */
+const WOBBLE_LARGE = 173
+const WOBBLE_LARGE_AMOUNT = 11
+const WOBBLE_SMALL = 47
+const WOBBLE_SMALL_AMOUNT = 7
+
+/**
+ * Line width in pixels of boundaries of impassable regions
+ */
+const IMPASSABLE_WIDTH = 2
+
+/**
+ * Line width in pixels of other boundaries, growing with the difference in travel cost
+ */
+const BASE_WIDTH = 0.45
+const COST_WIDTH = 0.22
+
+/**
+ * Widths in pixels of the bands along the coast, drawn from the outside in and alternating with the water color
+ */
+const SHORE_WIDTHS = [26, 21, 14, 10, 5]
+
+/**
+ * Pixels per noise pixel of the stains on the paper
+ */
+const STAIN_RESOLUTION = 2
+const STAIN_SCALE = 260
+
+/**
+ * View onto the map: the map position at the top left corner of the canvas and pixels per map unit
+ */
+export interface MapView
+{
+    x: number
+    y: number
+    scale: number
+}
+
+
+function inkWidth({ type, other }: InkEdge): number
+{
+    const cost = DEFAULT_COSTS[type.index]
+    const otherCost = other ? DEFAULT_COSTS[other.index] : cost
+    if (cost === Infinity || otherCost === Infinity)
+    {
+        return IMPASSABLE_WIDTH
+    }
+    return BASE_WIDTH + Math.abs(cost - otherCost) * COST_WIDTH
+}
+
+
+/**
+ * Cuts a frame out of the atlas in its size on the screen. Scaling once is better for the thin lines of the drawings
+ * and faster than scaling every symbol.
+ */
+function symbolSprite(atlas: MapAtlas, frame: AtlasFrame, width: number, height: number): HTMLCanvasElement
+{
+    const sprite = document.createElement("canvas")
+    sprite.width = Math.max(1, Math.round(width))
+    sprite.height = Math.max(1, Math.round(height))
+    const ctx = sprite.getContext("2d")!
+    ctx.imageSmoothingQuality = "high"
+    ctx.drawImage(atlas.image, frame.x, frame.y, frame.w, frame.h, 0, 0, sprite.width, sprite.height)
+    return sprite
+}
+
+
+/**
+ * Cuts the canvas into the shape of a sheet of handmade paper.
+ */
+function cutDeckledEdges(ctx: CanvasRenderingContext2D, pixelRatio: number, seed: number): void
+{
+    const { width, height } = ctx.canvas
+    const mask = document.createElement("canvas")
+    mask.width = width
+    mask.height = height
+    mask.getContext("2d")!.putImageData(new ImageData(deckleMask(width, height, pixelRatio, seed), width, height), 0, 0)
+
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalCompositeOperation = "destination-in"
+    ctx.drawImage(mask, 0, 0)
+    ctx.restore()
+}
+
+
+/**
+ * Stains the paper with noise.
+ */
+function drawStains(ctx: CanvasRenderingContext2D, width: number, height: number, stain: string, seed: number): void
+{
+    const prando = new Prando(seed)
+    const noise = createNoise2D(() => prando.next())
+
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.ceil(width / STAIN_RESOLUTION)
+    canvas.height = Math.ceil(height / STAIN_RESOLUTION)
+    const stains = canvas.getContext("2d")!
+    const image = stains.createImageData(canvas.width, canvas.height)
+    const { data } = image
+
+    const r = parseInt(stain.slice(1, 3), 16)
+    const g = parseInt(stain.slice(3, 5), 16)
+    const b = parseInt(stain.slice(5, 7), 16)
+    for (let y = 0, i = 0; y < canvas.height; y++)
+    {
+        for (let x = 0; x < canvas.width; x++, i += 4)
+        {
+            const stainNoise = noise(x * STAIN_RESOLUTION / STAIN_SCALE, y * STAIN_RESOLUTION / STAIN_SCALE)
+            data[i] = r
+            data[i + 1] = g
+            data[i + 2] = b
+            data[i + 3] = Math.max(0, 22 + stainNoise * 22)
+        }
+    }
+    stains.putImageData(image, 0, 0)
+
+    ctx.save()
+    ctx.globalCompositeOperation = "multiply"
+    ctx.drawImage(canvas, 0, 0, width, height)
+
+    const cx = width / 2
+    const cy = height / 2
+    const vignette = ctx.createRadialGradient(cx, cy, Math.min(cx, cy) * 0.75, cx, cy, Math.hypot(cx, cy))
+    vignette.addColorStop(0, stain + "00")
+    vignette.addColorStop(1, stain + "b0")
+    ctx.fillStyle = vignette
+    ctx.fillRect(0, 0, width, height)
+    ctx.restore()
+}
+
+
+/**
+ * Draws the map onto a canvas of the given size in pixels.
+ *
+ * @param ctx               context of the canvas
+ * @param map               map to draw
+ * @param view              part of the map to show
+ * @param width             width in pixels
+ * @param height            height in pixels
+ * @param atlas             atlas with the symbols
+ * @param paper             gray texture of the paper, see loadMapPaper()
+ * @param seed              seed for the wobble, the stains, the variants of the symbols and the edges
+ * @param pixelRatio        canvas pixels per pixel, for the resolution of the symbols
+ */
+export default function drawOldMap(
+    ctx: CanvasRenderingContext2D,
+    map: OldMap,
+    view: MapView,
+    width: number,
+    height: number,
+    atlas: MapAtlas,
+    paper: HTMLCanvasElement,
+    seed: number,
+    pixelRatio = 1
+): void
+{
+    const prando = new Prando(seed)
+    const wobbleX = createNoise2D(() => prando.next())
+    const wobbleY = createNoise2D(() => prando.next())
+
+    const screenX = (x: number, y: number) => (
+        x +
+        wobbleX(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
+        wobbleX(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
+        view.x
+    ) * view.scale
+    const screenY = (x: number, y: number) => (
+        y +
+        wobbleY(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
+        wobbleY(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
+        view.y
+    ) * view.scale
+
+    ctx.fillStyle = SEPIA.paper
+    ctx.fillRect(0, 0, width, height)
+
+    ctx.lineJoin = ctx.lineCap = "round"
+
+    const regions = new Map<FaceType, Path2D>()
+    map.outlines.forEach((loops, type) => {
+        const path = new Path2D()
+        for (const loop of loops)
+        {
+            for (let i = 0; i < loop.length; i += 2)
+            {
+                const x = screenX(loop[i], loop[i + 1])
+                const y = screenY(loop[i], loop[i + 1])
+                if (i === 0)
+                {
+                    path.moveTo(x, y)
+                }
+                else
+                {
+                    path.lineTo(x, y)
+                }
+            }
+            path.closePath()
+        }
+        regions.set(type, path)
+
+        // the hairline gaps between the regions end up below the ink
+        ctx.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
+        ctx.fill(path)
+    })
+
+    const coast = new Path2D()
+    const lines = new Map<number, Path2D>()
+    for (const edge of map.ink)
+    {
+        const { x0, y0, x1, y1, type, other } = edge
+        const sx0 = screenX(x0, y0)
+        const sy0 = screenY(x0, y0)
+        const sx1 = screenX(x1, y1)
+        const sy1 = screenY(x1, y1)
+
+        const lineWidth = inkWidth(edge)
+        let path = lines.get(lineWidth)
+        if (!path)
+        {
+            path = new Path2D()
+            lines.set(lineWidth, path)
+        }
+        path.moveTo(sx0, sy0)
+        path.lineTo(sx1, sy1)
+
+        if (type === FaceType.WATER || other === FaceType.WATER)
+        {
+            coast.moveTo(sx0, sy0)
+            coast.lineTo(sx1, sy1)
+        }
+    }
+
+    const water = regions.get(FaceType.WATER)
+    if (water)
+    {
+        ctx.save()
+        ctx.clip(water)
+        SHORE_WIDTHS.forEach((lineWidth, i) => {
+            ctx.lineWidth = lineWidth
+            ctx.strokeStyle = i % 2 === 0 ? SEPIA.shore : SEPIA.regions.get(FaceType.WATER)!
+            ctx.stroke(coast)
+        })
+        ctx.restore()
+    }
+
+    ctx.save()
+    ctx.globalCompositeOperation = "multiply"
+    ctx.fillStyle = ctx.createPattern(paper, "repeat")!
+    ctx.fillRect(0, 0, width, height)
+    ctx.restore()
+
+    drawStains(ctx, width, height, SEPIA.stain, seed)
+
+    ctx.strokeStyle = SEPIA.ink
+    lines.forEach((path, lineWidth) => {
+        ctx.lineWidth = lineWidth
+        ctx.stroke(path)
+    })
+
+    const sprites = new Map<AtlasFrame, HTMLCanvasElement>()
+    for (const { x, y, type } of map.symbols)
+    {
+        const style = SEPIA.symbols.get(type)
+        if (style)
+        {
+            const variants = atlas.sprites.get(style.sprite)
+            if (!variants)
+            {
+                throw new Error("No sprite " + style.sprite + " in the map atlas")
+            }
+
+            const frame = variants[prando.nextInt(0, variants.length - 1)]
+            const largest = Math.max(...variants.map(({ w, h }) => Math.max(w, h)))
+            const scale = style.size * view.scale / largest
+
+            let sprite = sprites.get(frame)
+            if (!sprite)
+            {
+                sprite = symbolSprite(atlas, frame, frame.w * scale * pixelRatio, frame.h * scale * pixelRatio)
+                sprites.set(frame, sprite)
+            }
+
+            const width = frame.w * scale
+            const height = frame.h * scale
+            ctx.drawImage(sprite, screenX(x, y) - width * frame.pivotX, screenY(x, y) - height * frame.pivotY, width, height)
+        }
+    }
+
+    cutDeckledEdges(ctx, pixelRatio, seed)
+}

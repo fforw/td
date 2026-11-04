@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { assert, describe, it } from "vitest"
 
 import { type AtlasFrame, spritesOf } from "../../src/render/mapAtlas"
+import { SEPIA } from "../../src/render/mapPalette"
 
 
 const { width, height, frames } = JSON.parse(readFileSync("public/media/map/atlas.json", "utf-8")) as {
@@ -26,6 +27,11 @@ describe("mapAtlas", function () {
         assert.deepEqual(sprites.get("tree"), [a, b])
         assert.deepEqual(sprites.get("old-tree"), [c])
         assert.deepEqual(sprites.get("castle"), [d])
+    })
+
+    it("has all sprites of the palette", function () {
+        const sprites = spritesOf(frames)
+        SEPIA.symbols.forEach(({ sprite }) => assert.ok(sprites.has(sprite), sprite))
     })
 
     it("keeps frames apart and inside of the image", function () {
