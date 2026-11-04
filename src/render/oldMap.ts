@@ -47,6 +47,12 @@ const WIDTH_STEPS = 6
 const SHORE_WIDTHS = [26, 21, 14, 10, 5]
 
 /**
+ * Opacity of the fills and shore bands and of the lines, letting the paper show through like in the drawn symbols
+ */
+const REGION_ALPHA = 0.8
+const INK_ALPHA = 0.6
+
+/**
  * Pixels per noise pixel of the stains on the paper
  */
 const STAIN_RESOLUTION = 2
@@ -94,6 +100,34 @@ function symbolSprite(atlas: MapAtlas, frame: AtlasFrame, width: number, height:
     ctx.imageSmoothingQuality = "high"
     ctx.drawImage(atlas.image, frame.x, frame.y, frame.w, frame.h, 0, 0, sprite.width, sprite.height)
     return sprite
+}
+
+
+/**
+ * Creates a transparent layer with the size and the transform of the given context.
+ */
+function createLayer(ctx: CanvasRenderingContext2D): CanvasRenderingContext2D
+{
+    const canvas = document.createElement("canvas")
+    canvas.width = ctx.canvas.width
+    canvas.height = ctx.canvas.height
+    const layer = canvas.getContext("2d")!
+    layer.setTransform(ctx.getTransform())
+    layer.lineJoin = layer.lineCap = "round"
+    return layer
+}
+
+
+/**
+ * Draws a layer as a whole, so that overlapping shapes on it don't get darker where they overlap.
+ */
+function drawLayer(ctx: CanvasRenderingContext2D, layer: CanvasRenderingContext2D, alpha: number): void
+{
+    ctx.save()
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.globalAlpha = alpha
+    ctx.drawImage(layer.canvas, 0, 0)
+    ctx.restore()
 }
 
 
@@ -208,8 +242,7 @@ export default function drawOldMap(
     ctx.fillStyle = SEPIA.paper
     ctx.fillRect(0, 0, width, height)
 
-    ctx.lineJoin = ctx.lineCap = "round"
-
+    const fills = createLayer(ctx)
     const regions = new Map<FaceType, Path2D>()
     map.outlines.forEach((loops, type) => {
         const path = new Path2D()
@@ -233,8 +266,8 @@ export default function drawOldMap(
         regions.set(type, path)
 
         // the hairline gaps between the regions end up below the ink
-        ctx.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
-        ctx.fill(path)
+        fills.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
+        fills.fill(path)
     })
 
     const coast = new Path2D()
@@ -274,15 +307,16 @@ export default function drawOldMap(
     const water = regions.get(FaceType.WATER)
     if (water)
     {
-        ctx.save()
-        ctx.clip(water)
+        fills.save()
+        fills.clip(water)
         SHORE_WIDTHS.forEach((lineWidth, i) => {
-            ctx.lineWidth = lineWidth
-            ctx.strokeStyle = i % 2 === 0 ? SEPIA.shore : SEPIA.regions.get(FaceType.WATER)!
-            ctx.stroke(coast)
+            fills.lineWidth = lineWidth
+            fills.strokeStyle = i % 2 === 0 ? SEPIA.shore : SEPIA.regions.get(FaceType.WATER)!
+            fills.stroke(coast)
         })
-        ctx.restore()
+        fills.restore()
     }
+    drawLayer(ctx, fills, REGION_ALPHA)
 
     ctx.save()
     ctx.globalCompositeOperation = "multiply"
@@ -292,11 +326,13 @@ export default function drawOldMap(
 
     drawStains(ctx, width, height, SEPIA.stain, seed)
 
-    ctx.strokeStyle = SEPIA.ink
+    const ink = createLayer(ctx)
+    ink.strokeStyle = SEPIA.ink
     lines.forEach((path, lineWidth) => {
-        ctx.lineWidth = lineWidth
-        ctx.stroke(path)
+        ink.lineWidth = lineWidth
+        ink.stroke(path)
     })
+    drawLayer(ctx, ink, INK_ALPHA)
 
     const sprites = new Map<AtlasFrame, HTMLCanvasElement>()
     for (const { x, y, type } of map.symbols)
