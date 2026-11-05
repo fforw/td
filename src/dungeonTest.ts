@@ -1,7 +1,7 @@
 import "./style.css"
 import { loadLevel } from "./dungeonPage"
 import type { DungeonLevel } from "./map/generateDungeon"
-import { EdgeType } from "./map/geometry"
+import { EdgeType, FaceType } from "./map/geometry"
 import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
 
@@ -10,8 +10,9 @@ import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadP
  */
 
 const BACKGROUND_COLOR = "#14141c"
-const WALL_COLOR = "#23232e"
+const EMPTY_COLOR = "#23232e"
 const REGION_COLOR = "#3c4252"
+const WALL_COLOR = "#7c7a82"
 const CORRIDOR_COLOR = "#d8d2c0"
 const EDGE_WALL_COLOR = "#000"
 const DOOR_COLOR = "#ff3030"
@@ -30,12 +31,12 @@ const ctx = canvas.getContext("2d")!
 
 
 /**
- * Returns the fill color per face of each patch: wall by default, then regions, then corridors and rooms with a color
- * of their own
+ * Returns the fill color per face of each patch: empty by default, then regions, then wall faces, then corridors and
+ * rooms with a color of their own
  */
 function faceColors({ patches, regions, rooms, corridors }: DungeonLevel): string[][]
 {
-    const colors = patches.map(patch => new Array<string>(faceCount(patch)).fill(WALL_COLOR))
+    const colors = patches.map(patch => new Array<string>(faceCount(patch)).fill(EMPTY_COLOR))
     const paint = (faces: number[], color: string) => {
         for (const face of faces)
         {
@@ -44,6 +45,12 @@ function faceColors({ patches, regions, rooms, corridors }: DungeonLevel): strin
     }
 
     regions.forEach(faces => paint(faces, REGION_COLOR))
+    patches.forEach(({ faceType }, slot) => faceType.forEach((type, face) => {
+        if (type === FaceType.WALL.index)
+        {
+            colors[slot][face] = WALL_COLOR
+        }
+    }))
     corridors.forEach(({ faces }) => paint(faces, CORRIDOR_COLOR))
     rooms.forEach((faces, i) => paint(faces, `hsl(${i * 360 / rooms.length} 70% 60%)`))
     return colors
