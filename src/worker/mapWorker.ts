@@ -1,4 +1,5 @@
 import RouteFinder from "../game/RouteFinder"
+import { generateDungeon } from "../map/generateDungeon"
 import { generatePatch } from "../map/generatePatch"
 import type { MapRequest, MapResponse, RouteRequest } from "./MapWorkerClient"
 import { transferables } from "../map/QuadPatch"
@@ -31,6 +32,11 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
         {
             const { patch, castle } = generatePatch(data.q, data.r, data.seed, data.size, data.castle)
             postMessage({ id, result: { patch, castle } } satisfies MapResponse, { transfer: transferables(patch) })
+        }
+        else if (data.type === "dungeon")
+        {
+            const patches = generateDungeon(data.seed, data.size, data.width, data.height)
+            postMessage({ id, result: patches } satisfies MapResponse, { transfer: patches.flatMap(transferables) })
         }
         else
         {
