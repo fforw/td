@@ -9,8 +9,8 @@ import {
     Quaternion,
     Vector3
 } from "three"
-import { EdgeType, FaceType } from "../map/geometry"
-import { LEVEL_PRIORITY, marchingSquaresPatch } from "../map/marchingSquares"
+import { wallGround } from "../map/dungeonWalls"
+import { EdgeType } from "../map/geometry"
 import type PatchWorld from "../map/PatchWorld"
 import { SLOT_SHIFT } from "../map/PatchWorld"
 import { next, prev } from "../map/QuadPatch"
@@ -67,39 +67,14 @@ const thinWallGeometry = new BoxGeometry(1, 1, 1)
 export function createThickWalls(world: PatchWorld, slot: number): Mesh
 {
     const positions: number[] = []
+    const { triangles, outline } = wallGround(world, slot)
 
-    // half edges of the top triangles that have no twin yet, which leaves the outline
-    const outline = new Map<string, number[]>()
-    const addEdge = (x0: number, z0: number, x1: number, z1: number) => {
-        const twin = x1 + "," + z1 + "," + x0 + "," + z0
-        if (!outline.delete(twin))
-        {
-            outline.set(x0 + "," + z0 + "," + x1 + "," + z1, [x0, z0, x1, z1])
-        }
+    for (let i = 0; i < triangles.length; i += 2)
+    {
+        positions.push(triangles[i] * SCALE, THICK_WALL_HEIGHT, triangles[i + 1] * SCALE)
     }
 
-    marchingSquaresPatch(world, slot, (type, x0, z0, x1, z1, x2, z2) => {
-        if (type !== FaceType.WALL)
-        {
-            return
-        }
-
-        // wind the triangle so the normal points up
-        if ((x1 - x0) * (z2 - z0) - (z1 - z0) * (x2 - x0) > 0)
-        {
-            [x1, z1, x2, z2] = [x2, z2, x1, z1]
-        }
-        positions.push(
-            x0 * SCALE, THICK_WALL_HEIGHT, z0 * SCALE,
-            x1 * SCALE, THICK_WALL_HEIGHT, z1 * SCALE,
-            x2 * SCALE, THICK_WALL_HEIGHT, z2 * SCALE
-        )
-        addEdge(x0, z0, x1, z1)
-        addEdge(x1, z1, x2, z2)
-        addEdge(x2, z2, x0, z0)
-    }, LEVEL_PRIORITY)
-
-    for (const [x0, z0, x1, z1] of outline.values())
+    for (const [x0, z0, x1, z1] of outline)
     {
         const ax = x0 * SCALE, az = z0 * SCALE, bx = x1 * SCALE, bz = z1 * SCALE
         positions.push(
