@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { isAway, jobDays, startJob } from "../../src/game/heroes"
+import { enterJob, hasArrived, isAway, jobDays, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
@@ -108,6 +108,13 @@ describe("Kind edits", () => {
 
 
 describe("Missions", () => {
+
+    it("keeps the way of a mission", () => {
+
+        const campaign = createCampaign(7)
+        startMission(campaign, campaign.tavern[0].id, "2/0", { ...ROUTE, way: [0, 0, 5, 5] })
+        assert.deepEqual(campaign.missions[0].way, [0, 0, 5, 5])
+    })
 
     it("pays the explorer and discovers the target when the days are up", () => {
 
@@ -266,20 +273,73 @@ describe("Heroes", () => {
         assert(campaign.heroes.every(hero => campaign.tavern.every(e => e.id !== hero.id)))
     })
 
-    it("sends a hero to a known patch and back", () => {
+    it("sends a hero to a known patch, who waits there for the order to enter", () => {
 
         const campaign = createCampaign(21)
         const hero = campaign.heroes[0]
         const days = jobDays("1/0")
         startJob(campaign, hero.id, "1/0")
+        const [job] = campaign.jobs
         assert(isAway(campaign, hero))
 
-        for (let i = 0; i < days; i++)
+        for (let i = 1; i < days; i++)
         {
             advanceDay(campaign)
+            assert(!hasArrived(campaign, job))
         }
+        advanceDay(campaign)
+        assert(hasArrived(campaign, job))
+
+        // no matter how long it takes
+        advanceDay(campaign)
+        assert(isAway(campaign, hero))
+        assert.equal(hero.experience, 0)
+
+        enterJob(campaign, hero.id)
         assert(!isAway(campaign, hero))
         assert(hero.experience === 1)
+    })
+
+    it("can't enter before getting there", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        startJob(campaign, hero.id, "1/0")
+        let error: Error | null = null
+        try
+        {
+            enterJob(campaign, hero.id)
+        }
+        catch (e)
+        {
+            error = e as Error
+        }
+        assert(error !== null)
+        assert(isAway(campaign, hero))
+    })
+
+    it("keeps the way of a job", () => {
+
+        const campaign = createCampaign(21)
+        startJob(campaign, campaign.heroes[0].id, "1/0", { reachable: true, way: [0, 0, 5, 5] })
+        assert.deepEqual(campaign.jobs[0].way, [0, 0, 5, 5])
+    })
+
+    it("needs a known way to the target", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        let error: Error | null = null
+        try
+        {
+            startJob(campaign, hero.id, "1/0", { reachable: false, way: [0, 0, 5, 5] })
+        }
+        catch (e)
+        {
+            error = e as Error
+        }
+        assert(error !== null)
+        assert(!isAway(campaign, hero))
     })
 
     it("only takes jobs at known patches other than the castle", () => {

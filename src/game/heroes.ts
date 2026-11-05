@@ -1,8 +1,8 @@
 import { patchSeed, withSeed } from "../math/random"
 import { randomCharacter } from "../meeple/character"
 import { meepleNameGenerator } from "../meeple/nameGenerator"
-import { type Campaign, type Hero, overworld } from "./campaign"
-import { travelDays } from "./missions"
+import { type Campaign, type Hero, type Job, overworld } from "./campaign"
+import { type MissionRoute, travelDays } from "./missions"
 
 /**
  * Mixed into the campaign seed for the heroes
@@ -52,18 +52,32 @@ export function isAway(campaign: Campaign, hero: Hero): boolean
 
 
 /**
- * Days a hero's job at the patch takes: the way there and back. What happens there comes with the levels.
+ * Days a hero takes to get to the patch of a job
  */
 export function jobDays(target: string): number
 {
-    return travelDays(target, 1) * 2
+    return travelDays(target, 1)
+}
+
+
+/**
+ * Returns whether the hero of the job has got there and waits for the order to enter
+ */
+export function hasArrived({ day }: Campaign, job: Job): boolean
+{
+    return job.endDay <= day
 }
 
 
 /**
  * Sends a hero at home on a job at a known patch
+ *
+ * @param campaign  campaign
+ * @param heroId    id of the hero
+ * @param target    key of the target patch
+ * @param route     route over known patches, without one the hero gets there unseen
  */
-export function startJob(campaign: Campaign, heroId: number, target: string): void
+export function startJob(campaign: Campaign, heroId: number, target: string, route?: Pick<MissionRoute, "reachable" | "way">): void
 {
     const hero = campaign.heroes.find(h => h.id === heroId)
     if (!hero)
@@ -78,20 +92,31 @@ export function startJob(campaign: Campaign, heroId: number, target: string): vo
     {
         throw new Error("Patch " + target + " is no job target")
     }
-    campaign.jobs.push({ heroId, target, startDay: campaign.day, endDay: campaign.day + jobDays(target) })
+    if (route && !route.reachable)
+    {
+        throw new Error("No known way to " + target)
+    }
+    campaign.jobs.push({
+        heroId,
+        target,
+        startDay: campaign.day,
+        endDay: campaign.day + jobDays(target),
+        ...(route?.way ? { way: route.way } : {})
+    })
 }
 
 
 /**
- * Brings the heroes whose jobs are done back home, a bit more experienced
+ * Has a hero who got to the target of their job enter it. What happens there comes with the levels, for now the hero
+ * comes straight back home a bit more experienced.
  */
-export function finishJobs(campaign: Campaign): void
+export function enterJob(campaign: Campaign, heroId: number): void
 {
-    const { day } = campaign
-    for (const job of campaign.jobs.filter(j => j.endDay <= day))
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job || !hasArrived(campaign, job))
     {
-        campaign.heroes.find(h => h.id === job.heroId)!.experience++
+        throw new Error("Hero " + heroId + " isn't at a target")
     }
-    campaign.jobs = campaign.jobs.filter(j => j.endDay > day)
+    campaign.heroes.find(h => h.id === heroId)!.experience++
+    campaign.jobs = campaign.jobs.filter(j => j !== job)
 }
-

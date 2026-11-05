@@ -28,9 +28,9 @@ export type MapMarker = {
     q: number
     r: number
 } & (
-    /** what's on a discovered patch, starts a mission of a hero unless one is there, which is back in the given days */
+    /** what's on a discovered patch, starts a mission of a hero unless one is on the way, which gets there in the given days */
     { type: "poi", kind: PatchKind, days?: number } |
-    /** explorer on the way, back in the given days */
+    /** explorer on the way, gets there in the given days */
     { type: "targeted", days: number } |
     /** unknown patch an explorer passed through */
     { type: "passed", impression: Impression }
@@ -131,7 +131,7 @@ export function mapContent(campaign: Campaign): MapContent
         else if (kind !== "EMPTY" && jobs.includes(key))
         {
             const job = campaign.jobs.find(j => j.target === key)
-            markers.push({ key, q, r, type: "poi", kind, ...(job ? { days: job.endDay - campaign.day } : {}) })
+            markers.push({ key, q, r, type: "poi", kind, ...(job ? { days: Math.max(0, job.endDay - campaign.day) } : {}) })
         }
     }
 

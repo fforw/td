@@ -163,6 +163,71 @@
     margin-top: 1rem;
 }
 
+#game .view-target
+{
+    display: block;
+    width: 100%;
+    padding: 0.15rem 0.4rem;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+}
+
+#game .view-target:hover
+{
+    background: rgba(232, 224, 212, 0.2);
+}
+
+#game .view-target.active
+{
+    background: rgba(232, 224, 212, 0.9);
+    color: #2a1d14;
+}
+
+/* below the HUD, it only takes clicks on what's in it */
+#game .notices
+{
+    position: absolute;
+    top: 4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    width: min(32rem, calc(100% - 2rem));
+    pointer-events: none;
+}
+
+#game .notice
+{
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 0.25rem;
+    background: rgba(42, 29, 20, 0.85);
+    pointer-events: auto;
+}
+
+#game .notice.followed
+{
+    font-size: 1.1rem;
+}
+
+#game .notice .enter
+{
+    background: #c0244e;
+    color: #fff;
+}
+
+#game .notice .dismiss
+{
+    padding: 0 0.3rem;
+    background: transparent;
+    color: inherit;
+}
+
 /* leaves the top of the 3D view and the HUD visible, and a bit of the 3D view all around */
 #game .popup
 {

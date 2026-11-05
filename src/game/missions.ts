@@ -1,7 +1,6 @@
 import type { Route } from "../map/route"
 import { type Campaign, type Explorer, overworld, type PassedPatch, type PatchKind, patchKey } from "./campaign"
 import { impressionOf, NEIGHBORS } from "./patchKinds"
-import { finishJobs } from "./heroes"
 import { price, returnToTavern, updateTavern } from "./tavern"
 
 /**
@@ -76,8 +75,8 @@ function parseKey(key: string): [number, number]
 
 
 /**
- * Days a mission of the given explorer takes for a route of the given cost, the way back included. A failed mission
- * takes as long as what the explorer tried, so failing isn't free.
+ * Days an explorer takes to get somewhere on a route of the given cost. A failed mission takes as long as what the
+ * explorer tried, so failing isn't free.
  */
 export function missionDays(explorer: Pick<Explorer, "speed">, cost: number): number
 {
@@ -165,14 +164,15 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
         startDay: campaign.day,
         endDay: campaign.day + missionDays(explorer, route.cost),
         ...(route.reachable ? {} : { failed: true }),
-        ...(route.passed.length ? { passed: route.passed } : {})
+        ...(route.passed.length ? { passed: route.passed } : {}),
+        ...(route.way ? { way: route.way } : {})
     })
 }
 
 
 /**
- * Advances the game by one day: missions that are due report back, the tavern crowd changes and heroes come home
- * from finished jobs.
+ * Advances the game by one day: explorers who got to their target report and are back in the tavern, and the tavern
+ * crowd changes. Heroes who got to theirs wait there until told to enter.
  */
 export function advanceDay(campaign: Campaign): void
 {
@@ -184,7 +184,6 @@ export function advanceDay(campaign: Campaign): void
     campaign.missions = campaign.missions.filter(m => m.endDay > day)
 
     updateTavern(campaign)
-    finishJobs(campaign)
 
     for (const mission of due)
     {

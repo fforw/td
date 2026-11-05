@@ -1,10 +1,22 @@
-import { type Campaign, type Explorer, type Hero, type Impression, type Mission, overworld, type PatchKind } from "./campaign"
-import { isAway, jobDays, startJob } from "./heroes"
-import CastleScene from "./castleScene"
+import {
+    type Campaign,
+    type Explorer,
+    type Hero,
+    type Impression,
+    type Job,
+    type Journey,
+    type Mission,
+    overworld,
+    type PatchKind,
+    type PatchNode
+} from "./campaign"
+import { enterJob, hasArrived, isAway, jobDays, startJob } from "./heroes"
+import CastleScene, { type Walker } from "./castleScene"
+import { dayMarks } from "./journey"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
 import Portraits, { meepleSitter } from "./portraits"
-import { advanceDay, frontier, startMission } from "./missions"
+import { advanceDay, frontier, type MissionRoute, startMission } from "./missions"
 import SimWorld from "./SimWorld"
 import { exportSave, importSave, type SaveStore } from "./storage"
 import { impressionOf } from "./patchKinds"
@@ -40,9 +52,15 @@ const IMPRESSION_NAMES: Record<Impression, string> = {
 }
 
 /**
- * Most report lines shown
+ * Most report lines and notices shown
  */
 const MAX_REPORTS = 5
+const MAX_NOTICES = 3
+
+/**
+ * Walking speed of heroes, explorers have their own
+ */
+const HERO_SPEED = 1
 
 
 type Child = Node | string | null | false
@@ -87,9 +105,34 @@ function passedNote({ passed }: Mission): string
 
 
 /**
+ * Returns the walking style of a meeple, which follows from the id like the look
+ */
+function gaitOf(id: number): number
+{
+    return id * 0.618 % 1
+}
+
+
+/**
+ * Returns what a report says an explorer found out
+ */
+function missionResult(campaign: Campaign, mission: Mission): string
+{
+    const { explorer, target, failed } = mission
+    if (failed)
+    {
+        return explorer.name + " found no way to " + target + passedNote(mission)
+    }
+    const { kind, q, r } = overworld(campaign).patches[target]
+    return explorer.name + " found " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + q + "/" + r + passedNote(mission)
+}
+
+
+/**
  * The castle in 3D with the HUD over it, running missions and reports in a corner. The map is a popup over the paused 3D
- * view, with a smaller popup on top to start a mission from what was clicked on it. The DOM parts are small, so every
- * change renders them all again; the 3D scene and the sheet of the map stay.
+ * view, with a smaller popup on top to start a mission from what was clicked on it. The view can leave the castle to follow
+ * someone on a journey. The DOM parts are small, so every change renders them all again; the 3D scene and the sheet of the
+ * map stay.
  */
 export default class GameView
 {
@@ -113,6 +156,7 @@ export default class GameView
 
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
+    private readonly notices = el("div", { className: "notices" })
     private readonly popup = el("div", { className: "popup", hidden: true })
     private readonly dialog = el("div", { className: "popup mission-popup", hidden: true })
 
@@ -122,10 +166,22 @@ export default class GameView
     /** hero picked for the mission */
     private pickedHero: number | null = null
 
-    /** an explorer is hired and waiting for the route to be found */
+    /** someone is about to leave and waiting for the route to be found */
     private sending = false
 
     private reports: string[] = []
+
+    /** latest route for a hero, for the target and the amount of known land in its key */
+    private heroRoute: { key: string, route: MissionRoute | null } | null = null
+
+    /** what happened out of sight and hasn't been dismissed */
+    private news: string[] = []
+
+    /** id of the explorer or hero the view follows, null for the castle */
+    private following: number | null = null
+
+    /** mission just finished by the explorer the view follows, who stays there for now */
+    private finished: Mission | null = null
 
     constructor(root: HTMLElement, campaign: Campaign, store: SaveStore)
     {
@@ -182,6 +238,7 @@ export default class GameView
             ...(castle ? [castle.element, castle.compass] : [el("p", { className: "no-3d" }, "The 3D view needs WebGL.")]),
             this.hud,
             this.info,
+            this.notices,
             this.popup,
             this.dialog
         )
@@ -230,52 +287,102 @@ export default class GameView
         this.render()
     }
 
+    private follow(id: number | null): void
+    {
+        this.following = id
+        this.finished = null
+        this.castle?.follow(id)
+        this.render()
+    }
+
     private endDay(): void
     {
-        const { campaign } = this
+        const { campaign, following } = this
         const { patches } = overworld(campaign)
         const due = campaign.missions.filter(m => m.endDay <= campaign.day + 1)
-        const done = campaign.jobs.filter(j => j.endDay <= campaign.day + 1)
+        const arriving = campaign.jobs.filter(j => j.endDay === campaign.day + 1)
 
         advanceDay(campaign)
 
-        for (const { heroId, target } of done)
+        for (const { heroId, target } of arriving)
         {
             const hero = campaign.heroes.find(h => h.id === heroId)!
             const { kind } = patches[target]
             this.reports.unshift(
-                "Day " + campaign.day + ": " + hero.name + " is back from " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
+                "Day " + campaign.day + ": " + hero.name + " got to " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
                 " at " + target
             )
         }
 
         for (const mission of due)
         {
-            const { explorer, target, failed } = mission
-            if (failed)
+            const result = missionResult(campaign, mission)
+            this.reports.unshift("Day " + campaign.day + ": " + result)
+            if (mission.explorer.id === following)
             {
-                this.reports.unshift("Day " + campaign.day + ": " + explorer.name + " found no way to " + target + passedNote(mission))
-                continue
+                this.finished = mission
             }
-            const { kind, q, r } = patches[target]
-            this.reports.unshift(
-                "Day " + campaign.day + ": " + explorer.name + " found " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
-                " at " + q + "/" + r + passedNote(mission)
-            )
+            else
+            {
+                this.news.unshift("🧭 " + result)
+            }
         }
         this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
+        this.news.length = Math.min(this.news.length, MAX_NOTICES)
         this.changed()
     }
 
-    private sendHero(): void
+    private enter({ heroId, target }: Job): void
+    {
+        const { campaign } = this
+        enterJob(campaign, heroId)
+        const hero = campaign.heroes.find(h => h.id === heroId)!
+        const { kind } = overworld(campaign).patches[target]
+        this.reports.unshift(
+            "Day " + campaign.day + ": " + hero.name + " is back from " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
+            " at " + target
+        )
+        this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
+        this.store.save(campaign)
+        this.follow(null)
+    }
+
+    private sendHero(route: MissionRoute): void
     {
         const { campaign, selected, pickedHero } = this
         if (selected && pickedHero !== null)
         {
-            startJob(campaign, pickedHero, selected.key)
+            startJob(campaign, pickedHero, selected.key, route)
             this.closeDialog()
             this.changed()
         }
+    }
+
+    /**
+     * Returns the route for a hero to the given patch, null while it is being looked for. More known land can open up a
+     * way, so it looks again after each discovery.
+     */
+    private routeForHero(target: string): MissionRoute | null
+    {
+        const { campaign } = this
+        const known = Object.values(overworld(campaign).patches).filter(node => node.state === "discovered").length
+        const key = target + "@" + known
+        if (this.heroRoute?.key !== key)
+        {
+            const request: { key: string, route: MissionRoute | null } = { key, route: null }
+            this.heroRoute = request
+            this.sim.heroRoute(campaign, target).then(
+                route => {
+                    if (this.heroRoute === request)
+                    {
+                        request.route = route
+                        this.render()
+                    }
+                },
+                e => console.error("No route to " + target, e)
+            )
+        }
+        return this.heroRoute!.route
     }
 
     private hire(explorer: Explorer): void
@@ -297,6 +404,11 @@ export default class GameView
                         {
                             this.closeDialog()
                         }
+                        if (this.finished?.explorer === explorer)
+                        {
+                            // off again, the view can't stay with them where they were
+                            this.follow(null)
+                        }
                         this.changed()
                     }
                 },
@@ -309,16 +421,62 @@ export default class GameView
         }
     }
 
+    /**
+     * Returns the journey the view follows and what it is about, if any
+     */
+    private followedJourney(): Mission | Job | undefined
+    {
+        const { campaign, following, finished } = this
+        return finished ??
+            campaign.missions.find(m => m.explorer.id === following) ??
+            campaign.jobs.find(j => j.heroId === following)
+    }
+
+    /**
+     * Returns everyone on a journey who can be seen, plus an explorer the view stays with after their report
+     */
+    private walkers(): Walker[]
+    {
+        const { campaign, finished } = this
+        const { seed, day } = campaign
+        const walker = (id: number, speed: number, journey: Journey): Walker[] => {
+            if (!journey.way)
+            {
+                return []
+            }
+            const [reached, next] = dayMarks(journey, day)
+            return [{ id, look: meepleSitter(seed, id).look, gait: gaitOf(id), way: journey.way, speed, reached, next }]
+        }
+        return [
+            ...campaign.missions.flatMap(m => walker(m.explorer.id, m.explorer.speed, m)),
+            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, j)),
+            ...(finished ? walker(finished.explorer.id, finished.explorer.speed, finished) : [])
+        ]
+    }
+
+    /**
+     * Returns the patches shown in 3D: what is known, and what someone the view follows is crossing or heading to. The
+     * latter doesn't make them known, they are just there to walk on.
+     */
+    private shownPatches(): Pick<PatchNode, "q" | "r" | "kind">[]
+    {
+        const { patches } = overworld(this.campaign)
+        const journey = this.followedJourney()
+        return [
+            ...Object.values(patches).filter(node => node.state === "discovered"),
+            ...(journey?.way && "explorer" in journey ? [...(journey.passed ?? []), patches[journey.target]].filter(Boolean) : [])
+        ]
+    }
+
     private render(): void
     {
         const { campaign } = this
-        this.castle?.show(
-            Object.values(overworld(campaign).patches)
-                .filter(node => node.state === "discovered")
-        )
+        this.castle?.show(this.shownPatches())
+        this.castle?.setWalkers(this.walkers())
         this.hud.replaceChildren(...present(this.renderHud()))
         this.info.replaceChildren(...present([this.renderMissions(), this.renderReports()]))
         this.info.hidden = this.info.childElementCount === 0
+        this.notices.replaceChildren(...present([this.renderFollowed(), ...this.renderArrivals(), ...this.renderNews()]))
         if (!this.popup.hidden)
         {
             this.popup.replaceChildren(
@@ -365,6 +523,10 @@ export default class GameView
                             this.popup.hidden = true
                             this.dialog.hidden = true
                             this.reports = []
+                            this.news = []
+                            this.heroRoute = null
+                            this.following = null
+                            this.finished = null
                             // the old ones hold the edits of another timeline, even for the same seed
                             this.castle?.dispose()
                             this.castle = this.createCastle()
@@ -391,8 +553,8 @@ export default class GameView
             {
                 return el("span", {
                     className: "marker poi away",
-                    title: KIND_NAMES[kind] + ": a hero is on the way, back in " + days + "d"
-                }, KIND_ICONS[kind], el("small", {}, "⏳" + days))
+                    title: KIND_NAMES[kind] + ": " + (days ? "a hero gets there in " + days + "d" : "a hero waits to enter")
+                }, KIND_ICONS[kind], el("small", {}, days ? "⏳" + days : "🚪"))
             }
             return el("button", {
                 type: "button",
@@ -449,10 +611,15 @@ export default class GameView
     private renderHeroes({ key, kind }: Extract<MapMarker, { type: "poi" }>): HTMLElement
     {
         const { campaign, pickedHero } = this
+        const route = this.routeForHero(key)
+        const blocked = route !== null && !route.reachable
         return el("section", { className: "mission" },
             this.renderDialogClose(),
             el("h3", {}, KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + key),
-            el("p", { className: "hint" }, "Who should go there?"),
+            el("p", { className: "hint" }, blocked
+                ? "🚧 No known way there. Heroes only travel over discovered land, so explorers have to find one first."
+                : "Who should go there?"
+            ),
             ...campaign.heroes.map(hero => {
                 const away = campaign.jobs.find(j => j.heroId === hero.id)
                 const { stats, classes } = hero.character
@@ -462,7 +629,7 @@ export default class GameView
                     el("span", { className: "stats" },
                         "hp " + stats.hp + " · mp " + stats.mp + " · str " + stats.str + " · dex " + stats.dex +
                         (hero.experience ? " · " + hero.experience + (hero.experience === 1 ? " job" : " jobs") : "") +
-                        (away ? " · away, back in " + (away.endDay - campaign.day) + "d" : "")
+                        (away ? " · " + this.jobStatus(away) : "")
                     ),
                     el("input", {
                         type: "radio",
@@ -479,9 +646,9 @@ export default class GameView
             el("button", {
                 type: "button",
                 className: "launch",
-                disabled: pickedHero === null,
-                onclick: () => this.sendHero()
-            }, "Launch mission · " + jobDays(key) + "d")
+                disabled: pickedHero === null || !route?.reachable,
+                onclick: () => route && this.sendHero(route)
+            }, route ? "Launch mission · " + jobDays(key) + "d" : "Looking for a way…")
         )
     }
 
@@ -499,23 +666,118 @@ export default class GameView
             : el("span", { className: "portrait" })
     }
 
+    private jobStatus(job: Job): string
+    {
+        return hasArrived(this.campaign, job) ? "waits to enter" : "gets there in " + (job.endDay - this.campaign.day) + "d"
+    }
+
+    /**
+     * Returns a line of the mission list, which binds the view to whoever it is about
+     */
+    private renderTarget(text: string, id: number | null, canFollow: boolean): HTMLElement
+    {
+        const active = this.following === id
+        return this.castle && canFollow
+            ? el("button", {
+                type: "button",
+                className: "view-target" + (active ? " active" : ""),
+                title: active ? "The view is here" : "Go there",
+                onclick: () => this.follow(id)
+            }, text)
+            : el("div", {}, text)
+    }
+
     private renderMissions(): HTMLElement | null
     {
-        const { campaign } = this
-        if (campaign.missions.length === 0 && campaign.jobs.length === 0)
+        const { campaign, following, castle } = this
+        if (campaign.missions.length === 0 && campaign.jobs.length === 0 && following === null)
         {
             return null
         }
         return el("section", { className: "missions" },
             el("h3", {}, "Missions"),
-            ...campaign.missions.map(({ explorer, target, endDay }) => el("div", {},
-                "🧭 " + explorer.name + " → " + target + ", back in " + (endDay - campaign.day) + "d"
+            castle && this.renderTarget("🏰 " + campaign.castleName, null, true),
+            ...campaign.missions.map(({ explorer, target, endDay, way }) => this.renderTarget(
+                "🧭 " + explorer.name + " → " + target + ", gets there in " + (endDay - campaign.day) + "d",
+                explorer.id,
+                !!way
             )),
-            ...campaign.jobs.map(({ heroId, target, endDay }) => el("div", {},
-                "🛡️ " + campaign.heroes.find(h => h.id === heroId)!.name + " → " + target +
-                ", back in " + (endDay - campaign.day) + "d"
+            ...campaign.jobs.map(job => this.renderTarget(
+                "🛡️ " + campaign.heroes.find(h => h.id === job.heroId)!.name + " → " + job.target + ", " + this.jobStatus(job),
+                job.heroId,
+                !!job.way
             ))
         )
+    }
+
+    /**
+     * Returns what there is to say about the journey the view follows, and the order to enter once the hero is there
+     */
+    private renderFollowed(): HTMLElement | null
+    {
+        const { campaign, following, finished } = this
+        if (finished)
+        {
+            return el("div", { className: "notice followed" }, "🧭 " + missionResult(campaign, finished))
+        }
+        const mission = campaign.missions.find(m => m.explorer.id === following)
+        if (mission)
+        {
+            return el("div", { className: "notice followed" },
+                "🧭 " + mission.explorer.name + " → " + mission.target + ", gets there in " + (mission.endDay - campaign.day) + "d"
+            )
+        }
+        const job = campaign.jobs.find(j => j.heroId === following)
+        if (!job)
+        {
+            return null
+        }
+        const { name } = campaign.heroes.find(h => h.id === job.heroId)!
+        const { kind } = overworld(campaign).patches[job.target]
+        const place = KIND_ICONS[kind] + " " + KIND_NAMES[kind]
+        return hasArrived(campaign, job)
+            ? el("div", { className: "notice followed" },
+                "🛡️ " + name + " is at " + place,
+                el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter")
+            )
+            : el("div", { className: "notice followed" }, "🛡️ " + name + " → " + place + ", gets there in " + (job.endDay - campaign.day) + "d")
+    }
+
+    /**
+     * Returns the notices of heroes waiting to enter out of sight, which stay until someone goes there
+     */
+    private renderArrivals(): HTMLElement[]
+    {
+        const { campaign, following, castle } = this
+        return campaign.jobs
+            .filter(job => hasArrived(campaign, job) && job.heroId !== following)
+            .map(job => {
+                const { kind } = overworld(campaign).patches[job.target]
+                const { name } = campaign.heroes.find(h => h.id === job.heroId)!
+                const text = "🛡️ " + name + " is at " + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
+                return el("div", { className: "notice" },
+                    text,
+                    castle && job.way
+                        ? el("button", { type: "button", onclick: () => this.follow(job.heroId) }, "Go there")
+                        : el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter")
+                )
+            })
+    }
+
+    private renderNews(): HTMLElement[]
+    {
+        return this.news.map(line => el("div", { className: "notice" },
+            line,
+            el("button", {
+                type: "button",
+                className: "dismiss",
+                title: "Dismiss",
+                onclick: () => {
+                    this.news = this.news.filter(other => other !== line)
+                    this.render()
+                }
+            }, "✕")
+        ))
     }
 
     private renderReports(): HTMLElement | null
