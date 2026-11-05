@@ -85,10 +85,29 @@ export function entranceMatrix({ positions, vertex }: QuadPatch, entrance: numbe
 }
 
 
+/**
+ * Returns the faces in front of entrances, which stay without models to not block the view of the door. An entrance
+ * opening over the border of the patch has no such face.
+ */
+export function entranceFronts({ twin }: QuadPatch, pois: readonly PointOfInterest[]): Set<number>
+{
+    const fronts = new Set<number>()
+    for (const { entrance } of pois)
+    {
+        if (entrance !== undefined && twin[entrance] >= 0)
+        {
+            fronts.add(twin[entrance] >> 2)
+        }
+    }
+    return fronts
+}
+
+
 export function createModels(patch: QuadPatch, pois: readonly PointOfInterest[]): InstancedMesh[]
 {
     const { positions, vertex, faceType } = patch
     const matrices = new Map<ModelName, Matrix4[]>()
+    const fronts = entranceFronts(patch, pois)
 
     const entrances = pois.flatMap(({ entrance }) => entrance === undefined ? [] : [entranceMatrix(patch, entrance)])
     if (entrances.length > 0)
@@ -104,7 +123,7 @@ export function createModels(patch: QuadPatch, pois: readonly PointOfInterest[])
     for (let f = 0; f < faceType.length; f++)
     {
         const models = FACE_MODELS.get(FaceType.byIndex(faceType[f]))
-        if (!models)
+        if (!models || fronts.has(f))
         {
             continue
         }

@@ -4,7 +4,7 @@ import { assert, describe, it } from "vitest"
 import { generatePatch } from "../../src/map/generatePatch"
 import { faceCount } from "../../src/map/QuadPatch"
 import { FACE_SIZE, SCALE } from "../../src/map/scale"
-import { entranceMatrix } from "../../src/render/patchMeshes"
+import { entranceFronts, entranceMatrix } from "../../src/render/patchMeshes"
 
 
 describe("Entrance model", () => {
@@ -45,5 +45,20 @@ describe("Entrance model", () => {
                 assert.closeTo(battlements.dot(outwards), 1, 1e-5)
             }
         }
+    })
+
+    it("keeps the face in front of an entrance free of models", () => {
+
+        const inner = patch.twin.findIndex(t => t >= 0)
+        assert.deepEqual(
+            [...entranceFronts(patch, [{ face: inner >> 2, entrance: inner }])],
+            [patch.twin[inner] >> 2]
+        )
+    })
+
+    it("keeps nothing free for other points of interest or over the border", () => {
+
+        const border = patch.twin.findIndex(t => t < 0)
+        assert(entranceFronts(patch, [{ face: 0 }, { face: border >> 2, entrance: border }]).size === 0)
     })
 })
