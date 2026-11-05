@@ -79,7 +79,7 @@ const SUN_STEP = 4
 /**
  * Speed of someone on a journey with a speed of 1 in world units per second, and how fast they turn in radians per second
  */
-const JOURNEY_SPEED = 2.5
+const JOURNEY_SPEED = 1.65
 const TURN_RATE = 8
 
 /**
