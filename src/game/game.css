@@ -141,9 +141,11 @@
     margin-left: auto;
 }
 
+/* stays in front of the map, to go after someone right from there */
 #game .info
 {
     position: absolute;
+    z-index: 3;
     left: 1rem;
     bottom: 1rem;
     max-width: min(24rem, calc(100% - 2rem));

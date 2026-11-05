@@ -83,6 +83,11 @@ const JOURNEY_SPEED = 2.5
 const TURN_RATE = 8
 
 /**
+ * Seconds of running view between someone being sent off and them leaving, to go after them before they do
+ */
+const DEPARTURE_DELAY = 1.5
+
+/**
  * How far from the castle in world units someone can be seen leaving, without being followed
  */
 const LEAVE_RADIUS = 11
@@ -164,6 +169,8 @@ interface ShownWalker
     followed: boolean
     /** share of the way someone got to while followed, or on the day they were first seen */
     held: number
+    /** seconds until leaving the castle */
+    wait: number
 }
 
 const walkPosition: number[] = []
@@ -358,7 +365,8 @@ export default class CastleScene
                     meeple,
                     visible: false,
                     followed: false,
-                    held: walker.reached
+                    held: walker.reached,
+                    wait: walker.reached > 0 ? 0 : DEPARTURE_DELAY
                 })
             }
         }
@@ -411,7 +419,9 @@ export default class CastleScene
                 }
             }
 
-            const step = JOURNEY_SPEED * speed * delta / SCALE
+            // ending the day is no reason to stand around any longer
+            entry.wait = reached > 0 ? 0 : Math.max(0, entry.wait - delta)
+            const step = entry.wait > 0 ? 0 : JOURNEY_SPEED * speed * delta / SCALE
             meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, 1)
             walk.position(walkPosition)
             meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)

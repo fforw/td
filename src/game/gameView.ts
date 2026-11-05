@@ -682,7 +682,13 @@ export default class GameView
                 type: "button",
                 className: "view-target" + (active ? " active" : ""),
                 title: active ? "The view is here" : "Go there",
-                onclick: () => this.follow(id)
+                onclick: () => {
+                    if (!this.popup.hidden)
+                    {
+                        this.closeMap()
+                    }
+                    this.follow(id)
+                }
             }, text)
             : el("div", {}, text)
     }
