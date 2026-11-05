@@ -1,5 +1,5 @@
 import "./style.css"
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "./map/generateDungeon"
+import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "./map/generateDungeon"
 import { EdgeType } from "./map/geometry"
 import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
@@ -8,7 +8,7 @@ import { FACE_SIZE } from "./render/scene3d"
 import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
- * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2
+ * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2&floor=0.5
  */
 
 const BACKGROUND_COLOR = "#14141c"
@@ -37,6 +37,7 @@ function sizeParam(name: string, fallback: number): number
 
 const width = sizeParam("width", DUNGEON_WIDTH)
 const height = sizeParam("height", DUNGEON_HEIGHT)
+const floorShare = Number(params.get("floor") ?? DEFAULT_DUNGEON_STYLE.floorShare)
 
 // module scripts are deferred, so the DOM is ready at this point
 const canvas = document.getElementById("screen") as HTMLCanvasElement
@@ -185,7 +186,7 @@ function draw(level: DungeonLevel): void
 }
 
 
-new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(level => {
+new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height, { floorShare }).then(level => {
     const { patches, regions, rooms, corridors } = level
     const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
     const roomFaces = rooms.reduce((sum, room) => sum + room.length, 0)

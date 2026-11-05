@@ -35,7 +35,7 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
         }
         else if (data.type === "dungeon")
         {
-            const level = generateDungeon(data.seed, data.size, data.width, data.height)
+            const level = generateDungeon(data.seed, data.size, data.width, data.height, data.style)
             postMessage({ id, result: level } satisfies MapResponse, { transfer: level.patches.flatMap(transferables) })
         }
         else

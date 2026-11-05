@@ -14,15 +14,26 @@ export const DUNGEON_WIDTH = 2
 export const DUNGEON_HEIGHT = 2
 
 /**
- * Share of the faces of a dungeon that should be the floor of rooms when they are picked. Corridors get laid out at this
- * point, so a lower share means fewer rooms with longer corridors between them.
+ * Share of the faces of a dungeon that should be the floor of rooms when they are picked, which takes nearly all regions
  */
 const PICKED_FLOOR_SHARE = 0.4
 
 /**
- * Share of the faces of a dungeon that should be the floor of rooms after growing them
+ * What a dungeon looks like, which can differ per dungeon without changing how it gets generated
  */
-const GROWN_FLOOR_SHARE = 0.6
+export interface DungeonStyle
+{
+    /**
+     * Share of the faces that should be the floor of rooms after growing them, at least the 40% rooms start out with:
+     * from rooms apart in a lot of wall to a warren with little but wall edges between them.
+     */
+    floorShare: number
+}
+
+
+export const DEFAULT_DUNGEON_STYLE: DungeonStyle = {
+    floorShare: 0.6
+}
 
 const LEVEL_SALT = 0x1e7e
 const ROOM_SALT = 0x4004
@@ -78,11 +89,20 @@ export interface DungeonLevel
  * @param size      hexagon size in map units
  * @param width     number of patches in q-direction
  * @param height    number of patches in r-direction
+ * @param style     what the level looks like, the default for what is left out
  *
  * @return generated level
  */
-export function generateDungeon(seed: number, size: number, width: number, height: number): DungeonLevel
+export function generateDungeon(
+    seed: number,
+    size: number,
+    width: number,
+    height: number,
+    style: Partial<DungeonStyle> = {}
+): DungeonLevel
 {
+    const { floorShare } = { ...DEFAULT_DUNGEON_STYLE, ...style }
+
     const patches: QuadPatch[] = []
     for (let r = 0; r < height; r++)
     {
@@ -107,7 +127,7 @@ export function generateDungeon(seed: number, size: number, width: number, heigh
     const corridorFaces = corridors.flatMap(({ faces }) => faces)
     const rooms = withSeed(
         patchSeed(seed ^ ROOM_SALT, 0, 0),
-        () => growRooms(world, picked, faceTotal * GROWN_FLOOR_SHARE, new Set(corridorFaces))
+        () => growRooms(world, picked, faceTotal * floorShare, new Set(corridorFaces))
     )
     setLevelEdges(world, rooms, corridors)
 

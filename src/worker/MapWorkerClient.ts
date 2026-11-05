@@ -1,6 +1,6 @@
 import type { PatchKind } from "../game/campaign"
 import type { RouteQuery, RouteResult } from "../game/RouteFinder"
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
+import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel, type DungeonStyle } from "../map/generateDungeon"
 import type { GeneratedPatch } from "../map/patchGenerators"
 
 /**
@@ -68,6 +68,10 @@ export interface DungeonRequest
      * Number of patches in r-direction
      */
     height: number
+    /**
+     * What the level looks like, the default for what is left out
+     */
+    style: Partial<DungeonStyle>
 }
 
 export type MapRequest = PatchRequest | RouteRequest | DungeonRequest
@@ -160,12 +164,19 @@ export default class MapWorkerClient
      * @param size      hexagon size in map units
      * @param width     number of patches in q-direction
      * @param height    number of patches in r-direction
+     * @param style     what the level looks like, the default for what is left out
      *
      * @return generated level
      */
-    buildDungeon(seed: number, size: number, width = DUNGEON_WIDTH, height = DUNGEON_HEIGHT): Promise<DungeonLevel>
+    buildDungeon(
+        seed: number,
+        size: number,
+        width = DUNGEON_WIDTH,
+        height = DUNGEON_HEIGHT,
+        style: Partial<DungeonStyle> = {}
+    ): Promise<DungeonLevel>
     {
-        return this.request(id => ({ id, type: "dungeon", seed, size, width, height }))
+        return this.request(id => ({ id, type: "dungeon", seed, size, width, height, style }))
     }
 
 

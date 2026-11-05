@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
+import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import { FaceType } from "../../src/map/geometry"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { marchingSquaresPatch } from "../../src/map/marchingSquares"
@@ -97,6 +97,20 @@ describe("generateDungeon", () => {
         assert.deepEqual(a.regions, b.regions)
         assert.deepEqual(a.rooms, b.rooms)
         assert.deepEqual(a.corridors, b.corridors)
+    })
+
+    it("grows rooms to the floor share it is asked for", () => {
+        for (const floorShare of [0.45, 0.6, 0.7])
+        {
+            const { patches, rooms } = generateDungeon(4711, FACE_SIZE, 2, 2, { floorShare })
+            const total = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
+            assert(rooms.flat().length === Math.ceil(total * floorShare))
+        }
+    })
+
+    it("keeps the default for what a style leaves out", () => {
+        const { rooms } = generateDungeon(4711, FACE_SIZE, 2, 2)
+        assert.deepEqual(generateDungeon(4711, FACE_SIZE, 2, 2, DEFAULT_DUNGEON_STYLE).rooms, rooms)
     })
 
     it("gives other patches for another seed", () => {
