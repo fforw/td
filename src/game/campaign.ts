@@ -86,16 +86,30 @@ export interface Explorer
     leavesOn: number
 }
 
-export interface Mission
+/**
+ * Someone walking from the castle to a patch. Days are all that counts: how far along someone is follows from them, the
+ * way is only there to see it.
+ */
+export interface Journey
 {
-    explorer: Explorer
     /** patch key in the overworld */
     target: string
     startDay: number
+    /** day of arriving */
     endDay: number
+    /** the way as x and y in map units, missing in journeys from older saves, which nobody gets to see */
+    way?: number[]
+}
+
+/**
+ * Journey of an explorer to an unknown patch, which ends in a report. The patches on the way get noted with it.
+ */
+export interface Mission extends Journey
+{
+    explorer: Explorer
     /** no way to all points of interest, the explorer comes back with nothing */
     failed?: boolean
-    /** unknown patches on the way, noted when the explorer reports back */
+    /** unknown patches on the way */
     passed?: PassedPatch[]
 }
 
@@ -112,13 +126,13 @@ export interface Hero
     experience: number
 }
 
-export interface Job
+/**
+ * Journey of a hero to a point of interest on a known patch, over known patches only. Once there, the hero waits outside
+ * for the order to enter.
+ */
+export interface Job extends Journey
 {
     heroId: number
-    /** known patch key in the overworld */
-    target: string
-    startDay: number
-    endDay: number
 }
 
 /**

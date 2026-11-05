@@ -171,7 +171,7 @@ export default class GameView
         let castle: CastleScene | null = null
         try
         {
-            castle = new CastleScene(this.campaign.seed, () => this.openMap())
+            castle = new CastleScene(this.campaign.seed, () => this.openMap(), () => this.endDay())
             castle.setRunning(true)
         }
         catch (e)

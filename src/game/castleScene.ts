@@ -23,10 +23,12 @@ import type { CastlePlan } from "../castle/castlePlan"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
 import { createGround, createModels } from "../render/patchMeshes"
-import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
+import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import type { GeneratedPatch } from "../map/patchGenerators"
+import MeepleCrowd, { type Meeple, type MeepleLook } from "../meeple/Meeple3D"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PatchNode } from "./campaign"
+import { Walk } from "./journey"
 
 /*
  * 3D view of the castle and all known patches around it, the home screen of the game
@@ -56,6 +58,46 @@ const DIRECTIONS: [string, number][] = [["N", 0], ["E", Math.PI / 2], ["S", Math
  * Distance of the compass letters from its center, in percent of its size
  */
 const COMPASS_RADIUS = 36
+
+/**
+ * How far the point the camera looks at can get from the castle or a followed meeple in world units, and how far the
+ * camera can get from that point
+ */
+const HOME_VIEW = { radius: 14, distance: 45 }
+const FOLLOW_VIEW = { radius: 3, distance: 7 }
+
+/**
+ * How fast the view gets to where it should be, in shares of the rest per second
+ */
+const VIEW_RATE = 3
+
+/**
+ * Size of the steps the sun moves in with the view, in world units. Moving in steps keeps shadow edges from crawling.
+ */
+const SUN_STEP = 4
+
+/**
+ * Speed of someone on a journey with a speed of 1 in world units per second, and how fast they turn in radians per second
+ */
+const JOURNEY_SPEED = 2.5
+const TURN_RATE = 8
+
+/**
+ * How far from the castle in world units someone can be seen leaving, without being followed
+ */
+const LEAVE_RADIUS = 11
+
+/**
+ * Most meeples walking around at once
+ */
+const MAX_WALKERS = 64
+
+/**
+ * Longest time between frames that counts in seconds, the view may have been hidden for much longer
+ */
+const MAX_FRAME_TIME = 0.1
+
+const TAU = Math.PI * 2
 
 /**
  * Pointer movement in pixels up to which a press counts as a click, not as dragging the camera
@@ -89,6 +131,44 @@ function createSign(icon: string): Sprite
     sign.renderOrder = 1
     return sign
 }
+
+
+/**
+ * Someone on a journey
+ */
+export interface Walker
+{
+    /** id of the explorer or hero */
+    id: number
+    look: MeepleLook
+    /** walking style, see Meeple */
+    gait: number
+    /** x and y in map units for each point of the way */
+    way: readonly number[]
+    /** walking speed, 1 for normal */
+    speed: number
+    /** share of the way that has to be reached by now */
+    reached: number
+    /** share of the way to wait at until the next day */
+    next: number
+}
+
+interface ShownWalker
+{
+    walker: Walker
+    walk: Walk
+    meeple: Meeple
+    /** the meeple is in the crowd */
+    visible: boolean
+    /** the view is bound to the walker */
+    followed: boolean
+    /** share of the way someone got to while followed, or on the day they were first seen */
+    held: number
+}
+
+const walkPosition: number[] = []
+const anchorGoal = new Vector3()
+const shift = new Vector3()
 
 
 export default class CastleScene
@@ -128,11 +208,39 @@ export default class CastleScene
     private width = 0
     private height = 0
 
+    private readonly sun: DirectionalLight
+
+    /** null until the meeple models are there */
+    private crowd: MeepleCrowd | null = null
+    private walkers: Walker[] = []
+    private readonly shown = new Map<number, ShownWalker>()
+
+    /** id of the walker the view is bound to, null for the castle */
+    private followed: number | null = null
+
+    /** middle of the castle */
+    private readonly home = new Vector3()
+    /** where the view is bound to right now, on its way to the castle or the followed walker */
+    private readonly anchor = new Vector3()
+    private viewRadius = HOME_VIEW.radius
+
+    /** distance of the camera to go back to at the castle, null once it is back or while away */
+    private homeDistance: number | null = null
+    /** distance of the camera when it last left the castle */
+    private leftAt = 0
+
+    private lastFrame = 0
+
     /**
      * @param seed      campaign seed, the same the castle and its surroundings are generated from
      * @param onTavern  called when the tavern is clicked
+     * @param onDayMark called when the followed walker got to the point of the way that ends the day
      */
-    constructor(private readonly seed: number, private readonly onTavern: () => void)
+    constructor(
+        private readonly seed: number,
+        private readonly onTavern: () => void,
+        private readonly onDayMark: () => void
+    )
     {
         const canvas = document.createElement("canvas")
         canvas.className = "castle-scene"
@@ -174,7 +282,7 @@ export default class CastleScene
         controls.enableDamping = true
         controls.maxPolarAngle = Math.PI * 0.45
         controls.minDistance = 3
-        controls.maxDistance = 60
+        controls.maxDistance = HOME_VIEW.distance
         controls.screenSpacePanning = false
         this.controls = controls
 
@@ -192,10 +300,194 @@ export default class CastleScene
         shadowCam.far = SUN_DISTANCE * 2
         shadowCam.updateProjectionMatrix()
         this.scene.add(sun, sun.target)
+        this.sun = sun
 
         this.listen(canvas)
 
         this.models = loadModels()
+        this.models.then(() => {
+            this.crowd = new MeepleCrowd(MAX_WALKERS)
+            this.scene.add(this.crowd.group)
+            this.setWalkers(this.walkers)
+        })
+    }
+
+    /**
+     * Sets who is on a journey right now. Someone already walking goes on from where they are.
+     */
+    setWalkers(walkers: Walker[]): void
+    {
+        this.walkers = walkers
+        const { crowd, shown } = this
+        if (!crowd)
+        {
+            return
+        }
+        for (const [id, { walker, meeple }] of shown)
+        {
+            // the same explorer can be off again on another way
+            if (!walkers.some(w => w.id === id && w.way === walker.way))
+            {
+                crowd.remove(meeple)
+                shown.delete(id)
+            }
+        }
+        for (const walker of walkers)
+        {
+            const entry = shown.get(walker.id)
+            if (entry)
+            {
+                entry.walker = walker
+            }
+            else
+            {
+                const walk = new Walk(walker.way, walker.reached)
+                walk.position(walkPosition)
+                const meeple: Meeple = {
+                    position: new Vector3(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE),
+                    facing: Math.atan2(walkPosition[2], walkPosition[3]),
+                    look: walker.look,
+                    phase: walker.id,
+                    name: "",
+                    gait: walker.gait,
+                    walking: false
+                }
+                shown.set(walker.id, {
+                    walker,
+                    walk,
+                    meeple,
+                    visible: false,
+                    followed: false,
+                    held: walker.reached
+                })
+            }
+        }
+    }
+
+    /**
+     * Binds the view to the walker with the given id, or to the castle
+     */
+    follow(id: number | null): void
+    {
+        if (this.followed === null && id !== null)
+        {
+            this.leftAt = this.camera.position.distanceTo(this.controls.target)
+            this.homeDistance = null
+        }
+        else if (this.followed !== null && id === null)
+        {
+            this.homeDistance = this.leftAt
+        }
+        this.followed = id
+    }
+
+    /**
+     * Lets everyone on a journey walk on. Someone followed walks as far as the days allow and ends the day at the next
+     * mark. Anyone else just gets seen leaving the castle, days don't matter until someone goes after them.
+     */
+    private updateWalkers(time: number, delta: number): void
+    {
+        let dayOver = false
+        for (const entry of this.shown.values())
+        {
+            const { walker, walk, meeple } = entry
+            const { reached, next, speed } = walker
+            const followed = walker.id === this.followed
+            if (followed !== entry.followed)
+            {
+                entry.followed = followed
+                if (followed)
+                {
+                    // someone still in sight just goes on, if the days allow it
+                    const start = Math.max(reached, entry.held)
+                    if (!entry.visible || walk.share < start || walk.share >= next)
+                    {
+                        walk.jumpTo(start)
+                    }
+                }
+                else
+                {
+                    entry.held = walk.share
+                }
+            }
+
+            const step = JOURNEY_SPEED * speed * delta / SCALE
+            meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, 1)
+            walk.position(walkPosition)
+            meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
+            if (meeple.walking)
+            {
+                // shortest turn in the direction walked in
+                const turn = ((Math.atan2(walkPosition[2], walkPosition[3]) - meeple.facing) % TAU + TAU * 1.5) % TAU - Math.PI
+                meeple.facing += Math.max(-TURN_RATE * delta, Math.min(TURN_RATE * delta, turn))
+            }
+            dayOver ||= followed && next > reached && walk.length > 0 && walk.isAt(next)
+
+            const visible = followed || (!walk.isAt(1) && meeple.position.distanceTo(this.home) <= LEAVE_RADIUS)
+            if (visible !== entry.visible)
+            {
+                entry.visible = visible
+                if (visible)
+                {
+                    this.crowd!.add(meeple)
+                }
+                else
+                {
+                    this.crowd!.remove(meeple)
+                }
+            }
+        }
+        this.crowd?.update(this.camera, time)
+        if (dayOver)
+        {
+            this.onDayMark()
+        }
+    }
+
+    /**
+     * Moves the view along with what it is bound to and keeps it in the area around that
+     */
+    private updateView(delta: number): void
+    {
+        const { anchor, camera, controls, sun } = this
+        const followed = this.followed !== null ? this.shown.get(this.followed) : undefined
+        const view = this.followed !== null ? FOLLOW_VIEW : HOME_VIEW
+        anchorGoal.copy(followed ? followed.meeple.position : this.home)
+
+        const share = 1 - Math.exp(-VIEW_RATE * delta)
+        shift.subVectors(anchorGoal, anchor).multiplyScalar(share)
+        anchor.add(shift)
+        this.viewRadius += (view.radius - this.viewRadius) * share
+        controls.maxDistance += (view.distance - controls.maxDistance) * share
+
+        // whatever panning did, the point looked at stays in the area
+        const dx = controls.target.x + shift.x - anchor.x
+        const dz = controls.target.z + shift.z - anchor.z
+        const off = Math.hypot(dx, dz)
+        if (off > this.viewRadius)
+        {
+            shift.x -= dx * (1 - this.viewRadius / off)
+            shift.z -= dz * (1 - this.viewRadius / off)
+        }
+        camera.position.add(shift)
+        controls.target.add(shift)
+
+        if (this.homeDistance !== null)
+        {
+            const distance = camera.position.distanceTo(controls.target)
+            const zoomed = distance + (this.homeDistance - distance) * share
+            camera.position.sub(controls.target).setLength(zoomed).add(controls.target)
+            if (Math.abs(this.homeDistance - zoomed) < 0.01)
+            {
+                this.homeDistance = null
+            }
+        }
+
+        const sunX = Math.round(anchor.x / SUN_STEP) * SUN_STEP
+        const sunZ = Math.round(anchor.z / SUN_STEP) * SUN_STEP
+        sun.position.x += sunX - sun.target.position.x
+        sun.position.z += sunZ - sun.target.position.z
+        sun.target.position.set(sunX, 0, sunZ)
     }
 
     /**
@@ -263,6 +555,8 @@ export default class CastleScene
         }
 
         const [fx, fz] = plan.fountain
+        this.home.set(fx, 0, fz)
+        this.anchor.copy(this.home)
         this.controls.target.set(fx, 0, fz)
         this.camera.position.set(fx, 0, fz).add(CAMERA_OFFSET)
         return castle
@@ -363,8 +657,14 @@ export default class CastleScene
             return
         }
         this.running = running
+        this.lastFrame = performance.now() / 1000
         this.renderer.setAnimationLoop(running ? () => {
+            const time = performance.now() / 1000
+            const delta = Math.min(MAX_FRAME_TIME, time - this.lastFrame)
+            this.lastFrame = time
             this.resize()
+            this.updateWalkers(time, delta)
+            this.updateView(delta)
             this.controls.update()
             this.updateCompass()
             this.renderer.render(this.scene, this.camera)
