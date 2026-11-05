@@ -1,11 +1,9 @@
 import "./style.css"
-import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "./map/generateDungeon"
+import { loadLevel } from "./dungeonPage"
+import type { DungeonLevel } from "./map/generateDungeon"
 import { EdgeType } from "./map/geometry"
 import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
-import { randomSeed } from "./math/random"
-import { FACE_SIZE } from "./render/scene3d"
-import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
  * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2&floor=0.5&labyrinth=5
@@ -25,20 +23,6 @@ const LABEL_COLOR = "#000"
  * Distance between the level and the edge of the canvas in pixels
  */
 const MARGIN = 16
-
-const params = new URLSearchParams(location.search)
-
-const seed = randomSeed(params.has("seed") ? Number(params.get("seed")) : null)
-
-function sizeParam(name: string, fallback: number): number
-{
-    return Math.max(1, Math.floor(Number(params.get(name) ?? fallback)) || fallback)
-}
-
-const width = sizeParam("width", DUNGEON_WIDTH)
-const height = sizeParam("height", DUNGEON_HEIGHT)
-const floorShare = Number(params.get("floor") ?? DEFAULT_DUNGEON_STYLE.floorShare)
-const labyrinth = Number(params.get("labyrinth") ?? DEFAULT_DUNGEON_STYLE.labyrinth)
 
 // module scripts are deferred, so the DOM is ready at this point
 const canvas = document.getElementById("screen") as HTMLCanvasElement
@@ -187,16 +171,7 @@ function draw(level: DungeonLevel): void
 }
 
 
-new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height, { floorShare, labyrinth }).then(level => {
-    const { patches, regions, rooms, corridors } = level
-    const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
-    const roomFaces = rooms.reduce((sum, room) => sum + room.length, 0)
-    const corridorFaces = corridors.reduce((sum, corridor) => sum + corridor.faces.length, 0)
-    const percent = (count: number) => Math.round(count * 100 / faces) + "%"
-    document.getElementById("ui")!.textContent =
-        `seed ${seed}, ${width} x ${height} patches, ${faces} faces, ${regions.length} regions, ` +
-        `${rooms.length} rooms ${percent(roomFaces)}, ${corridors.length} corridors ${percent(corridorFaces)}`
-
+loadLevel().then(level => {
     draw(level)
     window.addEventListener("resize", () => draw(level))
 })
