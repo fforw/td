@@ -1,6 +1,7 @@
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import type { MapArea } from "../map/mapRegions"
 import { FACE_SIZE } from "../map/scale"
+import type { MapView } from "../render/manuscriptMap"
 import { type Campaign, type Impression, overworld, type PatchKind, type PatchNode, patchKey } from "./campaign"
 import { jobTargets } from "./heroes"
 import { frontier } from "./missions"
@@ -97,6 +98,31 @@ export function patchArea(q: number, r: number): MapArea
 {
     const [x, y] = patchCenter(q, r)
     return { x: x - PATCH_WIDTH / 2, y: y - PATCH_DEPTH / 2, width: PATCH_WIDTH, height: PATCH_DEPTH }
+}
+
+
+/**
+ * Returns the size of the sheet showing the bounding rectangle of the given patches as large as the given room allows,
+ * with nothing left over on any side, and the view that goes with it.
+ *
+ * @param cells     patches
+ * @param maxWidth  largest width of the sheet in pixels
+ * @param maxHeight largest height of the sheet in pixels
+ */
+export function fitSheet(cells: { q: number, r: number }[], maxWidth: number, maxHeight: number): { width: number, height: number, view: MapView }
+{
+    const qs = cells.map(({ q }) => q)
+    const rs = cells.map(({ r }) => r)
+    const [x0, y0] = patchCenter(Math.min(...qs), Math.min(...rs))
+    const [x1, y1] = patchCenter(Math.max(...qs), Math.max(...rs))
+    const mapWidth = x1 - x0 + PATCH_WIDTH
+    const mapHeight = y1 - y0 + PATCH_DEPTH
+    const scale = Math.min(maxWidth / mapWidth, maxHeight / mapHeight)
+    return {
+        width: Math.round(mapWidth * scale),
+        height: Math.round(mapHeight * scale),
+        view: { x: x0 - PATCH_WIDTH / 2, y: y0 - PATCH_DEPTH / 2, scale }
+    }
 }
 
 

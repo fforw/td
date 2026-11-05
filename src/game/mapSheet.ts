@@ -13,12 +13,12 @@ import {
     type BorderArrow,
     borderArrow,
     type ExploreTarget,
+    fitSheet,
     type MapContent,
     type MapMarker,
     patchArea,
     patchCenter,
-    PATCH_DEPTH,
-    PATCH_WIDTH
+    PATCH_DEPTH
 } from "./mapContent"
 
 /**
@@ -76,30 +76,15 @@ function grow({ x, y, width, height }: MapArea, margin: number): MapArea
 
 
 /**
- * Returns the view in which the bounding rectangle of the given patches fills a sheet of the given size in pixels, in the
- * middle of it for the side that has room left.
- */
-function fitView(cells: { q: number, r: number }[], width: number, height: number): MapView
-{
-    const qs = cells.map(({ q }) => q)
-    const rs = cells.map(({ r }) => r)
-    const [x0, y0] = patchCenter(Math.min(...qs), Math.min(...rs))
-    const [x1, y1] = patchCenter(Math.max(...qs), Math.max(...rs))
-    const scale = Math.min(
-        width / (x1 - x0 + PATCH_WIDTH),
-        height / (y1 - y0 + PATCH_DEPTH)
-    )
-    return { x: (x0 + x1) / 2 - width / 2 / scale, y: (y0 + y1) / 2 - height / 2 / scale, scale }
-}
-
-
-/**
  * The map of a campaign as a sheet of old paper with markers on it. Drawing the sheet takes a moment, so it only happens
  * when the patches on it or its size changed; the markers are rendered by whoever owns the sheet.
  */
 export default class MapSheet
 {
     readonly element = document.createElement("div")
+
+    /** for whoever owns the sheet, to put things onto it that move along with its corners */
+    readonly extras = document.createElement("div")
 
     private readonly canvas = document.createElement("canvas")
     private readonly markers = document.createElement("div")
@@ -140,6 +125,7 @@ export default class MapSheet
         this.terrain = new Terrain(seed)
         this.element.className = "map-sheet"
         this.markers.className = "markers"
+        this.extras.className = "extras"
         this.arrow.type = "button"
         this.arrow.hidden = true
         this.arrow.innerHTML =
@@ -150,8 +136,7 @@ export default class MapSheet
                 this.onExplore?.(this.shown.target)
             }
         })
-        this.element.append(this.canvas, this.markers, this.arrow)
-        this.observer.observe(this.element)
+        this.element.append(this.canvas, this.markers, this.extras, this.arrow)
     }
 
     /**
@@ -181,6 +166,7 @@ export default class MapSheet
         if (surroundings && surroundings !== this.surroundings)
         {
             this.surroundings = surroundings
+            this.observer.observe(surroundings)
             const track = (ev: PointerEvent) => this.pointerAt(ev)
             surroundings.addEventListener("pointermove", track)
             surroundings.addEventListener("pointerdown", track)
@@ -262,16 +248,21 @@ export default class MapSheet
 
     private layout(): void
     {
-        const { content, renderMarker, element, seed } = this
-        const width = element.clientWidth
-        const height = element.clientHeight
-        if (!content || !renderMarker || !width || !height)
+        const { content, renderMarker, element, surroundings, seed } = this
+        if (!content || !renderMarker || !surroundings || !surroundings.clientWidth || !surroundings.clientHeight)
         {
             return
         }
 
-        const view = fitView([...content.known, ...content.rough], width, height)
+        const { paddingLeft, paddingRight, paddingTop, paddingBottom } = getComputedStyle(surroundings)
+        const { width, height, view } = fitSheet(
+            [...content.known, ...content.rough],
+            surroundings.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight),
+            surroundings.clientHeight - parseFloat(paddingTop) - parseFloat(paddingBottom)
+        )
         this.view = view
+        element.style.width = width + "px"
+        element.style.height = height + "px"
 
         const drawn = [
             width,

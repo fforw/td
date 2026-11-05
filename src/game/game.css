@@ -236,6 +236,9 @@
     position: absolute;
     inset: 0;
     z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 4rem 3rem 3rem;
     background: rgba(0, 0, 0, 0.35);
 }
@@ -243,17 +246,14 @@
 #game .mission-popup
 {
     z-index: 4;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 1rem;
 }
 
 #game .close
 {
     position: absolute;
-    top: 5.5rem;
-    right: 4.75rem;
+    top: 1.5rem;
+    right: 1.75rem;
     padding: 0.2rem 0.5rem;
     background: transparent;
     color: #3f2a14;
@@ -263,8 +263,7 @@
 #game .map-sheet
 {
     position: relative;
-    width: 100%;
-    height: 100%;
+    flex: none;
     filter: drop-shadow(0 2px 6px #000a);
 }
 
@@ -276,17 +275,25 @@
     height: 100%;
 }
 
-#game .markers
+#game .markers,
+#game .extras
 {
     position: absolute;
     inset: 0;
+    pointer-events: none;
+}
+
+#game .markers > *,
+#game .extras > *
+{
+    pointer-events: auto;
 }
 
 #game .map-north
 {
     position: absolute;
-    top: 5.75rem;
-    left: 5.25rem;
+    top: 1.75rem;
+    left: 2.25rem;
     font: bold 0.9rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
     color: #c0244e;
 }

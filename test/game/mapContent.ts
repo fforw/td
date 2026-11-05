@@ -2,7 +2,7 @@ import { assert, describe, it, vi } from "vitest"
 
 import { type Campaign, createCampaign, overworld } from "../../src/game/campaign"
 import { startJob } from "../../src/game/heroes"
-import { borderArrow, mapContent, type MapMarker, PATCH_DEPTH, PATCH_WIDTH, patchCenter } from "../../src/game/mapContent"
+import { borderArrow, fitSheet, mapContent, type MapMarker, PATCH_DEPTH, PATCH_WIDTH, patchArea, patchCenter } from "../../src/game/mapContent"
 import { advanceDay, type MissionRoute, startMission } from "../../src/game/missions"
 import { generatePatch } from "../../src/map/generatePatch"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
@@ -24,6 +24,43 @@ function hire(campaign: Campaign, target: string, route: MissionRoute = ROUTE): 
 {
     startMission(campaign, campaign.tavern[0].id, target, route)
 }
+
+
+describe("Map sheet", () => {
+
+    const CELLS = [{ q: -1, r: -1 }, { q: 1, r: 1 }, { q: 0, r: 0 }]
+
+    it("leaves nothing over on the sides if the room is wide", () => {
+
+        const { width, height, view } = fitSheet(CELLS, 2000, 500)
+        assert(height === 500)
+        assert(width === Math.round(3 * PATCH_WIDTH * view.scale))
+        assert(width < 2000)
+    })
+
+    it("leaves nothing over at the top and bottom if the room is high", () => {
+
+        const { width, height, view } = fitSheet(CELLS, 500, 2000)
+        assert(width === 500)
+        assert(height === Math.round(3 * PATCH_DEPTH * view.scale))
+        assert(height < 2000)
+    })
+
+    it("starts its view at the corner of the first patch", () => {
+
+        const { view } = fitSheet(CELLS, 800, 800)
+        const { x, y } = patchArea(-1, -1)
+        assert(view.x === x)
+        assert(view.y === y)
+    })
+
+    it("fits a single patch", () => {
+
+        const { width, height } = fitSheet([{ q: 2, r: 3 }], 800, 800)
+        assert(width === 800)
+        assert.closeTo(height, 800 * PATCH_DEPTH / PATCH_WIDTH, 1)
+    })
+})
 
 
 describe("Map content", () => {

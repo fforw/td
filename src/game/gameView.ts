@@ -479,8 +479,8 @@ export default class GameView
         this.notices.replaceChildren(...present([this.renderFollowed(), ...this.renderArrivals(), ...this.renderNews()]))
         if (!this.popup.hidden)
         {
-            this.popup.replaceChildren(
-                this.sheet.element,
+            this.popup.replaceChildren(this.sheet.element)
+            this.sheet.extras.replaceChildren(
                 el("span", { className: "map-north", title: "North is up, like N on the compass" }, "N ↑"),
                 el("button", {
                     type: "button",
