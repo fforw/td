@@ -157,7 +157,7 @@ function moveWalker(walker: Walker, dt: number): void
 /**
  * Gives the meshes copies of their materials that get lit by the field
  */
-function lightMeshes(meshes: Mesh[], field: LightField): void
+function lightMeshes(meshes: Mesh[], field: LightField, flatTops = false): void
 {
     const lit = new Map<Material, Material>()
     for (const mesh of meshes)
@@ -166,7 +166,7 @@ function lightMeshes(meshes: Mesh[], field: LightField): void
         if (!lit.has(material))
         {
             const copy = material.clone()
-            applyLightField(copy, field)
+            applyLightField(copy, field, flatTops)
             lit.set(material, copy)
         }
         mesh.material = lit.get(material)!
@@ -181,10 +181,11 @@ function show(level: DungeonLevel): void
 
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
-    const meshes: Mesh[] = slots.flatMap(slot => [createGround(world, slot, LEVEL_PRIORITY), createThickWalls(world, slot)])
-    meshes.push(createThinWalls(world, slots), createThinWallCorners(world, slots))
-    lightMeshes(meshes, field)
-    scene.add(...meshes)
+    const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY))
+    const walls: Mesh[] = [...slots.map(slot => createThickWalls(world, slot)), createThinWalls(world, slots), createThinWallCorners(world, slots)]
+    lightMeshes(ground, field)
+    lightMeshes(walls, field, true)
+    scene.add(...ground, ...walls)
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const { positions } of patches)

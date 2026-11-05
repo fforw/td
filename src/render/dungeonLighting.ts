@@ -113,8 +113,13 @@ export function createLightField({ minX, minZ, width, height, colors, directions
 /**
  * Makes the given lit material add the light of the field to its other lights, through its own way of shading. That keeps
  * the bands of toon materials.
+ *
+ * @param material      lit material
+ * @param field         light field
+ * @param flatTops      whether faces looking straight up stay out of the field, for the tops of walls. The field only knows
+ *                      the light on the floor, which has the hard edges of the walls right where their tops are.
  */
-export function applyLightField(material: Material, { uniforms }: LightField): void
+export function applyLightField(material: Material, { uniforms }: LightField, flatTops = false): void
 {
     material.onBeforeCompile = shader => {
         Object.assign(shader.uniforms, uniforms)
@@ -134,19 +139,22 @@ export function applyLightField(material: Material, { uniforms }: LightField): v
                 #include <lights_fragment_begin>
                 {
                     vec3 worldNormal = inverseTransformDirection(normal, viewMatrix);
-                    vec2 uv = (vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)} - lightOrigin) / lightSize;
-                    vec2 toLight = texture2D(lightDirections, uv).rg;
-                    toLight /= max(length(toLight), 0.02);
-                    vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
+                    if (${flatTops ? "worldNormal.y < 0.99" : "true"})
+                    {
+                        vec2 uv = (vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)} - lightOrigin) / lightSize;
+                        vec2 toLight = texture2D(lightDirections, uv).rg;
+                        toLight /= max(length(toLight), 0.02);
+                        vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
 
-                    directLight.color = texture2D(lightColors, uv).rgb * ${LIGHT_GAIN.toFixed(3)};
-                    directLight.direction = normalize((viewMatrix * vec4(worldDirection, 0.0)).xyz);
-                    directLight.visible = true;
-                    RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+                        directLight.color = texture2D(lightColors, uv).rgb * ${LIGHT_GAIN.toFixed(3)};
+                        directLight.direction = normalize((viewMatrix * vec4(worldDirection, 0.0)).xyz);
+                        directLight.visible = true;
+                        RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+                    }
                 }
             `)
     }
-    material.customProgramCacheKey = () => "light-field"
+    material.customProgramCacheKey = () => flatTops ? "light-field-flat-tops" : "light-field"
     material.needsUpdate = true
 }
 
