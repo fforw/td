@@ -14,8 +14,10 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { createCastle } from "./castle/castle3d"
+import { overworldKind } from "./game/patchKinds"
 import { PATCH_SIZE } from "./map/HexagonPatch"
-import MapWorkerClient, { type BuiltPatch } from "./worker/MapWorkerClient"
+import type { GeneratedPatch } from "./map/patchGenerators"
+import MapWorkerClient from "./worker/MapWorkerClient"
 import PatchWorld from "./map/PatchWorld"
 import { createGround, createModels } from "./render/patchMeshes"
 import { FACE_SIZE, loadModels, SCALE } from "./render/scene3d"
@@ -133,15 +135,16 @@ function updateGround(entry: LoadedPatch): void
 }
 
 
-function addPatch(key: string, { patch, castle }: BuiltPatch): void
+function addPatch(key: string, { patch, pois }: GeneratedPatch): void
 {
     const slot = world.add(patch)
     const group = new Group()
     // patches of water or snow have no models, and add() complains about being called without objects
     createModels(patch).forEach(obj => group.add(obj))
-    if (castle)
+    const plan = pois[0]?.plan
+    if (plan)
     {
-        group.add(createCastle(castle))
+        group.add(createCastle(plan))
     }
     scene.add(group)
 
@@ -207,8 +210,7 @@ function updatePatches(pq: number, pr: number): void
     {
         const key = patchKey(q, r)
         requested.add(key)
-        // for now there's only the castle in the starting patch
-        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0).then(
+        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, overworldKind(seed, q, r)).then(
             result => {
                 if (requestedFor !== generation)
                 {

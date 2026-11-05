@@ -51,7 +51,8 @@ async function show(seed: number): Promise<void>
     const current = ++generation
     seedLink.href = "map.html?seed=" + seed + "&rings=" + rings
 
-    const { castle } = await client.buildPatch(0, 0, seed, FACE_SIZE, true)
+    const { pois } = await client.buildPatch(0, 0, seed, FACE_SIZE, "CASTLE")
+    const castle = pois[0].plan!
     const [atlas, paper] = await assets
     if (current !== generation)
     {
@@ -67,8 +68,8 @@ async function show(seed: number): Promise<void>
     canvas.style.height = height + "px"
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
 
-    const cx = castle!.fountain[0] / SCALE
-    const cy = castle!.fountain[1] / SCALE
+    const cx = castle.fountain[0] / SCALE
+    const cy = castle.fountain[1] / SCALE
     const scale = Math.max(width / (2 * rings * PATCH_WIDTH), height / (2 * rings * PATCH_DEPTH))
     const view = { x: cx - width / 2 / scale, y: cy - height / 2 / scale, scale }
 

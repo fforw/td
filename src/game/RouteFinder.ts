@@ -1,10 +1,9 @@
 import { generatePatch } from "../map/generatePatch"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
-import { placePois } from "../map/pointsOfInterest"
 import { findRoute, globalFace, packPath, type Route, slotOf } from "../map/route"
 import type { PassedPatch, PatchKind } from "./campaign"
-import { NEIGHBORS, randomKind } from "./patchKinds"
+import { NEIGHBORS, overworldKind } from "./patchKinds"
 
 
 export interface RouteQuery
@@ -109,11 +108,14 @@ export default class RouteFinder
         let entry = this.patches.get(key)
         if (!entry)
         {
-            const isCastle = q === 0 && r === 0
-            const { patch, castleFace } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, this.size, isCastle)
-            const kind = isCastle ? "CASTLE" : kinds[key] ?? randomKind(this.seed, q, r)
-            const content = placePois(patch, kind, castleFace)
-            entry = { q, r, slot: this.world.add(patch), ...content }
+            const { patch, kind, pois } = generatePatch(
+                q * PATCH_SIZE,
+                r * PATCH_SIZE,
+                this.seed,
+                this.size,
+                kinds[key] ?? overworldKind(this.seed, q, r)
+            )
+            entry = { q, r, slot: this.world.add(patch), kind, pois: pois.map(({ face }) => face) }
             this.patches.set(key, entry)
             this.bySlot.set(entry.slot, entry)
         }

@@ -1,8 +1,7 @@
-import Castle from "../castle/Castle"
-import { type CastlePlan, planCastle } from "../castle/castlePlan"
+import type { PatchKind } from "../game/campaign"
 import { patchSeed, resetRandom, rng } from "../math/random"
 import HexagonPatch from "./HexagonPatch"
-import { packPatch, type QuadPatch } from "./QuadPatch"
+import { applyGenerator, type GeneratedPatch } from "./patchGenerators"
 import Terrain from "./terrain"
 
 
@@ -13,30 +12,19 @@ let terrain: Terrain | null = null
 let terrainSeed = NaN
 
 
-export interface GeneratedPatch
-{
-    patch: QuadPatch
-    castle: CastlePlan | null
-    /**
-     * Local face of the center of the castle, -1 without a castle
-     */
-    castleFace: number
-}
-
-
 /**
- * Generates the patch at the given hexagon position. The same seed and position always give the same patch, no matter
- * in which order patches get generated.
+ * Generates the patch at the given hexagon position. The same seed, position and kind always give the same patch, no
+ * matter in which order patches get generated.
  *
  * @param q         q-position of the patch center
  * @param r         r-position of the patch center
  * @param seed      world seed
  * @param size      hexagon size in map units
- * @param castle    build a castle around the face closest to the world origin
+ * @param kind      kind the patch is meant to be
  *
- * @return packed patch and castle
+ * @return packed patch, what it ended up as and its points of interest
  */
-export function generatePatch(q: number, r: number, seed: number, size: number, castle: boolean): GeneratedPatch
+export function generatePatch(q: number, r: number, seed: number, size: number, kind: PatchKind): GeneratedPatch
 {
     resetRandom(patchSeed(seed, q, r))
     const patch = new HexagonPatch(q, r, size)
@@ -54,8 +42,5 @@ export function generatePatch(q: number, r: number, seed: number, size: number, 
         face.type = terrain!.faceType(x, y, random)
     }
 
-    // the castle changes the face types, so it has to be built before packing
-    const built = castle ? new Castle(faces) : null
-    const plan = built && planCastle(faces, built)
-    return { patch: packPatch(patch, faces), castle: plan, castleFace: built ? faces.indexOf(built.centerFace) : -1 }
+    return applyGenerator(kind, patch, faces)
 }

@@ -1,6 +1,7 @@
-import type { CastlePlan } from "../castle/castlePlan"
+import type { PatchKind } from "../game/campaign"
 import type { RouteQuery, RouteResult } from "../game/RouteFinder"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH } from "../map/generateDungeon"
+import type { GeneratedPatch } from "../map/patchGenerators"
 import type { QuadPatch } from "../map/QuadPatch"
 
 /**
@@ -21,9 +22,10 @@ export interface PatchRequest
      */
     size: number
     /**
-     * Build a castle around the face closest to the world origin
+     * Kind the patch is meant to be. Every request for a patch has to ask for the same kind, generators can change the
+     * faces of a patch by kind.
      */
-    castle: boolean
+    kind: PatchKind
 }
 
 /**
@@ -71,17 +73,8 @@ export interface DungeonRequest
 
 export type MapRequest = PatchRequest | RouteRequest | DungeonRequest
 
-/**
- * Packed patch together with the plan of the castle built on it, if any
- */
-export interface BuiltPatch
-{
-    patch: QuadPatch
-    castle: CastlePlan | null
-}
-
 export type MapResponse =
-    { id: number, result: BuiltPatch | QuadPatch[] | RouteResult, error?: undefined } |
+    { id: number, result: GeneratedPatch | QuadPatch[] | RouteResult, error?: undefined } |
     { id: number, error: string }
 
 
@@ -144,20 +137,20 @@ export default class MapWorkerClient
 
 
     /**
-     * Builds the patch at the given hexagon position. The same seed and position always give the same patch, no matter
-     * in which order patches get built.
+     * Builds the patch at the given hexagon position. The same seed, position and kind always give the same patch, no
+     * matter in which order patches get built.
      *
      * @param q         q-position of the patch center
      * @param r         r-position of the patch center
      * @param seed      world seed
      * @param size      hexagon size in map units
-     * @param castle    build a castle around the face closest to the world origin
+     * @param kind      kind the patch is meant to be
      *
-     * @return packed patch and castle plan
+     * @return packed patch, what it ended up as and its points of interest
      */
-    buildPatch(q: number, r: number, seed: number, size: number, castle = false): Promise<BuiltPatch>
+    buildPatch(q: number, r: number, seed: number, size: number, kind: PatchKind): Promise<GeneratedPatch>
     {
-        return this.request(id => ({ id, type: "patch", q, r, seed, size, castle }))
+        return this.request(id => ({ id, type: "patch", q, r, seed, size, kind }))
     }
 
 

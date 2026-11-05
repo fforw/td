@@ -30,8 +30,8 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
     {
         if (data.type === "patch")
         {
-            const { patch, castle } = generatePatch(data.q, data.r, data.seed, data.size, data.castle)
-            postMessage({ id, result: { patch, castle } } satisfies MapResponse, { transfer: transferables(patch) })
+            const result = generatePatch(data.q, data.r, data.seed, data.size, data.kind)
+            postMessage({ id, result } satisfies MapResponse, { transfer: transferables(result.patch) })
         }
         else if (data.type === "dungeon")
         {

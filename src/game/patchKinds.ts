@@ -32,6 +32,15 @@ export function randomKind(seed: number, q: number, r: number): PatchKind
 
 
 /**
+ * Returns the kind of an overworld patch nothing is known about yet: the castle at 0/0, a roll anywhere else.
+ */
+export function overworldKind(seed: number, q: number, r: number): PatchKind
+{
+    return q === 0 && r === 0 ? "CASTLE" : randomKind(seed, q, r)
+}
+
+
+/**
  * What an explorer passing through makes of a patch. Only dungeons count as dangerous until there are threats to
  * look out for.
  */

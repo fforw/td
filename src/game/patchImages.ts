@@ -3,6 +3,7 @@ import { PATCH_SIZE } from "../map/HexagonPatch"
 import type { QuadPatch } from "../map/QuadPatch"
 import { FACE_SIZE } from "../map/scale"
 import MapWorkerClient from "../worker/MapWorkerClient"
+import type { PatchKind } from "./campaign"
 
 /**
  * Size of a patch in 2D map units, see createHexagon(). Patches sit on a grid of this size; their hexagon rows make
@@ -106,14 +107,14 @@ export default class PatchImages
     /**
      * Returns the image of the patch, null while it is being built.
      */
-    get(q: number, r: number): PatchImage | null
+    get(q: number, r: number, kind: PatchKind): PatchImage | null
     {
         const key = q + "/" + r
         if (!this.images.has(key))
         {
             this.images.set(key, null)
             const scale = IMAGE_WIDTH * window.devicePixelRatio / PATCH_WIDTH
-            this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, FACE_SIZE, q === 0 && r === 0).then(
+            this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, FACE_SIZE, kind).then(
                 ({ patch }) => {
                     const image = drawPatch(patch, scale)
                     this.origin ??= [

@@ -1,12 +1,11 @@
 import { assert, describe, it } from "vitest"
 
 import type { PatchKind } from "../../src/game/campaign"
-import { randomKind } from "../../src/game/patchKinds"
+import { overworldKind } from "../../src/game/patchKinds"
 import RouteFinder, { type RouteResult } from "../../src/game/RouteFinder"
 import { generatePatch } from "../../src/map/generatePatch"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import PatchWorld from "../../src/map/PatchWorld"
-import { placePois } from "../../src/map/pointsOfInterest"
 import { findRoute, globalFace } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
 
@@ -35,11 +34,11 @@ describe("RouteFinder", () => {
             {
                 for (let q = -4; q <= 4; q++)
                 {
-                    const isCastle = q === 0 && r === 0
-                    const { patch, castleFace } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, isCastle)
+                    const kind = overworldKind(seed, q, r)
+                    const { patch, pois: generated } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, kind)
                     const key = q + "/" + r
                     slots.set(key, world.add(patch))
-                    pois.set(key, placePois(patch, isCastle ? "CASTLE" : randomKind(seed, q, r), castleFace).pois)
+                    pois.set(key, generated.map(({ face }) => face))
                 }
             }
             const castle = globalFace(slots.get("0/0")!, pois.get("0/0")![0])

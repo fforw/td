@@ -1,11 +1,13 @@
 import { assert, describe, it } from "vitest"
 
+import type { PatchKind } from "../../src/game/campaign"
 import Castle from "../../src/castle/Castle"
 import { planCastle } from "../../src/castle/castlePlan"
 import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "../../src/map/PatchWorld"
-import { placePois } from "../../src/map/pointsOfInterest"
+import { generatePatch } from "../../src/map/generatePatch"
+import { applyGenerator, PATCH_GENERATORS } from "../../src/map/patchGenerators"
 import { faceCount, packPatch, transferables, type QuadPatch } from "../../src/map/QuadPatch"
 import {
     borderConnected,
@@ -25,15 +27,32 @@ const { GRASS, WATER, SWAMP, TREE, TREE2, FOREST_FLOOR, SAND, SNOW, WALL, HOUSE,
 
 
 /**
- * Builds a patch of nothing but the given face type
+ * Builds a hexagon patch of nothing but the given face type
  */
-function plainPatch(q: number, r: number, type: FaceType): QuadPatch
+function plainFaces(q: number, r: number, type: FaceType)
 {
     resetRandom(patchSeed(4711, q, r))
     const patch = new HexagonPatch(q * PATCH_SIZE, r * PATCH_SIZE, FACE_SIZE)
     const faces = patch.build()
     faces.forEach(face => face.type = type)
+    return { patch, faces }
+}
+
+
+function plainPatch(q: number, r: number, type: FaceType): QuadPatch
+{
+    const { patch, faces } = plainFaces(q, r, type)
     return packPatch(patch, faces)
+}
+
+
+/**
+ * Runs the generator of the given kind on a patch of nothing but the given face type
+ */
+function plainGenerated(kind: PatchKind, type: FaceType)
+{
+    const { patch, faces } = plainFaces(0, 0, type)
+    return applyGenerator(kind, patch, faces)
 }
 
 
@@ -419,16 +438,17 @@ describe("Points of interest", () => {
 
     it("falls back to NONE if a patch has no room for them", () => {
 
-        assert.deepEqual(placePois(plainPatch(0, 0, WATER), "DUNGEON"), { kind: "NONE", pois: [] })
+        const { kind, pois } = plainGenerated("DUNGEON", WATER)
+        assert(kind === "NONE")
+        assert.deepEqual(pois, [])
     })
 
     it("places them where they connect to the border", () => {
 
-        const patch = plainPatch(0, 0, GRASS)
-        const { kind, pois } = placePois(patch, "TEMPLE")
+        const { patch, kind, pois } = plainGenerated("TEMPLE", GRASS)
         assert(kind === "TEMPLE")
         assert(pois.length === 1)
-        assert(borderConnected(patch).has(pois[0]))
+        assert(borderConnected(patch).has(pois[0].face))
     })
 
     it("avoids pockets cut off from the border", () => {
@@ -437,12 +457,38 @@ describe("Points of interest", () => {
         const pocket = innerFace(patch)
         patch.faceType[pocket] = GRASS.index
         assert(!borderConnected(patch).has(pocket))
-        assert(placePois(patch, "TREASURE").kind === "NONE")
+        assert(PATCH_GENERATORS.TREASURE.place!(patch) === null)
     })
 
     it("has none on empty patches", () => {
 
-        assert.deepEqual(placePois(plainPatch(0, 0, GRASS), "EMPTY"), { kind: "EMPTY", pois: [] })
+        const { kind, pois } = plainGenerated("EMPTY", GRASS)
+        assert(kind === "EMPTY")
+        assert.deepEqual(pois, [])
+    })
+
+    it("has the castle plan as the only one of a castle", () => {
+
+        const { patch, kind, pois } = generatePatch(0, 0, 4711, FACE_SIZE, "CASTLE")
+        assert(kind === "CASTLE")
+        assert(pois.length === 1)
+        assert(pois[0].plan)
+        assert(pois[0].face >= 0 && pois[0].face < faceCount(patch))
+    })
+
+    it("has no plans on other kinds", () => {
+
+        const { pois } = generatePatch(0, PATCH_SIZE, 4711, FACE_SIZE, "DUNGEON")
+        assert(pois.every(({ plan }) => !plan))
+    })
+
+    it("leaves the terrain alone without a generator that changes it", () => {
+
+        const terrain = generatePatch(PATCH_SIZE, 0, 4711, FACE_SIZE, "NONE").patch.faceType
+        for (const kind of ["EMPTY", "DUNGEON", "TREASURE", "TEMPLE"] as const)
+        {
+            assert.deepEqual(generatePatch(PATCH_SIZE, 0, 4711, FACE_SIZE, kind).patch.faceType, terrain)
+        }
     })
 
     it("always lets the castle center reach the world around it", () => {

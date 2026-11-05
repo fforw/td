@@ -26,7 +26,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { createCastle } from "./castle/castle3d"
 import { missionDays } from "./game/missions"
 import type { PatchKind } from "./game/campaign"
-import { impressionOf, startPatches } from "./game/patchKinds"
+import { impressionOf, overworldKind, startPatches } from "./game/patchKinds"
 import { PATCH_SIZE } from "./map/HexagonPatch"
 import PatchWorld, { SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, next } from "./map/QuadPatch"
@@ -34,7 +34,8 @@ import { globalFace, unpackPath } from "./map/route"
 import { randomSeed } from "./math/random"
 import { createGround, createModels } from "./render/patchMeshes"
 import { FACE_SIZE, loadModels, SCALE } from "./render/scene3d"
-import MapWorkerClient, { type BuiltPatch } from "./worker/MapWorkerClient"
+import type { GeneratedPatch } from "./map/patchGenerators"
+import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
  * Test page for routes: the castle and the patches around it, with a form for planning the route of a mission. All
@@ -85,7 +86,7 @@ interface LoadedPatch
     slot: number
     group: Group
     ground: Mesh | null
-    built: BuiltPatch
+    built: GeneratedPatch
 }
 
 const params = new URLSearchParams(location.search)
@@ -206,9 +207,10 @@ function show(entry: LoadedPatch): void
     {
         // patches of water or snow have no models, and add() complains about being called without objects
         createModels(built.patch).forEach(obj => group.add(obj))
-        if (built.castle)
+        const plan = built.pois[0]?.plan
+        if (plan)
         {
-            group.add(createCastle(built.castle))
+            group.add(createCastle(plan))
         }
     }
     // the ground along the seams depends on the neighbors, which may have been built since
@@ -251,7 +253,7 @@ function load(q: number, r: number): Promise<LoadedPatch>
     let patch = loaded.get(key)
     if (!patch)
     {
-        patch = client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, q === 0 && r === 0).then(
+        patch = client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, startKinds[key] ?? overworldKind(seed, q, r)).then(
             built => {
                 const slot = world.add(built.patch)
                 const group = new Group()

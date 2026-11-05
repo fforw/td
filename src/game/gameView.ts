@@ -294,7 +294,6 @@ export default class GameView
         this.castle?.show(
             Object.values(overworld(campaign).patches)
                 .filter(node => node.state === "discovered")
-                .map(({ q, r }): [number, number] => [q, r])
         )
         this.hud.replaceChildren(...present(this.renderHud()))
         this.info.replaceChildren(...present([this.renderMissions(), this.renderReports()]))
@@ -422,7 +421,7 @@ export default class GameView
         for (const { q, r, kind } of known)
         {
             const key = patchKey(q, r)
-            const image = images.get(q, r)
+            const image = images.get(q, r, kind)
             const cell = svg("g", { class: "patch discovered " + kind.toLowerCase() + (jobs.includes(key) ? " job" : "") },
                 svg("title", {}, KIND_NAMES[kind]),
                 image

@@ -158,18 +158,19 @@ All edits come from the main thread, workers never send any back.
 
 ### 0.5 Generator requests
 
-- Replace `PatchRequest.castle: boolean` with the patch kind. Callers
-  know it; every request for a patch has to pass the same kind once
-  generators change faces by kind.
-- A table picks the generator per `PatchKind`. It runs after terrain in
-  up to two steps: one on the face objects before packing, one on the
-  packed patch, where `borderConnected` works.
+- `PatchRequest` carries the patch kind. Callers know it; every request
+  for a patch has to pass the same kind, since generators change faces
+  by kind.
+- A table picks the generator per `PatchKind` (`map/patchGenerators.ts`).
+  It runs after terrain in up to two steps: one on the face objects
+  before packing, one on the packed patch, where `borderConnected` works.
 - A generator returns its points of interest, each a local face plus the
-  plan that goes with it. `placePois` and its fallback to kind NONE move
-  in here, so routes and rendering read one result. The castle generator
-  builds the castle tiles and returns the `CastlePlan` as its only point
-  of interest. Kinds without a generator of their own keep one point of
-  interest in the middle.
+  plan that goes with it, so routes and rendering read one result. A
+  patch without room for them falls back to kind NONE with its faces
+  unchanged, so asking for NONE later gives the same patch. The castle
+  generator builds the castle tiles and returns the `CastlePlan` as its
+  only point of interest. Kinds without a generator of their own keep one
+  point of interest in the middle.
 - A kind with a sub-level has two generators. The patch generator only
   places the way in on the overworld, for a dungeon a gate or door on the
   central connected face; it keeps the face types, so routes stay the

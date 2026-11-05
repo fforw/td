@@ -24,7 +24,9 @@ import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
 import { createGround, createModels } from "../render/patchMeshes"
 import { FACE_SIZE, loadModels } from "../render/scene3d"
-import MapWorkerClient, { type BuiltPatch } from "../worker/MapWorkerClient"
+import type { GeneratedPatch } from "../map/patchGenerators"
+import MapWorkerClient from "../worker/MapWorkerClient"
+import type { PatchNode } from "./campaign"
 
 /*
  * 3D view of the castle and all known patches around it, the home screen of the game
@@ -200,17 +202,17 @@ export default class CastleScene
      * Shows the given patches, building the ones not shown yet, closest to the castle first. Patches are only ever
      * added; what is known stays known.
      *
-     * @param patches   grid positions of the known patches
+     * @param patches   the known patches
      */
-    show(patches: [number, number][]): void
+    show(patches: Pick<PatchNode, "q" | "r" | "kind">[]): void
     {
-        const missing = patches.filter(([q, r]) => !this.patches.has(q + "/" + r))
-        missing.sort(([q0, r0], [q1, r1]) => Math.hypot(q0, r0) - Math.hypot(q1, r1))
-        for (const [q, r] of missing)
+        const missing = patches.filter(({ q, r }) => !this.patches.has(q + "/" + r))
+        missing.sort((a, b) => Math.hypot(a.q, a.r) - Math.hypot(b.q, b.r))
+        for (const { q, r, kind } of missing)
         {
             const key = q + "/" + r
             this.patches.add(key)
-            const built = this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, FACE_SIZE, q === 0 && r === 0)
+            const built = this.client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, FACE_SIZE, kind)
             Promise.all([built, this.models]).then(
                 ([result]) => this.addPatch(result),
                 err => console.error("Building patch " + key + " failed", err)
@@ -218,16 +220,17 @@ export default class CastleScene
         }
     }
 
-    private addPatch({ patch, castle }: BuiltPatch): void
+    private addPatch({ patch, pois }: GeneratedPatch): void
     {
         const { world, scene } = this
         const slot = world.add(patch)
 
         const group = new Group()
         createModels(patch).forEach(obj => group.add(obj))
-        if (castle)
+        const plan = pois[0]?.plan
+        if (plan)
         {
-            group.add(this.createCastle(castle))
+            group.add(this.createCastle(plan))
         }
         scene.add(group)
 
