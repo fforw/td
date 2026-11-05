@@ -158,7 +158,7 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
-new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(patches => {
+new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(({ patches }) => {
     show(patches)
     renderer.setAnimationLoop(() => {
         controls.update()

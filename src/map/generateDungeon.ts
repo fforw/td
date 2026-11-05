@@ -1,7 +1,9 @@
 import { patchSeed, resetRandom } from "../math/random"
+import { findRegions, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
-import { packPatch, type QuadPatch } from "./QuadPatch"
+import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
+import { faceCount, packPatch, type QuadPatch } from "./QuadPatch"
 
 
 /**
@@ -9,6 +11,11 @@ import { packPatch, type QuadPatch } from "./QuadPatch"
  */
 export const DUNGEON_WIDTH = 2
 export const DUNGEON_HEIGHT = 2
+
+/**
+ * Share of the faces of a dungeon that should be the floor of rooms
+ */
+const PICKED_FLOOR_SHARE = 0.4
 
 const LEVEL_SALT = 0x1e7e
 
@@ -29,17 +36,39 @@ export function levelSeed(parentSeed: number, q: number, r: number, index = 0): 
 
 
 /**
- * Generates the patches of a dungeon level. They only give the dungeon room to grow in: all their faces start out as
- * NONE, so only what the dungeon sets later gets drawn. The same seed and size always give the same patches.
+ * Generated dungeon level
+ */
+export interface DungeonLevel
+{
+    /**
+     * Packed patches, row by row. Any two patches next to each other in a row or column share a seam.
+     */
+    patches: QuadPatch[]
+
+    /**
+     * Global face ids per region that could be a room, for a PatchWorld with the patches added in order
+     */
+    regions: number[][]
+
+    /**
+     * Global face ids per room
+     */
+    rooms: number[][]
+}
+
+
+/**
+ * Generates a dungeon level. All faces start out as NONE, so only what the dungeon sets gets drawn, which so far is the
+ * floor of its rooms. The same seed and size always give the same level.
  *
  * @param seed      seed of the level
  * @param size      hexagon size in map units
  * @param width     number of patches in q-direction
  * @param height    number of patches in r-direction
  *
- * @return packed patches, row by row. Any two patches next to each other in a row or column share a seam.
+ * @return generated level
  */
-export function generateDungeon(seed: number, size: number, width: number, height: number): QuadPatch[]
+export function generateDungeon(seed: number, size: number, width: number, height: number): DungeonLevel
 {
     const patches: QuadPatch[] = []
     for (let r = 0; r < height; r++)
@@ -53,5 +82,16 @@ export function generateDungeon(seed: number, size: number, width: number, heigh
             patches.push(packPatch(patch, faces))
         }
     }
-    return patches
+
+    const world = new PatchWorld()
+    const slots = patches.map(patch => world.add(patch))
+    const regions = findRegions(world, slots)
+    const faceTotal = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
+    const rooms = pickRooms(regions, faceTotal * PICKED_FLOOR_SHARE).map(index => regions[index])
+
+    for (const face of rooms.flat())
+    {
+        patches[face >> (SLOT_SHIFT - 2)].faceType[face & (LOCAL_MASK >> 2)] = FaceType.PAVED.index
+    }
+    return { patches, regions, rooms }
 }

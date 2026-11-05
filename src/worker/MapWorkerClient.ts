@@ -1,8 +1,7 @@
 import type { PatchKind } from "../game/campaign"
 import type { RouteQuery, RouteResult } from "../game/RouteFinder"
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH } from "../map/generateDungeon"
+import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import type { GeneratedPatch } from "../map/patchGenerators"
-import type { QuadPatch } from "../map/QuadPatch"
 
 /**
  * Asks the worker to build the patch at the given hexagon position
@@ -47,7 +46,7 @@ export interface RouteRequest extends RouteQuery
 }
 
 /**
- * Asks the worker for the connected patches of a dungeon level
+ * Asks the worker for a dungeon level
  */
 export interface DungeonRequest
 {
@@ -74,7 +73,7 @@ export interface DungeonRequest
 export type MapRequest = PatchRequest | RouteRequest | DungeonRequest
 
 export type MapResponse =
-    { id: number, result: GeneratedPatch | QuadPatch[] | RouteResult, error?: undefined } |
+    { id: number, result: GeneratedPatch | DungeonLevel | RouteResult, error?: undefined } |
     { id: number, error: string }
 
 
@@ -155,16 +154,16 @@ export default class MapWorkerClient
 
 
     /**
-     * Builds the connected patches of a dungeon level
+     * Builds a dungeon level
      *
      * @param seed      seed of the level
      * @param size      hexagon size in map units
      * @param width     number of patches in q-direction
      * @param height    number of patches in r-direction
      *
-     * @return packed patches
+     * @return generated level
      */
-    buildDungeon(seed: number, size: number, width = DUNGEON_WIDTH, height = DUNGEON_HEIGHT): Promise<QuadPatch[]>
+    buildDungeon(seed: number, size: number, width = DUNGEON_WIDTH, height = DUNGEON_HEIGHT): Promise<DungeonLevel>
     {
         return this.request(id => ({ id, type: "dungeon", seed, size, width, height }))
     }

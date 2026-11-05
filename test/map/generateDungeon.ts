@@ -10,9 +10,13 @@ import { DEFAULT_COSTS, globalFace } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
 
 
+/**
+ * Connects the patches of a level, with all of their faces back to NONE
+ */
 function connect(width: number, height: number)
 {
-    const patches = generateDungeon(4711, FACE_SIZE, width, height)
+    const { patches } = generateDungeon(4711, FACE_SIZE, width, height)
+    patches.forEach(patch => patch.faceType.fill(FaceType.NONE.index))
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
     return { patches, world, slots }
@@ -61,7 +65,7 @@ describe("generateDungeon", () => {
     })
 
     it("builds width times height patches row by row", () => {
-        const positions = generateDungeon(4711, FACE_SIZE, 3, 2).map(({ q, r }) => [q / PATCH_SIZE, r / PATCH_SIZE])
+        const positions = generateDungeon(4711, FACE_SIZE, 3, 2).patches.map(({ q, r }) => [q / PATCH_SIZE, r / PATCH_SIZE])
         assert.deepEqual(positions, [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1]])
     })
 
@@ -74,22 +78,29 @@ describe("generateDungeon", () => {
         }
     })
 
-    it("sets all faces to NONE", () => {
-        for (const patch of generateDungeon(4711, FACE_SIZE, 2, 2))
-        {
-            assert(patch.faceType.every(type => type === FaceType.NONE.index))
-        }
+    it("only sets the faces of its rooms", () => {
+        const { patches, rooms } = generateDungeon(4711, FACE_SIZE, 2, 2)
+        const floor = new Set(rooms.flat())
+        patches.forEach((patch, slot) => patch.faceType.forEach((type, face) => {
+            const expected = floor.has(globalFace(slot, face)) ? FaceType.PAVED : FaceType.NONE
+            assert(type === expected.index)
+        }))
     })
 
-    it("always gives the same patches for the same seed", () => {
+    it("always gives the same level for the same seed", () => {
         const a = generateDungeon(4711, FACE_SIZE, 2, 2)
         const b = generateDungeon(4711, FACE_SIZE, 2, 2)
-        a.forEach((patch, i) => assert.deepEqual(patch.positions, b[i].positions))
+        a.patches.forEach((patch, i) => {
+            assert.deepEqual(patch.positions, b.patches[i].positions)
+            assert.deepEqual(patch.faceType, b.patches[i].faceType)
+        })
+        assert.deepEqual(a.regions, b.regions)
+        assert.deepEqual(a.rooms, b.rooms)
     })
 
     it("gives other patches for another seed", () => {
-        const [a] = generateDungeon(4711, FACE_SIZE, 1, 1)
-        const [b] = generateDungeon(4712, FACE_SIZE, 1, 1)
+        const { patches: [a] } = generateDungeon(4711, FACE_SIZE, 1, 1)
+        const { patches: [b] } = generateDungeon(4712, FACE_SIZE, 1, 1)
         assert.notDeepEqual(a.positions, b.positions)
     })
 })
