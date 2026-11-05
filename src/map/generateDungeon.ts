@@ -1,5 +1,6 @@
 import { patchSeed, resetRandom, withSeed } from "../math/random"
 import { type Corridor, findCorridors, setLevelEdges } from "./dungeonCorridors"
+import type { LevelLighting } from "./dungeonLights"
 import { findRegions, growRooms, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
@@ -87,6 +88,11 @@ export interface DungeonLevel
      * Corridors between the rooms, their room indexes are positions in rooms
      */
     corridors: Corridor[]
+
+    /**
+     * Baked light of the level, if it was asked for
+     */
+    lighting?: LevelLighting
 }
 
 
