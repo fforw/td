@@ -16,15 +16,31 @@ const TAU = Math.PI * 2
  */
 
 /**
- * Radius of a light in world units, which sets the size of the soft shadows. Walls have to stay clear of it.
+ * Radius of the biggest light in world units, which sets the size of the soft shadows and the bright center. Walls have to stay
+ * clear of it.
  */
 export const LIGHT_RADIUS = 0.3
 
 /**
- * How far a light reaches in world units. A changed wall affects the lights within this distance, and the shadows of these
- * can change up to twice as far from the wall.
+ * How far the biggest light reaches in world units. A changed wall affects the lights within this distance, and the shadows of
+ * these can change up to twice as far from the wall.
  */
 export const MAX_INFLUENCE = 5
+
+/**
+ * How far the smallest light reaches in world units. The radius of a light goes with its reach.
+ */
+export const MIN_INFLUENCE = 2
+
+/**
+ * Reach of the light of a room as a multiple of the distance from its middle to its furthest face
+ */
+const ROOM_REACH = 2
+
+/**
+ * How much smaller to try a light that gives meeples two rims or doesn't fit
+ */
+const LIGHT_SHRINK = 0.8
 
 /**
  * Own light of a point where the rim of a meeple starts to show and where it is fully there. The energy goes down with
@@ -41,8 +57,7 @@ export const RIM_GATE_START = 0.16
 export const RIM_GATE_END = 0.45
 
 /**
- * How far a light gets a rim out of a meeple in world units. Lights this far from each other twice can't have rims at the
- * same point, closer lights need walls between them.
+ * How far the biggest light gets a rim out of a meeple in world units. See rimLimit() for other lights.
  */
 export const RIM_LIMIT = 4.2
 
@@ -91,6 +106,16 @@ export interface DungeonLight
     x: number
     z: number
     color: [number, number, number]
+
+    /**
+     * Radius of the light in world units
+     */
+    radius: number
+
+    /**
+     * How far the light reaches in world units
+     */
+    reach: number
 }
 
 
@@ -139,6 +164,13 @@ export interface LightView
 {
     x: number
     z: number
+    radius: number
+    reach: number
+
+    /**
+     * How far the light gets a rim out of a meeple in world units
+     */
+    rimLimit: number
 
     /**
      * Offsets into the segment array by the sector a point is in, seen from the light
@@ -200,14 +232,49 @@ export function findWallSegments(world: PatchWorld, slots: readonly number[]): F
 
 
 /**
+ * Returns how far a light with the given reach gets a rim out of a meeple. Without walls, the own light of a point at distance
+ * d is (1 - d² / reach²)² / d, whatever the radius of the light is. Lights this far from each other added up can't have rims at
+ * the same point, closer lights need walls between them.
+ *
+ * @param reach     how far the light reaches
+ */
+export function rimLimit(reach: number): number
+{
+    let low = 0, high = reach
+    for (let i = 0; i < 30; i++)
+    {
+        const d = (low + high) / 2
+        const fade = 1 - d * d / (reach * reach)
+        if (fade * fade / d > RIM_FADE_START)
+        {
+            low = d
+        }
+        else
+        {
+            high = d
+        }
+    }
+    return high
+}
+
+
+/**
  * Prepares a light for lightAt(). A wall at distance d from the light can only be in the way of a point if the angles of the
- * two seen from the light are less than asin(LIGHT_RADIUS / d) apart.
+ * two seen from the light are less than asin(radius / d) apart.
  *
  * @param x         position of the light
  * @param z         position of the light
  * @param segments  segment array
+ * @param radius    radius of the light
+ * @param reach     how far the light reaches
  */
-export function createLightView(x: number, z: number, segments: Float64Array): LightView
+export function createLightView(
+    x: number,
+    z: number,
+    segments: Float64Array,
+    radius = LIGHT_RADIUS,
+    reach = MAX_INFLUENCE
+): LightView
 {
     const sectors: number[][] = Array.from({ length: LIGHT_SECTORS }, () => [])
     for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
@@ -215,7 +282,7 @@ export function createLightView(x: number, z: number, segments: Float64Array): L
         const distance = segmentDistance(segments, s, x, z)
         const nx = segments[s + 4], nz = segments[s + 5]
         // the far side of a thick wall is never in front of its near side
-        if (distance > MAX_INFLUENCE || (x - segments[s]) * nx + (z - segments[s + 1]) * nz < 0)
+        if (distance > reach || (x - segments[s]) * nx + (z - segments[s + 1]) * nz < 0)
         {
             continue
         }
@@ -223,7 +290,7 @@ export function createLightView(x: number, z: number, segments: Float64Array): L
         const ax = segments[s] - x, az = segments[s + 1] - z, bx = segments[s + 2] - x, bz = segments[s + 3] - z
         const start = Math.atan2(az, ax)
         const span = Math.atan2(ax * bz - az * bx, ax * bx + az * bz)
-        const widen = distance > LIGHT_RADIUS ? Math.asin(LIGHT_RADIUS / distance) : Math.PI
+        const widen = distance > radius ? Math.asin(radius / distance) : Math.PI
         const from = Math.min(start, start + span) - widen, to = Math.max(start, start + span) + widen
         const count = Math.min(LIGHT_SECTORS, Math.ceil((to - from) / TAU * LIGHT_SECTORS) + 1)
         const first = sectorOf(((from % TAU) + TAU) % TAU)
@@ -232,7 +299,7 @@ export function createLightView(x: number, z: number, segments: Float64Array): L
             sectors[(first + i) % LIGHT_SECTORS].push(s)
         }
     }
-    return { x, z, sectors }
+    return { x, z, radius, reach, rimLimit: rimLimit(reach), sectors }
 }
 
 
@@ -242,7 +309,7 @@ export function createLightView(x: number, z: number, segments: Float64Array): L
 export interface LightSample
 {
     /**
-     * Seen angle of the light relative to its size, faded out toward MAX_INFLUENCE
+     * Seen angle of the light relative to its size, faded out toward its reach
      */
     energy: number
 
@@ -269,26 +336,27 @@ const blockedTo: number[] = []
  */
 export function lightAt(view: LightView, segments: Float64Array, px: number, pz: number, out: LightSample): void
 {
+    const { radius, reach } = view
     const dx = view.x - px, dz = view.z - pz
     const d = Math.hypot(dx, dz)
-    const reach = 1 - d * d / (MAX_INFLUENCE * MAX_INFLUENCE)
-    if (reach <= 0)
+    const left = 1 - d * d / (reach * reach)
+    if (left <= 0)
     {
         out.energy = out.x = out.z = 0
         return
     }
-    const fade = reach * reach / (2 * LIGHT_RADIUS)
+    const fade = left * left / (2 * radius)
 
-    if (d <= LIGHT_RADIUS)
+    if (d <= radius)
     {
         // from all around, with the direction going on to nothing in the center
         out.energy = Math.PI * fade
-        out.x = dx * 2 / LIGHT_RADIUS * fade
-        out.z = dz * 2 / LIGHT_RADIUS * fade
+        out.x = dx * 2 / radius * fade
+        out.z = dz * 2 / radius * fade
         return
     }
 
-    const alpha = Math.asin(LIGHT_RADIUS / d)
+    const alpha = Math.asin(radius / d)
     const ux = dx / d, uz = dz / d
 
     let count = 0
@@ -361,8 +429,8 @@ const sampleB: LightSample = { energy: 0, x: 0, z: 0 }
  */
 export function rimsOverlap(a: LightView, b: LightView, segments: Float64Array): boolean
 {
-    const minX = Math.max(a.x, b.x) - RIM_LIMIT, maxX = Math.min(a.x, b.x) + RIM_LIMIT
-    const minZ = Math.max(a.z, b.z) - RIM_LIMIT, maxZ = Math.min(a.z, b.z) + RIM_LIMIT
+    const minX = Math.max(a.x - a.rimLimit, b.x - b.rimLimit), maxX = Math.min(a.x + a.rimLimit, b.x + b.rimLimit)
+    const minZ = Math.max(a.z - a.rimLimit, b.z - b.rimLimit), maxZ = Math.min(a.z + a.rimLimit, b.z + b.rimLimit)
     for (let z = minZ; z < maxZ; z += 1 / LIGHT_TEXELS)
     {
         for (let x = minX; x < maxX; x += 1 / LIGHT_TEXELS)
@@ -400,8 +468,9 @@ export function faceCenter(world: PatchWorld, face: number): [number, number]
 
 
 /**
- * Places up to one light in the middle of each room, the biggest rooms first. A room stays dark if its light would give
- * meeples two rims at the same point. Doors count as open.
+ * Places up to one light in the middle of each room, the biggest rooms first. Big rooms get big lights. The light of a room
+ * gets smaller until it no longer gives meeples two rims at the same point, and the room stays dark if even the smallest light
+ * does. Doors count as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
@@ -426,30 +495,42 @@ export function placeLights(
             const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
 
             centers.sort((a, b) => Math.hypot(a[0] - midX, a[1] - midZ) - Math.hypot(b[0] - midX, b[1] - midZ))
-            const center = centers.find(([x, z]) => {
-                for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
-                {
-                    if (segmentDistance(segments, s, x, z) <= LIGHT_RADIUS)
-                    {
-                        return false
-                    }
-                }
-                return true
-            })
-            if (!center)
-            {
-                continue
-            }
+            const [lastX, lastZ] = centers[centers.length - 1]
+            const roomReach = Math.hypot(lastX - midX, lastZ - midZ) * ROOM_REACH
 
-            const [x, z] = center
-            const view = createLightView(x, z, segments)
-            if (views.some(other =>
-                Math.hypot(other.x - x, other.z - z) < RIM_LIMIT * 2 && rimsOverlap(other, view, segments)))
+            for (
+                let reach = Math.max(MIN_INFLUENCE, Math.min(MAX_INFLUENCE, roomReach));
+                reach >= MIN_INFLUENCE;
+                reach *= LIGHT_SHRINK
+            )
             {
-                continue
+                const radius = LIGHT_RADIUS * reach / MAX_INFLUENCE
+                const center = centers.find(([x, z]) => {
+                    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+                    {
+                        if (segmentDistance(segments, s, x, z) <= radius)
+                        {
+                            return false
+                        }
+                    }
+                    return true
+                })
+                if (!center)
+                {
+                    continue
+                }
+
+                const [x, z] = center
+                const view = createLightView(x, z, segments, radius, reach)
+                if (views.some(other =>
+                    Math.hypot(other.x - x, other.z - z) < other.rimLimit + view.rimLimit && rimsOverlap(other, view, segments)))
+                {
+                    continue
+                }
+                views.push(view)
+                lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)], radius, reach })
+                break
             }
-            views.push(view)
-            lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)] })
         }
         return lights
     })
@@ -523,13 +604,13 @@ export function bakeLights(
     const colors = new Float32Array(width * height * 4)
     const directions = new Float32Array(width * height * 2)
 
-    for (const { x, z, color } of lights)
+    for (const { x, z, color, radius, reach } of lights)
     {
-        const view = createLightView(x, z, segments)
-        const fromX = Math.max(0, Math.floor((x - MAX_INFLUENCE - minX) * LIGHT_TEXELS))
-        const toX = Math.min(width, Math.ceil((x + MAX_INFLUENCE - minX) * LIGHT_TEXELS))
-        const fromZ = Math.max(0, Math.floor((z - MAX_INFLUENCE - minZ) * LIGHT_TEXELS))
-        const toZ = Math.min(height, Math.ceil((z + MAX_INFLUENCE - minZ) * LIGHT_TEXELS))
+        const view = createLightView(x, z, segments, radius, reach)
+        const fromX = Math.max(0, Math.floor((x - reach - minX) * LIGHT_TEXELS))
+        const toX = Math.min(width, Math.ceil((x + reach - minX) * LIGHT_TEXELS))
+        const fromZ = Math.max(0, Math.floor((z - reach - minZ) * LIGHT_TEXELS))
+        const toZ = Math.min(height, Math.ceil((z + reach - minZ) * LIGHT_TEXELS))
 
         for (let tz = fromZ; tz < toZ; tz++)
         {

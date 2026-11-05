@@ -11,11 +11,13 @@ import {
     lightDungeon,
     type LightSample,
     MAX_INFLUENCE,
+    MIN_INFLUENCE,
     NO_WALL,
     placeLights,
     RIM_FADE_START,
     RIM_GATE_END,
     RIM_LIMIT,
+    rimLimit,
     WALL_CLEARANCE
 } from "../../src/map/dungeonLights"
 import { generateDungeon } from "../../src/map/generateDungeon"
@@ -80,13 +82,13 @@ function randomWalls(random: () => number): Float64Array
 }
 
 
-function clearOfWalls(segments: Float64Array, x: number, z: number): boolean
+function clearOfWalls(segments: Float64Array, x: number, z: number, radius = LIGHT_RADIUS): boolean
 {
     for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
     {
         const ex = segments[s + 2] - segments[s], ez = segments[s + 3] - segments[s + 1]
         const t = Math.max(0, Math.min(1, ((x - segments[s]) * ex + (z - segments[s + 1]) * ez) / (ex * ex + ez * ez)))
-        if (Math.hypot(segments[s] + ex * t - x, segments[s + 1] + ez * t - z) < LIGHT_RADIUS + 0.01)
+        if (Math.hypot(segments[s] + ex * t - x, segments[s + 1] + ez * t - z) < radius)
         {
             return false
         }
@@ -155,6 +157,50 @@ describe("lightAt", () => {
         assert(Math.hypot(out.x, out.z) < RIM_FADE_START)
     })
 
+    it("ends at the reach of a smaller light, with the same light further out whatever its radius", () => {
+        const segments = new Float64Array(0)
+        const out: LightSample = { energy: 1, x: 1, z: 1 }
+        lightAt(createLightView(0, 0, segments, 0.1, 3), segments, 3, 0, out)
+        assert.equal(out.energy, 0)
+
+        const small: LightSample = { energy: 0, x: 0, z: 0 }
+        const big: LightSample = { energy: 0, x: 0, z: 0 }
+        lightAt(createLightView(0, 0, segments, 0.1, 3), segments, 2, 0, small)
+        lightAt(createLightView(0, 0, segments, 0.3, 3), segments, 2, 0, big)
+        assert.closeTo(small.x, big.x, 1e-9)
+        assert.closeTo(small.energy, big.energy, big.energy * 0.01)
+    })
+
+    it("has a sharper shadow with a smaller radius", () => {
+        // a wall from z = 0 to the north, halfway to the light, and a point behind its end
+        const segments = new Float64Array([2, 0, 2, 5, 0, 0])
+        const share = (radius: number, z: number) => {
+            const out: LightSample = { energy: 0, x: 0, z: 0 }
+            lightAt(createLightView(0, 0, segments, radius, MAX_INFLUENCE), segments, 4, z, out)
+            const free: LightSample = { energy: 0, x: 0, z: 0 }
+            lightAt(createLightView(0, 0, new Float64Array(0), radius, MAX_INFLUENCE), new Float64Array(0), 4, z, free)
+            return out.energy / free.energy
+        }
+        // inside of the soft shadow of the big light and outside of the one of the small light
+        assert(share(0.3, -0.1) > 0.1 && share(0.3, -0.1) < 0.9)
+        assert.equal(share(0.05, -0.1), 1)
+    })
+
+    it("has no more rim at the rim limit of any light", () => {
+        const segments = new Float64Array(0)
+        const out: LightSample = { energy: 0, x: 0, z: 0 }
+        assert(rimLimit(MAX_INFLUENCE) <= RIM_LIMIT)
+        for (const reach of [MIN_INFLUENCE, 3, MAX_INFLUENCE])
+        {
+            const limit = rimLimit(reach)
+            const view = createLightView(0, 0, segments, 0.1, reach)
+            lightAt(view, segments, limit + 0.01, 0, out)
+            assert(Math.hypot(out.x, out.z) < RIM_FADE_START)
+            lightAt(view, segments, limit - 0.01, 0, out)
+            assert(Math.hypot(out.x, out.z) > RIM_FADE_START)
+        }
+    })
+
     it("keeps its direction going inside of the light", () => {
         const segments = new Float64Array(0)
         const view = createLightView(0, 0, segments)
@@ -206,12 +252,20 @@ describe("placeLights", () => {
             const lights = placeLights(seed, world, level.rooms, segments)
             assert(lights.length >= 10)
 
-            const views = lights.map(({ x, z }) => createLightView(x, z, segments))
+            // lights of different sizes, and all of them within the limits
+            assert(new Set(lights.map(({ reach }) => reach)).size > 1)
+            for (const { radius, reach } of lights)
+            {
+                assert(reach >= MIN_INFLUENCE && reach <= MAX_INFLUENCE)
+                assert(radius > 0 && radius <= LIGHT_RADIUS)
+            }
+
+            const views = lights.map(({ x, z, radius, reach }) => createLightView(x, z, segments, radius, reach))
             const a: LightSample = { energy: 0, x: 0, z: 0 }
             const b: LightSample = { energy: 0, x: 0, z: 0 }
             for (let i = 0; i < views.length; i++)
             {
-                assert(clearOfWalls(segments, views[i].x, views[i].z))
+                assert(clearOfWalls(segments, views[i].x, views[i].z, views[i].radius))
                 for (let j = i + 1; j < views.length; j++)
                 {
                     const { x: ax, z: az } = views[i], { x: bx, z: bz } = views[j]
@@ -254,7 +308,10 @@ describe("bakeLights", () => {
         const segments = new Float64Array(0)
         const bounds = { minX: 0, minZ: 0, maxX: 20, maxZ: 10 }
         const { width, height, colors, directions } = bakeLights(
-            [{ x: 7, z: 5, color: [1, 0.5, 0] }, { x: 13, z: 5, color: [0, 0.5, 1] }],
+            [
+                { x: 7, z: 5, color: [1, 0.5, 0], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE },
+                { x: 13, z: 5, color: [0, 0.5, 1], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE }
+            ],
             segments,
             bounds
         )
