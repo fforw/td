@@ -57,6 +57,17 @@ function plainGenerated(kind: PatchKind, type: FaceType)
 
 
 /**
+ * Runs the dungeon generator on a patch that should end up with its entrance on the given face
+ */
+function placeEntrance(patch: QuadPatch, face: number): { entrance: number }
+{
+    const [poi] = PATCH_GENERATORS.DUNGEON.place!(patch)!
+    assert(poi.face === face)
+    return { entrance: poi.entrance! }
+}
+
+
+/**
  * Returns the faces next to the given local face inside its patch
  */
 function neighbors(patch: QuadPatch, face: number): number[]
@@ -565,6 +576,71 @@ describe("Points of interest", () => {
                 assert(kind === "EMPTY" ? best === null : best!.faces.includes(pois[0].face), seed + " " + q + "/" + r)
             }
         }
+    })
+
+    it("puts the entrance of a dungeon on a free face of the best part", () => {
+
+        let placed = 0
+        for (const seed of [1, 2, 3, 4, 5, 6])
+        {
+            for (const [q, r] of [[1, 0], [0, 1], [-1, 0], [2, 2], [-3, 1]])
+            {
+                const { patch, kind, pois } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, "DUNGEON")
+                if (kind === "DUNGEON")
+                {
+                    const [{ face, entrance }] = pois
+                    assert(bestPart(borderParts(patch))!.faces.includes(face))
+                    assert(!FaceType.byIndex(patch.faceType[face]).occupied)
+                    assert(entrance! >> 2 === face)
+                    placed++
+                }
+            }
+        }
+        assert(placed > 0)
+    })
+
+    it("uses a clearing for the entrance of a dungeon in a forest", () => {
+
+        const patch = plainPatch(0, 0, TREE)
+        const clearing = innerFace(patch)
+        patch.faceType[clearing] = GRASS.index
+
+        const [{ face }] = PATCH_GENERATORS.DUNGEON.place!(patch)!
+        assert(face === clearing)
+    })
+
+    it("has no room for a dungeon if nothing in the best part is free", () => {
+
+        const { patch, faces } = plainFaces(0, 0, TREE)
+        const { kind, pois, patch: packed } = applyGenerator("DUNGEON", patch, faces)
+        assert(kind === "EMPTY")
+        assert.deepEqual(pois, [])
+        assert(packed.faceType.every(type => type === TREE.index))
+    })
+
+    it("opens an entrance towards the neighbor cheapest to enter", () => {
+
+        const { patch, pois: [{ face }] } = plainGenerated("DUNGEON", GRASS)
+        const around = neighbors(patch, face)
+        assert(around.length === 4)
+
+        for (const road of around)
+        {
+            around.forEach(other => patch.faceType[other] = other === road ? GRASS.index : SWAMP.index)
+            const { entrance } = placeEntrance(patch, face)
+            assert(patch.twin[entrance] >> 2 === road)
+        }
+    })
+
+    it("opens an entrance over the border without a neighbor to enter", () => {
+
+        const patch = plainPatch(0, 0, WATER)
+        const face = patch.twin.findIndex(t => t < 0) >> 2
+        patch.faceType[face] = GRASS.index
+
+        const { entrance } = placeEntrance(patch, face)
+        assert(entrance >> 2 === face)
+        assert(patch.twin[entrance] < 0)
     })
 
     it("has none on empty patches", () => {

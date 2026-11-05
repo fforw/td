@@ -184,9 +184,10 @@ All edits come from the main thread, workers never send any back.
   point of interest in the middle.
 - A kind with a sub-level has two generators. The patch generator only
   places the way in on the overworld, for a dungeon a gate or door on the
-  central connected face; it keeps the face types, so routes stay the
-  same. The level generator is a separate worker call made when the level
-  is first needed.
+  most central face of the best part with nothing on it, opening towards
+  the neighbor cheapest to enter. It keeps the face types, so routes stay
+  the same, and without such a face the patch stays EMPTY. The level
+  generator is a separate worker call made when the level is first needed.
 - A level generator doesn't work per patch. It builds a `PatchWorld` of
   all patches of the level in the worker, works on packed faces across the
   seams and writes face and edge types before handing the patches over.

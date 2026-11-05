@@ -1,10 +1,10 @@
 import Castle from "../castle/Castle"
 import { type CastlePlan, planCastle } from "../castle/castlePlan"
 import type { PatchKind } from "../game/campaign"
-import type { Face } from "./geometry"
+import { type Face, FaceType } from "./geometry"
 import type HexagonPatch from "./HexagonPatch"
 import { packPatch, type QuadPatch } from "./QuadPatch"
-import { type BorderPart, borderParts } from "./route"
+import { type BorderPart, borderParts, DEFAULT_COSTS, EDGE_COSTS } from "./route"
 
 
 /**
@@ -21,6 +21,11 @@ export interface PointOfInterest
      * Plan of what got built there, if any
      */
     plan?: CastlePlan
+
+    /**
+     * Half edge of the face that the way into a sub-level opens to, if there is one
+     */
+    entrance?: number
 }
 
 
@@ -148,6 +153,49 @@ const CENTRAL: PatchGenerator = {
 
 
 /**
+ * Returns the half edge of a face in a border part that leads to the neighbor cheapest to enter. A border edge is only
+ * the choice of a face that has no way to go within the patch, since what's behind it is up to the neighboring patch.
+ */
+function entranceEdge(patch: QuadPatch, face: number): number
+{
+    const { twin, edgeType, faceType } = patch
+    let best = face * 4
+    let bestCost = Infinity
+    for (let h = face * 4; h < face * 4 + 4; h++)
+    {
+        const behind = twin[h] < 0 ? Number.MAX_VALUE : DEFAULT_COSTS[faceType[twin[h] >> 2]]
+        const cost = EDGE_COSTS[edgeType[h]] + behind
+        if (cost < bestCost)
+        {
+            best = h
+            bestCost = cost
+        }
+    }
+    return best
+}
+
+
+/**
+ * Places the way into a dungeon in the middle of the best part. Only faces with nothing on them have room for it, the
+ * level behind it is generated when it is first needed.
+ */
+const DUNGEON: PatchGenerator = {
+    place(patch)
+    {
+        const free = bestPart(borderParts(patch))?.faces.filter(
+            face => !FaceType.byIndex(patch.faceType[face]).occupied
+        )
+        if (!free?.length)
+        {
+            return null
+        }
+        const face = centralFace(patch, free)
+        return [{ face, entrance: entranceEdge(patch, face) }]
+    }
+}
+
+
+/**
  * Nothing but terrain
  */
 const TERRAIN: PatchGenerator = {}
@@ -156,7 +204,7 @@ const TERRAIN: PatchGenerator = {}
 export const PATCH_GENERATORS: Record<PatchKind, PatchGenerator> = {
     CASTLE,
     EMPTY: TERRAIN,
-    DUNGEON: CENTRAL,
+    DUNGEON,
     TREASURE: CENTRAL,
     TEMPLE: CENTRAL
 }
