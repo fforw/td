@@ -3,8 +3,8 @@ import { assert, describe, it } from "vitest"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
-import { faceOf } from "../../src/map/QuadPatch"
-import { findRoute, slotOf } from "../../src/map/route"
+import { faceCount, faceOf } from "../../src/map/QuadPatch"
+import { FaceHeap, findRoute, slotOf } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
 
 
@@ -257,6 +257,36 @@ describe("Corridors", () => {
         {
             const { roomFaces, corridors } = level(4711, width, height)
             assert(corridors.length === roomFaces.length - 1)
+        }
+    })
+})
+
+
+describe("Corridor search", () => {
+
+    it("doesn't cover the level again for every corridor", () => {
+
+        const { pop } = FaceHeap.prototype
+        let pops = 0
+        FaceHeap.prototype.pop = function ()
+        {
+            pops++
+            return pop.call(this)
+        }
+
+        try
+        {
+            for (const size of [2, 4])
+            {
+                pops = 0
+                const { world, slots } = level(4711, size, size)
+                const faces = slots.reduce((sum, slot) => sum + faceCount(world.getPatch(slot)), 0)
+                assert(pops < faces * 5, size + ": " + pops / faces)
+            }
+        }
+        finally
+        {
+            FaceHeap.prototype.pop = pop
         }
     })
 })

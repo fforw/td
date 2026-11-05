@@ -51,85 +51,183 @@ function faceCenter(world: PatchWorld, face: number): [number, number]
 
 
 /**
- * Finds a corridor from the connected rooms to the closest other room. Faces cost the distance between their centers,
- * which keeps corridors straighter than counting faces.
- *
- * @param world     world with all patches of the level
- * @param rooms     global face ids per room
- * @param connected indexes of the connected rooms
- * @param roomOf    room index by global face
- * @param blocked   faces a corridor can't use
- *
- * @return corridor or null if there is no way to any other room
+ * Finds corridors from sources to target rooms, always to the closest one. It's one search that keeps running from one
+ * corridor to the next, instead of covering all that is connected so far again for every corridor, which would take
+ * minutes on large levels. Most of what it knows stays right when a corridor gets added. Sources only make ways shorter,
+ * and removeFaces() repairs the ways that led through the faces of a corridor. Other rooms are in the way. Faces cost the
+ * distance between their centers, which keeps corridors straighter than counting faces.
  */
-function findCorridor(
-    world: PatchWorld,
-    rooms: readonly number[][],
-    connected: ReadonlySet<number>,
-    roomOf: ReadonlyMap<number, number>,
-    blocked: ReadonlySet<number>
-): Corridor | null
+class CorridorSearch
 {
-    const reached = new Map<number, number>()
-    const parents = new Map<number, number>()
-    const heap = new FaceHeap()
-    for (const room of connected)
+    /**
+     * Cost of the best known way per global face and the face it comes from, which sources don't have
+     */
+    private readonly costs = new Map<number, number>()
+    private readonly parents = new Map<number, number>()
+
+    /**
+     * Cost a face had when its neighbors last got to know about it
+     */
+    private readonly expanded = new Map<number, number>()
+
+    private readonly centers = new Map<number, [number, number]>()
+    private readonly heap = new FaceHeap()
+
+    /**
+     * @param world     world with all patches of the level
+     * @param targets   indexes of the rooms to get to, removing one stops the search from going there
+     * @param roomOf    room index by global face
+     * @param blocked   faces a corridor can't use, removeFaces() has to be called for new ones
+     */
+    constructor(
+        private readonly world: PatchWorld,
+        private readonly targets: ReadonlySet<number>,
+        private readonly roomOf: ReadonlyMap<number, number>,
+        private readonly blocked: ReadonlySet<number>
+    )
     {
-        for (const face of rooms[room])
+    }
+
+
+    /**
+     * Adds global faces to start from
+     */
+    addSources(faces: readonly number[]): void
+    {
+        for (const face of faces)
         {
-            reached.set(face, 0)
-            heap.push(0, face)
+            this.costs.set(face, 0)
+            this.parents.delete(face)
+            this.expanded.delete(face)
+            this.heap.push(0, face)
         }
     }
 
-    const done = new Set<number>()
-    while (heap.size > 0)
+
+    /**
+     * Forgets the ways that lead through the given faces, which only takes what is behind them. The faces around those
+     * then get to find new ways.
+     */
+    removeFaces(faces: readonly number[]): void
     {
-        const face = heap.pop()
-        if (done.has(face))
-        {
-            continue
-        }
-        done.add(face)
+        const { costs, parents, expanded, heap } = this
 
-        const room = roomOf.get(face)
-        if (room !== undefined && !connected.has(room))
+        const cleared = new Set(faces)
+        for (const face of cleared)
         {
-            const path = [face]
-            for (let curr = parents.get(face); curr !== undefined; curr = parents.get(curr))
+            for (const next of this.neighbors(face))
             {
-                path.push(curr)
-            }
-            path.reverse()
-            return {
-                from: roomOf.get(path[0])!,
-                to: room,
-                faces: path.slice(1, -1),
-                fromFace: path[0],
-                toFace: face
-            }
-        }
-
-        const [x, y] = faceCenter(world, face)
-        const cost = reached.get(face)!
-        for (let i = 0; i < 4; i++)
-        {
-            const next = faceOf(world.twin(face * 4 + i))
-            const nextRoom = roomOf.get(next)
-            if (!done.has(next) && !blocked.has(next) && (nextRoom === undefined || !connected.has(nextRoom)))
-            {
-                const [nx, ny] = faceCenter(world, next)
-                const nextCost = cost + Math.hypot(nx - x, ny - y)
-                if (nextCost < (reached.get(next) ?? Infinity))
+                if (parents.get(next) === face)
                 {
-                    reached.set(next, nextCost)
-                    parents.set(next, face)
-                    heap.push(nextCost, next)
+                    cleared.add(next)
+                }
+            }
+        }
+
+        for (const face of cleared)
+        {
+            costs.delete(face)
+            parents.delete(face)
+            expanded.delete(face)
+        }
+
+        for (const face of cleared)
+        {
+            for (const next of this.neighbors(face))
+            {
+                const cost = costs.get(next)
+                if (cost !== undefined)
+                {
+                    expanded.delete(next)
+                    heap.push(cost, next)
                 }
             }
         }
     }
-    return null
+
+
+    /**
+     * Returns the next corridor to the closest target room or null if there is no way to any of them
+     */
+    next(): Corridor | null
+    {
+        const { costs, parents, expanded, heap, targets, roomOf, blocked } = this
+
+        while (heap.size > 0)
+        {
+            const face = heap.pop()
+            const cost = costs.get(face)
+            if (cost === undefined || expanded.get(face) === cost)
+            {
+                continue
+            }
+
+            const room = roomOf.get(face)
+            if (room !== undefined && targets.has(room))
+            {
+                const path = [face]
+                for (let curr = parents.get(face); curr !== undefined; curr = parents.get(curr))
+                {
+                    path.push(curr)
+                }
+                path.reverse()
+                return {
+                    from: roomOf.get(path[0])!,
+                    to: room,
+                    faces: path.slice(1, -1),
+                    fromFace: path[0],
+                    toFace: face
+                }
+            }
+            expanded.set(face, cost)
+
+            const [x, y] = this.center(face)
+            for (const next of this.neighbors(face))
+            {
+                const nextRoom = roomOf.get(next)
+                if (!blocked.has(next) && (nextRoom === undefined || targets.has(nextRoom)))
+                {
+                    const [nx, ny] = this.center(next)
+                    const nextCost = cost + Math.hypot(nx - x, ny - y)
+                    if (nextCost < (costs.get(next) ?? Infinity))
+                    {
+                        costs.set(next, nextCost)
+                        parents.set(next, face)
+                        heap.push(nextCost, next)
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+
+    private center(face: number): [number, number]
+    {
+        let center = this.centers.get(face)
+        if (!center)
+        {
+            center = faceCenter(this.world, face)
+            this.centers.set(face, center)
+        }
+        return center
+    }
+
+
+    private neighbors(face: number): number[]
+    {
+        const { world } = this
+        const faces: number[] = []
+        for (let h = face * 4; h < face * 4 + 4; h++)
+        {
+            const twin = world.twin(h)
+            if (twin >= 0)
+            {
+                faces.push(faceOf(twin))
+            }
+        }
+        return faces
+    }
 }
 
 
@@ -163,17 +261,24 @@ export function findCorridors(world: PatchWorld, rooms: readonly number[][], slo
     }
 
     const corridors: Corridor[] = []
-    const connected = new Set<number>(rooms.length > 0 ? [0] : [])
-    while (connected.size < rooms.length)
+    const targets = new Set(rooms.keys())
+    targets.delete(0)
+    const search = new CorridorSearch(world, targets, roomOf, blocked)
+    search.addSources(rooms[0] ?? [])
+
+    while (targets.size > 0)
     {
-        const corridor = findCorridor(world, rooms, connected, roomOf, blocked)
+        const corridor = search.next()
         if (!corridor)
         {
             break
         }
         corridors.push(corridor)
-        connected.add(corridor.to)
+        targets.delete(corridor.to)
         corridor.faces.forEach(face => blocked.add(face))
+
+        search.removeFaces(corridor.faces)
+        search.addSources(rooms[corridor.to])
     }
     return corridors
 }
