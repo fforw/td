@@ -1,3 +1,4 @@
+import { rng } from "../math/random"
 import PatchWorld from "./PatchWorld"
 import { faceCount, faceOf, prev } from "./QuadPatch"
 import { globalFace } from "./route"
@@ -119,4 +120,61 @@ export function pickRooms(regions: readonly number[][], floorFaces: number): num
         faces += regions[index].length
     }
     return rooms
+}
+
+
+/**
+ * Grows rooms into the wall, one random face next to a random room at a time. Picking the room first makes all rooms
+ * grow alike, while picking from all faces next to any room would favor the large ones. Rooms stay off the outer edge of
+ * the level.
+ *
+ * @param world         world with all patches of the level
+ * @param rooms         global face ids per room
+ * @param floorFaces    number of faces the rooms should have together, it can be less if the level has no room for them
+ * @param blocked       faces rooms can't grow into
+ *
+ * @return global face ids per room with the new faces added
+ */
+export function growRooms(
+    world: PatchWorld,
+    rooms: readonly number[][],
+    floorFaces: number,
+    blocked: ReadonlySet<number> = new Set()
+): number[][]
+{
+    const grown = rooms.map(faces => [...faces])
+    const taken = new Set(rooms.flat())
+    let count = taken.size
+
+    const neighbors = (face: number) => [0, 1, 2, 3].flatMap(i => {
+        const twin = world.twin(face * 4 + i)
+        return twin < 0 ? [] : [faceOf(twin)]
+    })
+    const frontiers = grown.map((faces, room) => ({ room, faces: faces.flatMap(neighbors) }))
+
+    while (count < floorFaces && frontiers.length > 0)
+    {
+        const at = rng.nextInt(0, frontiers.length - 1)
+        const { room, faces } = frontiers[at]
+        if (faces.length === 0)
+        {
+            frontiers.splice(at, 1)
+            continue
+        }
+
+        const pick = rng.nextInt(0, faces.length - 1)
+        const face = faces[pick]
+        faces[pick] = faces[faces.length - 1]
+        faces.pop()
+
+        const around = neighbors(face)
+        if (!taken.has(face) && !blocked.has(face) && around.length === 4)
+        {
+            taken.add(face)
+            grown[room].push(face)
+            faces.push(...around)
+            count++
+        }
+    }
+    return grown
 }

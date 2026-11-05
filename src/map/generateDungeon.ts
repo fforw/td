@@ -1,6 +1,6 @@
-import { patchSeed, resetRandom } from "../math/random"
+import { patchSeed, resetRandom, withSeed } from "../math/random"
 import { type Corridor, findCorridors, setLevelEdges } from "./dungeonCorridors"
-import { findRegions, pickRooms } from "./dungeonRooms"
+import { findRegions, growRooms, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
@@ -14,11 +14,18 @@ export const DUNGEON_WIDTH = 2
 export const DUNGEON_HEIGHT = 2
 
 /**
- * Share of the faces of a dungeon that should be the floor of rooms
+ * Share of the faces of a dungeon that should be the floor of rooms when they are picked. Corridors get laid out at this
+ * point, so a lower share means fewer rooms with longer corridors between them.
  */
 const PICKED_FLOOR_SHARE = 0.4
 
+/**
+ * Share of the faces of a dungeon that should be the floor of rooms after growing them
+ */
+const GROWN_FLOOR_SHARE = 0.6
+
 const LEVEL_SALT = 0x1e7e
+const ROOM_SALT = 0x4004
 
 
 /**
@@ -52,7 +59,7 @@ export interface DungeonLevel
     regions: number[][]
 
     /**
-     * Global face ids per room
+     * Global face ids per room, which grew out of the largest regions
      */
     rooms: number[][]
 
@@ -93,11 +100,18 @@ export function generateDungeon(seed: number, size: number, width: number, heigh
     const slots = patches.map(patch => world.add(patch))
     const regions = findRegions(world, slots)
     const faceTotal = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
-    const rooms = pickRooms(regions, faceTotal * PICKED_FLOOR_SHARE).map(index => regions[index])
-    const corridors = findCorridors(world, rooms, slots)
+    const picked = pickRooms(regions, faceTotal * PICKED_FLOOR_SHARE).map(index => regions[index])
+    const corridors = findCorridors(world, picked, slots)
+
+    // corridors come first, growing rooms would eat the way for them and leave nothing but doors between rooms
+    const corridorFaces = corridors.flatMap(({ faces }) => faces)
+    const rooms = withSeed(
+        patchSeed(seed ^ ROOM_SALT, 0, 0),
+        () => growRooms(world, picked, faceTotal * GROWN_FLOOR_SHARE, new Set(corridorFaces))
+    )
     setLevelEdges(world, rooms, corridors)
 
-    for (const face of [...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
+    for (const face of [...rooms.flat(), ...corridorFaces])
     {
         patches[face >> (SLOT_SHIFT - 2)].faceType[face & (LOCAL_MASK >> 2)] = FaceType.PAVED.index
     }

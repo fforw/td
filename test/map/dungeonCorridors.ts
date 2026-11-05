@@ -190,6 +190,67 @@ describe("Corridors", () => {
         }
     })
 
+    it("survives rooms growing around it", () => {
+
+        for (const seed of SEEDS)
+        {
+            const { corridors } = level(seed)
+            assert(corridors.every(({ faces }) => faces.length > 0), String(seed))
+        }
+    })
+
+    it("has rooms grown right up to it, behind walls", () => {
+
+        const { world, roomFaces, corridors } = level(4711)
+        const inRooms = new Set(roomFaces.flat())
+        let walled = 0
+        for (const { faces, fromFace, toFace } of corridors)
+        {
+            for (const face of faces)
+            {
+                for (let i = 0; i < 4; i++)
+                {
+                    const h = face * 4 + i
+                    const other = faceOf(world.twin(h))
+                    if (inRooms.has(other) && world.edgeType(h) !== EdgeType.DOOR.index)
+                    {
+                        assert(world.edgeType(h) === EdgeType.WALL.index)
+                        walled++
+                    }
+                    else if (inRooms.has(other))
+                    {
+                        assert(other === fromFace || other === toFace)
+                    }
+                }
+            }
+        }
+        assert(walled > 0)
+    })
+
+    it("keeps rooms apart with walls where they touch", () => {
+
+        const touching = SEEDS.map(seed => {
+            const { world, roomFaces } = level(seed)
+            const roomOf = new Map(roomFaces.flatMap((faces, room) => faces.map(face => [face, room] as const)))
+            let walls = 0
+            for (const [face, room] of roomOf)
+            {
+                for (let i = 0; i < 4; i++)
+                {
+                    const h = face * 4 + i
+                    const other = roomOf.get(faceOf(world.twin(h)))
+                    if (other !== undefined && other !== room)
+                    {
+                        assert(world.edgeType(h) !== EdgeType.OPEN.index)
+                        walls += world.edgeType(h) === EdgeType.WALL.index ? 1 : 0
+                    }
+                }
+            }
+            return walls
+        })
+        assert(touching.every(walls => walls > 0))
+    })
+
     it("connects the rooms of levels of other sizes", () => {
 
         for (const [width, height] of [[1, 1], [3, 1], [3, 2]])

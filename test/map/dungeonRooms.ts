@@ -1,11 +1,12 @@
 import { assert, describe, it } from "vitest"
 
-import { findRegions, pickRooms } from "../../src/map/dungeonRooms"
+import { findRegions, growRooms, pickRooms } from "../../src/map/dungeonRooms"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import PatchWorld from "../../src/map/PatchWorld"
 import { faceCount, faceOf, prev } from "../../src/map/QuadPatch"
 import { globalFace, slotOf } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
+import { patchSeed, withSeed } from "../../src/math/random"
 
 
 const SEEDS = [1, 2, 3, 4711, 12345]
@@ -147,5 +148,112 @@ describe("pickRooms", () => {
         const { regions } = level(4711)
         assert.deepEqual(pickRooms(regions, 0), [])
         assert(pickRooms(regions, 1).length === 1)
+    })
+})
+
+
+describe("growRooms", () => {
+
+    function grow(seed: number, floorFaces: number)
+    {
+        const { world, regions } = level(4711)
+        const rooms = pickRooms(regions, Infinity).map(room => regions[room])
+        return { world, rooms, grown: withSeed(patchSeed(seed, 0, 0), () => growRooms(world, rooms, floorFaces)) }
+    }
+
+    it("stops at the floor it was asked for", () => {
+
+        const { rooms, grown } = grow(1, 2500)
+        assert(rooms.flat().length < 2500)
+        assert(grown.flat().length === 2500)
+    })
+
+    it("does nothing if the rooms are large enough already", () => {
+
+        const { rooms, grown } = grow(1, 0)
+        assert.deepEqual(grown, rooms)
+    })
+
+    it("keeps the faces rooms had and doesn't change the given rooms", () => {
+
+        const { rooms, grown } = grow(1, 2500)
+        rooms.forEach((faces, room) => {
+            assert.deepEqual(grown[room].slice(0, faces.length), faces)
+            assert(grown[room].length >= faces.length)
+        })
+        assert(rooms.flat().length < grown.flat().length)
+    })
+
+    it("gives every face to one room only", () => {
+
+        const faces = grow(1, 2500).grown.flat()
+        assert(new Set(faces).size === faces.length)
+    })
+
+    it("keeps rooms connected", () => {
+
+        const { world, grown } = grow(1, 2500)
+        for (const faces of grown)
+        {
+            const inRoom = new Set(faces)
+            const seen = new Set([faces[0]])
+            for (const face of seen)
+            {
+                for (let i = 0; i < 4; i++)
+                {
+                    const other = faceOf(world.twin(face * 4 + i))
+                    if (inRoom.has(other))
+                    {
+                        seen.add(other)
+                    }
+                }
+            }
+            assert(seen.size === faces.length)
+        }
+    })
+
+    it("stays off the outer edge of the level", () => {
+
+        const { world, grown } = grow(1, 2500)
+        for (const face of grown.flat())
+        {
+            for (let i = 0; i < 4; i++)
+            {
+                assert(world.twin(face * 4 + i) >= 0)
+            }
+        }
+    })
+
+    it("stops when there is nothing left to grow into", () => {
+
+        const { world, grown } = grow(1, Infinity)
+        const taken = new Set(grown.flat())
+        for (const face of taken)
+        {
+            for (let i = 0; i < 4; i++)
+            {
+                const other = faceOf(world.twin(face * 4 + i))
+                const inner = [0, 1, 2, 3].every(k => world.twin(other * 4 + k) >= 0)
+                assert(taken.has(other) || !inner)
+            }
+        }
+    })
+
+    it("doesn't grow into blocked faces", () => {
+
+        const { world, regions } = level(4711)
+        const rooms = pickRooms(regions, Infinity).map(room => regions[room])
+        const free = withSeed(patchSeed(1, 0, 0), () => growRooms(world, rooms, 2500))
+        const taken = free.flatMap((faces, room) => faces.slice(rooms[room].length))
+        const blocked = new Set(taken.slice(0, 100))
+
+        const grown = withSeed(patchSeed(1, 0, 0), () => growRooms(world, rooms, 2500, blocked))
+        assert(!grown.flat().some(face => blocked.has(face)))
+        assert(grown.flat().length === 2500)
+    })
+
+    it("depends on the seed", () => {
+
+        assert.notDeepEqual(grow(1, 2500).grown, grow(2, 2500).grown)
     })
 })

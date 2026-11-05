@@ -162,7 +162,7 @@ function draw(level: DungeonLevel): void
         ctx.stroke()
     }
 
-    // room numbers, the largest room is number 1
+    // room numbers, room 1 grew out of the largest region
     ctx.fillStyle = LABEL_COLOR
     ctx.font = "bold 13px monospace"
     ctx.textAlign = "center"
