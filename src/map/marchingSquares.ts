@@ -45,7 +45,8 @@ export type TriangleCallback = (type: FaceType, x0: number, y0: number, x1: numb
 
 function rank(type: FaceType): number
 {
-    return GROUND_PRIORITY.indexOf(type)
+    // NONE never wins a contested sample, so faces that are set keep their ground up to the end of the level
+    return type === FaceType.NONE ? GROUND_PRIORITY.length : GROUND_PRIORITY.indexOf(type)
 }
 
 function background(a: FaceType, b: FaceType): FaceType
@@ -183,8 +184,8 @@ function marchCell(cb: TriangleCallback): void
     {
         const type = ground[i]
 
-        // handle every type once, at its first corner
-        if (ground.indexOf(type) !== i)
+        // handle every type once, at its first corner. NONE has no ground at all.
+        if (type === FaceType.NONE || ground.indexOf(type) !== i)
         {
             continue
         }

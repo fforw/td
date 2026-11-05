@@ -132,6 +132,10 @@ export class FaceType
     static SNOW = new FaceType({ color: "#b8c4cc", })
     static PRAIRIE = new FaceType({ color: "#7a6f22", })
     static SWAMP = new FaceType({ color: "#2b3518", })
+    /**
+     * Face outside of a sub-level. It has no ground and nobody can enter it, which bounds the drawable world.
+     */
+    static NONE = new FaceType({ occupied: true })
 
     static typeNames(): string[]
     {
