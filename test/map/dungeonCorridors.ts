@@ -19,9 +19,10 @@ const FENCED_SEEDS = [681944586, 580605849, 388526211, 595451591]
 const LOCAL_FACE = (1 << (SLOT_SHIFT - 2)) - 1
 
 
-function level(seed: number, width = 2, height = 2)
+function level(seed: number, width = 2, height = 2, labyrinth?: number)
 {
-    const { patches, rooms, corridors } = generateDungeon(seed, FACE_SIZE, width, height)
+    const style = labyrinth === undefined ? {} : { labyrinth }
+    const { patches, rooms, corridors } = generateDungeon(seed, FACE_SIZE, width, height, style)
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
     return { world, slots, roomFaces: rooms, corridors }
@@ -278,6 +279,55 @@ describe("Corridors", () => {
 })
 
 
+describe("Labyrinth style", () => {
+
+    const corridorFaces = (seed: number, labyrinth: number) => (
+        level(seed, 2, 2, labyrinth).corridors.reduce((sum, { faces }) => sum + faces.length, 0)
+    )
+
+    it("has more corridors than without", () => {
+
+        for (const seed of SEEDS)
+        {
+            assert(corridorFaces(seed, 0) < corridorFaces(seed, 1), String(seed))
+            assert(corridorFaces(seed, 0) < corridorFaces(seed, 2.5), String(seed))
+            assert(corridorFaces(seed, 0) < corridorFaces(seed, 5), String(seed))
+        }
+    })
+
+    it("has fewer and longer corridors for a lower value", () => {
+
+        const longest = (labyrinth: number) => Math.max(
+            ...SEEDS.flatMap(seed => level(seed, 2, 2, labyrinth).corridors.map(({ faces }) => faces.length))
+        )
+        assert(longest(1) > longest(5))
+    })
+
+    it("is back to short connections if all rooms get connected first", () => {
+
+        assert(corridorFaces(4711, 100) < corridorFaces(4711, 5))
+    })
+
+    it("connects all rooms however much of a labyrinth a level is", () => {
+
+        for (const seed of [1, 4711])
+        {
+            for (const labyrinth of [0, 1, 5, 100])
+            {
+                const { world, slots, roomFaces, corridors } = level(seed, 2, 2, labyrinth)
+                assert(corridors.length === roomFaces.length - 1, seed + " " + labyrinth)
+
+                const start = roomFaces[0][0]
+                for (const [target] of roomFaces.slice(1))
+                {
+                    assert(findRoute(world, start, slotOf(target), [target & LOCAL_FACE], slots).reachable)
+                }
+            }
+        }
+    })
+})
+
+
 describe("Fenced in rooms", () => {
 
     it("branch off a corridor through a door", () => {
@@ -335,10 +385,13 @@ describe("Corridor search", () => {
         {
             for (const size of [2, 4])
             {
-                pops = 0
-                const { world, slots } = level(4711, size, size)
-                const faces = slots.reduce((sum, slot) => sum + faceCount(world.getPatch(slot)), 0)
-                assert(pops < faces * 5, size + ": " + pops / faces)
+                for (const labyrinth of [0, 2.5, 5])
+                {
+                    pops = 0
+                    const { world, slots } = level(4711, size, size, labyrinth)
+                    const faces = slots.reduce((sum, slot) => sum + faceCount(world.getPatch(slot)), 0)
+                    assert(pops < faces * 5, size + " " + labyrinth + ": " + pops / faces)
+                }
             }
         }
         finally

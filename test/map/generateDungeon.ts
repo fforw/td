@@ -110,6 +110,7 @@ describe("generateDungeon", () => {
 
     it("keeps the default for what a style leaves out", () => {
         const { rooms } = generateDungeon(4711, FACE_SIZE, 2, 2)
+        assert.deepEqual(generateDungeon(4711, FACE_SIZE, 2, 2, { labyrinth: 2.5 }).rooms, rooms)
         assert.deepEqual(generateDungeon(4711, FACE_SIZE, 2, 2, DEFAULT_DUNGEON_STYLE).rooms, rooms)
     })
 

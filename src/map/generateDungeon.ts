@@ -28,11 +28,20 @@ export interface DungeonStyle
      * from rooms apart in a lot of wall to a warren with little but wall edges between them.
      */
     floorShare: number
+
+    /**
+     * Number of rooms per patch that get connected first, each by a corridor winding through the wall between all the
+     * other rooms. 0 leaves only short connections between neighbors, 1 gives a few very long corridors and 5 many of
+     * medium length. It's no use going further: the rooms get closer together, and once there are about 80 of them per
+     * level, which is all of them, it's back to short connections.
+     */
+    labyrinth: number
 }
 
 
 export const DEFAULT_DUNGEON_STYLE: DungeonStyle = {
-    floorShare: 0.6
+    floorShare: 0.6,
+    labyrinth: 2.5
 }
 
 const LEVEL_SALT = 0x1e7e
@@ -101,7 +110,7 @@ export function generateDungeon(
     style: Partial<DungeonStyle> = {}
 ): DungeonLevel
 {
-    const { floorShare } = { ...DEFAULT_DUNGEON_STYLE, ...style }
+    const { floorShare, labyrinth } = { ...DEFAULT_DUNGEON_STYLE, ...style }
 
     const patches: QuadPatch[] = []
     for (let r = 0; r < height; r++)
@@ -121,7 +130,7 @@ export function generateDungeon(
     const regions = findRegions(world, slots)
     const faceTotal = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
     const picked = pickRooms(regions, faceTotal * PICKED_FLOOR_SHARE).map(index => regions[index])
-    const corridors = findCorridors(world, picked, slots)
+    const corridors = findCorridors(world, picked, slots, Math.round(width * height * labyrinth))
 
     // corridors come first, growing rooms would eat the way for them and leave nothing but doors between rooms
     const corridorFaces = corridors.flatMap(({ faces }) => faces)

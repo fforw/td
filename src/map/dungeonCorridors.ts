@@ -10,12 +10,6 @@ import { FaceHeap } from "./route"
  */
 
 /**
- * Number of rooms per patch that get connected first, spread out over the level
- */
-const SPREAD_ROOMS_PER_PATCH = 2.5
-
-
-/**
  * Corridor between two rooms
  */
 export interface Corridor
@@ -294,10 +288,16 @@ export function spreadRooms(world: PatchWorld, rooms: readonly number[][], count
  * @param world     world with all patches of the level
  * @param rooms     global face ids per room
  * @param slots     slots of the patches of the level
+ * @param spread    number of rooms spread out over the level to connect first
  *
  * @return corridors, one less than rooms
  */
-export function findCorridors(world: PatchWorld, rooms: readonly number[][], slots: readonly number[]): Corridor[]
+export function findCorridors(
+    world: PatchWorld,
+    rooms: readonly number[][],
+    slots: readonly number[],
+    spread: number
+): Corridor[]
 {
     const roomOf = new Map(rooms.flatMap((faces, room) => faces.map(face => [face, room] as const)))
 
@@ -318,7 +318,7 @@ export function findCorridors(world: PatchWorld, rooms: readonly number[][], slo
 
     const corridors: Corridor[] = []
     // the first room is where everything starts from, also if there is nothing to spread out
-    const spreadOut = spreadRooms(world, rooms, Math.round(slots.length * SPREAD_ROOMS_PER_PATCH))
+    const spreadOut = spreadRooms(world, rooms, Math.max(spread, 1))
     const allRooms = rooms.map((_, room) => room)
     const connected = new Set<number>(spreadOut.slice(0, 1))
 
