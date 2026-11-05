@@ -19,9 +19,11 @@ function sizeParam(params: URLSearchParams, name: string, fallback: number): num
  * Generates the level the page parameters ask for and sets up the parts of the page around it: the numbers of the level,
  * the button for a new seed and the link to the same level on the other page.
  *
+ * @param lit   whether to also place and bake the lights of the level
+ *
  * @return generated level
  */
-export function loadLevel(): Promise<DungeonLevel>
+export function loadLevel(lit = false): Promise<DungeonLevel>
 {
     const params = new URLSearchParams(location.search)
     const seed = randomSeed(params.has("seed") ? Number(params.get("seed")) : null)
@@ -38,15 +40,16 @@ export function loadLevel(): Promise<DungeonLevel>
         location.search = params.toString()
     })
 
-    return new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height, { floorShare, labyrinth }).then(level => {
-        const { patches, regions, rooms, corridors } = level
+    return new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height, { floorShare, labyrinth }, lit).then(level => {
+        const { patches, regions, rooms, corridors, lighting } = level
         const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
         const roomFaces = rooms.reduce((sum, room) => sum + room.length, 0)
         const corridorFaces = corridors.reduce((sum, corridor) => sum + corridor.faces.length, 0)
         const percent = (count: number) => Math.round(count * 100 / faces) + "%"
         document.getElementById("info")!.textContent =
             `seed ${seed}, ${width} x ${height} patches, ${faces} faces, ${regions.length} regions, ` +
-            `${rooms.length} rooms ${percent(roomFaces)}, ${corridors.length} corridors ${percent(corridorFaces)}`
+            `${rooms.length} rooms ${percent(roomFaces)}, ${corridors.length} corridors ${percent(corridorFaces)}` +
+            (lighting ? `, ${lighting.lights.length} lights` : "")
         return level
     })
 }

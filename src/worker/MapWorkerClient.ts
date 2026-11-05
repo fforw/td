@@ -72,6 +72,10 @@ export interface DungeonRequest
      * What the level looks like, the default for what is left out
      */
     style: Partial<DungeonStyle>
+    /**
+     * Whether to also place and bake the lights of the level
+     */
+    lit: boolean
 }
 
 export type MapRequest = PatchRequest | RouteRequest | DungeonRequest
@@ -165,6 +169,7 @@ export default class MapWorkerClient
      * @param width     number of patches in q-direction
      * @param height    number of patches in r-direction
      * @param style     what the level looks like, the default for what is left out
+     * @param lit       whether to also place and bake the lights of the level
      *
      * @return generated level
      */
@@ -173,10 +178,11 @@ export default class MapWorkerClient
         size: number,
         width = DUNGEON_WIDTH,
         height = DUNGEON_HEIGHT,
-        style: Partial<DungeonStyle> = {}
+        style: Partial<DungeonStyle> = {},
+        lit = false
     ): Promise<DungeonLevel>
     {
-        return this.request(id => ({ id, type: "dungeon", seed, size, width, height, style }))
+        return this.request(id => ({ id, type: "dungeon", seed, size, width, height, style, lit }))
     }
 
 

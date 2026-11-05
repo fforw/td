@@ -1,4 +1,5 @@
 import RouteFinder from "../game/RouteFinder"
+import { lightDungeon } from "../map/dungeonLights"
 import { generateDungeon } from "../map/generateDungeon"
 import { generatePatch } from "../map/generatePatch"
 import type { MapRequest, MapResponse, RouteRequest } from "./MapWorkerClient"
@@ -36,7 +37,13 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
         else if (data.type === "dungeon")
         {
             const level = generateDungeon(data.seed, data.size, data.width, data.height, data.style)
-            postMessage({ id, result: level } satisfies MapResponse, { transfer: level.patches.flatMap(transferables) })
+            const transfer: Transferable[] = level.patches.flatMap(transferables)
+            if (data.lit)
+            {
+                level.lighting = lightDungeon(data.seed, level)
+                transfer.push(level.lighting.colors.buffer, level.lighting.directions.buffer)
+            }
+            postMessage({ id, result: level } satisfies MapResponse, { transfer })
         }
         else
         {
