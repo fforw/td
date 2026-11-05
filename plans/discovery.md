@@ -17,8 +17,8 @@ The overworld is one level among many. Every location (overworld, house
 interior, dungeon) is a level with:
 
 - its own `PatchWorld` and patch layout. A house is a single small
-  patch, a dungeon three hexagon patches around a shared corner, the
-  most compact cluster with room to grow in every direction.
+  patch, a dungeon a block of width x height connected patches, 2 x 2
+  to start with, sized per dungeon.
 - its own generator in the worker, picked by level kind.
 - Sub-levels are generated on a patch layout with ample space. Faces
   outside the level get a new face type NONE, which bounds the drawable
@@ -33,6 +33,8 @@ Simulation is separated from rendering:
   patches plus patches a running mission targets, requests them from
   `MapWorkerClient` and connects them. Levels keep simulating while not
   shown.
+- A level's patches stay loaded while anyone is inside. A level with
+  nobody in it can be dropped and rebuilt from its seed and overlay.
 - Rendering shows one level at a time, picks the patches near the camera
   from its simulation set and adds ground meshes and models for those.
   Entering a portal swaps the level group and the camera setup.
@@ -76,6 +78,7 @@ interface PatchNode
     state: "targeted" | "discovered"
     parent: string | null          // patch key it was discovered from
     overlay: Map<number, number>   // local face -> FaceType index
+    edges: Map<number, number>     // local half edge -> EdgeType index
     fixtures: Map<string, FixtureState>  // changes to generated fixtures
     events: PatchEvent[]
 }
@@ -91,24 +94,62 @@ interface PatchNode
 - Local face indexes are only stable as long as generation doesn't
   change, hence `generatorVersion`.
 
-### 0.3 Face overlay
+### 0.3 Overlay
+
+The overlay holds what changed on the faces and edges of a level. It is
+the current value per face or half edge, not a history, so a door opened
+500 times is still one entry. Generated data stays `f(seed, ...)`.
 
 - On patch load, write the node's overlay entries into `patch.faceType`
-  before `world.add()`. Reads stay at array speed.
+  and `patch.edgeType` before `world.add()`. Reads stay at array speed.
 - `setFaceType(globalFace, type)`: resolve slot -> patch `q/r` + local
   face, record in the overlay, write into the live array, rebuild the
   patch's ground and models, and the ground of every neighbor patch
   that a half edge of the face twins into.
+- `setEdgeType(globalHalfEdge, type)`: the same for an edge, for both of
+  its half edges unless it is one-way. Ground doesn't read edge types,
+  so this only touches the models on the edge.
 - Optional: keep the generated value on first edit to allow reverting.
+
+All edits come from the main thread, workers never send any back.
+
+- Levels other than the overworld are local. The worker generates them
+  and hands the patches over; the main thread owns them from then on and
+  changes them in place. No messages, however often they change. Reopening
+  a level regenerates it and applies its overlay.
+- Overworld edits are rare, so they can be expensive: rebuilding ground
+  and redrawing patch images is fine. The patch view gets them directly,
+  patch images redraw from a newly built patch with the overlay applied.
+- The route finder is the only thing that needs them sent. `SimWorld`
+  keeps a pending list of edits and sends it with the next route query,
+  then empties it. `postMessage` is in order and the worker handles one
+  message at a time, so a search always sees all edits made before it.
+- The route finder builds patches lazily, so it keeps the edits it got
+  per patch and applies them when it builds that patch.
+- A new `SimWorld` starts with the whole overlay as its pending list.
+  Loading a save always starts over with new workers, even for the same
+  seed, since they hold changes of the other timeline.
+- The pending list is never saved, the overlay is.
 
 ### 0.4 Face types and themes
 
 - One global `FaceType` list. Face types are semantic: what a face is
   for simulation (passable, cost, occupied). Interior types (FLOOR,
-  DOOR, ...) are added to the same list; new types only for new
-  behavior, not new looks.
-- A theme maps face types and fixture kinds to appearance: color,
-  models, scale range. It replaces `GROUND_COLORS` (`render/scene3d.ts`)
+  ...) are added to the same list; new types only for new behavior, not
+  new looks.
+- One global `EdgeType` list on the same pattern, stored per half edge
+  in `QuadPatch.edgeType`, a `Uint8Array` like `faceType`. 0 is OPEN, the
+  others block or cost something to cross: WALL, DESTRUCTIBLE, DOOR to
+  start with. Patches are immutable in their geometry only.
+- Per half edge, so a read needs no lookup, each patch stores its own
+  side of a seam and overlays apply per patch. The two sides match
+  unless the edge is one-way on purpose.
+- What goes where: thin walls and doors are edge types; thick wall masses
+  are `FaceType.WALL`, destroyed through the face overlay; movable
+  obstacles are fixtures or mobiles on a face, since they have state and
+  move.
+- A theme maps face types, edge types and fixture kinds to appearance:
+  color, models, scale range. It replaces `GROUND_COLORS` (`render/scene3d.ts`)
   and `FACE_MODELS` (`world3d.ts`). A castle styled as an oriental bazaar
   is the same castle plan with a different theme; TREE/TREE2 become other
   trees without the simulation noticing.
@@ -117,12 +158,28 @@ interface PatchNode
 
 ### 0.5 Generator requests
 
-- Replace `PatchRequest.castle: boolean` with level kind, patch kind and
-  level seed.
-- The worker runs the planner for the kind after terrain, like
-  `planCastle` today, and returns a feature plan: face types plus
-  fixtures as plain data (`{ kind, face, orientation, params }`).
-- `BuiltPatch.castle` becomes that per-kind feature plan.
+- Replace `PatchRequest.castle: boolean` with the patch kind. Callers
+  know it; every request for a patch has to pass the same kind once
+  generators change faces by kind.
+- A table picks the generator per `PatchKind`. It runs after terrain in
+  up to two steps: one on the face objects before packing, one on the
+  packed patch, where `borderConnected` works.
+- A generator returns its points of interest, each a local face plus the
+  plan that goes with it. `placePois` and its fallback to kind NONE move
+  in here, so routes and rendering read one result. The castle generator
+  builds the castle tiles and returns the `CastlePlan` as its only point
+  of interest. Kinds without a generator of their own keep one point of
+  interest in the middle.
+- A kind with a sub-level has two generators. The patch generator only
+  places the way in on the overworld, for a dungeon a gate or door on the
+  central connected face; it keeps the face types, so routes stay the
+  same. The level generator is a separate worker call made when the level
+  is first needed.
+- A level generator doesn't work per patch. It builds a `PatchWorld` of
+  all patches of the level in the worker, works on packed faces across the
+  seams and writes face and edge types before handing the patches over.
+- A dungeon is width x height connected patches, sized per dungeon.
+  Every face starts as NONE; only what the generator sets gets drawn.
 
 ### 0.6 Campaign start
 
@@ -178,6 +235,7 @@ subtitle on top of that.
   HOUSE and TAVERN are impassable. Passing is separate from `occupied`,
   which is about what can be placed on a face: nothing gets built in a
   forest, but people walk through it. An impassable THICKET may follow.
+  Crossing an edge adds the cost of its `EdgeType` (0.4).
 - A route leads from the center of the castle to all points of interest
   of the target and costs as much as the farthest one. If any can't be
   reached, there is no route.
@@ -187,8 +245,10 @@ subtitle on top of that.
   once the search gets there, so a route doesn't cost more patches than
   it reaches. `SimWorld` only sends one request with what the worker
   can't know: the kinds of known patches. Patches are addressed by q/r
-  between threads, slots stay private to each `PatchWorld`. The overlay
-  of 0.3 has to reach the worker as messages once it exists.
+  between threads, slots stay private to each `PatchWorld`. Overworld
+  edits reach the worker with the route queries (0.3).
+- Routes inside other levels run on the main thread, which owns those
+  patches (0.3). They can move to a worker if they turn out to stutter.
 - Portals are extra edges between levels; routes across levels search
   over portals on top of the per-level search.
 - Cost tables are per traveller, so hero traits (ranger, dwarf) and
@@ -420,8 +480,8 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 ### 3.1 Doors and portals
 
-- A door within a level is a face type with state (open, locked); GATE
-  is one already, changed through the overlay.
+- A door within a level is an edge type with state (open, locked),
+  changed through the overlay. The castle's GATE stays a face type.
 - A portal is a fixture linking a face in one level to a face in another,
   e.g. the HOUSE face on the overworld to the entrance of the house
   interior. Stored in both levels as a pair of (level, patch, face).
@@ -454,14 +514,25 @@ Glyphs are built from the stroke data of a source kanji per concept
 
 - The premise is a stereotype; it decides inhabitants, fixtures and
   theme.
-- Walls are faces, like the castle walls, drawn thinner than their
-  face where that looks better. Sub-levels have the space for the ring
-  of faces (0.1), so walls on half edges aren't worth a change of the
-  packed patch format.
-- Rooms: take the most square faces as seeds (`faceRatio`, like house
-  placement in `Castle.ts`), spaced apart, grow each into a compact
-  region with a size limit, wall it in, connect rooms by carved
-  corridors.
+- Walls are mostly faces: thick masses between rooms, to avoid a look of
+  many skinny walls. Edge walls (0.4) are for dividing a space and for
+  doors, and rule nothing else out.
+- Room candidates come from classifying the mesh, after gen-88: count
+  the quads around each vertex across seams. Faces that touch a vertex
+  of 5 or more quads, or the outer edge of the level, are wall. The
+  connected regions of the other faces are candidates. Irregular vertices
+  end up in the walls, so the floors are nearly regular grids.
+- Two candidates can't share an edge, but they can touch at a corner.
+  A 2 x 2 level has about 5300 faces and 200 to 240 regions, half of them
+  4 faces or fewer, 52 to 58 with 12 or more, the largest 95 to 217.
+- Rooms: keep regions of about 12 faces or more, split or trim big ones
+  at their narrow necks, with a door edge where that keeps the faces, and
+  pick around 10, spaced apart and not touching at corners. Everything
+  else is wall, corridors are carved through it. Small regions along a
+  corridor can become closets or niches. The numbers are a starting
+  point; picking and carving aren't tried yet.
+- Four quads around a vertex aren't a classification, 77% of the vertices
+  have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
   (deepest point or end of the main path), reward behind the climax,
   way out. Depth from the entrance and main path vs. branch decide.
@@ -473,7 +544,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   repeat. Guarantees solvability. Keys can be items, levers, abilities
   (hidden passage, barred door) or facts (a password found on a note).
 - Shortcuts: doors that only open from the far side, so the way out is
-  short after the climax.
+  short after the climax. A one-way edge, where the two half edges
+  differ (0.4).
 
 ### 3.5 House interiors
 
@@ -558,3 +630,6 @@ Still to be designed: who needs what and who produces what.
 - What wisdom reveals in an explorer's report, exactly.
 - Does the game run in the 3D view of `world.html` with the patch map as
   an overlay, or is the patch map a view of its own?
+- How do heroes act inside a level: orders from the player, how time
+  passes there, how fights work?
+- How are thin walls drawn where they meet at irregular vertices?
