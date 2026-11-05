@@ -1,7 +1,7 @@
 import { createNoise2D } from "simplex-noise"
 import Prando from "prando"
 import { FaceType } from "../map/geometry"
-import type { InkEdge, OldMap } from "../map/mapRegions"
+import type { InkEdge, ManuscriptMap } from "../map/mapRegions"
 import { DEFAULT_COSTS } from "../map/route"
 import { deckleMask } from "./deckle"
 import type { AtlasFrame, MapAtlas } from "./mapAtlas"
@@ -211,7 +211,7 @@ function drawStains(ctx: CanvasRenderingContext2D, width: number, height: number
  */
 export default function drawOldMap(
     ctx: CanvasRenderingContext2D,
-    map: OldMap,
+    map: ManuscriptMap,
     view: MapView,
     width: number,
     height: number,

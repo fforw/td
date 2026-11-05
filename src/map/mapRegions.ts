@@ -3,7 +3,7 @@ import { FaceType } from "./geometry"
 import type Terrain from "./terrain"
 
 /*
- * The old map doesn't look at any faces. It scans the climate noise the faces get their types from in a raster of its
+ * The manuscript map doesn't look at any faces. It scans the climate noise the faces get their types from in a raster of its
  * own and runs marching squares over that, so its cost depends on the size of the raster and not on the size of the part
  * of the world it shows. What the builders change on the faces only shows up as the symbols given as points of interest.
  *
@@ -91,7 +91,7 @@ export interface MapArea
 /**
  * Everything the old map shows, in map units
  */
-export interface OldMap
+export interface ManuscriptMap
 {
     /**
      * Outlines per region as closed loops of flat coordinates. Holes run the other way round, so they are holes for the
@@ -142,7 +142,7 @@ function scan(terrain: Pick<Terrain, "faceType">, area: MapArea, step: number): 
 /**
  * Runs marching squares over the regions of the raster.
  */
-function marchRaster(terrain: Pick<Terrain, "faceType">, raster: Raster): Pick<OldMap, "outlines" | "ink">
+function marchRaster(terrain: Pick<Terrain, "faceType">, raster: Raster): Pick<ManuscriptMap, "outlines" | "ink">
 {
     const { area, step, columns, rows, types } = raster
     const stride = columns + 1
@@ -452,7 +452,7 @@ export function createManuscriptMap(
     step: number,
     pois: MapSymbol[],
     seed: number
-): OldMap
+): ManuscriptMap
 {
     const raster = scan(terrain, area, step)
     return { ...marchRaster(terrain, raster), symbols: placeSymbols(raster, pois, seed) }

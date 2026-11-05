@@ -7,11 +7,11 @@ import Terrain from "./map/terrain"
 import { randomSeed } from "./math/random"
 import { loadMapAtlas } from "./render/mapAtlas"
 import { loadMapPaper } from "./render/mapPaper"
-import drawOldMap from "./render/oldMap"
+import drawManuscriptMap from "./render/manuscriptMap"
 import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
- * Test page for the old map around the castle. "seed" sets the world seed, "rings" how many patches to show in every
+ * Test page for the manuscript map around the castle. "seed" sets the world seed, "rings" how many patches to show in every
  * direction of the castle.
  */
 
@@ -79,7 +79,7 @@ async function show(seed: number): Promise<void>
         height: height / scale + AREA_MARGIN * 2
     }
     const map = createManuscriptMap(new Terrain(seed), area, RASTER_PIXELS / scale, [{ x: cx, y: cy, type: FaceType.WALL }], seed)
-    drawOldMap(ctx, map, view, width, height, atlas, paper, seed, ratio)
+    drawManuscriptMap(ctx, map, view, width, height, atlas, paper, seed, ratio)
 }
 
 
