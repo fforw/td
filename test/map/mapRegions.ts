@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { FaceType } from "../../src/map/geometry"
-import { createManuscriptMap, type InkEdge, type MapArea, regionOf } from "../../src/map/mapRegions"
+import { createManuscriptMap, type InkEdge, type MapArea, outerSides, regionOf } from "../../src/map/mapRegions"
 import Terrain from "../../src/map/terrain"
 
 
@@ -140,5 +140,28 @@ describe("createManuscriptMap", function () {
         const c = createManuscriptMap(new Terrain(4712), area, 25, [], 1)
         assert.deepEqual(a, b)
         assert.notDeepEqual(a.ink, c.ink)
+    })
+})
+
+
+describe("outerSides", () => {
+
+    it("leaves out sides shared by two rectangles", () => {
+        const sides = outerSides([
+            { x: 0, y: 0, width: 10, height: 20 },
+            { x: 10, y: 0, width: 10, height: 20 },
+            { x: 0, y: 20, width: 10, height: 20 }
+        ])
+        assert(sides.length === 8)
+        assert(!sides.some(([x0, y0, x1, y1]) => x0 === 10 && x1 === 10 && y0 === 0 && y1 === 20))
+        assert(!sides.some(([x0, y0, x1, y1]) => y0 === 20 && y1 === 20 && x0 === 0 && x1 === 10))
+    })
+
+    it("treats sides only differing by rounding errors as the same", () => {
+        const sides = outerSides([
+            { x: 0, y: 0, width: 0.1 + 0.2 + 100, height: 20 },
+            { x: 100.3, y: 0, width: 100, height: 20 }
+        ])
+        assert(sides.length === 6)
     })
 })

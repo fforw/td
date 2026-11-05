@@ -1,7 +1,7 @@
 import { createNoise2D } from "simplex-noise"
 import Prando from "prando"
 import { FaceType } from "../map/geometry"
-import type { InkEdge, ManuscriptMap } from "../map/mapRegions"
+import { type InkEdge, type ManuscriptMap, type MapArea, outerSides } from "../map/mapRegions"
 import { DEFAULT_COSTS } from "../map/route"
 import { deckleMask } from "./deckle"
 import type { AtlasFrame, MapAtlas } from "./mapAtlas"
@@ -65,6 +65,21 @@ const SYMBOL_SIZE_JITTER = 0.1
 const SYMBOL_ROTATION_JITTER = 0.06
 
 /**
+ * Line width in pixels of the outer border of what a map reveals
+ */
+const BORDER_WIDTH = 1.4
+
+/**
+ * Length in map units of the pieces the sides of revealed areas get cut into, so they wobble like everything else
+ */
+const SIDE_STEP = 20
+
+/**
+ * Pixels revealed areas reach beyond their sides, so no paper shows between the areas of two layers
+ */
+const REVEAL_OVERLAP = 1
+
+/**
  * View onto the map: the map position at the top left corner of the canvas and pixels per map unit
  */
 export interface MapView
@@ -72,6 +87,85 @@ export interface MapView
     x: number
     y: number
     scale: number
+}
+
+
+/**
+ * Map drawn only within some areas, later layers on top of earlier ones
+ */
+export interface MapLayer
+{
+    map: ManuscriptMap
+    /**
+     * Areas to draw in with their outer border, everything if left out
+     */
+    reveal?: MapArea[]
+}
+
+
+type Projection = (x: number, y: number) => number
+
+
+/**
+ * Creates the functions from map units to the screen, wobble included. The noise for it comes first out of the given
+ * generator.
+ */
+function createProjection(prando: Prando, view: MapView): [Projection, Projection]
+{
+    const wobbleX = createNoise2D(() => prando.next())
+    const wobbleY = createNoise2D(() => prando.next())
+
+    return [
+        (x, y) => (
+            x +
+            wobbleX(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
+            wobbleX(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
+            view.x
+        ) * view.scale,
+        (x, y) => (
+            y +
+            wobbleY(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
+            wobbleY(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
+            view.y
+        ) * view.scale
+    ]
+}
+
+
+/**
+ * Returns where drawOldMap() draws map positions for the same seed and view, in pixels, so things can be put on top.
+ */
+export function mapProjection(seed: number, view: MapView): (x: number, y: number) => [number, number]
+{
+    const [screenX, screenY] = createProjection(new Prando(seed), view)
+    return (x, y) => [screenX(x, y), screenY(x, y)]
+}
+
+
+/**
+ * Returns the path around the given areas with the wobble of the map
+ */
+function revealPath(areas: MapArea[], grow: number, screenX: Projection, screenY: Projection): Path2D
+{
+    const path = new Path2D()
+    for (const { x, y, width, height } of areas)
+    {
+        const x0 = x - grow, y0 = y - grow, x1 = x + width + grow, y1 = y + height + grow
+        const corners = [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0]
+        path.moveTo(screenX(x0, y0), screenY(x0, y0))
+        for (let c = 0; c < 8; c += 2)
+        {
+            const pieces = Math.ceil(Math.hypot(corners[c + 2] - corners[c], corners[c + 3] - corners[c + 1]) / SIDE_STEP)
+            for (let i = 0; i < pieces; i++)
+            {
+                const px = corners[c] + (corners[c + 2] - corners[c]) * i / pieces
+                const py = corners[c + 1] + (corners[c + 3] - corners[c + 1]) * i / pieces
+                path.lineTo(screenX(px, py), screenY(px, py))
+            }
+        }
+        path.closePath()
+    }
+    return path
 }
 
 
@@ -200,7 +294,7 @@ function drawStains(ctx: CanvasRenderingContext2D, width: number, height: number
  * Draws the map onto a canvas of the given size in pixels.
  *
  * @param ctx               context of the canvas
- * @param map               map to draw
+ * @param layers            maps to draw, from the bottom up
  * @param view              part of the map to show
  * @param width             width in pixels
  * @param height            height in pixels
@@ -211,7 +305,7 @@ function drawStains(ctx: CanvasRenderingContext2D, width: number, height: number
  */
 export default function drawOldMap(
     ctx: CanvasRenderingContext2D,
-    map: ManuscriptMap,
+    layers: MapLayer[],
     view: MapView,
     width: number,
     height: number,
@@ -222,67 +316,13 @@ export default function drawOldMap(
 ): void
 {
     const prando = new Prando(seed)
-    const wobbleX = createNoise2D(() => prando.next())
-    const wobbleY = createNoise2D(() => prando.next())
+    const [screenX, screenY] = createProjection(prando, view)
     const pressure = createNoise2D(() => prando.next())
 
-    const screenX = (x: number, y: number) => (
-        x +
-        wobbleX(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
-        wobbleX(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
-        view.x
-    ) * view.scale
-    const screenY = (x: number, y: number) => (
-        y +
-        wobbleY(x / WOBBLE_LARGE, y / WOBBLE_LARGE) * WOBBLE_LARGE_AMOUNT +
-        wobbleY(y / WOBBLE_SMALL, x / WOBBLE_SMALL) * WOBBLE_SMALL_AMOUNT -
-        view.y
-    ) * view.scale
-
-    ctx.fillStyle = SEPIA.paper
-    ctx.fillRect(0, 0, width, height)
-
-    const fills = createLayer(ctx)
-    const regions = new Map<FaceType, Path2D>()
-    map.outlines.forEach((loops, type) => {
-        const path = new Path2D()
-        for (const loop of loops)
-        {
-            for (let i = 0; i < loop.length; i += 2)
-            {
-                const x = screenX(loop[i], loop[i + 1])
-                const y = screenY(loop[i], loop[i + 1])
-                if (i === 0)
-                {
-                    path.moveTo(x, y)
-                }
-                else
-                {
-                    path.lineTo(x, y)
-                }
-            }
-            path.closePath()
-        }
-        regions.set(type, path)
-
-        // the hairline gaps between the regions end up below the ink
-        fills.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
-        fills.fill(path)
-    })
-
-    const coast = new Path2D()
-    const lines = new Map<number, Path2D>()
-    for (const edge of map.ink)
-    {
-        const { x0, y0, x1, y1, type, other } = edge
-        const sx0 = screenX(x0, y0)
-        const sy0 = screenY(x0, y0)
-        const sx1 = screenX(x1, y1)
-        const sy1 = screenY(x1, y1)
-
+    const addLine = (lines: Map<number, Path2D>, x0: number, y0: number, x1: number, y1: number, width: number) => {
         const mx = (x0 + x1) / 2
         const my = (y0 + y1) / 2
-        const pressed = inkWidth(edge) * (
+        const pressed = width * (
             1 +
             pressure(mx / PRESSURE_SLOW, my / PRESSURE_SLOW) * PRESSURE_SLOW_AMOUNT +
             pressure(my / PRESSURE_FAST, mx / PRESSURE_FAST) * PRESSURE_FAST_AMOUNT
@@ -294,27 +334,89 @@ export default function drawOldMap(
             path = new Path2D()
             lines.set(lineWidth, path)
         }
-        path.moveTo(sx0, sy0)
-        path.lineTo(sx1, sy1)
-
-        if (type === FaceType.WATER || other === FaceType.WATER)
-        {
-            coast.moveTo(sx0, sy0)
-            coast.lineTo(sx1, sy1)
-        }
+        path.moveTo(screenX(x0, y0), screenY(x0, y0))
+        path.lineTo(screenX(x1, y1), screenY(x1, y1))
     }
 
-    const water = regions.get(FaceType.WATER)
-    if (water)
+    ctx.fillStyle = SEPIA.paper
+    ctx.fillRect(0, 0, width, height)
+
+    const fills = createLayer(ctx)
+    const ink = createLayer(ctx)
+    ink.strokeStyle = SEPIA.ink
+    const strokeLines = (lines: Map<number, Path2D>) => lines.forEach((path, lineWidth) => {
+        ink.lineWidth = lineWidth
+        ink.stroke(path)
+    })
+
+    for (const { map, reveal } of layers)
     {
+        const clip = reveal && revealPath(reveal, REVEAL_OVERLAP / view.scale, screenX, screenY)
         fills.save()
-        fills.clip(water)
-        SHORE_WIDTHS.forEach((lineWidth, i) => {
-            fills.lineWidth = lineWidth
-            fills.strokeStyle = i % 2 === 0 ? SEPIA.shore : SEPIA.regions.get(FaceType.WATER)!
-            fills.stroke(coast)
+        ink.save()
+        if (clip)
+        {
+            fills.clip(clip)
+            ink.clip(clip)
+        }
+
+        const regions = new Map<FaceType, Path2D>()
+        map.outlines.forEach((loops, type) => {
+            const path = new Path2D()
+            for (const loop of loops)
+            {
+                for (let i = 0; i < loop.length; i += 2)
+                {
+                    const x = screenX(loop[i], loop[i + 1])
+                    const y = screenY(loop[i], loop[i + 1])
+                    if (i === 0)
+                    {
+                        path.moveTo(x, y)
+                    }
+                    else
+                    {
+                        path.lineTo(x, y)
+                    }
+                }
+                path.closePath()
+            }
+            regions.set(type, path)
+
+            // the hairline gaps between the regions end up below the ink
+            fills.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
+            fills.fill(path)
         })
+
+        const coast = new Path2D()
+        const lines = new Map<number, Path2D>()
+        for (const edge of map.ink)
+        {
+            const { x0, y0, x1, y1, type, other } = edge
+            addLine(lines, x0, y0, x1, y1, inkWidth(edge))
+
+            if (type === FaceType.WATER || other === FaceType.WATER)
+            {
+                coast.moveTo(screenX(x0, y0), screenY(x0, y0))
+                coast.lineTo(screenX(x1, y1), screenY(x1, y1))
+            }
+        }
+
+        const water = regions.get(FaceType.WATER)
+        if (water)
+        {
+            fills.save()
+            fills.clip(water)
+            SHORE_WIDTHS.forEach((lineWidth, i) => {
+                fills.lineWidth = lineWidth
+                fills.strokeStyle = i % 2 === 0 ? SEPIA.shore : SEPIA.regions.get(FaceType.WATER)!
+                fills.stroke(coast)
+            })
+            fills.restore()
+        }
+        strokeLines(lines)
+
         fills.restore()
+        ink.restore()
     }
     drawLayer(ctx, fills, REGION_ALPHA)
 
@@ -326,16 +428,27 @@ export default function drawOldMap(
 
     drawStains(ctx, width, height, SEPIA.stain, seed)
 
-    const ink = createLayer(ctx)
-    ink.strokeStyle = SEPIA.ink
-    lines.forEach((path, lineWidth) => {
-        ink.lineWidth = lineWidth
-        ink.stroke(path)
-    })
+    const border = new Map<number, Path2D>()
+    for (const [x0, y0, x1, y1] of outerSides(layers.flatMap(({ reveal }) => reveal ?? [])))
+    {
+        const pieces = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / SIDE_STEP)
+        for (let i = 0; i < pieces; i++)
+        {
+            addLine(
+                border,
+                x0 + (x1 - x0) * i / pieces,
+                y0 + (y1 - y0) * i / pieces,
+                x0 + (x1 - x0) * (i + 1) / pieces,
+                y0 + (y1 - y0) * (i + 1) / pieces,
+                BORDER_WIDTH
+            )
+        }
+    }
+    strokeLines(border)
     drawLayer(ctx, ink, INK_ALPHA)
 
     const sprites = new Map<AtlasFrame, HTMLCanvasElement>()
-    for (const { x, y, type } of map.symbols)
+    for (const { x, y, type } of layers.flatMap(({ map }) => map.symbols))
     {
         const style = SEPIA.symbols.get(type)
         if (style)

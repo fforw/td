@@ -438,6 +438,31 @@ function placeSymbols(raster: Raster, pois: MapSymbol[], seed: number): MapSymbo
 
 
 /**
+ * Returns the sides of the given rectangles that aren't shared with another one, as x0, y0, x1, y1. Rectangles sit on a
+ * grid here, so a shared side is the same side of both.
+ */
+export function outerSides(areas: readonly MapArea[]): [number, number, number, number][]
+{
+    const sides = new Map<string, [number, number, number, number]>()
+    const toggle = (x0: number, y0: number, x1: number, y1: number) => {
+        const key = [x0, y0, x1, y1].map(Math.round).join("/")
+        if (!sides.delete(key))
+        {
+            sides.set(key, [x0, y0, x1, y1])
+        }
+    }
+    for (const { x, y, width, height } of areas)
+    {
+        toggle(x, y, x + width, y)
+        toggle(x, y + height, x + width, y + height)
+        toggle(x, y, x, y + height)
+        toggle(x + width, y, x + width, y + height)
+    }
+    return [...sides.values()]
+}
+
+
+/**
  * Creates an old manuscript style map of a part of the world.
  *
  * @param terrain   terrain of the world

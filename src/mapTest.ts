@@ -80,7 +80,7 @@ async function show(seed: number): Promise<void>
         height: height / scale + AREA_MARGIN * 2
     }
     const map = createManuscriptMap(new Terrain(seed), area, RASTER_PIXELS / scale, [{ x: cx, y: cy, type: FaceType.WALL }], seed)
-    drawManuscriptMap(ctx, map, view, width, height, atlas, paper, seed, ratio)
+    drawManuscriptMap(ctx, [{ map }], view, width, height, atlas, paper, seed, ratio)
 }
 
 
