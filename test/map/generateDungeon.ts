@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon } from "../../src/map/generateDungeon"
+import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import { FaceType } from "../../src/map/geometry"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { marchingSquaresPatch } from "../../src/map/marchingSquares"
@@ -91,6 +91,26 @@ describe("generateDungeon", () => {
         const [a] = generateDungeon(4711, FACE_SIZE, 1, 1)
         const [b] = generateDungeon(4712, FACE_SIZE, 1, 1)
         assert.notDeepEqual(a.positions, b.positions)
+    })
+})
+
+
+describe("levelSeed", () => {
+
+    it("always gives the same seed for the same entrance", () => {
+        assert(levelSeed(4711, -1, 0) === levelSeed(4711, -1, 0))
+    })
+
+    it("gives every entrance a level of its own", () => {
+        const seeds = [
+            levelSeed(4711, -1, 0),
+            levelSeed(4711, 1, 0),
+            levelSeed(4711, -1, 1),
+            levelSeed(4711, -1, 0, 1),
+            levelSeed(4712, -1, 0),
+            levelSeed(levelSeed(4711, -1, 0), -1, 0)
+        ]
+        assert(new Set(seeds).size === seeds.length)
     })
 })
 

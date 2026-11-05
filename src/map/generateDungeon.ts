@@ -10,6 +10,23 @@ import { packPatch, type QuadPatch } from "./QuadPatch"
 export const DUNGEON_WIDTH = 2
 export const DUNGEON_HEIGHT = 2
 
+const LEVEL_SALT = 0x1e7e
+
+
+/**
+ * Returns the seed of a level behind an entrance. It doesn't depend on the entrance face or the kind of the patch, so
+ * the level stays the same if those change.
+ *
+ * @param parentSeed    seed of the level the entrance is in, the world seed for the overworld
+ * @param q             grid position of the patch of the entrance
+ * @param r             grid position of the patch of the entrance
+ * @param index         tells apart several entrances on one patch
+ */
+export function levelSeed(parentSeed: number, q: number, r: number, index = 0): number
+{
+    return patchSeed(parentSeed ^ LEVEL_SALT ^ index, q, r)
+}
+
 
 /**
  * Generates the patches of a dungeon level. They only give the dungeon room to grow in: all their faces start out as
