@@ -580,6 +580,21 @@ Glyphs are built from the stroke data of a source kanji per concept
   them are rounded. Tight corners also get a flat outer side. The
   floor wins the contested samples in levels (`LEVEL_PRIORITY`), the other
   way around than on the overworld, or walls would spread into the floor.
+- Light is baked into a field over the plan of the level, one texture of
+  color and energy and one of direction, which floors, walls and meeples
+  look up by position (`map/dungeonLights.ts`, `render/dungeonLighting.ts`).
+  A point gets the angle under which it sees a light, minus the angles of
+  the walls in front of it, which needs no rays and gives exact soft
+  shadows. Lights stay below the top of the walls, so 2D is right for the
+  floor. About 25 lights on 2 x 2 patches bake in under a second in the
+  worker. A changed wall means rebaking the lights within `MAX_INFLUENCE`
+  of it, and their shadows reach up to twice as far. Not done yet.
+- A meeple gets a rim instead of its outline only where it stands in the
+  dark and a light still reaches it, so not close to a light. Rooms get a
+  light in the middle, the biggest ones first, unless a meeple could get
+  rims from two lights at the same point. That is `RIM_LIMIT` twice apart,
+  or closer with walls between them, counting doors as open. Other rooms
+  stay dark. Meeples have no shadows in levels yet.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
