@@ -10,23 +10,30 @@ import { FaceHeap } from "./route"
  */
 
 /**
+ * Number of rooms per patch that get connected first, spread out over the level
+ */
+const SPREAD_ROOMS_PER_PATCH = 2.5
+
+
+/**
  * Corridor between two rooms
  */
 export interface Corridor
 {
     /**
-     * Indexes of the rooms it connects
+     * Indexes of the rooms it connects. A corridor that branches off another one starts at the room that one leads to.
      */
     from: number
     to: number
 
     /**
-     * Global face ids of the corridor in the order of walking from one room to the other, without the faces of the rooms
+     * Global face ids of the corridor in the order of walking from one room to the other, without the faces of the rooms.
+     * Empty for a room right next to the corridor it branches off, which only needs a door.
      */
     faces: number[]
 
     /**
-     * Global ids of the faces of the rooms that the doors at its ends lead to
+     * Global ids of the faces that the doors at its ends lead to: of its rooms, or of the corridor it branches off
      */
     fromFace: number
     toFace: number
@@ -76,7 +83,7 @@ class CorridorSearch
     /**
      * @param world     world with all patches of the level
      * @param targets   indexes of the rooms to get to, removing one stops the search from going there
-     * @param roomOf    room index by global face
+     * @param roomOf    room index by global face, also of corridor faces for the room they lead to
      * @param blocked   faces a corridor can't use, removeFaces() has to be called for new ones
      */
     constructor(
@@ -232,14 +239,63 @@ class CorridorSearch
 
 
 /**
+ * Returns rooms spread out over the level: after the first one always the room farthest from the ones so far.
+ *
+ * @param world     world with all patches of the level
+ * @param rooms     global face ids per room
+ * @param count     number of rooms to return, there can be fewer if the level has less
+ *
+ * @return indexes of the rooms
+ */
+export function spreadRooms(world: PatchWorld, rooms: readonly number[][], count: number): number[]
+{
+    const centers = rooms.map(faces => {
+        let x = 0, y = 0
+        for (const face of faces)
+        {
+            const [fx, fy] = faceCenter(world, face)
+            x += fx / faces.length
+            y += fy / faces.length
+        }
+        return [x, y]
+    })
+    const distances = rooms.map(() => Infinity)
+
+    const spread: number[] = []
+    let pick = 0
+    while (spread.length < Math.min(count, rooms.length))
+    {
+        spread.push(pick)
+        const [x, y] = centers[pick]
+        distances[pick] = 0
+
+        let farthest = -1
+        for (let room = 0; room < rooms.length; room++)
+        {
+            distances[room] = Math.min(distances[room], Math.hypot(centers[room][0] - x, centers[room][1] - y))
+            if (farthest < 0 || distances[room] > distances[farthest])
+            {
+                farthest = room
+            }
+        }
+        pick = farthest
+    }
+    return spread
+}
+
+
+/**
  * Connects rooms with corridors, always the closest room that isn't connected yet to the ones that are, which makes the
- * rooms and corridors a tree. Corridors don't cross and stay off the outer edge of the level.
+ * rooms and corridors a tree. Rooms spread out over the level come first, their corridors are long since they have to
+ * find a way through the wall between all the other rooms. Only then the others get connected to what is closest by.
+ * Corridors don't cross and stay off the outer edge of the level, so they can fence in rooms, which then branch off a
+ * corridor.
  *
  * @param world     world with all patches of the level
  * @param rooms     global face ids per room
  * @param slots     slots of the patches of the level
  *
- * @return corridors, there is one less than rooms unless some room can't be reached
+ * @return corridors, one less than rooms
  */
 export function findCorridors(world: PatchWorld, rooms: readonly number[][], slots: readonly number[]): Corridor[]
 {
@@ -261,25 +317,47 @@ export function findCorridors(world: PatchWorld, rooms: readonly number[][], slo
     }
 
     const corridors: Corridor[] = []
-    const targets = new Set(rooms.keys())
-    targets.delete(0)
-    const search = new CorridorSearch(world, targets, roomOf, blocked)
-    search.addSources(rooms[0] ?? [])
+    // the first room is where everything starts from, also if there is nothing to spread out
+    const spreadOut = spreadRooms(world, rooms, Math.round(slots.length * SPREAD_ROOMS_PER_PATCH))
+    const allRooms = rooms.map((_, room) => room)
+    const connected = new Set<number>(spreadOut.slice(0, 1))
 
-    while (targets.size > 0)
-    {
-        const corridor = search.next()
-        if (!corridor)
+    const connect = (group: readonly number[], branching: boolean) => {
+        const targets = new Set(group.filter(room => !connected.has(room)))
+        const search = new CorridorSearch(world, targets, roomOf, blocked)
+        search.addSources([...connected].flatMap(room => rooms[room]))
+        if (branching)
         {
-            break
+            search.addSources(corridors.flatMap(({ faces }) => faces))
         }
-        corridors.push(corridor)
-        targets.delete(corridor.to)
-        corridor.faces.forEach(face => blocked.add(face))
 
-        search.removeFaces(corridor.faces)
-        search.addSources(rooms[corridor.to])
+        while (targets.size > 0)
+        {
+            const corridor = search.next()
+            if (!corridor)
+            {
+                break
+            }
+            corridors.push(corridor)
+            connected.add(corridor.to)
+            targets.delete(corridor.to)
+            for (const face of corridor.faces)
+            {
+                blocked.add(face)
+                roomOf.set(face, corridor.to)
+            }
+
+            search.removeFaces(corridor.faces)
+            search.addSources(rooms[corridor.to])
+            if (branching)
+            {
+                search.addSources(corridor.faces)
+            }
+        }
     }
+    connect(spreadOut, false)
+    connect(allRooms, false)
+    connect(allRooms, true)
     return corridors
 }
 

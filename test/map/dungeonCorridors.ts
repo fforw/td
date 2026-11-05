@@ -1,5 +1,6 @@
 import { assert, describe, it } from "vitest"
 
+import { spreadRooms } from "../../src/map/dungeonCorridors"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
@@ -9,6 +10,11 @@ import { FACE_SIZE } from "../../src/map/scale"
 
 
 const SEEDS = [1, 2, 3, 4711, 12345]
+
+/**
+ * Seeds of levels with a room that long corridors fence in
+ */
+const FENCED_SEEDS = [681944586, 580605849, 388526211, 595451591]
 
 const LOCAL_FACE = (1 << (SLOT_SHIFT - 2)) - 1
 
@@ -44,6 +50,16 @@ describe("Corridors", () => {
                 assert(!connected.has(to))
                 connected.add(to)
             }
+        }
+    })
+
+    it("has long corridors between the rooms connected first", () => {
+
+        for (const seed of SEEDS)
+        {
+            const { corridors } = level(seed)
+            const lengths = corridors.slice(0, 9).map(({ faces }) => faces.length).sort((a, b) => a - b)
+            assert(lengths[4] >= 8, seed + ": " + lengths)
         }
     })
 
@@ -262,6 +278,47 @@ describe("Corridors", () => {
 })
 
 
+describe("Fenced in rooms", () => {
+
+    it("branch off a corridor through a door", () => {
+
+        for (const seed of FENCED_SEEDS)
+        {
+            const { world, roomFaces, corridors } = level(seed)
+            const inRooms = new Set(roomFaces.flat())
+            const carved = new Set(corridors.flatMap(({ faces }) => faces))
+
+            const branches = corridors.filter(({ fromFace }) => !inRooms.has(fromFace))
+            assert(branches.length > 0, String(seed))
+            for (const { faces, fromFace, toFace } of branches)
+            {
+                assert(carved.has(fromFace))
+
+                // a room right next to the corridor only needs the door
+                const first = faces.length > 0 ? faces[0] : toFace
+                const h = [0, 1, 2, 3].map(i => first * 4 + i).find(h => faceOf(world.twin(h)) === fromFace)!
+                assert(world.edgeType(h) === EdgeType.DOOR.index)
+            }
+        }
+    })
+
+    it("can be reached, and all rooms are in the tree", () => {
+
+        for (const seed of FENCED_SEEDS)
+        {
+            const { world, slots, roomFaces, corridors } = level(seed)
+            assert(corridors.length === roomFaces.length - 1, String(seed))
+
+            const start = roomFaces[0][0]
+            for (const [target] of roomFaces.slice(1))
+            {
+                assert(findRoute(world, start, slotOf(target), [target & LOCAL_FACE], slots).reachable, String(seed))
+            }
+        }
+    })
+})
+
+
 describe("Corridor search", () => {
 
     it("doesn't cover the level again for every corridor", () => {
@@ -288,5 +345,25 @@ describe("Corridor search", () => {
         {
             FaceHeap.prototype.pop = pop
         }
+    })
+})
+
+
+describe("spreadRooms", () => {
+
+    it("starts with the first room and returns every room once", () => {
+
+        const { world, roomFaces } = level(4711)
+        const spread = spreadRooms(world, roomFaces, 10)
+        assert(spread.length === 10)
+        assert(spread[0] === 0)
+        assert(new Set(spread).size === 10)
+    })
+
+    it("stops when there are no rooms left", () => {
+
+        const { world, roomFaces } = level(4711)
+        assert(spreadRooms(world, roomFaces, roomFaces.length + 5).length === roomFaces.length)
+        assert.deepEqual(spreadRooms(world, [], 5), [])
     })
 })
