@@ -1,7 +1,8 @@
-import { type Campaign, type Explorer, type Hero, type Impression, type Mission, overworld, type PatchKind, patchKey } from "./campaign"
-import { isAway, jobDays, jobTargets, startJob } from "./heroes"
+import { type Campaign, type Explorer, type Hero, type Impression, type Mission, overworld, type PatchKind } from "./campaign"
+import { isAway, jobDays, startJob } from "./heroes"
 import CastleScene from "./castleScene"
-import PatchImages, { PATCH_DEPTH, PATCH_WIDTH } from "./patchImages"
+import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
+import MapSheet from "./mapSheet"
 import Portraits, { meepleSitter } from "./portraits"
 import { advanceDay, frontier, startMission } from "./missions"
 import SimWorld from "./SimWorld"
@@ -38,13 +39,6 @@ const IMPRESSION_NAMES: Record<Impression, string> = {
     dangerous: "Looked dangerous"
 }
 
-const SVG_NS = "http://www.w3.org/2000/svg"
-
-/**
- * Size of the icons and labels on the patch map relative to the patch depth
- */
-const LABEL_SIZE = 0.28
-
 /**
  * Most report lines shown
  */
@@ -77,24 +71,6 @@ function present(children: Child[]): (Node | string)[]
 }
 
 
-function svg(tag: string, attrs: Record<string, string | number>, ...children: Child[]): SVGElement
-{
-    const elem = document.createElementNS(SVG_NS, tag)
-    for (const [name, value] of Object.entries(attrs))
-    {
-        elem.setAttribute(name, String(value))
-    }
-    for (const child of children)
-    {
-        if (child)
-        {
-            elem.append(child)
-        }
-    }
-    return elem
-}
-
-
 /**
  * Returns what an explorer has to tell about the unknown patches on the way, for the end of a report line
  */
@@ -111,8 +87,9 @@ function passedNote({ passed }: Mission): string
 
 
 /**
- * The castle in 3D with the HUD over it, running missions and reports in a corner, and the tavern as a popup with the
- * patch map. The DOM parts are small, so every change renders them all again; the 3D scene stays.
+ * The castle in 3D with the HUD over it, running missions and reports in a corner. The map is a popup over the paused 3D
+ * view, with a smaller popup on top to start a mission from what was clicked on it. The DOM parts are small, so every
+ * change renders them all again; the 3D scene and the sheet of the map stay.
  */
 export default class GameView
 {
@@ -123,12 +100,12 @@ export default class GameView
     /** null where the browser has no WebGL */
     private castle: CastleScene | null
 
-    private images: PatchImages
+    private sheet: MapSheet
 
     private sim: SimWorld
 
     private readonly portraits = new Portraits(() => {
-        if (!this.popup.hidden)
+        if (!this.dialog.hidden)
         {
             this.render()
         }
@@ -137,9 +114,16 @@ export default class GameView
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
     private readonly popup = el("div", { className: "popup", hidden: true })
+    private readonly dialog = el("div", { className: "popup mission-popup", hidden: true })
 
-    /** frontier patch picked as the next mission target */
-    private selected: string | null = null
+    /** marker a mission is being set up for */
+    private selected: MissionMarker | null = null
+
+    /** hero picked for the mission */
+    private pickedHero: number | null = null
+
+    /** an explorer is hired and waiting for the route to be found */
+    private sending = false
 
     private reports: string[] = []
 
@@ -149,20 +133,33 @@ export default class GameView
         this.campaign = campaign
         this.store = store
         this.castle = this.createCastle()
-        this.images = this.createImages()
+        this.sheet = this.createSheet()
         this.sim = new SimWorld(campaign.seed)
 
+        // a click on the backdrop closes a popup
         this.popup.addEventListener("click", ev => {
-            // a click on the backdrop closes the popup
             if (ev.target === this.popup)
             {
-                this.closeTavern()
+                this.closeMap()
+            }
+        })
+        this.dialog.addEventListener("click", ev => {
+            if (ev.target === this.dialog)
+            {
+                this.closeDialog()
             }
         })
         window.addEventListener("keydown", ev => {
-            if (ev.key === "Escape" && !this.popup.hidden)
+            if (ev.key === "Escape")
             {
-                this.closeTavern()
+                if (!this.dialog.hidden)
+                {
+                    this.closeDialog()
+                }
+                else if (!this.popup.hidden)
+                {
+                    this.closeMap()
+                }
             }
         })
 
@@ -174,7 +171,7 @@ export default class GameView
         let castle: CastleScene | null = null
         try
         {
-            castle = new CastleScene(this.campaign.seed, () => this.openTavern())
+            castle = new CastleScene(this.campaign.seed, () => this.openMap())
             castle.setRunning(true)
         }
         catch (e)
@@ -185,31 +182,45 @@ export default class GameView
             ...(castle ? [castle.element, castle.compass] : [el("p", { className: "no-3d" }, "The 3D view needs WebGL.")]),
             this.hud,
             this.info,
-            this.popup
+            this.popup,
+            this.dialog
         )
         return castle
     }
 
-    private createImages(): PatchImages
+    private createSheet(): MapSheet
     {
-        return new PatchImages(this.campaign.seed, () => {
-            if (!this.popup.hidden)
-            {
-                this.render()
-            }
-        })
+        return new MapSheet(this.campaign.seed, () => this.hud.offsetHeight)
     }
 
-    private openTavern(): void
+    private openMap(): void
     {
         this.popup.hidden = false
+        this.castle?.setRunning(false)
         this.render()
     }
 
-    private closeTavern(): void
+    private closeMap(): void
     {
         this.popup.hidden = true
         this.selected = null
+        this.dialog.hidden = true
+        this.castle?.setRunning(true)
+        this.render()
+    }
+
+    private openDialog(marker: MissionMarker): void
+    {
+        this.selected = marker
+        this.pickedHero = null
+        this.dialog.hidden = false
+        this.render()
+    }
+
+    private closeDialog(): void
+    {
+        this.selected = null
+        this.dialog.hidden = true
         this.render()
     }
 
@@ -256,12 +267,13 @@ export default class GameView
         this.changed()
     }
 
-    private sendHero(hero: Hero): void
+    private sendHero(): void
     {
-        if (this.selected)
+        const { campaign, selected, pickedHero } = this
+        if (selected && pickedHero !== null)
         {
-            startJob(this.campaign, hero.id, this.selected)
-            this.selected = null
+            startJob(campaign, pickedHero, selected.key)
+            this.closeDialog()
             this.changed()
         }
     }
@@ -271,17 +283,28 @@ export default class GameView
         const { campaign, selected } = this
         if (selected)
         {
-            this.sim.route(campaign, selected).then(
+            const target = selected.key
+            this.sending = true
+            this.render()
+            this.sim.route(campaign, target).then(
                 route => {
-                    // the route takes a moment, in which a click or the end of the day may have changed things
-                    if (campaign === this.campaign && campaign.tavern.includes(explorer) && frontier(campaign).includes(selected))
+                    this.sending = false
+                    // the route takes a moment, in which a click may have changed things
+                    if (campaign === this.campaign && campaign.tavern.includes(explorer) && frontier(campaign).includes(target))
                     {
-                        startMission(campaign, explorer.id, selected, route)
-                        this.selected = null
+                        startMission(campaign, explorer.id, target, route)
+                        if (this.selected === selected)
+                        {
+                            this.closeDialog()
+                        }
                         this.changed()
                     }
                 },
-                e => console.error("No route to " + selected, e)
+                e => {
+                    this.sending = false
+                    console.error("No route to " + target, e)
+                    this.render()
+                }
             )
         }
     }
@@ -299,17 +322,21 @@ export default class GameView
         if (!this.popup.hidden)
         {
             this.popup.replaceChildren(
-                el("div", { className: "dialog" },
-                    el("button", {
-                        type: "button",
-                        className: "close",
-                        title: "Back to the castle",
-                        onclick: () => this.closeTavern()
-                    }, "✕"),
-                    el("span", { className: "map-north", title: "North is up, like N on the compass" }, "N ↑"),
-                    this.renderMap(),
-                    this.renderTavern()
-                )
+                this.sheet.element,
+                el("span", { className: "map-north", title: "North is up, like N on the compass" }, "N ↑"),
+                el("button", {
+                    type: "button",
+                    className: "close",
+                    title: "Back to the castle",
+                    onclick: () => this.closeMap()
+                }, "✕")
+            )
+            this.sheet.update(mapContent(campaign), marker => this.renderMarker(marker), target => this.openDialog(target))
+        }
+        if (!this.dialog.hidden && this.selected)
+        {
+            this.dialog.replaceChildren(
+                this.selected.type === "explore" ? this.renderExplorers(this.selected) : this.renderHeroes(this.selected)
             )
         }
         document.title = campaign.castleName + ", day " + campaign.day + " - Treasure & Dread"
@@ -323,7 +350,10 @@ export default class GameView
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
             el("button", { type: "button", className: "end-day", onclick: () => this.endDay() }, "End day"),
-            el("button", { type: "button", onclick: () => this.openTavern() }, "🍺 Tavern"),
+            el("button", {
+                type: "button",
+                onclick: () => this.popup.hidden ? this.openMap() : this.closeMap()
+            }, "🗺️ Map"),
             __DEV && el("span", { className: "dev" },
                 el("button", { type: "button", onclick: () => exportSave(campaign) }, "Export"),
                 el("button", {
@@ -332,12 +362,14 @@ export default class GameView
                         loaded => {
                             this.campaign = loaded
                             this.selected = null
+                            this.popup.hidden = true
+                            this.dialog.hidden = true
                             this.reports = []
                             // the old ones hold the edits of another timeline, even for the same seed
                             this.castle?.dispose()
                             this.castle = this.createCastle()
-                            this.images.dispose()
-                            this.images = this.createImages()
+                            this.sheet.dispose()
+                            this.sheet = this.createSheet()
                             this.sim.dispose()
                             this.sim = new SimWorld(loaded.seed)
                             this.changed()
@@ -349,133 +381,48 @@ export default class GameView
         ]
     }
 
-    private renderMap(): Element
+    private renderMarker(marker: MapMarker): HTMLElement
     {
-        const { campaign, images } = this
-        const nodes = Object.values(overworld(campaign).patches)
-        const targets = frontier(campaign).map(key => {
-            const [q, r] = key.split("/").map(Number)
-            return { key, q, r }
-        })
-
-        const all = [...nodes, ...targets]
-        const [x0, y0] = images.center(Math.min(...all.map(p => p.q)), Math.min(...all.map(p => p.r)))
-        const [x1, y1] = images.center(Math.max(...all.map(p => p.q)), Math.max(...all.map(p => p.r)))
-        const pad = PATCH_DEPTH * 0.05
-
-        const map = svg("svg", {
-            class: "patch-map",
-            viewBox: [
-                x0 - PATCH_WIDTH / 2 - pad,
-                y0 - PATCH_DEPTH / 2 - pad,
-                x1 - x0 + PATCH_WIDTH + pad * 2,
-                y1 - y0 + PATCH_DEPTH + pad * 2
-            ].join(" ")
-        })
-
-        // unknown and targeted patches as plain tiles below the jagged edges of the known ones
-        for (const { key, q, r } of targets)
+        const { type } = marker
+        if (type === "poi")
         {
-            const { impression } = overworld(campaign).patches[key] ?? {}
-            const cell = svg("g", { class: "patch frontier" + (impression ? " passed" : "") + (key === this.selected ? " selected" : "") },
-                impression ? svg("title", {}, IMPRESSION_NAMES[impression]) : null,
-                this.tile(q, r),
-                this.label(q, r, impression ? IMPRESSION_ICONS[impression] : "?")
-            )
-            cell.addEventListener("click", () => this.select(key))
-            map.append(cell)
-        }
-
-        // passed on the way, too far out to be a target yet
-        for (const { q, r, state, impression } of nodes)
-        {
-            if (state === "passed" && impression && !targets.some(t => t.q === q && t.r === r))
+            const { kind, days } = marker
+            if (days !== undefined)
             {
-                map.append(svg("g", { class: "patch passed" },
-                    svg("title", {}, IMPRESSION_NAMES[impression]),
-                    this.tile(q, r),
-                    this.label(q, r, IMPRESSION_ICONS[impression])
-                ))
+                return el("span", {
+                    className: "marker poi away",
+                    title: KIND_NAMES[kind] + ": a hero is on the way, back in " + days + "d"
+                }, KIND_ICONS[kind], el("small", {}, "⏳" + days))
             }
+            return el("button", {
+                type: "button",
+                className: "marker poi",
+                title: KIND_NAMES[kind] + ": send a hero",
+                onclick: () => this.openDialog(marker)
+            }, KIND_ICONS[kind])
         }
-
-        const known = nodes.filter(node => node.state === "discovered")
-        for (const node of nodes)
+        if (type === "targeted")
         {
-            if (node.state === "targeted")
-            {
-                const mission = campaign.missions.find(m => m.target === patchKey(node.q, node.r))
-                map.append(svg("g", { class: "patch targeted" },
-                    svg("title", {}, "Explorer on the way"),
-                    this.tile(node.q, node.r),
-                    this.label(node.q, node.r, "⏳" + (mission ? mission.endDay - campaign.day : ""))
-                ))
-            }
+            return el("span", { className: "marker targeted", title: "Explorer on the way" }, "⏳" + marker.days)
         }
-        const jobs = jobTargets(campaign)
-        for (const { q, r, kind } of known)
-        {
-            const key = patchKey(q, r)
-            const image = images.get(q, r, kind)
-            const cell = svg("g", { class: "patch discovered " + kind.toLowerCase() + (jobs.includes(key) ? " job" : "") },
-                svg("title", {}, KIND_NAMES[kind]),
-                image
-                    ? svg("image", { href: image.href, x: image.x, y: image.y, width: image.width, height: image.height })
-                    : this.tile(q, r)
-            )
-            if (jobs.includes(key))
-            {
-                cell.addEventListener("click", () => this.select(key))
-            }
-            map.append(cell)
-        }
-        // icons and the selection last, so no neighboring patch image covers them
-        for (const { q, r, kind } of known)
-        {
-            map.append(svg("g", { class: "patch icon" }, this.label(q, r, KIND_ICONS[kind])))
-        }
-        const picked = known.find(({ q, r }) => patchKey(q, r) === this.selected)
-        if (picked)
-        {
-            map.append(svg("g", { class: "patch picked" }, this.tile(picked.q, picked.r)))
-        }
-        return map
+        return el("span", {
+            className: "marker passed",
+            title: IMPRESSION_NAMES[marker.impression]
+        }, IMPRESSION_ICONS[marker.impression])
     }
 
     /**
-     * Picks a patch as the target for an explorer or a hero, or drops it when picked again
+     * Popup to hire an explorer for an unknown patch
      */
-    private select(key: string): void
+    private renderExplorers({ key, impression }: ExploreTarget): HTMLElement
     {
-        this.selected = key === this.selected ? null : key
-        this.render()
-    }
-
-    /**
-     * Rectangle of a patch for patches without an image
-     */
-    private tile(q: number, r: number): SVGElement
-    {
-        const [x, y] = this.images.center(q, r)
-        return svg("rect", { x: x - PATCH_WIDTH / 2, y: y - PATCH_DEPTH / 2, width: PATCH_WIDTH, height: PATCH_DEPTH })
-    }
-
-    private label(q: number, r: number, text: string): SVGElement
-    {
-        const [x, y] = this.images.center(q, r)
-        return svg("text", { x, y, "font-size": PATCH_DEPTH * LABEL_SIZE }, text)
-    }
-
-    private renderTavern(): HTMLElement
-    {
-        const { campaign, selected } = this
-        // an unknown patch is for explorers, a known one for heroes
-        const explore = selected !== null && !overworld(campaign).patches[selected]
-        const job = selected !== null && jobTargets(campaign).includes(selected)
-        return el("section", { className: "tavern" },
-            el("h3", {}, "🍺 Tavern"),
+        const { campaign, sending } = this
+        return el("section", { className: "mission small" },
+            this.renderDialogClose(),
+            el("h3", {}, "🧭 Unknown patch at " + key),
             el("p", { className: "hint" },
-                explore ? "Hire someone to look at " + selected + "." : "Pick a ? on the map to send an explorer."
+                (impression ? IMPRESSION_ICONS[impression] + " " + IMPRESSION_NAMES[impression] + ". " : "") +
+                (sending ? "Getting ready…" : "Hire someone to have a look.")
             ),
             campaign.tavern.length === 0 && el("p", {}, "Nobody is around today."),
             ...campaign.tavern.map(explorer => el("div", { className: "explorer" },
@@ -489,18 +436,27 @@ export default class GameView
                 ),
                 el("button", {
                     type: "button",
-                    disabled: !explore,
+                    disabled: sending,
                     onclick: () => this.hire(explorer)
                 }, "🪙 " + price(explorer))
-            )),
-            el("h3", {}, "🛡️ Local heroes"),
-            el("p", { className: "hint" },
-                job ? "Give someone a job at " + selected + "." : "Pick a known patch on the map for a job."
-            ),
+            ))
+        )
+    }
+
+    /**
+     * Popup to send one hero to a point of interest
+     */
+    private renderHeroes({ key, kind }: Extract<MapMarker, { type: "poi" }>): HTMLElement
+    {
+        const { campaign, pickedHero } = this
+        return el("section", { className: "mission" },
+            this.renderDialogClose(),
+            el("h3", {}, KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + key),
+            el("p", { className: "hint" }, "Who should go there?"),
             ...campaign.heroes.map(hero => {
                 const away = campaign.jobs.find(j => j.heroId === hero.id)
                 const { stats, classes } = hero.character
-                return el("div", { className: "explorer" },
+                return el("label", { className: "explorer" + (away ? " away" : "") },
                     this.renderPortrait(hero),
                     el("span", { className: "name" }, hero.name + " · " + classes.join(", ")),
                     el("span", { className: "stats" },
@@ -508,14 +464,30 @@ export default class GameView
                         (hero.experience ? " · " + hero.experience + (hero.experience === 1 ? " job" : " jobs") : "") +
                         (away ? " · away, back in " + (away.endDay - campaign.day) + "d" : "")
                     ),
-                    el("button", {
-                        type: "button",
-                        disabled: !job || isAway(campaign, hero),
-                        onclick: () => this.sendHero(hero)
-                    }, job ? "Send · " + jobDays(selected) + "d" : "Send")
+                    el("input", {
+                        type: "radio",
+                        name: "hero",
+                        checked: pickedHero === hero.id,
+                        disabled: isAway(campaign, hero),
+                        onchange: () => {
+                            this.pickedHero = hero.id
+                            this.render()
+                        }
+                    })
                 )
-            })
+            }),
+            el("button", {
+                type: "button",
+                className: "launch",
+                disabled: pickedHero === null,
+                onclick: () => this.sendHero()
+            }, "Launch mission · " + jobDays(key) + "d")
         )
+    }
+
+    private renderDialogClose(): HTMLElement
+    {
+        return el("button", { type: "button", className: "close", title: "Back to the map", onclick: () => this.closeDialog() }, "✕")
     }
 
     private renderPortrait({ id, name }: Explorer | Hero): HTMLElement

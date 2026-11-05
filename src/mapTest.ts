@@ -1,5 +1,5 @@
 import "./style.css"
-import { PATCH_DEPTH, PATCH_WIDTH } from "./game/patchImages"
+import { PATCH_DEPTH, PATCH_WIDTH } from "./game/mapContent"
 import { FaceType } from "./map/geometry"
 import { createManuscriptMap } from "./map/mapRegions"
 import { FACE_SIZE, SCALE } from "./map/scale"

@@ -111,6 +111,7 @@
 #game .hud
 {
     position: absolute;
+    z-index: 3;
     top: 0;
     left: 0;
     right: 0;
@@ -162,63 +163,195 @@
     margin-top: 1rem;
 }
 
+/* leaves the top of the 3D view and the HUD visible, and a bit of the 3D view all around */
 #game .popup
 {
     position: absolute;
     inset: 0;
     z-index: 2;
+    padding: 4rem 3rem 3rem;
+    background: rgba(0, 0, 0, 0.35);
+}
+
+#game .mission-popup
+{
+    z-index: 4;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 1rem;
-    background: rgba(0, 0, 0, 0.45);
 }
 
-#game .dialog
-{
-    position: relative;
-    display: flex;
-    gap: 1rem;
-    width: min(76rem, 100%);
-    height: min(48rem, 100%);
-    padding: 1rem;
-    border-radius: 0.5rem;
-    background: #333;
-    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
-}
-
-#game .dialog .close
+#game .close
 {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 5.5rem;
+    right: 4.75rem;
     padding: 0.2rem 0.5rem;
     background: transparent;
-    color: #e8e0d4;
+    color: #3f2a14;
     font-size: 1.1rem;
+}
+
+#game .map-sheet
+{
+    position: relative;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 2px 6px #000a);
+}
+
+#game .map-sheet canvas
+{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#game .markers
+{
+    position: absolute;
+    inset: 0;
 }
 
 #game .map-north
 {
     position: absolute;
-    top: 0.5rem;
-    left: 0.75rem;
+    top: 5.75rem;
+    left: 5.25rem;
     font: bold 0.9rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
     color: #c0244e;
 }
 
-#game .patch-map
+#game .marker
 {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    padding: 0;
+    border: 2px solid #3f2a14;
+    border-radius: 50%;
+    background: rgba(236, 220, 182, 0.9);
+    color: #3f2a14;
+    font: bold 1.2rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    transform: translate(-50%, -50%);
 }
 
-#game .tavern
+#game button.marker:hover
 {
-    width: 17rem;
+    background: #fff4d8;
+    transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* floats over the gap between the map and the edge of the screen, rotated by its --angle */
+#game .border-arrow
+{
+    position: absolute;
+    z-index: 1;
+    padding: 0;
+    background: transparent;
+    transform: translate(-50%, -50%) rotate(var(--angle));
+    animation: border-arrow-float 0.9s ease-in-out infinite alternate;
+}
+
+#game .border-arrow[hidden]
+{
+    display: none;
+}
+
+#game .border-arrow svg
+{
+    display: block;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 2px 3px #000a);
+}
+
+#game .border-arrow polygon
+{
+    fill: #ecdcb6;
+    stroke: #3f2a14;
+    stroke-width: 5;
+    stroke-linejoin: round;
+}
+
+#game .border-arrow:hover polygon
+{
+    fill: #fff4d8;
+}
+
+#game .border-arrow.dangerous polygon
+{
+    stroke: #c0244e;
+}
+
+@keyframes border-arrow-float
+{
+    from
+    {
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateX(-3px);
+    }
+
+    to
+    {
+        transform: translate(-50%, -50%) rotate(var(--angle)) translateX(3px);
+    }
+}
+
+#game .marker.targeted,
+#game .marker.passed
+{
+    border-style: dashed;
+    background: rgba(236, 220, 182, 0.6);
+    font-size: 0.8rem;
+}
+
+#game .marker.poi.away
+{
+    opacity: 0.8;
+}
+
+#game .marker.poi small
+{
+    position: absolute;
+    top: 100%;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+#game .mission
+{
+    position: relative;
+    width: min(28rem, 100%);
+    max-height: 100%;
     overflow-y: auto;
-    padding-top: 1.5rem;
+    padding: 1rem 1.25rem;
+    border-radius: 0.5rem;
+    background: #333;
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.5);
+}
+
+#game .mission.small
+{
+    width: min(22rem, 100%);
+}
+
+#game .mission .close
+{
+    top: 0.5rem;
+    right: 0.5rem;
+    color: #e8e0d4;
+}
+
+#game .mission .launch
+{
+    width: 100%;
+    background: #c0244e;
+    color: #fff;
 }
 
 #game .hint
@@ -259,11 +392,35 @@
     color: #bbb;
 }
 
-#game .explorer button
+#game .explorer button,
+#game .explorer input
 {
     grid-row: 1 / span 2;
     grid-column: 3;
     align-self: center;
+}
+
+#game label.explorer
+{
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+
+#game label.explorer:hover
+{
+    background: #444;
+}
+
+#game label.explorer:has(input:checked)
+{
+    outline: 2px solid #c0244e;
+}
+
+#game label.explorer.away
+{
+    opacity: 0.5;
+    cursor: default;
 }
 
 #game .missions div,
@@ -273,109 +430,20 @@
     font-size: 0.9rem;
 }
 
-/* sizes on the patch map are in 2D map units, a patch is about 690 x 600 */
-.patch rect
-{
-    stroke: #222;
-    stroke-width: 4;
-}
-
-.patch text
-{
-    text-anchor: middle;
-    dominant-baseline: central;
-    pointer-events: none;
-}
-
-.patch.discovered rect
-{
-    fill: #6b7a3a;
-}
-
-.patch.icon text
-{
-    filter: drop-shadow(0 0 12px rgba(0, 0, 0, 0.8));
-}
-
-.patch.targeted rect
-{
-    fill: #555;
-    stroke: #e8e0d4;
-    stroke-width: 8;
-    stroke-dasharray: 30 20;
-}
-
-.patch.targeted text
-{
-    fill: #e8e0d4;
-}
-
-.patch.frontier,
-.patch.job
-{
-    cursor: pointer;
-}
-
-.patch.passed rect
-{
-    stroke-dasharray: 24 16;
-}
-
-.patch.picked rect
-{
-    fill: none;
-    stroke: #c0244e;
-    stroke-width: 16;
-    pointer-events: none;
-}
-
-#game .tavern h3 + .hint
-{
-    margin-top: 0;
-}
-
-#game .tavern .explorer + h3
-{
-    margin-top: 1.5rem;
-}
-
-.patch.frontier rect
-{
-    fill: #3a3a3a;
-}
-
-.patch.frontier text
-{
-    fill: #888;
-}
-
-.patch.frontier:hover rect
-{
-    fill: #4a4a4a;
-}
-
-.patch.frontier.selected rect
-{
-    fill: #c0244e;
-}
-
-.patch.frontier.selected text
-{
-    fill: #fff;
-}
-
 @media (max-width: 700px)
 {
-    #game .dialog
+    #game .popup
     {
-        flex-direction: column;
-        height: 100%;
+        padding: 4rem 0.5rem 0.5rem;
     }
 
-    #game .tavern
+    #game .close
     {
-        width: auto;
-        max-height: 50%;
-        padding-top: 0;
+        right: 2.25rem;
+    }
+
+    #game .map-north
+    {
+        left: 2.75rem;
     }
 }
