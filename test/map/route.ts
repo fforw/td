@@ -3,11 +3,19 @@ import { assert, describe, it } from "vitest"
 import Castle from "../../src/castle/Castle"
 import { planCastle } from "../../src/castle/castlePlan"
 import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
-import { FaceType } from "../../src/map/geometry"
-import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
+import { EdgeType, FaceType } from "../../src/map/geometry"
+import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { placePois } from "../../src/map/pointsOfInterest"
-import { faceCount, packPatch, type QuadPatch } from "../../src/map/QuadPatch"
-import { borderConnected, DEFAULT_COSTS, findRoute, globalFace, packPath, unpackPath } from "../../src/map/route"
+import { faceCount, packPatch, transferables, type QuadPatch } from "../../src/map/QuadPatch"
+import {
+    borderConnected,
+    DEFAULT_COSTS,
+    EDGE_COSTS,
+    findRoute,
+    globalFace,
+    packPath,
+    unpackPath
+} from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
 import Terrain from "../../src/map/terrain"
 import { patchSeed, resetRandom, rng } from "../../src/math/random"
@@ -168,6 +176,182 @@ describe("Route", () => {
         assert(!route.reachable)
         assert(route.cost > 0)
         assert(route.cost < Infinity)
+    })
+})
+
+
+/**
+ * Patch of water with two faces of grass next to each other and the global half edge from one to the other
+ */
+function twoFaces()
+{
+    const patch = plainPatch(0, 0, WATER)
+    const from = innerFace(patch)
+    const to = neighbors(patch, from)[0]
+    patch.faceType[from] = GRASS.index
+    patch.faceType[to] = GRASS.index
+
+    const world = new PatchWorld()
+    const slot = world.add(patch)
+    const h = [0, 1, 2, 3].map(i => from * 4 + i).find(h => patch.twin[h] >> 2 === to)!
+    return { patch, world, slot, from, to, edge: (slot << SLOT_SHIFT) | h }
+}
+
+
+/**
+ * Connects two patches of grass and returns a global half edge of the first one that crosses the seam
+ */
+function seamEdge()
+{
+    const world = new PatchWorld()
+    const a = world.add(plainPatch(0, 0, GRASS))
+    const b = world.add(plainPatch(1, 0, GRASS))
+    const { twin } = world.getPatch(a)
+    const h = twin.findIndex((_, i) => twin[i] < 0 && world.twin((a << SLOT_SHIFT) | i) >= 0)
+    return { world, a, b, edge: (a << SLOT_SHIFT) | h }
+}
+
+
+describe("Edge types", () => {
+
+    it("start out open", () => {
+
+        const patch = plainPatch(0, 0, GRASS)
+        assert(patch.edgeType.length === patch.vertex.length)
+        assert(patch.edgeType.every(type => type === EdgeType.OPEN.index))
+        assert(EdgeType.OPEN.index === 0)
+    })
+
+    it("are transferred with the patch", () => {
+
+        const patch = plainPatch(0, 0, GRASS)
+        assert(transferables(patch).includes(patch.edgeType.buffer))
+    })
+
+    it("know their names", () => {
+
+        assert.deepEqual(EdgeType.typeNames(), ["OPEN", "WALL", "DESTRUCTIBLE", "DOOR"])
+        assert(EdgeType.byIndex(EdgeType.DOOR.index) === EdgeType.DOOR)
+    })
+
+    it("cost nothing if open, something for a door and can't be crossed otherwise", () => {
+
+        assert(EDGE_COSTS[EdgeType.OPEN.index] === 0)
+        assert(EDGE_COSTS[EdgeType.DOOR.index] === 1)
+        assert(EDGE_COSTS[EdgeType.WALL.index] === Infinity)
+        assert(EDGE_COSTS[EdgeType.DESTRUCTIBLE.index] === Infinity)
+    })
+
+    it("change both sides of an edge", () => {
+
+        const { world, edge } = twoFaces()
+        world.setEdgeType(edge, EdgeType.WALL.index)
+        assert(world.edgeType(edge) === EdgeType.WALL.index)
+        assert(world.edgeType(world.twin(edge)) === EdgeType.WALL.index)
+    })
+
+    it("change both sides of a seam", () => {
+
+        const { world, edge } = seamEdge()
+        world.setEdgeType(edge, EdgeType.WALL.index)
+        assert(world.edgeType(edge) === EdgeType.WALL.index)
+        assert(world.edgeType(world.twin(edge)) === EdgeType.WALL.index)
+    })
+
+    it("only change the own side of an unconnected border", () => {
+
+        const world = new PatchWorld()
+        const a = world.add(plainPatch(0, 0, GRASS))
+        const { twin } = world.getPatch(a)
+        const edge = (a << SLOT_SHIFT) | twin.findIndex(t => t < 0)
+        assert(world.twin(edge) === -1)
+
+        world.setEdgeType(edge, EdgeType.WALL.index)
+        assert(world.edgeType(edge) === EdgeType.WALL.index)
+    })
+
+    it("block a route through a wall", () => {
+
+        const { world, slot, from, to, edge } = twoFaces()
+        const start = globalFace(slot, from)
+        assert(findRoute(world, start, slot, [to], [slot]).cost === 1)
+
+        world.setEdgeType(edge, EdgeType.WALL.index)
+        assert(!findRoute(world, start, slot, [to], [slot]).reachable)
+    })
+
+    it("block a route across a seam from both sides", () => {
+
+        const { world, a, b, edge } = seamEdge()
+        const local = (h: number) => (h & LOCAL_MASK) >> 2
+        const faceA = local(edge)
+        const faceB = local(world.twin(edge))
+
+        // the two faces next to the seam are all that's left to walk on
+        world.getPatch(a).faceType.fill(WATER.index)
+        world.getPatch(b).faceType.fill(WATER.index)
+        world.getPatch(a).faceType[faceA] = GRASS.index
+        world.getPatch(b).faceType[faceB] = GRASS.index
+
+        const startA = globalFace(a, faceA)
+        const startB = globalFace(b, faceB)
+        assert(findRoute(world, startA, b, [faceB], [a]).cost === 1)
+        assert(findRoute(world, startB, a, [faceA], [b]).cost === 1)
+
+        world.setEdgeType(edge, EdgeType.WALL.index)
+        assert(!findRoute(world, startA, b, [faceB], [a]).reachable)
+        assert(!findRoute(world, startB, a, [faceA], [b]).reachable)
+    })
+
+    it("add the cost of a door to the route", () => {
+
+        const { world, slot, from, to, edge } = twoFaces()
+        world.setEdgeType(edge, EdgeType.DOOR.index)
+        const route = findRoute(world, globalFace(slot, from), slot, [to], [slot])
+        assert(route.reachable)
+        assert(route.cost === 2)
+    })
+
+    it("can be one-way", () => {
+
+        const { world, slot, from, to, edge } = twoFaces()
+        world.setEdgeType(edge, EdgeType.WALL.index, true)
+        assert(world.edgeType(world.twin(edge)) === EdgeType.OPEN.index)
+
+        assert(!findRoute(world, globalFace(slot, from), slot, [to], [slot]).reachable)
+        assert(findRoute(world, globalFace(slot, to), slot, [from], [slot]).reachable)
+    })
+
+    it("cut faces off from the border", () => {
+
+        const patch = plainPatch(0, 0, GRASS)
+        const inner = innerFace(patch)
+        assert(borderConnected(patch).has(inner))
+
+        // wall in the face from both sides
+        for (let h = inner * 4; h < inner * 4 + 4; h++)
+        {
+            patch.edgeType[h] = EdgeType.WALL.index
+            patch.edgeType[patch.twin[h]] = EdgeType.WALL.index
+        }
+        const connected = borderConnected(patch)
+        assert(!connected.has(inner))
+        assert(connected.size === faceCount(patch) - 1)
+    })
+
+    it("don't let a walled border count as connection", () => {
+
+        const patch = plainPatch(0, 0, WATER)
+        const h = patch.twin.findIndex(t => t < 0)
+        const face = h >> 2
+        patch.faceType[face] = GRASS.index
+        assert(borderConnected(patch).has(face))
+
+        for (let i = face * 4; i < face * 4 + 4; i++)
+        {
+            patch.edgeType[i] = EdgeType.WALL.index
+        }
+        assert(!borderConnected(patch).has(face))
     })
 })
 

@@ -22,8 +22,8 @@ export const BORDER_SECOND = 6
 export const MAX_HALF_EDGES = 1 << 16
 
 /**
- * Packed, immutable form of a finished hexagon patch, made of typed arrays only, so it can be transferred from a worker
- * without copying.
+ * Packed form of a finished hexagon patch, made of typed arrays only, so it can be transferred from a worker without
+ * copying. Its geometry is immutable, only face and edge types change.
  *
  * All faces are quads. The half edges of face f are 4f to 4f + 3 in loop order, which makes next, prev and the face of
  * a half edge implicit, see next(), prev() and faceOf().
@@ -59,6 +59,12 @@ export interface QuadPatch
      * FaceType index per face
      */
     faceType: Uint8Array<ArrayBuffer>
+
+    /**
+     * EdgeType index per half edge, for crossing it from its own face to the face of its twin. Both half edges of an
+     * edge have the same type unless the edge is one-way.
+     */
+    edgeType: Uint8Array<ArrayBuffer>
 
     /**
      * Border entries of BORDER_STRIDE ints per outer hexagon edge
@@ -111,6 +117,7 @@ export function transferables(patch: QuadPatch): ArrayBuffer[]
         patch.vertex.buffer,
         patch.twin.buffer,
         patch.faceType.buffer,
+        patch.edgeType.buffer,
         patch.border.buffer
     ]
 }
@@ -212,6 +219,7 @@ export function packPatch(patch: HexagonPatch, faces: Face[]): QuadPatch
         vertex,
         twin,
         faceType,
+        edgeType: new Uint8Array(halfEdgeCount),
         border
     }
 }

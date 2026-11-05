@@ -46,8 +46,8 @@ interface Slot
 
 
 /**
- * Set of loaded packed patches that are connected along their shared borders. Patches are immutable, connecting and
- * disconnecting only changes the seam twins kept here.
+ * Set of loaded packed patches that are connected along their shared borders. The geometry of patches is immutable,
+ * connecting and disconnecting only changes the seam twins kept here.
  */
 export default class PatchWorld
 {
@@ -222,6 +222,35 @@ export default class PatchWorld
     {
         const slot = face >> (SLOT_SHIFT - 2)
         return this.getSlot(slot).patch.faceType[face & (LOCAL_MASK >> 2)]
+    }
+
+
+    /**
+     * Returns the EdgeType index for crossing the given global half edge from its own face
+     */
+    edgeType(h: number): number
+    {
+        return this.getSlot(h >> SLOT_SHIFT).patch.edgeType[h & LOCAL_MASK]
+    }
+
+
+    /**
+     * Sets the type of the edge of the given global half edge. A neighbor that isn't connected keeps its side of a
+     * seam, it has to get the type when it is loaded.
+     *
+     * @param h         global half edge
+     * @param type      EdgeType index
+     * @param oneWay    only change crossing in the direction of the given half edge, not the way back
+     */
+    setEdgeType(h: number, type: number, oneWay = false): void
+    {
+        this.getSlot(h >> SLOT_SHIFT).patch.edgeType[h & LOCAL_MASK] = type
+
+        const twin = this.twin(h)
+        if (!oneWay && twin >= 0)
+        {
+            this.getSlot(twin >> SLOT_SHIFT).patch.edgeType[twin & LOCAL_MASK] = type
+        }
     }
 
 

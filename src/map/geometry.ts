@@ -168,6 +168,55 @@ for (const [name, ft] of Object.entries(FaceType))
 
 //console.log("OCCUPIED", _faceTypeNames.filter(n => FaceType[n].occupied))
 
+const _edgeTypeNames: string[] = [];
+const _edgeTypes: EdgeType[] = [];
+
+/**
+ * What it takes to cross a half edge. What that costs is up to the route search.
+ */
+export class EdgeType
+{
+    name = ""
+
+    /**
+     * Position in the list of all edge types, used to store edge types as numbers
+     */
+    index = -1
+
+    /**
+     * Nothing in the way. Has to stay the first one, so that zero-filled arrays start out open.
+     */
+    static OPEN = new EdgeType()
+    static WALL = new EdgeType()
+    static DESTRUCTIBLE = new EdgeType()
+    static DOOR = new EdgeType()
+
+    static typeNames(): string[]
+    {
+        return _edgeTypeNames
+    }
+
+    /**
+     * Returns the edge type with the given index
+     */
+    static byIndex(index: number): EdgeType
+    {
+        return _edgeTypes[index]
+    }
+}
+
+// INITIALIZE EDGE TYPE NAMES
+for (const [name, et] of Object.entries(EdgeType))
+{
+    if (et instanceof EdgeType)
+    {
+        et.name = name
+        et.index = _edgeTypes.length
+        _edgeTypeNames.push(name)
+        _edgeTypes.push(et)
+    }
+}
+
 const DEFAULT_TYPES = [
     FaceType.DIRT,
     FaceType.TREE,

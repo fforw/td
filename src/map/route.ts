@@ -1,4 +1,4 @@
-import { FaceType } from "./geometry"
+import { EdgeType, FaceType } from "./geometry"
 import PatchWorld, { SLOT_SHIFT } from "./PatchWorld"
 import { faceCount, type QuadPatch } from "./QuadPatch"
 
@@ -35,6 +35,25 @@ export const DEFAULT_COSTS: CostTable = Float64Array.from(
     }
 )
 
+/**
+ * Cost of crossing a half edge per EdgeType index, on top of the cost of the face behind it. Costs for everyone like
+ * DEFAULT_COSTS, nobody can break through a destructible wall yet.
+ */
+export const EDGE_COSTS: CostTable = Float64Array.from(
+    EdgeType.typeNames(),
+    (_, index) => {
+        switch (EdgeType.byIndex(index))
+        {
+            case EdgeType.OPEN:
+                return 0
+            case EdgeType.DOOR:
+                return 1
+            default:
+                return Infinity
+        }
+    }
+)
+
 
 export interface Route
 {
@@ -44,8 +63,8 @@ export interface Route
     reachable: boolean
 
     /**
-     * Summed costs of all faces entered on the way to the farthest goal. Without a way there it's the cost of getting
-     * to the reachable face closest to the target patch instead.
+     * Summed costs of all faces entered and edges crossed on the way to the farthest goal. Without a way there it's the
+     * cost of getting to the reachable face closest to the target patch instead.
      */
     cost: number
 }
@@ -258,7 +277,8 @@ export function findRoute(
 
         for (let i = 0; i < 4; i++)
         {
-            const twin = world.twin(face * 4 + i)
+            const h = face * 4 + i
+            const twin = world.twin(h)
             if (twin < 0)
             {
                 continue
@@ -268,7 +288,7 @@ export function findRoute(
             {
                 continue
             }
-            const nextCost = cost + costs[world.faceType(next)]
+            const nextCost = cost + EDGE_COSTS[world.edgeType(h)] + costs[world.faceType(next)]
             if (nextCost < (reached.get(next) ?? Infinity))
             {
                 reached.set(next, nextCost)
@@ -327,10 +347,13 @@ export function unpackPath(world: PatchWorld, packed: Int32Array): number[]
 
 
 /**
- * Returns the local faces of a patch that connect to its border within the patch and can be entered
+ * Returns the local faces of a patch that connect to its border within the patch and can be entered. Edges that can't
+ * be crossed count like faces that can't be entered, also on the border itself.
  */
 export function borderConnected(patch: QuadPatch, costs: CostTable = DEFAULT_COSTS): Set<number>
 {
+    const crossable = (h: number) => EDGE_COSTS[patch.edgeType[h]] !== Infinity
+
     const connected = new Set<number>()
     const stack: number[] = []
     const count = faceCount(patch)
@@ -340,7 +363,8 @@ export function borderConnected(patch: QuadPatch, costs: CostTable = DEFAULT_COS
         {
             for (let i = 0; i < 4; i++)
             {
-                if (patch.twin[face * 4 + i] < 0 && !connected.has(face))
+                const h = face * 4 + i
+                if (patch.twin[h] < 0 && crossable(h) && !connected.has(face))
                 {
                     connected.add(face)
                     stack.push(face)
@@ -353,8 +377,9 @@ export function borderConnected(patch: QuadPatch, costs: CostTable = DEFAULT_COS
         const face = stack.pop()!
         for (let i = 0; i < 4; i++)
         {
-            const twin = patch.twin[face * 4 + i]
-            if (twin >= 0)
+            const h = face * 4 + i
+            const twin = patch.twin[h]
+            if (twin >= 0 && crossable(h))
             {
                 const next = twin >> 2
                 if (!connected.has(next) && costs[patch.faceType[next]] !== Infinity)
