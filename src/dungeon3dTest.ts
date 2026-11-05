@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { loadLevel } from "./dungeonPage"
 import type { DungeonLevel } from "./map/generateDungeon"
 import PatchWorld from "./map/PatchWorld"
+import { createThickWalls, createThinWalls } from "./render/dungeonMeshes"
 import { createGround } from "./render/patchMeshes"
 import { SCALE } from "./render/scene3d"
 
@@ -38,7 +39,7 @@ function show({ patches }: DungeonLevel): void
 {
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
-    slots.forEach(slot => scene.add(createGround(world, slot)))
+    slots.forEach(slot => scene.add(createGround(world, slot), createThickWalls(world, slot), createThinWalls(world, slot)))
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const { positions } of patches)
