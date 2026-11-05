@@ -6,6 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="17c29973-b146-4826-acc7-a8c176877a3c" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/map/mapRegions.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/map/mapRegions.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/mapTest.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/mapTest.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,13 +34,15 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "feat/path-finding",
+    "git-widget-placeholder": "feat/map",
     "js.last.introduce.type": "CONST",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "/home/sven/ideaprojects/td/src/palette",
     "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "pnpm",
     "python.packages.toolwindow.project.migrated.to.right.top.v2": "true",
