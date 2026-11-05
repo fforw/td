@@ -547,22 +547,30 @@ Glyphs are built from the stroke data of a source kanji per concept
   4 faces or fewer, 52 to 58 with 12 or more, the largest 95 to 217.
 - Rooms: keep regions of 8 faces or more, split or trim big ones at their
   narrow necks, with a door edge where that keeps the faces. Pick the
-  largest ones first until 20% of the faces are floor, about 18 rooms on
-  2 x 2 patches (`map/dungeonRooms.ts`). Corridors depend on this: 38% left
-  them stubby at a median of 1 face and at most 7, 20% gives a median of 2
-  and up to 15, 10% a median of 8 and up to 38, but only 6 huge rooms.
-  They can touch at a corner, keeping them apart tops out near 22% floor.
-  Everything else is wall, corridors are carved through it. Small regions
-  along a corridor can become closets or niches. Splitting isn't tried yet.
-- Corridors are one face wide (`map/dungeonCorridors.ts`). The closest
-  room not connected yet gets a shortest way to the connected ones, which
-  makes a tree. A door at each end. They can't cross each other. Loops
-  aren't tried yet.
-- Rooms then grow into the wall around the corridors until 50% of the faces
-  are floor, one random face next to a random room at a time. Corridors
-  come first so growth can't eat them. Rooms end up sharing edges, and wall
-  edges separate everything that touches, so corridors stay one face wide
-  with rooms right next to them. Irregular vertices end up in the floors.
+  largest ones first until 40% of the faces are floor, which takes nearly
+  all of them, about 80 rooms on 2 x 2 patches (`map/dungeonRooms.ts`).
+  They can touch at a corner. Everything else is wall, corridors are carved
+  through it. Small regions along a corridor can become closets or niches.
+  Splitting isn't tried yet.
+- Corridors are one face wide (`map/dungeonCorridors.ts`). Some rooms
+  spread out over the level get connected first, closest first. Other rooms
+  are in their way, so these corridors are long and wind through the wall.
+  How many is a matter of style per dungeon (`labyrinth`, 2.5 per patch by
+  default). 0 leaves only short connections, 1 gives a few corridors of up
+  to 97 faces, 5 about 11 of up to 29. Beyond that the rooms get too close
+  together for long ones, with all rooms it's the same as 0.
+  The other rooms then connect to what is closest, mostly by a face or two.
+  That makes a tree, with a door at each end of a corridor. Corridors can't
+  cross each other, so they can fence in a room, in 3% of the levels. It
+  then gets a corridor branching off the one in its way. Loops aren't tried
+  yet.
+- Rooms then grow into the wall around the corridors, one random face next
+  to a random room at a time, until a share of the faces is floor. That
+  share is a matter of style per dungeon (`floorShare`, 60% by default).
+  Corridors come first so growth can't eat them. Rooms end up sharing edges,
+  and wall edges separate everything that touches, so corridors stay one
+  face wide with rooms right next to them. Irregular vertices end up in the
+  floors.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
