@@ -1,9 +1,14 @@
 import { generatePatch } from "../map/generatePatch"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
-import { findRoute, globalFace, packPath, type Route, slotOf } from "../map/route"
+import { findRoute, globalFace, packPath, type Route, slotOf, stopShort, tautPath } from "../map/route"
 import type { KindEdits, PassedPatch, PatchKind } from "./campaign"
 import { NEIGHBORS, wantedKind } from "./patchKinds"
+
+/**
+ * How far before a point of interest someone walking a route stops, in map units
+ */
+const STOP_DISTANCE = 60
 
 
 export interface RouteQuery
@@ -22,6 +27,11 @@ export interface RouteQuery
      * Ring around the castle the route has to stay in
      */
     radius: number
+
+    /**
+     * Keys of the only patches the route may cross besides the castle and the target, any patch without them
+     */
+    known?: string[]
 }
 
 
@@ -46,6 +56,11 @@ export interface RouteResult extends Route
      * Paths packed by packPath()
      */
     paths: Int32Array<ArrayBuffer>[]
+
+    /**
+     * Way to walk from the castle to shortly before the point of interest farthest along, as x and y in map units
+     */
+    way: number[]
 
     /**
      * The patches the paths go through in grid positions
@@ -150,7 +165,7 @@ export default class RouteFinder
      *
      * @return route
      */
-    find({ target, edits, radius }: RouteQuery): RouteResult
+    find({ target, edits, radius, known }: RouteQuery): RouteResult
     {
         this.applyEdits(edits)
 
@@ -171,9 +186,14 @@ export default class RouteFinder
                 return NEIGHBORS
                     .map(([dq, dr]) => [q + dq, r + dr])
                     .filter(([nq, nr]) => Math.max(Math.abs(nq), Math.abs(nr)) <= radius)
+                    .filter(([nq, nr]) => !known || known.includes(patchKey(nq, nr)))
                     .map(([nq, nr]) => this.ensure(nq, nr).slot)
             }
         )
+
+        // of several goals, the one that takes the most faces to get to stands for the farthest one
+        const longest = paths.reduce((a, b) => b.length > a.length ? b : a)
+        const way = stopShort(tautPath(world, longest), STOP_DISTANCE).map(Math.round)
 
         const crossed = new Set(paths.flat().map(slotOf))
         return {
@@ -183,6 +203,7 @@ export default class RouteFinder
             start: castle.pois[0],
             goals: goal.pois,
             paths: paths.map(path => packPath(world, path)),
+            way,
             patches: [...crossed].map(slot => {
                 const { q, r, kind } = bySlot.get(slot)!
                 return { q, r, kind }

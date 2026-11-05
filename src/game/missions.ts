@@ -37,6 +37,10 @@ export interface MissionRoute extends Route
      * Unknown patches the route crosses on the way
      */
     passed: PassedPatch[]
+    /**
+     * The way to walk as x and y in map units
+     */
+    way?: number[]
 }
 
 /**

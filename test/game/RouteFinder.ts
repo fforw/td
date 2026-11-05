@@ -23,6 +23,46 @@ function find(finder: RouteFinder, q: number, r: number, edits: KindEdits = {}):
 
 describe("RouteFinder", () => {
 
+    it("only crosses known patches if it has to", () => {
+
+        const finder = new RouteFinder(SEEDS[0], FACE_SIZE)
+
+        // patches an earlier search built are no exception
+        assert(find(finder, 3, 0).reachable)
+
+        const known = ["1/0", "2/0"]
+        const { patches } = finder.find({ target: { q: 3, r: 0 }, edits: {}, radius: 4, known })
+        for (const { q, r } of patches)
+        {
+            assert(["0/0", "3/0", ...known].includes(q + "/" + r), q + "/" + r)
+        }
+    })
+
+    it("can't get to a target across unknown land", () => {
+
+        const finder = new RouteFinder(SEEDS[0], FACE_SIZE)
+        assert(find(finder, 3, 0).reachable)
+
+        const { reachable } = finder.find({ target: { q: 3, r: 0 }, edits: {}, radius: 4, known: [] })
+        assert(!reachable)
+    })
+
+    it("gives a way to walk from the castle to close to the target", () => {
+
+        const finder = new RouteFinder(SEEDS[0], FACE_SIZE)
+        for (const [q, r] of TARGETS)
+        {
+            const { way, reachable, paths } = find(finder, q, r)
+            assert(way.length >= 4, q + "/" + r)
+            assert(way.length % 2 === 0)
+            assert(way.every(Number.isInteger))
+            if (reachable)
+            {
+                assert(way.length / 2 < Math.max(...paths.map(path => path.length)))
+            }
+        }
+    })
+
     it("finds the same as a search with all patches built up front", () => {
 
         for (const seed of SEEDS)
