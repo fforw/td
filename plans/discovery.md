@@ -174,7 +174,7 @@ All edits come from the main thread, workers never send any back.
   by kind.
 - A table picks the generator per `PatchKind` (`map/patchGenerators.ts`).
   It runs after terrain in up to two steps: one on the face objects
-  before packing, one on the packed patch, where `borderConnected` works.
+  before packing, one on the packed patch, where `borderParts` works.
 - A generator returns its points of interest, each a local face plus the
   plan that goes with it, so routes and rendering read one result. A
   patch without room for them falls back to kind EMPTY with its faces
@@ -268,7 +268,9 @@ subtitle on top of that.
 
 Generators own their points of interest: they make sure these connect
 to the border of the patch, a patch without room for them falls back to
-kind EMPTY. Whether the border can be reached from outside depends on
+kind EMPTY. They go into the part of the patch that borders the most
+neighbors, the larger one if there are several, since routes come from
+all sides and a patch doesn't depend on where one comes from. Whether the border can be reached from outside depends on
 the neighbors, which is what makes a mission fail. The castle has one
 point of interest, its center, where every route starts.
 

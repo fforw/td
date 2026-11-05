@@ -7,10 +7,10 @@ import HexagonPatch, { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { generatePatch } from "../../src/map/generatePatch"
-import { applyGenerator, PATCH_GENERATORS } from "../../src/map/patchGenerators"
+import { applyGenerator, bestPart, PATCH_GENERATORS } from "../../src/map/patchGenerators"
 import { faceCount, packPatch, transferables, type QuadPatch } from "../../src/map/QuadPatch"
 import {
-    borderConnected,
+    borderParts,
     DEFAULT_COSTS,
     EDGE_COSTS,
     findRoute,
@@ -88,6 +88,33 @@ function innerFace(patch: QuadPatch): number
         }
     }
     throw new Error("No inner face")
+}
+
+
+/**
+ * Returns the faces of all parts of a patch that connect to its border
+ */
+function borderFaces(patch: QuadPatch): Set<number>
+{
+    return new Set(borderParts(patch).flatMap(({ faces }) => faces))
+}
+
+
+/**
+ * Returns a face with a border half edge that has no neighbors on the border among the given faces
+ */
+function borderFaceApart(patch: QuadPatch, others: number[]): number
+{
+    const count = faceCount(patch)
+    for (let face = 0; face < count; face++)
+    {
+        const near = others.some(other => other === face || neighbors(patch, other).includes(face))
+        if (!near && [0, 1, 2, 3].some(i => patch.twin[face * 4 + i] < 0))
+        {
+            return face
+        }
+    }
+    throw new Error("No such face")
 }
 
 
@@ -345,7 +372,7 @@ describe("Edge types", () => {
 
         const patch = plainPatch(0, 0, GRASS)
         const inner = innerFace(patch)
-        assert(borderConnected(patch).has(inner))
+        assert(borderFaces(patch).has(inner))
 
         // wall in the face from both sides
         for (let h = inner * 4; h < inner * 4 + 4; h++)
@@ -353,7 +380,7 @@ describe("Edge types", () => {
             patch.edgeType[h] = EdgeType.WALL.index
             patch.edgeType[patch.twin[h]] = EdgeType.WALL.index
         }
-        const connected = borderConnected(patch)
+        const connected = borderFaces(patch)
         assert(!connected.has(inner))
         assert(connected.size === faceCount(patch) - 1)
     })
@@ -364,13 +391,13 @@ describe("Edge types", () => {
         const h = patch.twin.findIndex(t => t < 0)
         const face = h >> 2
         patch.faceType[face] = GRASS.index
-        assert(borderConnected(patch).has(face))
+        assert(borderFaces(patch).has(face))
 
         for (let i = face * 4; i < face * 4 + 4; i++)
         {
             patch.edgeType[i] = EdgeType.WALL.index
         }
-        assert(!borderConnected(patch).has(face))
+        assert(!borderFaces(patch).has(face))
     })
 })
 
@@ -448,7 +475,7 @@ describe("Points of interest", () => {
         const { patch, kind, pois } = plainGenerated("TEMPLE", GRASS)
         assert(kind === "TEMPLE")
         assert(pois.length === 1)
-        assert(borderConnected(patch).has(pois[0].face))
+        assert(borderFaces(patch).has(pois[0].face))
     })
 
     it("avoids pockets cut off from the border", () => {
@@ -456,8 +483,88 @@ describe("Points of interest", () => {
         const patch = plainPatch(0, 0, WATER)
         const pocket = innerFace(patch)
         patch.faceType[pocket] = GRASS.index
-        assert(!borderConnected(patch).has(pocket))
+        assert(!borderFaces(patch).has(pocket))
         assert(PATCH_GENERATORS.TREASURE.place!(patch) === null)
+    })
+
+    it("splits a patch into parts that aren't connected", () => {
+
+        const patch = plainPatch(0, 0, WATER)
+        const a = patch.twin.findIndex(t => t < 0) >> 2
+        const b = borderFaceApart(patch, [a])
+        patch.faceType[a] = GRASS.index
+        patch.faceType[b] = GRASS.index
+
+        const parts = borderParts(patch)
+        assert.sameDeepMembers(parts.map(({ faces }) => faces), [[a], [b]])
+        assert(parts.every(({ sides }) => sides >= 1))
+    })
+
+    it("counts the neighbor patches a part has a border with", () => {
+
+        const [part, ...others] = borderParts(plainPatch(0, 0, GRASS))
+        assert(others.length === 0)
+        assert(part.sides === 6)
+
+        // same as the patches a world connects it to
+        const world = new PatchWorld()
+        const slot = world.add(plainPatch(0, 0, GRASS))
+        for (const [q, r] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]])
+        {
+            world.add(plainPatch(q, r, GRASS))
+        }
+        assert(world.neighbors(slot).length === part.sides)
+    })
+
+    it("has no side for a border that can't be crossed", () => {
+
+        const patch = plainPatch(0, 0, WATER)
+        const face = patch.twin.findIndex(t => t < 0) >> 2
+        patch.faceType[face] = GRASS.index
+        const [{ sides }] = borderParts(patch)
+
+        for (let h = face * 4; h < face * 4 + 4; h++)
+        {
+            if (patch.twin[h] < 0)
+            {
+                patch.edgeType[h] = EdgeType.WALL.index
+            }
+        }
+        assert(sides >= 1)
+        assert.deepEqual(borderParts(patch), [])
+    })
+
+    it("prefers the part with the most sides, then the larger one", () => {
+
+        const small = { faces: [1], sides: 3 }
+        const large = { faces: [2, 3, 4], sides: 2 }
+        const larger = { faces: [5, 6, 7, 8], sides: 2 }
+        assert(bestPart([]) === null)
+        assert(bestPart([large, small]) === small)
+        assert(bestPart([large, larger]) === larger)
+        assert(bestPart([larger, large]) === larger)
+    })
+
+    it("doesn't prefer a part that is tiny next to the largest one", () => {
+
+        const land = { faces: Array.from({ length: 100 }, (_, i) => i), sides: 1 }
+        assert(bestPart([{ faces: [100, 101, 102, 103, 104, 105, 106, 107, 108], sides: 3 }, land]) === land)
+
+        const smaller = { faces: [100, 101, 102, 103, 104, 105, 106, 107, 108, 109], sides: 3 }
+        assert(bestPart([land, smaller]) === smaller)
+    })
+
+    it("puts them into the best part of generated patches", () => {
+
+        for (const seed of [1, 2, 3, 4, 5, 6])
+        {
+            for (const [q, r] of [[1, 0], [0, 1], [-1, 0], [2, 2], [-3, 1]])
+            {
+                const { patch, kind, pois } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, "TEMPLE")
+                const best = bestPart(borderParts(patch))
+                assert(kind === "EMPTY" ? best === null : best!.faces.includes(pois[0].face), seed + " " + q + "/" + r)
+            }
+        }
     })
 
     it("has none on empty patches", () => {

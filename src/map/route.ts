@@ -1,6 +1,7 @@
 import { EdgeType, FaceType } from "./geometry"
+import { PATCH_SIZE } from "./HexagonPatch"
 import PatchWorld, { SLOT_SHIFT } from "./PatchWorld"
-import { faceCount, type QuadPatch } from "./QuadPatch"
+import { BORDER_NQ, BORDER_NR, BORDER_STRIDE, faceCount, type QuadPatch } from "./QuadPatch"
 
 const FACE_SHIFT = SLOT_SHIFT - 2
 const FACE_MASK = (1 << FACE_SHIFT) - 1
@@ -347,48 +348,88 @@ export function unpackPath(world: PatchWorld, packed: Int32Array): number[]
 
 
 /**
- * Returns the local faces of a patch that connect to its border within the patch and can be entered. Edges that can't
- * be crossed count like faces that can't be entered, also on the border itself.
+ * Faces of a patch that are connected to each other and to the border of the patch
  */
-export function borderConnected(patch: QuadPatch, costs: CostTable = DEFAULT_COSTS): Set<number>
+export interface BorderPart
 {
-    const crossable = (h: number) => EDGE_COSTS[patch.edgeType[h]] !== Infinity
+    /**
+     * Local faces of the part
+     */
+    faces: number[]
 
-    const connected = new Set<number>()
-    const stack: number[] = []
+    /**
+     * Number of neighbor patches the part has a border with
+     */
+    sides: number
+}
+
+
+/**
+ * Returns the parts of a patch that connect to its border and can be entered. Edges that can't be crossed count like
+ * faces that can't be entered, also on the border itself. What's behind the border is up to the neighboring patches.
+ *
+ * @param patch     packed patch
+ * @param costs     cost table
+ *
+ * @return separate parts, a face that one-way edges connect to several of them is only in the first one
+ */
+export function borderParts(patch: QuadPatch, costs: CostTable = DEFAULT_COSTS): BorderPart[]
+{
+    const { border, twin, edgeType, faceType } = patch
+    const crossable = (h: number) => EDGE_COSTS[edgeType[h]] !== Infinity
+    const enterable = (face: number) => costs[faceType[face]] !== Infinity
+
+    // the patch a border half edge leads to, patches are blocks of hexagons around their center
+    const sideOf = (h: number) => {
+        const off = ((-2 - twin[h]) >> 1) * BORDER_STRIDE
+        const toPatch = (hexagon: number) => Math.floor((hexagon + PATCH_SIZE / 2) / PATCH_SIZE)
+        return toPatch(border[off + BORDER_NQ]) + "/" + toPatch(border[off + BORDER_NR])
+    }
+
+    const parts: BorderPart[] = []
+    const seen = new Set<number>()
     const count = faceCount(patch)
-    for (let face = 0; face < count; face++)
+    for (let start = 0; start < count; start++)
     {
-        if (costs[patch.faceType[face]] !== Infinity)
+        let onBorder = false
+        for (let h = start * 4; h < start * 4 + 4; h++)
         {
-            for (let i = 0; i < 4; i++)
+            onBorder ||= twin[h] < 0 && crossable(h)
+        }
+        if (!onBorder || seen.has(start) || !enterable(start))
+        {
+            continue
+        }
+
+        const faces: number[] = []
+        const sides = new Set<string>()
+        const stack = [start]
+        seen.add(start)
+        while (stack.length > 0)
+        {
+            const face = stack.pop()!
+            faces.push(face)
+            for (let h = face * 4; h < face * 4 + 4; h++)
             {
-                const h = face * 4 + i
-                if (patch.twin[h] < 0 && crossable(h) && !connected.has(face))
+                if (crossable(h))
                 {
-                    connected.add(face)
-                    stack.push(face)
+                    if (twin[h] < 0)
+                    {
+                        sides.add(sideOf(h))
+                    }
+                    else
+                    {
+                        const next = twin[h] >> 2
+                        if (!seen.has(next) && enterable(next))
+                        {
+                            seen.add(next)
+                            stack.push(next)
+                        }
+                    }
                 }
             }
         }
+        parts.push({ faces, sides: sides.size })
     }
-    while (stack.length > 0)
-    {
-        const face = stack.pop()!
-        for (let i = 0; i < 4; i++)
-        {
-            const h = face * 4 + i
-            const twin = patch.twin[h]
-            if (twin >= 0 && crossable(h))
-            {
-                const next = twin >> 2
-                if (!connected.has(next) && costs[patch.faceType[next]] !== Infinity)
-                {
-                    connected.add(next)
-                    stack.push(next)
-                }
-            }
-        }
-    }
-    return connected
+    return parts
 }

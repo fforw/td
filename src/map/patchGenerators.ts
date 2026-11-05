@@ -4,7 +4,7 @@ import type { PatchKind } from "../game/campaign"
 import type { Face } from "./geometry"
 import type HexagonPatch from "./HexagonPatch"
 import { packPatch, type QuadPatch } from "./QuadPatch"
-import { borderConnected } from "./route"
+import { type BorderPart, borderParts } from "./route"
 
 
 /**
@@ -57,7 +57,7 @@ export interface PatchGenerator
 /**
  * Returns the face closest to the center of the patch out of the given faces
  */
-function centralFace(patch: QuadPatch, faces: Set<number>): number
+function centralFace(patch: QuadPatch, faces: readonly number[]): number
 {
     const { positions, vertex } = patch
     const count = positions.length / 3
@@ -91,6 +91,37 @@ function centralFace(patch: QuadPatch, faces: Set<number>): number
 
 
 /**
+ * Share of the largest part of a patch a part needs to have room for points of interest. Measured on generated worlds:
+ * without it, a few patches choose a spit of 4 faces with two sides over 271 faces with one.
+ */
+const MIN_PART_SHARE = 0.1
+
+
+/**
+ * Returns the part for points of interest that has the most ways to get there: the one with the most sides, the larger
+ * one of those, out of the parts that are not tiny next to the others. Routes come from all sides, and all points of
+ * interest have to be in the same part, or no route gets to all of them.
+ */
+export function bestPart(parts: readonly BorderPart[]): BorderPart | null
+{
+    const largest = Math.max(0, ...parts.map(({ faces }) => faces.length))
+
+    let best: BorderPart | null = null
+    for (const part of parts)
+    {
+        const size = part.faces.length
+        if (size >= largest * MIN_PART_SHARE && (
+            !best || part.sides > best.sides || (part.sides === best.sides && size > best.faces.length)
+        ))
+        {
+            best = part
+        }
+    }
+    return best
+}
+
+
+/**
  * Builds a castle around the face closest to the world origin, its plan is the only point of interest
  */
 const CASTLE: PatchGenerator = {
@@ -104,14 +135,14 @@ const CASTLE: PatchGenerator = {
 
 
 /**
- * Places one point of interest in the middle, for kinds without a generator of their own. It always connects to the
- * border of the patch, whether the border can be reached from outside is up to the neighboring patches.
+ * Places one point of interest in the middle of the best part, for kinds without a generator of their own. It always
+ * connects to the border of the patch, whether the border can be reached from outside is up to the neighboring patches.
  */
 const CENTRAL: PatchGenerator = {
     place(patch)
     {
-        const connected = borderConnected(patch)
-        return connected.size > 0 ? [{ face: centralFace(patch, connected) }] : null
+        const part = bestPart(borderParts(patch))
+        return part && [{ face: centralFace(patch, part.faces) }]
     }
 }
 

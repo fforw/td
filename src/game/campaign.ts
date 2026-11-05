@@ -9,7 +9,7 @@ import { arrivals } from "./tavern"
  * Increases whenever generation changes in a way that shifts patch contents or face indexes. Saves made with
  * another version are refused.
  */
-export const GENERATOR_VERSION = 1
+export const GENERATOR_VERSION = 2
 
 /**
  * Version of the save format
