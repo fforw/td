@@ -554,6 +554,52 @@ export function bakeLights(
 
 
 /**
+ * Finds how far a moving light sees in all directions, which is quick enough to do whenever it moves. Direction i has the
+ * angle (i + 0.5) / out.length of a full turn.
+ *
+ * @param segments  segment array
+ * @param x         position of the light
+ * @param z         position of the light
+ * @param reach     distance for directions without a wall
+ * @param out       receives the distances
+ */
+export function castWallDistances(segments: Float64Array, x: number, z: number, reach: number, out: Float32Array): void
+{
+    const count = out.length
+    out.fill(reach)
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+    {
+        // the far side of a thick wall is never in front of its near side
+        if (segmentDistance(segments, s, x, z) >= reach ||
+            (x - segments[s]) * segments[s + 4] + (z - segments[s + 1]) * segments[s + 5] < 0)
+        {
+            continue
+        }
+
+        const ax = segments[s] - x, az = segments[s + 1] - z, bx = segments[s + 2] - x, bz = segments[s + 3] - z
+        const ex = bx - ax, ez = bz - az
+        const start = Math.atan2(az, ax)
+        const span = Math.atan2(ax * bz - az * bx, ax * bx + az * bz)
+        const first = Math.floor(Math.min(start, start + span) / TAU * count)
+        const last = Math.ceil(Math.max(start, start + span) / TAU * count)
+
+        for (let i = first; i <= last; i++)
+        {
+            const angle = (i + 0.5) / count * TAU
+            const rx = Math.cos(angle), rz = Math.sin(angle)
+            const den = rx * ez - rz * ex
+            const along = (ax * ez - az * ex) / den, on = (ax * rz - az * rx) / den
+            const direction = (i + count) % count
+            if (along > 0 && on >= 0 && on <= 1 && along < out[direction])
+            {
+                out[direction] = along
+            }
+        }
+    }
+}
+
+
+/**
  * Places the lights of a level and bakes them
  *
  * @param seed      seed of the level

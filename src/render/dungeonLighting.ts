@@ -9,11 +9,14 @@ import {
     type MeshBasicMaterial,
     NearestFilter,
     type PixelFormat,
+    RedFormat,
+    RepeatWrapping,
     RGBAFormat,
     RGFormat,
     Vector2
 } from "three"
 import {
+    castWallDistances,
     LIGHT_TEXELS,
     type LevelLighting,
     RIM_FADE_END,
@@ -59,6 +62,55 @@ const RIM_BRIGHTNESS = 1
  */
 const RIM_WIDEN = 0.6
 
+/**
+ * Number of directions the hero light knows its walls in
+ */
+const HERO_DIRECTIONS = 1024
+
+/**
+ * How far the hero light reaches in world units
+ */
+const HERO_REACH = 3.5
+
+/**
+ * Radius of the hero light in world units, which sets the size of its soft shadows
+ */
+const HERO_RADIUS = 0.12
+
+/**
+ * Height of the hero light in world units, above a meeple and below the top of the walls
+ */
+const HERO_HEIGHT = 0.5
+
+const HERO_COLOR = "vec3(1.0, 0.8, 0.55)"
+const HERO_GAIN = 3
+
+/**
+ * How far behind a wall in world units the shadow of the hero light starts. Faces of walls look up their distance in front
+ * of them, so this only has to keep the floor from flickering and stays within the thickness of a thin wall.
+ */
+const HERO_BIAS = 0.02
+
+/**
+ * How far to the sides to look for walls that give a soft shadow, as an angle in radians
+ */
+const HERO_SEARCH = 0.2
+
+/**
+ * Number of directions to look at on each side
+ */
+const HERO_TAPS = 3
+
+/**
+ * Number of halvings to find the edge of a shadow between two directions
+ */
+const HERO_EDGE_STEPS = 4
+
+/**
+ * Where the hero light is while there is none
+ */
+const NO_HERO = 1e6
+
 const PARS = /* glsl */`
     uniform sampler2D lightColors;
     uniform sampler2D lightDirections;
@@ -88,6 +140,75 @@ const STAY_ON_SIDE = /* glsl */`
     }
 `
 
+/**
+ * Share of the hero light that reaches a point. The walls next to the direction of the point tell how wide its soft shadow is:
+ * nothing right behind a wall, more the further the point is behind it.
+ */
+const HERO_VISIBILITY = /* glsl */`
+    uniform sampler2D heroDistances;
+    uniform vec2 heroPosition;
+
+    float heroDistance(float angle)
+    {
+        return texture2D(heroDistances, vec2(angle / ${(Math.PI * 2).toFixed(6)}, 0.5)).r;
+    }
+
+    float heroVisibility(float angle, float distance)
+    {
+        float limit = distance - ${HERO_BIAS.toFixed(3)};
+        float blockers = 0.0, count = 0.0;
+        for (int i = -${HERO_TAPS}; i <= ${HERO_TAPS}; i++)
+        {
+            float blocker = heroDistance(angle + float(i) / ${HERO_TAPS}.0 * ${HERO_SEARCH.toFixed(3)});
+            if (blocker < limit)
+            {
+                blockers += blocker;
+                count += 1.0;
+            }
+        }
+        if (count == 0.0)
+        {
+            return 1.0;
+        }
+
+        float blocker = blockers / count;
+        float spread = min(${HERO_SEARCH.toFixed(3)}, ${HERO_RADIUS.toFixed(3)} * (distance - blocker) / (distance * blocker));
+
+        // finding the edges between the directions keeps the soft shadow free of bands
+        float seen = 0.0;
+        float from = angle - spread;
+        bool fromSeen = heroDistance(from) >= limit;
+        for (int i = 1 - ${HERO_TAPS}; i <= ${HERO_TAPS}; i++)
+        {
+            float to = angle + float(i) / ${HERO_TAPS}.0 * spread;
+            bool toSeen = heroDistance(to) >= limit;
+            float share = fromSeen ? 1.0 : 0.0;
+            if (toSeen != fromSeen)
+            {
+                float low = from, high = to;
+                for (int j = 0; j < ${HERO_EDGE_STEPS}; j++)
+                {
+                    float middle = (low + high) / 2.0;
+                    if ((heroDistance(middle) >= limit) == fromSeen)
+                    {
+                        low = middle;
+                    }
+                    else
+                    {
+                        high = middle;
+                    }
+                }
+                float at = (low + high) / 2.0;
+                share = fromSeen ? (at - from) / (to - from) : (to - at) / (to - from);
+            }
+            seen += share;
+            from = to;
+            fromSeen = toSeen;
+        }
+        return seen / ${(HERO_TAPS * 2).toFixed(1)};
+    }
+`
+
 
 /**
  * Textures and uniforms of a baked light field
@@ -100,6 +221,8 @@ export interface LightField
         lightWalls: { value: DataTexture }
         lightOrigin: { value: Vector2 }
         lightSize: { value: Vector2 }
+        heroDistances: { value: DataTexture }
+        heroPosition: { value: Vector2 }
     }
 }
 
@@ -131,15 +254,54 @@ export function createLightField({ minX, minZ, width, height, colors, directions
     wallTexture.wrapS = wallTexture.wrapT = ClampToEdgeWrapping
     wallTexture.needsUpdate = true
 
+    const heroTexture = createTexture(new Float32Array(HERO_DIRECTIONS), HERO_DIRECTIONS, 1, RedFormat)
+    heroTexture.wrapS = RepeatWrapping
+
     return {
         uniforms: {
             lightColors: { value: createTexture(colors, width, height, RGBAFormat) },
             lightDirections: { value: createTexture(directions, width, height, RGFormat) },
             lightWalls: { value: wallTexture },
             lightOrigin: { value: new Vector2(minX, minZ) },
-            lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) }
+            lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
+            heroDistances: { value: heroTexture },
+            heroPosition: { value: new Vector2(NO_HERO, NO_HERO) }
         }
     }
+}
+
+
+const heroDistances = new Float32Array(HERO_DIRECTIONS)
+
+/**
+ * Moves the hero light of the field. There is no hero light before the first move.
+ *
+ * @param field     light field
+ * @param segments  segment array of the level
+ * @param x         position of the light
+ * @param z         position of the light
+ */
+export function moveHeroLight({ uniforms }: LightField, segments: Float64Array, x: number, z: number): void
+{
+    castWallDistances(segments, x, z, HERO_REACH, heroDistances)
+
+    const texture = uniforms.heroDistances.value
+    const half = texture.image.data as Uint16Array
+    for (let i = 0; i < HERO_DIRECTIONS; i++)
+    {
+        half[i] = DataUtils.toHalfFloat(heroDistances[i])
+    }
+    texture.needsUpdate = true
+    uniforms.heroPosition.value.set(x, z)
+}
+
+
+/**
+ * Turns off the hero light of the field until it moves again
+ */
+export function hideHeroLight({ uniforms }: LightField): void
+{
+    uniforms.heroPosition.value.set(NO_HERO, NO_HERO)
 }
 
 
@@ -157,17 +319,19 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
     material.onBeforeCompile = shader => {
         Object.assign(shader.uniforms, uniforms)
         shader.vertexShader = shader.vertexShader
-            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;`)
+            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;\nvarying float vLightHeight;`)
             .replace("#include <project_vertex>", /* glsl */`
                 #include <project_vertex>
                 vec4 lightPosition = vec4(transformed, 1.0);
                 #ifdef USE_INSTANCING
                 lightPosition = instanceMatrix * lightPosition;
                 #endif
-                vLightPosition = (modelMatrix * lightPosition).xz;
+                lightPosition = modelMatrix * lightPosition;
+                vLightPosition = lightPosition.xz;
+                vLightHeight = lightPosition.y;
             `)
         shader.fragmentShader = shader.fragmentShader
-            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;\n${PARS}\n${STAY_ON_SIDE}`)
+            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;\nvarying float vLightHeight;\n${PARS}\n${STAY_ON_SIDE}\n${HERO_VISIBILITY}`)
             .replace("#include <lights_fragment_begin>", /* glsl */`
                 #include <lights_fragment_begin>
                 {
@@ -183,6 +347,19 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                         directLight.direction = normalize((viewMatrix * vec4(worldDirection, 0.0)).xyz);
                         directLight.visible = true;
                         RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+
+                        vec2 fromHero = vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)} - heroPosition;
+                        float heroDistance = length(fromHero);
+                        if (heroDistance < ${HERO_REACH.toFixed(3)})
+                        {
+                            vec3 toHero = vec3(-fromHero.x, ${HERO_HEIGHT.toFixed(3)} - vLightHeight, -fromHero.y);
+                            float heroFade = 1.0 - heroDistance * heroDistance / ${(HERO_REACH * HERO_REACH).toFixed(3)};
+
+                            directLight.color = ${HERO_COLOR} * ${HERO_GAIN.toFixed(3)} * heroFade * heroFade / length(toHero)
+                                * heroVisibility(atan(fromHero.y, fromHero.x), heroDistance);
+                            directLight.direction = normalize((viewMatrix * vec4(normalize(toHero), 0.0)).xyz);
+                            RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
+                        }
                     }
                 }
             `)

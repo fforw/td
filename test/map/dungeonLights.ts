@@ -2,6 +2,7 @@ import { assert, describe, it } from "vitest"
 
 import {
     bakeLights,
+    castWallDistances,
     createLightView,
     findWallSegments,
     LIGHT_RADIUS,
@@ -297,6 +298,52 @@ describe("bakeLights", () => {
         assert.deepEqual(wallAt(2, 0.9), [2, 1, 2, 9])
 
         assert.deepEqual(wallAt(5, 5), [NO_WALL, NO_WALL, NO_WALL, NO_WALL])
+    })
+})
+
+
+describe("castWallDistances", () => {
+    it("finds the same as going through all walls per direction", () => {
+        const random = randomizer(4711)
+        const out = new Float32Array(256)
+        let hits = 0
+        for (let i = 0; i < 50; i++)
+        {
+            const segments = randomWalls(random)
+            const x = random() * 12, z = random() * 12
+            castWallDistances(segments, x, z, 4, out)
+
+            for (let d = 0; d < out.length; d++)
+            {
+                const angle = (d + 0.5) / out.length * Math.PI * 2
+                const rx = Math.cos(angle), rz = Math.sin(angle)
+                let closest = 4
+                for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+                {
+                    const ax = segments[s] - x, az = segments[s + 1] - z
+                    const ex = segments[s + 2] - segments[s], ez = segments[s + 3] - segments[s + 1]
+                    const den = rx * ez - rz * ex
+                    const along = (ax * ez - az * ex) / den, on = (ax * rz - az * rx) / den
+                    if (along > 0 && on >= 0 && on <= 1)
+                    {
+                        closest = Math.min(closest, along)
+                    }
+                }
+                assert.closeTo(out[d], closest, 1e-5)
+                hits += closest < 4 ? 1 : 0
+            }
+        }
+        assert(hits > 1000)
+    })
+
+    it("sees past the far side of a thick wall", () => {
+        // a wall to the east, seen from its east side only
+        const segments = new Float64Array([2, -1, 2, 1, 1, 0])
+        const out = new Float32Array(64)
+        castWallDistances(segments, 0, 0, 4, out)
+        assert.equal(out[0], 4)
+        castWallDistances(segments, 3, 0, 4, out)
+        assert.closeTo(out[32], 1, 0.01)
     })
 })
 

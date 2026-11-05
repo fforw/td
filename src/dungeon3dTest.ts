@@ -14,14 +14,14 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { loadLevel } from "./dungeonPage"
 import { loadItems } from "./items/itemSprite"
-import { faceCenter } from "./map/dungeonLights"
+import { faceCenter, findWallSegments } from "./map/dungeonLights"
 import type { DungeonLevel } from "./map/generateDungeon"
 import { LEVEL_PRIORITY } from "./map/marchingSquares"
 import PatchWorld from "./map/PatchWorld"
 import { faceOf } from "./map/QuadPatch"
 import { randomLook } from "./meeple/look"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
-import { applyLightField, createLightField, type LightField } from "./render/dungeonLighting"
+import { applyLightField, createLightField, hideHeroLight, type LightField, moveHeroLight } from "./render/dungeonLighting"
 import { createThickWalls, createThinWallCorners, createThinWalls } from "./render/dungeonMeshes"
 import { createGround } from "./render/patchMeshes"
 import { loadModels, SCALE } from "./render/scene3d"
@@ -210,7 +210,9 @@ function show(level: DungeonLevel): void
     crowd.setLightField(field)
     scene.add(crowd.group)
 
-    // follow one meeple after the other from close up
+    const segments = findWallSegments(world, slots)
+
+    // follow one meeple after the other from close up, the one we follow carries the hero light
     let followed = -1
     const button = document.createElement("button")
     button.type = "button"
@@ -221,7 +223,19 @@ function show(level: DungeonLevel): void
         controls.target.copy(position)
         camera.position.set(position.x, position.y + 1.6, position.z + 1.6)
     })
-    document.getElementById("ui")!.append(button)
+
+    const heroLight = document.createElement("input")
+    heroLight.type = "checkbox"
+    heroLight.checked = true
+    heroLight.addEventListener("change", () => {
+        if (!heroLight.checked)
+        {
+            hideHeroLight(field)
+        }
+    })
+    const heroLightLabel = document.createElement("label")
+    heroLightLabel.append(heroLight, " hero light")
+    document.getElementById("ui")!.append(button, " ", heroLightLabel)
 
     const timer = new Timer()
     const step = new Vector3()
@@ -243,6 +257,11 @@ function show(level: DungeonLevel): void
             {
                 moveWalker(walker, dt)
             }
+        }
+        const hero = walkers[Math.max(followed, 0)]?.meeple
+        if (hero && heroLight.checked)
+        {
+            moveHeroLight(field, segments, hero.position.x, hero.position.z)
         }
         controls.update()
         crowd.update(camera, timer.getElapsed())
