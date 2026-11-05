@@ -1,4 +1,5 @@
 import { patchSeed, resetRandom } from "../math/random"
+import { type Corridor, findCorridors, setLevelEdges } from "./dungeonCorridors"
 import { findRegions, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
@@ -54,12 +55,17 @@ export interface DungeonLevel
      * Global face ids per room
      */
     rooms: number[][]
+
+    /**
+     * Corridors between the rooms, their room indexes are positions in rooms
+     */
+    corridors: Corridor[]
 }
 
 
 /**
  * Generates a dungeon level. All faces start out as NONE, so only what the dungeon sets gets drawn, which so far is the
- * floor of its rooms. The same seed and size always give the same level.
+ * floor of its rooms and corridors. The same seed and size always give the same level.
  *
  * @param seed      seed of the level
  * @param size      hexagon size in map units
@@ -88,10 +94,12 @@ export function generateDungeon(seed: number, size: number, width: number, heigh
     const regions = findRegions(world, slots)
     const faceTotal = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
     const rooms = pickRooms(regions, faceTotal * PICKED_FLOOR_SHARE).map(index => regions[index])
+    const corridors = findCorridors(world, rooms, slots)
+    setLevelEdges(world, rooms, corridors)
 
-    for (const face of rooms.flat())
+    for (const face of [...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
     {
         patches[face >> (SLOT_SHIFT - 2)].faceType[face & (LOCAL_MASK >> 2)] = FaceType.PAVED.index
     }
-    return { patches, regions, rooms }
+    return { patches, regions, rooms, corridors }
 }

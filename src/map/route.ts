@@ -84,7 +84,7 @@ export interface TracedRoute extends Route
 /**
  * Min-heap of faces by cost, in two arrays to not allocate per entry
  */
-class FaceHeap
+export class FaceHeap
 {
     private costs: number[] = []
     private faces: number[] = []

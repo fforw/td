@@ -78,9 +78,9 @@ describe("generateDungeon", () => {
         }
     })
 
-    it("only sets the faces of its rooms", () => {
-        const { patches, rooms } = generateDungeon(4711, FACE_SIZE, 2, 2)
-        const floor = new Set(rooms.flat())
+    it("only sets the faces of its rooms and corridors", () => {
+        const { patches, rooms, corridors } = generateDungeon(4711, FACE_SIZE, 2, 2)
+        const floor = new Set([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
         patches.forEach((patch, slot) => patch.faceType.forEach((type, face) => {
             const expected = floor.has(globalFace(slot, face)) ? FaceType.PAVED : FaceType.NONE
             assert(type === expected.index)
@@ -96,6 +96,7 @@ describe("generateDungeon", () => {
         })
         assert.deepEqual(a.regions, b.regions)
         assert.deepEqual(a.rooms, b.rooms)
+        assert.deepEqual(a.corridors, b.corridors)
     })
 
     it("gives other patches for another seed", () => {

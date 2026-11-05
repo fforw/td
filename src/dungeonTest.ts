@@ -1,5 +1,6 @@
 import "./style.css"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "./map/generateDungeon"
+import { EdgeType } from "./map/geometry"
 import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
 import { randomSeed } from "./math/random"
@@ -13,6 +14,9 @@ import MapWorkerClient from "./worker/MapWorkerClient"
 const BACKGROUND_COLOR = "#14141c"
 const WALL_COLOR = "#23232e"
 const REGION_COLOR = "#3c4252"
+const CORRIDOR_COLOR = "#d8d2c0"
+const EDGE_WALL_COLOR = "#000"
+const DOOR_COLOR = "#ff3030"
 const MESH_COLOR = "#00000060"
 const OUTLINE_COLOR = "#e0a04060"
 const LABEL_COLOR = "#000"
@@ -40,9 +44,10 @@ const ctx = canvas.getContext("2d")!
 
 
 /**
- * Returns the fill color per face of each patch: wall by default, then regions, then rooms with a color of their own
+ * Returns the fill color per face of each patch: wall by default, then regions, then corridors and rooms with a color
+ * of their own
  */
-function faceColors({ patches, regions, rooms }: DungeonLevel): string[][]
+function faceColors({ patches, regions, rooms, corridors }: DungeonLevel): string[][]
 {
     const colors = patches.map(patch => new Array<string>(faceCount(patch)).fill(WALL_COLOR))
     const paint = (faces: number[], color: string) => {
@@ -53,6 +58,7 @@ function faceColors({ patches, regions, rooms }: DungeonLevel): string[][]
     }
 
     regions.forEach(faces => paint(faces, REGION_COLOR))
+    corridors.forEach(({ faces }) => paint(faces, CORRIDOR_COLOR))
     rooms.forEach((faces, i) => paint(faces, `hsl(${i * 360 / rooms.length} 70% 60%)`))
     return colors
 }
@@ -135,6 +141,27 @@ function draw(level: DungeonLevel): void
         ctx.stroke()
     }
 
+    // both half edges of an edge have the same type, drawing it twice doesn't change it
+    ctx.lineCap = "round"
+    for (const [type, color, lineWidth] of [[EdgeType.WALL, EDGE_WALL_COLOR, 1.5], [EdgeType.DOOR, DOOR_COLOR, 4]] as const)
+    {
+        ctx.strokeStyle = color
+        ctx.lineWidth = lineWidth
+        ctx.beginPath()
+        for (const { edgeType, positions, vertex } of patches)
+        {
+            for (let h = 0; h < edgeType.length; h++)
+            {
+                if (edgeType[h] === type.index)
+                {
+                    ctx.moveTo(...toScreen(positions[vertex[h] * 3], positions[vertex[h] * 3 + 1]))
+                    ctx.lineTo(...toScreen(positions[vertex[next(h)] * 3], positions[vertex[next(h)] * 3 + 1]))
+                }
+            }
+        }
+        ctx.stroke()
+    }
+
     // room numbers, the largest room is number 1
     ctx.fillStyle = LABEL_COLOR
     ctx.font = "bold 13px monospace"
@@ -159,13 +186,14 @@ function draw(level: DungeonLevel): void
 
 
 new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(level => {
-    const { patches, regions, rooms } = level
+    const { patches, regions, rooms, corridors } = level
     const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
     const roomFaces = rooms.reduce((sum, room) => sum + room.length, 0)
+    const corridorFaces = corridors.reduce((sum, corridor) => sum + corridor.faces.length, 0)
     const percent = (count: number) => Math.round(count * 100 / faces) + "%"
     document.getElementById("ui")!.textContent =
         `seed ${seed}, ${width} x ${height} patches, ${faces} faces, ${regions.length} regions, ` +
-        `${rooms.length} rooms ${percent(roomFaces)}`
+        `${rooms.length} rooms ${percent(roomFaces)}, ${corridors.length} corridors ${percent(corridorFaces)}`
 
     draw(level)
     window.addEventListener("resize", () => draw(level))
