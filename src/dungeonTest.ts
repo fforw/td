@@ -1,41 +1,26 @@
 import "./style.css"
-import {
-    BufferGeometry,
-    Color,
-    DirectionalLight,
-    Float32BufferAttribute,
-    HemisphereLight,
-    LineBasicMaterial,
-    LineSegments,
-    PerspectiveCamera,
-    Scene,
-    WebGLRenderer
-} from "three"
-import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { DUNGEON_HEIGHT, DUNGEON_WIDTH } from "./map/generateDungeon"
-import { FaceType } from "./map/geometry"
-import PatchWorld from "./map/PatchWorld"
+import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "./map/generateDungeon"
+import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
 import { randomSeed } from "./math/random"
-import { createGround } from "./render/patchMeshes"
-import { FACE_SIZE, SCALE } from "./render/scene3d"
+import { FACE_SIZE } from "./render/scene3d"
 import MapWorkerClient from "./worker/MapWorkerClient"
 
 /*
- * Test page for the patches of a dungeon level, e.g. dungeon.html?seed=1&width=3&height=2
+ * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2
  */
+
+const BACKGROUND_COLOR = "#14141c"
+const WALL_COLOR = "#23232e"
+const REGION_COLOR = "#3c4252"
+const MESH_COLOR = "#00000060"
+const OUTLINE_COLOR = "#e0a04060"
+const LABEL_COLOR = "#000"
 
 /**
- * Radius of the placeholder disc in faces. All faces start out as NONE, so without it the level would be empty.
+ * Distance between the level and the edge of the canvas in pixels
  */
-const DISC_RADIUS = 12
-
-const OUTLINE_COLOR = "#e0a040"
-
-/**
- * Height of the patch outlines above the ground, in world units
- */
-const OUTLINE_HEIGHT = 0.02
+const MARGIN = 16
 
 const params = new URLSearchParams(location.search)
 
@@ -51,67 +36,46 @@ const height = sizeParam("height", DUNGEON_HEIGHT)
 
 // module scripts are deferred, so the DOM is ready at this point
 const canvas = document.getElementById("screen") as HTMLCanvasElement
-
-const renderer = new WebGLRenderer({ canvas, antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
-renderer.setSize(window.innerWidth, window.innerHeight)
-
-const scene = new Scene()
-scene.background = new Color("#14141c")
-scene.add(new HemisphereLight("#dfefff", "#404050", 1.6))
-
-const sun = new DirectionalLight("#fff4e0", 2.5)
-sun.position.set(-1, 1.5, 0.6)
-scene.add(sun)
-
-const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 1000)
-const controls = new OrbitControls(camera, renderer.domElement)
-controls.enableDamping = true
-controls.screenSpacePanning = false
+const ctx = canvas.getContext("2d")!
 
 
 /**
- * Returns the center of a face in map units
+ * Returns the fill color per face of each patch: wall by default, then regions, then rooms with a color of their own
  */
-function faceCenter({ positions, vertex }: QuadPatch, face: number): [number, number]
+function faceColors({ patches, regions, rooms }: DungeonLevel): string[][]
 {
-    let x = 0, y = 0
-    for (let h = face * 4; h < face * 4 + 4; h++)
-    {
-        x += positions[vertex[h] * 3] / 4
-        y += positions[vertex[h] * 3 + 1] / 4
-    }
-    return [x, y]
-}
-
-
-/**
- * Creates the outline of a patch along its border half edges
- */
-function createOutline({ border, positions, vertex }: QuadPatch): LineSegments
-{
-    const points: number[] = []
-    const addHalfEdge = (h: number) => {
-        for (const v of [vertex[h] * 3, vertex[next(h)] * 3])
+    const colors = patches.map(patch => new Array<string>(faceCount(patch)).fill(WALL_COLOR))
+    const paint = (faces: number[], color: string) => {
+        for (const face of faces)
         {
-            points.push(positions[v] * SCALE, OUTLINE_HEIGHT, positions[v + 1] * SCALE)
+            colors[face >> (SLOT_SHIFT - 2)][face & (LOCAL_MASK >> 2)] = color
         }
     }
 
-    for (let off = 0; off < border.length; off += BORDER_STRIDE)
-    {
-        addHalfEdge(border[off + BORDER_FIRST])
-        addHalfEdge(border[off + BORDER_SECOND])
-    }
-
-    const geometry = new BufferGeometry()
-    geometry.setAttribute("position", new Float32BufferAttribute(points, 3))
-    return new LineSegments(geometry, new LineBasicMaterial({ color: OUTLINE_COLOR }))
+    regions.forEach(faces => paint(faces, REGION_COLOR))
+    rooms.forEach((faces, i) => paint(faces, `hsl(${i * 360 / rooms.length} 70% 60%)`))
+    return colors
 }
 
 
-function show(patches: QuadPatch[]): void
+/**
+ * Starts a new path around the given face
+ */
+function traceFace({ positions, vertex }: QuadPatch, face: number, toScreen: (x: number, y: number) => [number, number]): void
 {
+    ctx.beginPath()
+    for (let h = face * 4; h < face * 4 + 4; h++)
+    {
+        ctx.lineTo(...toScreen(positions[vertex[h] * 3], positions[vertex[h] * 3 + 1]))
+    }
+    ctx.closePath()
+}
+
+
+function draw(level: DungeonLevel): void
+{
+    const { patches, rooms } = level
+
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const { positions } of patches)
     {
@@ -123,45 +87,86 @@ function show(patches: QuadPatch[]): void
             maxY = Math.max(maxY, positions[i + 1])
         }
     }
-    const centerX = (minX + maxX) / 2
-    const centerY = (minY + maxY) / 2
 
-    for (const patch of patches)
-    {
+    const ratio = window.devicePixelRatio
+    canvas.width = window.innerWidth * ratio
+    canvas.height = window.innerHeight * ratio
+    canvas.style.width = window.innerWidth + "px"
+    canvas.style.height = window.innerHeight + "px"
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
+    ctx.fillStyle = BACKGROUND_COLOR
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)
+
+    const scale = Math.min(
+        (window.innerWidth - MARGIN * 2) / (maxX - minX),
+        (window.innerHeight - MARGIN * 2) / (maxY - minY)
+    )
+    const toScreen = (x: number, y: number): [number, number] => [
+        window.innerWidth / 2 + (x - (minX + maxX) / 2) * scale,
+        window.innerHeight / 2 + (y - (minY + maxY) / 2) * scale
+    ]
+
+    const colors = faceColors(level)
+    ctx.lineWidth = 0.5
+    ctx.strokeStyle = MESH_COLOR
+    patches.forEach((patch, index) => {
         for (let f = 0; f < faceCount(patch); f++)
         {
-            const [x, y] = faceCenter(patch, f)
-            if (Math.hypot(x - centerX, y - centerY) < DISC_RADIUS * FACE_SIZE)
+            traceFace(patch, f, toScreen)
+            ctx.fillStyle = colors[index][f]
+            ctx.fill()
+            ctx.stroke()
+        }
+    })
+
+    ctx.strokeStyle = OUTLINE_COLOR
+    ctx.lineWidth = 1
+    for (const { border, positions, vertex } of patches)
+    {
+        ctx.beginPath()
+        for (let off = 0; off < border.length; off += BORDER_STRIDE)
+        {
+            for (const h of [border[off + BORDER_FIRST], border[off + BORDER_SECOND]])
             {
-                patch.faceType[f] = FaceType.PAVED.index
+                ctx.moveTo(...toScreen(positions[vertex[h] * 3], positions[vertex[h] * 3 + 1]))
+                ctx.lineTo(...toScreen(positions[vertex[next(h)] * 3], positions[vertex[next(h)] * 3 + 1]))
             }
         }
+        ctx.stroke()
     }
 
-    const world = new PatchWorld()
-    const slots = patches.map(patch => world.add(patch))
-    slots.forEach(slot => scene.add(createGround(world, slot)))
-    patches.forEach(patch => scene.add(createOutline(patch)))
-
-    const size = Math.max(maxX - minX, maxY - minY) * SCALE
-    controls.target.set(centerX * SCALE, 0, centerY * SCALE)
-    camera.position.set(centerX * SCALE, size * 1.1, centerY * SCALE + size * 0.6)
-
-    const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
-    document.getElementById("ui")!.textContent = `seed ${seed}, ${width} x ${height} patches, ${faces} faces`
+    // room numbers, the largest room is number 1
+    ctx.fillStyle = LABEL_COLOR
+    ctx.font = "bold 13px monospace"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    rooms.forEach((faces, i) => {
+        let x = 0, y = 0
+        for (const face of faces)
+        {
+            const patch = patches[face >> (SLOT_SHIFT - 2)]
+            const local = face & (LOCAL_MASK >> 2)
+            for (let h = local * 4; h < local * 4 + 4; h++)
+            {
+                x += patch.positions[patch.vertex[h] * 3]
+                y += patch.positions[patch.vertex[h] * 3 + 1]
+            }
+        }
+        const count = faces.length * 4
+        ctx.fillText(String(i + 1), ...toScreen(x / count, y / count))
+    })
 }
 
 
-window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight
-    camera.updateProjectionMatrix()
-    renderer.setSize(window.innerWidth, window.innerHeight)
-})
+new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(level => {
+    const { patches, regions, rooms } = level
+    const faces = patches.reduce((sum, patch) => sum + faceCount(patch), 0)
+    const roomFaces = rooms.reduce((sum, room) => sum + room.length, 0)
+    const percent = (count: number) => Math.round(count * 100 / faces) + "%"
+    document.getElementById("ui")!.textContent =
+        `seed ${seed}, ${width} x ${height} patches, ${faces} faces, ${regions.length} regions, ` +
+        `${rooms.length} rooms ${percent(roomFaces)}`
 
-new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height).then(({ patches }) => {
-    show(patches)
-    renderer.setAnimationLoop(() => {
-        controls.update()
-        renderer.render(scene, camera)
-    })
+    draw(level)
+    window.addEventListener("resize", () => draw(level))
 })
