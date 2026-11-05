@@ -3,6 +3,7 @@ import { assert, describe, it } from "vitest"
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
 import { isAway, jobDays, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
+import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
 
 
@@ -35,6 +36,73 @@ describe("Campaign", () => {
             assert(nodes.some(node => node.kind === "DUNGEON"))
             assert(frontier(campaign).length === 16)
         }
+    })
+})
+
+
+describe("Kind edits", () => {
+
+    it("start with the first dungeon as the only one", () => {
+
+        for (const seed of [1, 2, 3, 4, 5])
+        {
+            const { kindEdits, patches } = overworld(createCampaign(seed))
+            const [[key, kind], ...others] = Object.entries(kindEdits)
+            assert(kind === "DUNGEON")
+            assert(others.length === 0)
+            assert(patches[key].kind === "DUNGEON")
+        }
+    })
+
+    it("win over the natural kind", () => {
+
+        const natural = naturalKind(7, 3, 2)
+        assert(wantedKind(7, {}, 3, 2) === natural)
+        assert(wantedKind(7, { "3/2": "TEMPLE" }, 3, 2) === "TEMPLE")
+        assert(wantedKind(7, { "2/2": "TEMPLE" }, 3, 2) === natural)
+    })
+
+    it("has a castle as the natural kind at the origin only", () => {
+
+        assert(naturalKind(7, 0, 0) === "CASTLE")
+        for (const [q, r] of NEIGHBORS)
+        {
+            assert(naturalKind(7, q, r) !== "CASTLE")
+        }
+    })
+
+    it("move the first dungeon on if its patch has no room", () => {
+
+        const [key] = Object.keys(startEdits(7))
+        const edits = startEdits(7, (_, q, r, kind) => q + "/" + r === key ? "NONE" : kind)
+        const [other, ...rest] = Object.keys(edits)
+        assert(other !== key)
+        assert(rest.length === 0)
+        assert(edits[other] === "DUNGEON")
+    })
+
+    it("don't exist for a first dungeon no patch has room for", () => {
+
+        assert.deepEqual(startEdits(7, () => "NONE"), {})
+    })
+
+    it("know what start patches ended up as", () => {
+
+        const nodes = startPatches(7, { "1/0": "TEMPLE" }, (_, q, r, kind) => kind === "TEMPLE" ? "NONE" : kind)
+        assert(nodes.find(({ q, r }) => q === 1 && r === 0)!.kind === "NONE")
+        assert(nodes.find(({ q, r }) => q === 0 && r === 0)!.kind === "CASTLE")
+    })
+
+    it("only get sent when new or changed", () => {
+
+        const sent = { "1/0": "DUNGEON" } as const
+        assert.deepEqual(unsentEdits({}, {}), {})
+        assert.deepEqual(unsentEdits(sent, sent), {})
+        assert.deepEqual(unsentEdits(sent, {}), sent)
+        assert.deepEqual(
+            unsentEdits({ "1/0": "TEMPLE", "2/0": "EMPTY" }, sent),
+            { "1/0": "TEMPLE", "2/0": "EMPTY" }
+        )
     })
 })
 

@@ -2,7 +2,7 @@ import { withSeed } from "../math/random"
 import { createSubtitle } from "./subtitle"
 import type { Character } from "../meeple/character"
 import { createHeroes } from "./heroes"
-import { startPatches } from "./patchKinds"
+import { startEdits, startPatches } from "./patchKinds"
 import { arrivals } from "./tavern"
 
 /**
@@ -14,7 +14,7 @@ export const GENERATOR_VERSION = 1
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export const START_GOLD = 1000
 
@@ -31,6 +31,11 @@ export const OVERWORLD = "overworld"
 export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE" | "NONE"
 
 /**
+ * Kinds the game rules set instead of the natural kind of a patch by patch key, see wantedKind()
+ */
+export type KindEdits = Record<string, PatchKind>
+
+/**
  * All an explorer can tell about a patch they only passed through
  */
 export type Impression = "safe" | "dangerous"
@@ -39,7 +44,7 @@ export interface PatchNode
 {
     q: number
     r: number
-    /** only known to the player once the patch is discovered */
+    /** what the patch ended up as, only known to the player once the patch is discovered */
     kind: PatchKind
     /** a patch that was only passed through still counts as unknown, it never affects the story */
     state: "targeted" | "discovered" | "passed"
@@ -64,6 +69,7 @@ export interface LevelRecord
     id: string
     kind: "OVERWORLD"
     patches: Record<string, PatchNode>
+    kindEdits: KindEdits
 }
 
 export interface Explorer
@@ -158,6 +164,7 @@ export function overworld(campaign: Campaign): LevelRecord
 export function createCampaign(seed: number): Campaign
 {
     const { text, castleName, characterName } = withSeed(seed, createSubtitle)
+    const kindEdits = startEdits(seed)
 
     const campaign: Campaign = {
         saveVersion: SAVE_VERSION,
@@ -172,7 +179,8 @@ export function createCampaign(seed: number): Campaign
             [OVERWORLD]: {
                 id: OVERWORLD,
                 kind: "OVERWORLD",
-                patches: Object.fromEntries(startPatches(seed).map(node => [patchKey(node.q, node.r), node]))
+                patches: Object.fromEntries(startPatches(seed, kindEdits).map(node => [patchKey(node.q, node.r), node])),
+                kindEdits
             }
         },
         tavern: [],

@@ -1,5 +1,6 @@
-import { type Campaign, GENERATOR_VERSION, SAVE_VERSION, START_HEROES } from "./campaign"
+import { type Campaign, GENERATOR_VERSION, overworld, patchKey, SAVE_VERSION, START_HEROES } from "./campaign"
 import { createHeroes } from "./heroes"
+import { naturalKind } from "./patchKinds"
 
 /**
  * Where campaigns are kept. Only localStorage for now; a server can implement the same interface later.
@@ -20,6 +21,16 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
     1: campaign => {
         campaign.heroes = createHeroes(campaign, START_HEROES)
         campaign.jobs = []
+    },
+    // version 3 keeps the kinds set by game rules apart from what's known about patches. Up to now that was only the
+    // first dungeon. NONE is what a generator ended up with, not what it was asked for.
+    2: campaign => {
+        const level = overworld(campaign)
+        level.kindEdits = Object.fromEntries(
+            Object.values(level.patches)
+                .filter(({ q, r, kind }) => kind !== "NONE" && kind !== naturalKind(campaign.seed, q, r))
+                .map(({ q, r, kind }) => [patchKey(q, r), kind])
+        )
     }
 }
 

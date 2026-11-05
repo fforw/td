@@ -1,7 +1,8 @@
 import { FACE_SIZE } from "../map/scale"
 import MapWorkerClient from "../worker/MapWorkerClient"
-import { type Campaign, overworld, patchKey } from "./campaign"
+import { type Campaign, type KindEdits, overworld, patchKey } from "./campaign"
 import type { MissionRoute } from "./missions"
+import { unsentEdits } from "./patchKinds"
 
 
 /**
@@ -13,6 +14,11 @@ export default class SimWorld
     private readonly seed: number
 
     private readonly client = new MapWorkerClient()
+
+    /**
+     * Kind edits the worker knows. Requests are handled in order, so a search sees all edits made before it.
+     */
+    private readonly sentEdits: KindEdits = {}
 
     constructor(seed: number)
     {
@@ -32,18 +38,21 @@ export default class SimWorld
      */
     async route(campaign: Campaign, target: string): Promise<MissionRoute>
     {
-        const { patches } = overworld(campaign)
+        const { patches, kindEdits } = overworld(campaign)
         const [q, r] = target.split("/").map(Number)
 
         const nodes = Object.values(patches)
         const radius = Math.max(...[...nodes.filter(node => node.state === "discovered"), { q, r }]
             .map(node => Math.max(Math.abs(node.q), Math.abs(node.r)))) + 1
 
+        const edits = unsentEdits(kindEdits, this.sentEdits)
+        Object.assign(this.sentEdits, edits)
+
         const { reachable, cost, kind, patches: crossed } = await this.client.findRoute({
             seed: this.seed,
             size: FACE_SIZE,
             target: { q, r },
-            kinds: Object.fromEntries(nodes.map(node => [patchKey(node.q, node.r), node.kind])),
+            edits,
             radius
         })
 

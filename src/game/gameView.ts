@@ -332,19 +332,16 @@ export default class GameView
                     type: "button",
                     onclick: () => importSave().then(
                         loaded => {
-                            const newCastle = loaded.seed !== this.campaign.seed
                             this.campaign = loaded
                             this.selected = null
                             this.reports = []
-                            if (newCastle)
-                            {
-                                this.castle?.dispose()
-                                this.castle = this.createCastle()
-                                this.images.dispose()
-                                this.images = this.createImages()
-                                this.sim.dispose()
-                                this.sim = new SimWorld(loaded.seed)
-                            }
+                            // the old ones hold the edits of another timeline, even for the same seed
+                            this.castle?.dispose()
+                            this.castle = this.createCastle()
+                            this.images.dispose()
+                            this.images = this.createImages()
+                            this.sim.dispose()
+                            this.sim = new SimWorld(loaded.seed)
                             this.changed()
                         },
                         e => alert(e.message)

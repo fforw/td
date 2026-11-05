@@ -25,8 +25,8 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { createCastle } from "./castle/castle3d"
 import { missionDays } from "./game/missions"
-import type { PatchKind } from "./game/campaign"
-import { impressionOf, overworldKind, startPatches } from "./game/patchKinds"
+import type { KindEdits } from "./game/campaign"
+import { impressionOf, startEdits, wantedKind } from "./game/patchKinds"
 import { PATCH_SIZE } from "./map/HexagonPatch"
 import PatchWorld, { SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, next } from "./map/QuadPatch"
@@ -160,7 +160,7 @@ let world = new PatchWorld()
 /**
  * Kinds of the patches known from the start of a campaign, the worker rolls the others
  */
-let startKinds: Record<string, PatchKind> = {}
+let kindEdits: KindEdits = {}
 
 const loaded = new Map<string, Promise<LoadedPatch>>()
 const bySlot = new Map<number, LoadedPatch>()
@@ -253,7 +253,7 @@ function load(q: number, r: number): Promise<LoadedPatch>
     let patch = loaded.get(key)
     if (!patch)
     {
-        patch = client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, startKinds[key] ?? overworldKind(seed, q, r)).then(
+        patch = client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, wantedKind(seed, kindEdits, q, r)).then(
             built => {
                 const slot = world.add(built.patch)
                 const group = new Group()
@@ -452,7 +452,7 @@ async function plan(q: number, r: number, known: number): Promise<void>
         seed,
         size: FACE_SIZE,
         target: { q, r },
-        kinds: startKinds,
+        edits: kindEdits,
         radius: Math.max(known, Math.abs(q), Math.abs(r)) + 1
     })
     if (current !== generation)
@@ -555,7 +555,7 @@ function newWorld(newSeed: number): void
     client.terminate()
     client = new MapWorkerClient()
     world = new PatchWorld()
-    startKinds = Object.fromEntries(startPatches(seed).map(node => [patchKey(node.q, node.r), node.kind]))
+    kindEdits = startEdits(seed)
 
     bySlot.forEach(entry => {
         scene.remove(entry.group)

@@ -2,8 +2,8 @@ import { generatePatch } from "../map/generatePatch"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
 import { findRoute, globalFace, packPath, type Route, slotOf } from "../map/route"
-import type { PassedPatch, PatchKind } from "./campaign"
-import { NEIGHBORS, overworldKind } from "./patchKinds"
+import type { KindEdits, PassedPatch, PatchKind } from "./campaign"
+import { NEIGHBORS, wantedKind } from "./patchKinds"
 
 
 export interface RouteQuery
@@ -14,9 +14,9 @@ export interface RouteQuery
     target: { q: number, r: number }
 
     /**
-     * Kinds of the patches that are known already by patch key, the others get rolled
+     * Kind edits since the last query, all patches without an edit so far have their natural kind
      */
-    kinds: Record<string, PatchKind>
+    edits: KindEdits
 
     /**
      * Ring around the castle the route has to stay in
@@ -59,6 +59,10 @@ interface FinderPatch
     q: number
     r: number
     slot: number
+    /**
+     * Kind the patch was built as, what it ended up as is in kind
+     */
+    wanted: PatchKind
     kind: PatchKind
     pois: number[]
 }
@@ -82,6 +86,7 @@ export default class RouteFinder
     private readonly world = new PatchWorld()
     private readonly patches = new Map<string, FinderPatch>()
     private readonly bySlot = new Map<number, FinderPatch>()
+    private readonly edits: KindEdits = {}
 
     constructor(seed: number, size: number)
     {
@@ -100,22 +105,37 @@ export default class RouteFinder
 
 
     /**
+     * Keeps the given edits for the patches they are about. Generators change faces by kind, so a patch built as
+     * another kind goes away, to be built again once a search gets there.
+     */
+    private applyEdits(edits: KindEdits): void
+    {
+        for (const [key, kind] of Object.entries(edits))
+        {
+            this.edits[key] = kind
+            const entry = this.patches.get(key)
+            if (entry && entry.wanted !== kind)
+            {
+                this.world.remove(entry.slot)
+                this.patches.delete(key)
+                this.bySlot.delete(entry.slot)
+            }
+        }
+    }
+
+
+    /**
      * Returns the patch at the given position and builds it if necessary
      */
-    private ensure(q: number, r: number, kinds: Record<string, PatchKind>): FinderPatch
+    private ensure(q: number, r: number): FinderPatch
     {
         const key = patchKey(q, r)
         let entry = this.patches.get(key)
         if (!entry)
         {
-            const { patch, kind, pois } = generatePatch(
-                q * PATCH_SIZE,
-                r * PATCH_SIZE,
-                this.seed,
-                this.size,
-                kinds[key] ?? overworldKind(this.seed, q, r)
-            )
-            entry = { q, r, slot: this.world.add(patch), kind, pois: pois.map(({ face }) => face) }
+            const wanted = wantedKind(this.seed, this.edits, q, r)
+            const { patch, kind, pois } = generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, this.seed, this.size, wanted)
+            entry = { q, r, slot: this.world.add(patch), wanted, kind, pois: pois.map(({ face }) => face) }
             this.patches.set(key, entry)
             this.bySlot.set(entry.slot, entry)
         }
@@ -130,11 +150,13 @@ export default class RouteFinder
      *
      * @return route
      */
-    find({ target, kinds, radius }: RouteQuery): RouteResult
+    find({ target, edits, radius }: RouteQuery): RouteResult
     {
+        this.applyEdits(edits)
+
         const { world, bySlot } = this
-        const castle = this.ensure(0, 0, kinds)
-        const goal = this.ensure(target.q, target.r, kinds)
+        const castle = this.ensure(0, 0)
+        const goal = this.ensure(target.q, target.r)
 
         const { reachable, cost, paths } = findRoute(
             world,
@@ -149,7 +171,7 @@ export default class RouteFinder
                 return NEIGHBORS
                     .map(([dq, dr]) => [q + dq, r + dr])
                     .filter(([nq, nr]) => Math.max(Math.abs(nq), Math.abs(nr)) <= radius)
-                    .map(([nq, nr]) => this.ensure(nq, nr, kinds).slot)
+                    .map(([nq, nr]) => this.ensure(nq, nr).slot)
             }
         )
 

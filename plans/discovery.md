@@ -113,6 +113,13 @@ the current value per face or half edge, not a history, so a door opened
 
 All edits come from the main thread, workers never send any back.
 
+- Patch kinds work the same way. A patch has a natural kind from the seed
+  and its position; `LevelRecord.kindEdits` holds what game rules changed,
+  the first dungeon being the first edit. Generators run on edit ?? natural
+  and can still veto to NONE, which isn't stored as an edit and runs before
+  the face overlay, so later edits to faces don't change what a patch is.
+  A rule that has to hold checks the generator before writing its edit.
+  Patch nodes hold what's known about a patch, not what it is meant to be.
 - Levels other than the overworld are local. The worker generates them
   and hands the patches over; the main thread owns them from then on and
   changes them in place. No messages, however often they change. Reopening
@@ -121,15 +128,19 @@ All edits come from the main thread, workers never send any back.
   and redrawing patch images is fine. The patch view gets them directly,
   patch images redraw from a newly built patch with the overlay applied.
 - The route finder is the only thing that needs them sent. `SimWorld`
-  keeps a pending list of edits and sends it with the next route query,
-  then empties it. `postMessage` is in order and the worker handles one
-  message at a time, so a search always sees all edits made before it.
+  remembers what it sent and sends what's new with the next route query.
+  `postMessage` is in order and the worker handles one message at a time,
+  so a search always sees all edits made before it. Kind edits do this
+  already, face and edge edits will follow.
 - The route finder builds patches lazily, so it keeps the edits it got
-  per patch and applies them when it builds that patch.
-- A new `SimWorld` starts with the whole overlay as its pending list.
+  per patch and applies them when it builds that patch. A kind edit on a
+  patch it has built drops that patch, to be built again when needed.
+  The patch view and patch images don't react to kind edits yet, no rule
+  changes a patch they have shown.
+- A new `SimWorld` starts with nothing sent, so it gets the whole overlay.
   Loading a save always starts over with new workers, even for the same
   seed, since they hold changes of the other timeline.
-- The pending list is never saved, the overlay is.
+- What was sent is never saved, the overlay is.
 
 ### 0.4 Face types and themes
 

@@ -14,7 +14,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { createCastle } from "./castle/castle3d"
-import { overworldKind } from "./game/patchKinds"
+import { startEdits, wantedKind } from "./game/patchKinds"
 import { PATCH_SIZE } from "./map/HexagonPatch"
 import type { GeneratedPatch } from "./map/patchGenerators"
 import MapWorkerClient from "./worker/MapWorkerClient"
@@ -108,6 +108,7 @@ const bySlot = new Map<number, LoadedPatch>()
 const requested = new Set<string>()
 
 let seed = randomSeed(params.has("seed") ? Number(params.get("seed")) : null)
+let kindEdits = startEdits(seed)
 
 /**
  * Increases with every new seed, so patches requested for an older seed get dropped
@@ -210,7 +211,7 @@ function updatePatches(pq: number, pr: number): void
     {
         const key = patchKey(q, r)
         requested.add(key)
-        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, overworldKind(seed, q, r)).then(
+        client.buildPatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, wantedKind(seed, kindEdits, q, r)).then(
             result => {
                 if (requestedFor !== generation)
                 {
@@ -257,6 +258,7 @@ footer.appendChild(seedLink)
 function newWorld(newSeed: number): void
 {
     seed = newSeed
+    kindEdits = startEdits(seed)
     seedLink.href = "world.html?seed=" + seed + (params.has("radius") ? "&radius=" + LOAD_RADIUS : "")
     generation++
     requested.clear()
