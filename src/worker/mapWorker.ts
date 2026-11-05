@@ -41,7 +41,7 @@ onmessage = (ev: MessageEvent<MapRequest>) => {
             if (data.lit)
             {
                 level.lighting = lightDungeon(data.seed, level)
-                transfer.push(level.lighting.colors.buffer, level.lighting.directions.buffer)
+                transfer.push(level.lighting.colors.buffer, level.lighting.directions.buffer, level.lighting.walls.buffer)
             }
             postMessage({ id, result: level } satisfies MapResponse, { transfer })
         }

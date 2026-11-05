@@ -10,10 +10,12 @@ import {
     lightDungeon,
     type LightSample,
     MAX_INFLUENCE,
+    NO_WALL,
     placeLights,
     RIM_FADE_START,
     RIM_GATE_END,
-    RIM_LIMIT
+    RIM_LIMIT,
+    WALL_CLEARANCE
 } from "../../src/map/dungeonLights"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { faceCount } from "../../src/map/QuadPatch"
@@ -273,6 +275,28 @@ describe("bakeLights", () => {
         const middle = at(10, 5)
         assert(colors[middle * 4] > 0 && colors[middle * 4 + 2] > 0)
         assert(Math.abs(directions[middle * 2]) < colors[middle * 4 + 3] / 2)
+    })
+
+    it("finds the closest wall for lookups near walls", () => {
+        const segments = new Float64Array([
+            2, 1, 2, 9, 0, 0,
+            2.5, 1, 2.5, 9, 0, 0
+        ])
+        const { width, walls } = bakeLights([], segments, { minX: 0, minZ: 0, maxX: 10, maxZ: 10 })
+        const wallAt = (x: number, z: number) => {
+            const i = (Math.floor(z * LIGHT_TEXELS) * width + Math.floor(x * LIGHT_TEXELS)) * 4
+            return [...walls.subarray(i, i + 4)]
+        }
+
+        assert.deepEqual(wallAt(1.9, 5), [2, 1, 2, 9])
+        assert.deepEqual(wallAt(2.1, 5), [2, 1, 2, 9])
+        assert.deepEqual(wallAt(2.4, 5), [2.5, 1, 2.5, 9])
+        // has to be there for anything a lookup could mix with
+        assert.deepEqual(wallAt(2 - WALL_CLEARANCE, 5), [2, 1, 2, 9])
+        // past the end of the wall
+        assert.deepEqual(wallAt(2, 0.9), [2, 1, 2, 9])
+
+        assert.deepEqual(wallAt(5, 5), [NO_WALL, NO_WALL, NO_WALL, NO_WALL])
     })
 })
 

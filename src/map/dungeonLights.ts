@@ -52,6 +52,16 @@ export const RIM_LIMIT = 4.2
 export const LIGHT_TEXELS = 8
 
 /**
+ * How far from a wall a lookup in the light field has to be in world units so that all texels it mixes are on its side
+ */
+export const WALL_CLEARANCE = Math.SQRT2 / LIGHT_TEXELS
+
+/**
+ * Coordinates of the wall of a texel without any wall close to it, far enough to never push a lookup
+ */
+export const NO_WALL = 1e6
+
+/**
  * Number of sectors around a light to find the walls of a point quickly
  */
 const LIGHT_SECTORS = 128
@@ -113,6 +123,12 @@ export interface LevelLighting
      * energy of the light unless that is very close.
      */
     directions: Float32Array
+
+    /**
+     * Per texel the start and end in x and z of the wall closest to it, for lookups to stay on their side of it, or NO_WALL
+     * if none is within reach of a lookup at the texel. The field itself can't have an edge as sharp as a thin wall.
+     */
+    walls: Float32Array
 }
 
 
@@ -440,6 +456,53 @@ export function placeLights(
 }
 
 
+/**
+ * Finds the closest wall of every texel that has one within reach of a lookup at the texel
+ *
+ * @param segments  segment array
+ * @param minX      world position of the corner of the light field
+ * @param minZ      world position of the corner of the light field
+ * @param width     size of the light field in texels
+ * @param height    size of the light field in texels
+ *
+ * @return start and end in x and z per texel
+ */
+function bakeWalls(segments: Float64Array, minX: number, minZ: number, width: number, height: number): Float32Array
+{
+    // a lookup needs the wall if it is too close to it, from anywhere in its texel
+    const reach = WALL_CLEARANCE + Math.SQRT1_2 / LIGHT_TEXELS
+
+    const walls = new Float32Array(width * height * 4).fill(NO_WALL)
+    const closest = new Float64Array(width * height).fill(reach)
+
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+    {
+        const fromX = Math.max(0, Math.floor((Math.min(segments[s], segments[s + 2]) - reach - minX) * LIGHT_TEXELS))
+        const toX = Math.min(width, Math.ceil((Math.max(segments[s], segments[s + 2]) + reach - minX) * LIGHT_TEXELS))
+        const fromZ = Math.max(0, Math.floor((Math.min(segments[s + 1], segments[s + 3]) - reach - minZ) * LIGHT_TEXELS))
+        const toZ = Math.min(height, Math.ceil((Math.max(segments[s + 1], segments[s + 3]) + reach - minZ) * LIGHT_TEXELS))
+
+        for (let tz = fromZ; tz < toZ; tz++)
+        {
+            for (let tx = fromX; tx < toX; tx++)
+            {
+                const distance = segmentDistance(segments, s, minX + (tx + 0.5) / LIGHT_TEXELS, minZ + (tz + 0.5) / LIGHT_TEXELS)
+                const i = tz * width + tx
+                if (distance < closest[i])
+                {
+                    closest[i] = distance
+                    walls[i * 4] = segments[s]
+                    walls[i * 4 + 1] = segments[s + 1]
+                    walls[i * 4 + 2] = segments[s + 2]
+                    walls[i * 4 + 3] = segments[s + 3]
+                }
+            }
+        }
+    }
+    return walls
+}
+
+
 const sample: LightSample = { energy: 0, x: 0, z: 0 }
 
 /**
@@ -486,7 +549,7 @@ export function bakeLights(
             }
         }
     }
-    return { lights, minX, minZ, width, height, colors, directions }
+    return { lights, minX, minZ, width, height, colors, directions, walls: bakeWalls(segments, minX, minZ, width, height) }
 }
 
 

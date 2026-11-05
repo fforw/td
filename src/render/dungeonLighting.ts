@@ -2,10 +2,12 @@ import {
     ClampToEdgeWrapping,
     DataTexture,
     DataUtils,
+    FloatType,
     HalfFloatType,
     LinearFilter,
     type Material,
     type MeshBasicMaterial,
+    NearestFilter,
     type PixelFormat,
     RGBAFormat,
     RGFormat,
@@ -17,7 +19,8 @@ import {
     RIM_FADE_END,
     RIM_FADE_START,
     RIM_GATE_END,
-    RIM_GATE_START
+    RIM_GATE_START,
+    WALL_CLEARANCE
 } from "../map/dungeonLights"
 
 /*
@@ -63,6 +66,28 @@ const PARS = /* glsl */`
     uniform vec2 lightSize;
 `
 
+/**
+ * Moves a lookup away from the walls around it, on the side it is on. The second round is for corners, where getting away
+ * from one wall leads to the other.
+ */
+const STAY_ON_SIDE = /* glsl */`
+    uniform sampler2D lightWalls;
+
+    vec2 stayOnSide(vec2 position)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            vec4 wall = texture2D(lightWalls, (position - lightOrigin) / lightSize);
+            vec2 along = wall.zw - wall.xy;
+            vec2 offset = position - wall.xy;
+            vec2 away = offset - along * clamp(dot(offset, along) / max(dot(along, along), 1e-6), 0.0, 1.0);
+            float distance = length(away);
+            position += away / max(distance, 1e-5) * max(0.0, ${WALL_CLEARANCE.toFixed(4)} - distance);
+        }
+        return position;
+    }
+`
+
 
 /**
  * Textures and uniforms of a baked light field
@@ -72,6 +97,7 @@ export interface LightField
     uniforms: {
         lightColors: { value: DataTexture }
         lightDirections: { value: DataTexture }
+        lightWalls: { value: DataTexture }
         lightOrigin: { value: Vector2 }
         lightSize: { value: Vector2 }
     }
@@ -97,12 +123,19 @@ function createTexture(data: Float32Array, width: number, height: number, format
 /**
  * Creates the light field for a baked level
  */
-export function createLightField({ minX, minZ, width, height, colors, directions }: LevelLighting): LightField
+export function createLightField({ minX, minZ, width, height, colors, directions, walls }: LevelLighting): LightField
 {
+    // world positions need the full floats, and mixing the ends of different walls makes no sense
+    const wallTexture = new DataTexture(walls, width, height, RGBAFormat, FloatType)
+    wallTexture.magFilter = wallTexture.minFilter = NearestFilter
+    wallTexture.wrapS = wallTexture.wrapT = ClampToEdgeWrapping
+    wallTexture.needsUpdate = true
+
     return {
         uniforms: {
             lightColors: { value: createTexture(colors, width, height, RGBAFormat) },
             lightDirections: { value: createTexture(directions, width, height, RGFormat) },
+            lightWalls: { value: wallTexture },
             lightOrigin: { value: new Vector2(minX, minZ) },
             lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) }
         }
@@ -134,14 +167,14 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                 vLightPosition = (modelMatrix * lightPosition).xz;
             `)
         shader.fragmentShader = shader.fragmentShader
-            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;\n${PARS}`)
+            .replace("#include <common>", `#include <common>\nvarying vec2 vLightPosition;\n${PARS}\n${STAY_ON_SIDE}`)
             .replace("#include <lights_fragment_begin>", /* glsl */`
                 #include <lights_fragment_begin>
                 {
                     vec3 worldNormal = inverseTransformDirection(normal, viewMatrix);
                     if (${flatTops ? "worldNormal.y < 0.99" : "true"})
                     {
-                        vec2 uv = (vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)} - lightOrigin) / lightSize;
+                        vec2 uv = (stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}) - lightOrigin) / lightSize;
                         vec2 toLight = texture2D(lightDirections, uv).rg;
                         toLight /= max(length(toLight), 0.02);
                         vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
