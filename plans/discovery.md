@@ -292,8 +292,9 @@ point of interest, its center, where every route starts.
   affect the story. A patch passed on the way only gets a note on the map,
   "looked safe" or "looked dangerous", and stays a possible target.
 - Explorers are freakishly good at this, so missions are no realistic
-  journeys: a route cost maps to a few neat day steps of 1, 3, 5, ...,
-  the way back included. The first targets take 1 day, every ring
+  journeys: a route cost maps to a few neat day steps of 1, 3, 5, ...
+  to get there. They report on arrival and are back in the tavern, the
+  way back takes no time. The first targets take 1 day, every ring
   further out one step more. The limits are measured on generated
   worlds.
 - Nothing shows the days before a mission, the tavern only shows speed
@@ -343,8 +344,15 @@ Heroes do everything that happens inside a discovered patch:
   castle. They are not hired per job like explorers.
 - They learn from their jobs. Later events bring new heroes or make
   others leave.
-- A job targets a known patch other than the castle. Until levels
-  exist, it is the trip there and back and a report.
+- Unlike explorers they get noticed, so they only travel over discovered
+  patches. A job without a way over known land is blocked until explorers
+  have discovered enough of it, the popup for the job says so.
+- A job targets a known patch other than the castle. It is a journey
+  of 3 days per ring (1.5), after which the hero waits at the target
+  until told to enter, for as long as that takes. Until levels exist,
+  entering brings the hero straight back with a report. The hero can also
+  be told to return instead, which takes the same days back along the
+  way and teaches nothing. The target is free for another hero meanwhile.
 - Attribute for wisdom: inside levels finds hidden traps and passages.
 - They enter levels, take treasure and fight, and are the ones who get
   seen, followed and hated (phase 4).
@@ -352,8 +360,9 @@ Heroes do everything that happens inside a discovered patch:
 ### 1.4 Patch map UI
 
 - The map is a popup over the 3D view, a sheet of the manuscript map
-  (`game/mapSheet.ts`) a bit smaller than the screen. The 3D view pauses
-  while it is open. Nobody is listed on it, it only shows what's known.
+  (`game/mapSheet.ts`). The 3D view pauses while it is open. Nobody is
+  listed on it, it only shows what's known, but the mission list stays
+  in front of it. A line of the list closes the map and goes there.
 - Discovered patches are drawn in full detail, patches an explorer only
   passed through in a raster of 128 pixels, as layers clipped to their
   cells on the patch grid. Anything else is blank paper. Patches are cells
@@ -361,16 +370,52 @@ Heroes do everything that happens inside a discovered patch:
 - Points of interest of discovered patches are the markers to click for a
   mission of a hero, one hero per mission for now. Empty patches have
   nothing to click, so heroes go nowhere but to points of interest.
-- The bounding rectangle of discovered and passed patches fills the sheet,
-  keeping its aspect ratio. A patch an explorer is on the way to takes up no
+- The sheet has the shape of the bounding rectangle of discovered and
+  passed patches, as large as the screen allows, so there is no blank paper
+  beside them. A patch an explorer is on the way to takes up no
   room, its marker stays on the screen. Moving the pointer to the border of a discovered patch next
   to an unknown one shows a fat floating arrow in the gap around the map,
   over the edge of the paper and the stopped 3D view. It opens a smaller
   popup to hire an explorer. Running missions show their remaining days.
 
-### 1.5 Time
+### 1.5 Time and journeys
 
 - Game time advances in days; missions resolve when their days are up.
+- Whoever leaves the castle really walks there, on a route (1.1) that
+  for heroes stays on discovered patches. The route is a path of faces, which
+  gets pulled taut inside those faces (`tautPath()`), so it cuts the
+  stairs of the grid without touching what's beside the faces. It stops
+  a bit short of the point of interest.
+- Days decide how far along someone is: each day of a journey stands
+  for an equal share of the way. The way is saved with the journey, so
+  it doesn't depend on later edits; the position is not (`game/journey.ts`).
+  Journeys from older saves have no way and happen unseen.
+- Someone sent off stands at the castle for 1.5 seconds first, with the
+  mission listed already, counted only while the 3D view runs, so there is
+  always time to go after them once the map is closed.
+- Someone followed walks up to the share of the next day. Ending the
+  day by hand makes them run to catch up if they fell behind.
+- Anyone else just gets seen leaving: they walk on no matter the days
+  until they are well away from the castle or at the end of the way, then
+  disappear. Going after them finds them at the share their days have
+  reached, or further if they were followed that far before. Someone still
+  in sight just goes on, unless that's already past the next day's share.
+- The view is bound to the castle, with a wide area to look around in,
+  or to someone on a journey, with a small one and closer in. The mission
+  list has a line to jump to each of them. Following someone is what
+  turns walking into time: reaching the share of the next day ends the
+  day for everyone. It isn't saved, a loaded game starts at the castle.
+- Patches on the way get built in 3D only for whoever is followed, and
+  stay there. Seeing them doesn't make them known: the map and the rules
+  don't change, it just leaves ground to walk on. It can show what a
+  target is a bit before the report.
+- On arrival, an explorer the view follows stays there with the result
+  until the view moves on, otherwise a notice tells it. A hero out of
+  sight gets a notice that stays with a button to go there. Enter and
+  return are only offered with the view there. A returning hero is a
+  journey like any other, out of sight only the last day of it can be
+  seen coming in. Getting home brings the view back to the castle, or a
+  notice if it is elsewhere.
 
 ### 1.6 Event log
 
