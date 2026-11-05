@@ -10,6 +10,7 @@ import {
     InstancedMesh,
     type Mesh,
     Matrix4,
+    type Material,
     MeshBasicMaterial,
     MeshToonMaterial,
     NearestFilter,
@@ -26,6 +27,7 @@ import { canEquip, type Character, checkClasses } from "./character"
 import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "../items/itemAnimation"
 import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "../items/itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
+import { applyLightField, applyRimLight, type LightField } from "../render/dungeonLighting"
 import { type ModelName, template } from "../render/scene3d"
 import { rng } from "../math/random"
 import { meepleNameGenerator } from "./nameGenerator";
@@ -601,6 +603,29 @@ export default class MeepleCrowd
     set outlinesVisible(visible: boolean)
     {
         this.outlines.forEach(o => o.visible = visible)
+    }
+
+    /**
+     * Lights the meeples with the given light field. Their outlines turn into rims where they stand in the dark and a light
+     * still reaches them.
+     */
+    setLightField(field: LightField): void
+    {
+        const materials = new Set(this.group.children.map(mesh => (mesh as InstancedMesh).material as Material))
+        for (const hull of this.outlines)
+        {
+            const material = hull.material as MeshBasicMaterial
+            applyRimLight(material, field, OUTLINE)
+            materials.delete(material)
+        }
+        for (const material of materials)
+        {
+            // the eyes have no shading at all
+            if (!(material as ShaderMaterial).isShaderMaterial)
+            {
+                applyLightField(material, field)
+            }
+        }
     }
 
     private createPart(geometry: BufferGeometry, material: MeshToonMaterial, outline: boolean): InstancedMesh
