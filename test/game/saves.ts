@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { assert, describe, it } from "vitest"
 
-import { type Campaign, createCampaign, overworld, SAVE_VERSION, START_HEROES } from "../../src/game/campaign"
+import { type Campaign, createCampaign, overworld, type PatchKind, SAVE_VERSION, START_HEROES } from "../../src/game/campaign"
 import { advanceDay, startMission } from "../../src/game/missions"
 import { wantedKind } from "../../src/game/patchKinds"
 import { parseSave, serializeSave } from "../../src/game/storage"
@@ -56,7 +56,7 @@ describe("Save fixtures", () => {
             const { patches, kindEdits } = overworld(campaign)
             for (const { q, r, kind } of Object.values(patches))
             {
-                assert(kind === "NONE" || wantedKind(campaign.seed, kindEdits, q, r) === kind, q + "/" + r)
+                assert(kind === "EMPTY" || wantedKind(campaign.seed, kindEdits, q, r) === kind, q + "/" + r)
             }
         })
     }
@@ -95,10 +95,32 @@ describe("Save migration", () => {
 
         const campaign = createCampaign(9)
         const level = overworld(campaign)
-        level.patches["0/1"].kind = "NONE"
+        level.patches["0/1"].kind = "NONE" as PatchKind
         level.kindEdits = {}
         campaign.saveVersion = 2
 
-        assert(overworld(parseSave(JSON.stringify(campaign))).kindEdits["0/1"] === undefined)
+        const migrated = overworld(parseSave(JSON.stringify(campaign)))
+        assert(migrated.kindEdits["0/1"] === undefined)
+        assert(migrated.patches["0/1"].kind === "EMPTY")
+    })
+
+    it("turns NONE of version 3 saves into EMPTY", () => {
+
+        const campaign = createCampaign(9)
+        const { patches } = overworld(campaign)
+        patches["5/5"] = { q: 5, r: 5, kind: "NONE" as PatchKind, state: "passed", parent: null }
+        campaign.missions.push({
+            explorer: campaign.tavern[0],
+            target: "0/1",
+            startDay: 1,
+            endDay: 3,
+            passed: [{ q: 6, r: 5, kind: "NONE" as PatchKind }]
+        })
+        campaign.saveVersion = 3
+
+        const migrated = parseSave(JSON.stringify(campaign))
+        assert(overworld(migrated).patches["5/5"].kind === "EMPTY")
+        assert(overworld(migrated).patches["0/0"].kind === "CASTLE")
+        assert(migrated.missions[0].passed![0].kind === "EMPTY")
     })
 })

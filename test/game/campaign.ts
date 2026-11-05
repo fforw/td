@@ -74,7 +74,7 @@ describe("Kind edits", () => {
     it("move the first dungeon on if its patch has no room", () => {
 
         const [key] = Object.keys(startEdits(7))
-        const edits = startEdits(7, (_, q, r, kind) => q + "/" + r === key ? "NONE" : kind)
+        const edits = startEdits(7, (_, q, r, kind) => q + "/" + r === key ? "EMPTY" : kind)
         const [other, ...rest] = Object.keys(edits)
         assert(other !== key)
         assert(rest.length === 0)
@@ -83,13 +83,13 @@ describe("Kind edits", () => {
 
     it("don't exist for a first dungeon no patch has room for", () => {
 
-        assert.deepEqual(startEdits(7, () => "NONE"), {})
+        assert.deepEqual(startEdits(7, () => "EMPTY"), {})
     })
 
     it("know what start patches ended up as", () => {
 
-        const nodes = startPatches(7, { "1/0": "TEMPLE" }, (_, q, r, kind) => kind === "TEMPLE" ? "NONE" : kind)
-        assert(nodes.find(({ q, r }) => q === 1 && r === 0)!.kind === "NONE")
+        const nodes = startPatches(7, { "1/0": "TEMPLE" }, (_, q, r, kind) => kind === "TEMPLE" ? "EMPTY" : kind)
+        assert(nodes.find(({ q, r }) => q === 1 && r === 0)!.kind === "EMPTY")
         assert(nodes.find(({ q, r }) => q === 0 && r === 0)!.kind === "CASTLE")
     })
 

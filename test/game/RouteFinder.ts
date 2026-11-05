@@ -94,7 +94,7 @@ describe("RouteFinder", () => {
         for (const seed of SEEDS)
         {
             const route = find(new RouteFinder(seed, FACE_SIZE), 2, 0, { "2/0": "TEMPLE" })
-            assert(route.kind === "TEMPLE" || route.kind === "NONE")
+            assert(route.kind === "TEMPLE" || route.kind === "EMPTY")
             assert(route.goals.length === (route.kind === "TEMPLE" ? 1 : 0))
             assert(route.start >= 0)
             assert(route.patches.some(({ q, r }) => q === 0 && r === 0))

@@ -39,7 +39,7 @@ export function naturalKind(seed: number, q: number, r: number): PatchKind
 
 /**
  * Returns the kind an overworld patch is meant to be: what the game rules made it, its natural kind otherwise. Its
- * generator can still end up with NONE.
+ * generator can still end up with EMPTY.
  */
 export function wantedKind(seed: number, edits: KindEdits, q: number, r: number): PatchKind
 {

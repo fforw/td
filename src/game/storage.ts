@@ -23,14 +23,28 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
         campaign.jobs = []
     },
     // version 3 keeps the kinds set by game rules apart from what's known about patches. Up to now that was only the
-    // first dungeon. NONE is what a generator ended up with, not what it was asked for.
+    // first dungeon. The old kind NONE is what a generator ended up with, not what it was asked for.
     2: campaign => {
         const level = overworld(campaign)
         level.kindEdits = Object.fromEntries(
             Object.values(level.patches)
-                .filter(({ q, r, kind }) => kind !== "NONE" && kind !== naturalKind(campaign.seed, q, r))
+                .filter(({ q, r, kind }) => kind as string !== "NONE" && kind !== naturalKind(campaign.seed, q, r))
                 .map(({ q, r, kind }) => [patchKey(q, r), kind])
         )
+    },
+    // version 4 has generators without room fall back to EMPTY, which NONE was the same as in all but the name
+    3: campaign => {
+        const known = [
+            ...Object.values(overworld(campaign).patches),
+            ...campaign.missions.flatMap(mission => mission.passed ?? [])
+        ]
+        for (const patch of known)
+        {
+            if (patch.kind as string === "NONE")
+            {
+                patch.kind = "EMPTY"
+            }
+        }
     }
 }
 

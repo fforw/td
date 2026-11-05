@@ -116,7 +116,7 @@ All edits come from the main thread, workers never send any back.
 - Patch kinds work the same way. A patch has a natural kind from the seed
   and its position; `LevelRecord.kindEdits` holds what game rules changed,
   the first dungeon being the first edit. Generators run on edit ?? natural
-  and can still veto to NONE, which isn't stored as an edit and runs before
+  and can still veto to EMPTY, which isn't stored as an edit and runs before
   the face overlay, so later edits to faces don't change what a patch is.
   A rule that has to hold checks the generator before writing its edit.
   Patch nodes hold what's known about a patch, not what it is meant to be.
@@ -177,8 +177,8 @@ All edits come from the main thread, workers never send any back.
   before packing, one on the packed patch, where `borderConnected` works.
 - A generator returns its points of interest, each a local face plus the
   plan that goes with it, so routes and rendering read one result. A
-  patch without room for them falls back to kind NONE with its faces
-  unchanged, so asking for NONE later gives the same patch. The castle
+  patch without room for them falls back to kind EMPTY with its faces
+  unchanged, so asking for EMPTY later gives the same patch. The castle
   generator builds the castle tiles and returns the `CastlePlan` as its
   only point of interest. Kinds without a generator of their own keep one
   point of interest in the middle.
@@ -268,7 +268,7 @@ subtitle on top of that.
 
 Generators own their points of interest: they make sure these connect
 to the border of the patch, a patch without room for them falls back to
-kind NONE. Whether the border can be reached from outside depends on
+kind EMPTY. Whether the border can be reached from outside depends on
 the neighbors, which is what makes a mission fail. The castle has one
 point of interest, its center, where every route starts.
 

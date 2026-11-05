@@ -436,10 +436,10 @@ describe("Lazy routes", () => {
 
 describe("Points of interest", () => {
 
-    it("falls back to NONE if a patch has no room for them", () => {
+    it("falls back to EMPTY if a patch has no room for them", () => {
 
         const { kind, pois } = plainGenerated("DUNGEON", WATER)
-        assert(kind === "NONE")
+        assert(kind === "EMPTY")
         assert.deepEqual(pois, [])
     })
 
@@ -484,8 +484,8 @@ describe("Points of interest", () => {
 
     it("leaves the terrain alone without a generator that changes it", () => {
 
-        const terrain = generatePatch(PATCH_SIZE, 0, 4711, FACE_SIZE, "NONE").patch.faceType
-        for (const kind of ["EMPTY", "DUNGEON", "TREASURE", "TEMPLE"] as const)
+        const terrain = generatePatch(PATCH_SIZE, 0, 4711, FACE_SIZE, "EMPTY").patch.faceType
+        for (const kind of ["DUNGEON", "TREASURE", "TEMPLE"] as const)
         {
             assert.deepEqual(generatePatch(PATCH_SIZE, 0, 4711, FACE_SIZE, kind).patch.faceType, terrain)
         }

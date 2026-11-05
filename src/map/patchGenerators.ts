@@ -25,7 +25,7 @@ export interface PointOfInterest
 
 
 /**
- * Finished patch with what it ended up as, which is NONE if it had no room for what it was meant to be
+ * Finished patch with what it ended up as, which is EMPTY if it had no room for what it was meant to be
  */
 export interface GeneratedPatch
 {
@@ -37,8 +37,8 @@ export interface GeneratedPatch
 
 /**
  * Turns a patch with its terrain into a patch of some kind, in up to two steps. Both get to return points of interest.
- * Faces have to stay as they are if a generator ends up with NONE, since other requests for the patch might ask for
- * NONE right away.
+ * Faces have to stay as they are if a generator finds no room, since other requests for the patch might ask for EMPTY
+ * right away.
  */
 export interface PatchGenerator
 {
@@ -127,8 +127,7 @@ export const PATCH_GENERATORS: Record<PatchKind, PatchGenerator> = {
     EMPTY: TERRAIN,
     DUNGEON: CENTRAL,
     TREASURE: CENTRAL,
-    TEMPLE: CENTRAL,
-    NONE: TERRAIN
+    TEMPLE: CENTRAL
 }
 
 
@@ -149,5 +148,5 @@ export function applyGenerator(kind: PatchKind, patch: HexagonPatch, faces: Face
     const placed = generator.place ? generator.place(packed) : []
     return placed
         ? { patch: packed, kind, pois: [...built, ...placed] }
-        : { patch: packed, kind: "NONE", pois: [] }
+        : { patch: packed, kind: "EMPTY", pois: [] }
 }

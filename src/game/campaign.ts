@@ -14,7 +14,7 @@ export const GENERATOR_VERSION = 1
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 export const START_GOLD = 1000
 
@@ -26,9 +26,9 @@ export const START_HEROES = 3
 export const OVERWORLD = "overworld"
 
 /**
- * NONE is what a patch falls back to when its generator found no room for its points of interest
+ * EMPTY is also what a patch falls back to when its generator found no room for its points of interest
  */
-export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE" | "NONE"
+export type PatchKind = "CASTLE" | "EMPTY" | "DUNGEON" | "TREASURE" | "TEMPLE"
 
 /**
  * Kinds the game rules set instead of the natural kind of a patch by patch key, see wantedKind()
