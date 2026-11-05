@@ -225,6 +225,10 @@ export interface Meeple
      * Holds the items readied. Acting readies them as well.
      */
     ready?: boolean
+    /**
+     * Walks or stands no matter what the crowd does
+     */
+    walking?: boolean
 }
 
 
@@ -688,11 +692,43 @@ export default class MeepleCrowd
         this.blinkDuration.push(blinkDuration())
 
         // only the new meeple's colors, rewriting all of them on every add makes building a crowd quadratic
-        const { look } = meeple
+        this.paint(meeple, i)
+        this.body.count = this.head.count = this.eyes.count = i + 1
+    }
+
+    /**
+     * Takes a meeple out of the crowd
+     */
+    remove(meeple: Meeple): void
+    {
+        const i = this.meeples.indexOf(meeple)
+        if (i < 0)
+        {
+            return
+        }
+        for (const list of [this.meeples, this.attention, this.itemStates, this.nextBlink, this.blinkDuration])
+        {
+            list.splice(i, 1)
+        }
+
+        // instance colors go by index and hair is packed per style, so all of it moves
+        for (const hair of this.hair.values())
+        {
+            hair.count = 0
+        }
+        this.meeples.forEach((other, index) => this.paint(other, index))
+        this.body.count = this.head.count = this.eyes.count = this.meeples.length
+    }
+
+    /**
+     * Sets the colors of the meeple at the given index, which has to come after those of all meeples before it for the
+     * hair
+     */
+    private paint({ look }: Meeple, i: number): void
+    {
         this.body.setColorAt(i, look.shirt)
         this.head.setColorAt(i, look.skin)
         this.eyes.setColorAt(i, look.skin)
-        this.body.count = this.head.count = this.eyes.count = i + 1
         this.body.instanceColor!.needsUpdate = true
         this.head.instanceColor!.needsUpdate = true
         this.eyes.instanceColor!.needsUpdate = true
@@ -756,7 +792,7 @@ export default class MeepleCrowd
             const { position, look, phase, gait } = meeple
 
             let bounce = 0, stretch = 1, roll = 0, swing = 0
-            if (this.walking)
+            if (meeple.walking ?? this.walking)
             {
                 // the body is highest and rocked furthest over the foot it stands on
                 const speed = WALK_SPEED * walkSpeedMultiplier(meeple)
