@@ -50,7 +50,8 @@ export default defineConfig(({ mode }) => {
                     meeple: resolve(import.meta.dirname, "meeple.html"),
                     world: resolve(import.meta.dirname, "world.html"),
                     path: resolve(import.meta.dirname, "path.html"),
-                    map: resolve(import.meta.dirname, "map.html")
+                    map: resolve(import.meta.dirname, "map.html"),
+                    dungeon: resolve(import.meta.dirname, "dungeon.html")
                 }
             }
         },

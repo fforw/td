@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🏰 ⚔️ 🛡️ dungeon</title>
+    <style>
+        #ui
+        {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            max-width: calc(100vw - 16px);
+            box-sizing: border-box;
+            padding: 8px;
+            background: #000c;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+<canvas id="screen">
+    <p>
+        Your browser has no support for canvas elements.
+    </p>
+</canvas>
+<div id="ui"></div>
+<div id="footer">
+    <a href="3d.html">3D</a>
+    <a href="world.html">world</a>
+    <a class="github" href="https://github.com/fforw/td">github</a>
+</div>
+<script type="module" src="/src/dungeonTest.ts"></script>
+</body>
+</html>
