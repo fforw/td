@@ -226,7 +226,7 @@ export default class CastleScene
         const slot = world.add(patch)
 
         const group = new Group()
-        createModels(patch).forEach(obj => group.add(obj))
+        createModels(patch, pois).forEach(obj => group.add(obj))
         const plan = pois[0]?.plan
         if (plan)
         {

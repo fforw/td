@@ -141,7 +141,7 @@ function addPatch(key: string, { patch, pois }: GeneratedPatch): void
     const slot = world.add(patch)
     const group = new Group()
     // patches of water or snow have no models, and add() complains about being called without objects
-    createModels(patch).forEach(obj => group.add(obj))
+    createModels(patch, pois).forEach(obj => group.add(obj))
     const plan = pois[0]?.plan
     if (plan)
     {

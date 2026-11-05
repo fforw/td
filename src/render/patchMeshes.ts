@@ -11,6 +11,7 @@ import {
 } from "three"
 import { FaceType } from "../map/geometry"
 import { marchingSquaresPatch } from "../map/marchingSquares"
+import type { PointOfInterest } from "../map/patchGenerators"
 import type PatchWorld from "../map/PatchWorld"
 import type { QuadPatch } from "../map/QuadPatch"
 import { patchSeed } from "../math/random"
@@ -31,6 +32,11 @@ const FACE_MODELS = new Map<FaceType, { names: ModelName[], scale: [number, numb
     [FaceType.ROCK, { names: ["rock", "rock2", "rock3"], scale: [1, 1] }],
 ])
 
+/**
+ * Size of the model that stands in for the way into a sub-level
+ */
+const ENTRANCE_SCALE = 1
+
 
 
 /**
@@ -49,10 +55,46 @@ function faceRandom(patch: QuadPatch, face: number): () => number
 }
 
 
-export function createModels(patch: QuadPatch): InstancedMesh[]
+/**
+ * Returns the transformation of the model for an entrance on a face. The doorway model is half a unit thick on its
+ * negative x-side, has its battlements on that side and runs along its local z-axis. It stands in the middle of the
+ * face with its battlements towards the half edge of the entrance.
+ */
+export function entranceMatrix({ positions, vertex }: QuadPatch, entrance: number): Matrix4
+{
+    const face = entrance >> 2
+    let x = 0
+    let z = 0
+    for (let h = face * 4; h < face * 4 + 4; h++)
+    {
+        x += positions[vertex[h] * 3] / 4
+        z += positions[vertex[h] * 3 + 1] / 4
+    }
+
+    const next = face * 4 + (entrance + 1) % 4
+    const dx = (positions[vertex[entrance] * 3] + positions[vertex[next] * 3]) / 2 - x
+    const dz = (positions[vertex[entrance] * 3 + 1] + positions[vertex[next] * 3 + 1]) / 2 - z
+    const length = Math.hypot(dx, dz)
+    const shift = -0.25 * ENTRANCE_SCALE / SCALE / length
+
+    return new Matrix4().compose(
+        new Vector3((x + dx * shift) * SCALE, 0, (z + dz * shift) * SCALE),
+        new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.atan2(-dz, dx) + Math.PI),
+        new Vector3().setScalar(ENTRANCE_SCALE)
+    )
+}
+
+
+export function createModels(patch: QuadPatch, pois: readonly PointOfInterest[]): InstancedMesh[]
 {
     const { positions, vertex, faceType } = patch
     const matrices = new Map<ModelName, Matrix4[]>()
+
+    const entrances = pois.flatMap(({ entrance }) => entrance === undefined ? [] : [entranceMatrix(patch, entrance)])
+    if (entrances.length > 0)
+    {
+        matrices.set("gateway", entrances)
+    }
 
     const pos = new Vector3()
     const rotation = new Quaternion()

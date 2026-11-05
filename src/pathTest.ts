@@ -206,7 +206,7 @@ function show(entry: LoadedPatch): void
     if (!ground)
     {
         // patches of water or snow have no models, and add() complains about being called without objects
-        createModels(built.patch).forEach(obj => group.add(obj))
+        createModels(built.patch, built.pois).forEach(obj => group.add(obj))
         const plan = built.pois[0]?.plan
         if (plan)
         {
