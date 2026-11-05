@@ -348,6 +348,174 @@ export function unpackPath(world: PatchWorld, packed: Int32Array): number[]
 
 
 /**
+ * How far portals between the faces of a path stay away from their corners, as a share of their length. It keeps the
+ * way from grazing what stands next to it.
+ */
+const PORTAL_MARGIN = 0.25
+
+
+/**
+ * Point in map units
+ */
+type Point = readonly [number, number]
+
+
+function faceCenter(world: PatchWorld, face: number): Point
+{
+    const position = [0, 0, 0]
+    let x = 0, y = 0
+    for (let i = 0; i < 4; i++)
+    {
+        world.position(face * 4 + i, position)
+        x += position[0] / 4
+        y += position[1] / 4
+    }
+    return [x, y]
+}
+
+
+function cross(ax: number, ay: number, bx: number, by: number): number
+{
+    return ax * by - ay * bx
+}
+
+
+/**
+ * Returns the shared edge of two neighboring faces, as seen going from the first to the second one: its left and right
+ * end moved inward by the margin.
+ */
+function portal(world: PatchWorld, from: number, to: number, margin: number): [Point, Point]
+{
+    const [fromX, fromY] = faceCenter(world, from)
+    const [toX, toY] = faceCenter(world, to)
+    for (let i = 0; i < 4; i++)
+    {
+        const h = from * 4 + i
+        if (world.twin(h) >> 2 === to && EDGE_COSTS[world.edgeType(h)] !== Infinity)
+        {
+            const a = [0, 0, 0]
+            const b = [0, 0, 0]
+            world.position(h, a)
+            world.position(from * 4 + (i + 1) % 4, b)
+
+            const dirX = toX - fromX
+            const dirY = toY - fromY
+            const [leftX, leftY, rightX, rightY] = cross(dirX, dirY, a[0] - fromX, a[1] - fromY) > cross(dirX, dirY, b[0] - fromX, b[1] - fromY)
+                ? [a[0], a[1], b[0], b[1]]
+                : [b[0], b[1], a[0], a[1]]
+            const dx = rightX - leftX
+            const dy = rightY - leftY
+            return [
+                [leftX + dx * margin, leftY + dy * margin],
+                [rightX - dx * margin, rightY - dy * margin]
+            ]
+        }
+    }
+    throw new Error("No way from face " + from + " to " + to)
+}
+
+
+/**
+ * Returns the shortest way through the faces of a path, from the middle of the first to the middle of the last one. It
+ * pulls the path taut like a string inside its faces with the funnel algorithm, so it cuts the stairs a path over a grid
+ * of faces is made of without ever leaving those faces.
+ *
+ * @param world     connected patches
+ * @param faces     global ids of the faces on the path
+ * @param margin    how far to stay away from the corners of the faces, as a share of the edges between them
+ *
+ * @return x and y in map units for each point of the way
+ */
+export function tautPath(world: PatchWorld, faces: readonly number[], margin = PORTAL_MARGIN): number[]
+{
+    if (faces.length === 0)
+    {
+        return []
+    }
+    const end = faceCenter(world, faces[faces.length - 1])
+    const portals: [Point, Point][] = []
+    for (let i = 0; i + 1 < faces.length; i++)
+    {
+        portals.push(portal(world, faces[i], faces[i + 1], margin))
+    }
+    portals.push([end, end])
+
+    let apex = faceCenter(world, faces[0])
+    const way = [apex[0], apex[1]]
+    let left = apex, right = apex
+    let leftIndex = 0, rightIndex = 0
+
+    // how the given point lies to a side of the funnel, positive for left of it
+    const side = (edge: Point, point: Point) => cross(edge[0] - apex[0], edge[1] - apex[1], point[0] - apex[0], point[1] - apex[1])
+
+    for (let i = 0; i < portals.length; i++)
+    {
+        const [nextLeft, nextRight] = portals[i]
+
+        if (side(right, nextRight) >= 0)
+        {
+            if (apex === right || side(left, nextRight) < 0)
+            {
+                right = nextRight
+                rightIndex = i
+            }
+            else
+            {
+                // the right side crossed the left one, so the way bends around the corner on the left
+                way.push(left[0], left[1])
+                apex = right = left
+                i = rightIndex = leftIndex
+                continue
+            }
+        }
+
+        if (side(left, nextLeft) <= 0)
+        {
+            if (apex === left || side(right, nextLeft) > 0)
+            {
+                left = nextLeft
+                leftIndex = i
+            }
+            else
+            {
+                way.push(right[0], right[1])
+                apex = left = right
+                i = leftIndex = rightIndex
+            }
+        }
+    }
+    way.push(end[0], end[1])
+    return way
+}
+
+
+/**
+ * Returns a way that ends the given distance before the end of the given way, or just its start if it isn't that long.
+ *
+ * @param way       x and y in map units for each point
+ * @param distance  distance in map units
+ */
+export function stopShort(way: readonly number[], distance: number): number[]
+{
+    let left = distance
+    for (let i = way.length - 2; i >= 2; i -= 2)
+    {
+        const dx = way[i] - way[i - 2]
+        const dy = way[i + 1] - way[i - 1]
+        const length = Math.hypot(dx, dy)
+        if (length > left)
+        {
+            const t = left / length
+            return [...way.slice(0, i), way[i] - dx * t, way[i + 1] - dy * t]
+        }
+        left -= length
+    }
+    return way.slice(0, 2)
+}
+
+
+
+/**
  * Faces of a patch that are connected to each other and to the border of the patch
  */
 export interface BorderPart

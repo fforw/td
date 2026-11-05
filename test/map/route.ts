@@ -16,6 +16,8 @@ import {
     findRoute,
     globalFace,
     packPath,
+    stopShort,
+    tautPath,
     unpackPath
 } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
@@ -267,6 +269,130 @@ function seamEdge()
     const h = twin.findIndex((_, i) => twin[i] < 0 && world.twin((a << SLOT_SHIFT) | i) >= 0)
     return { world, a, b, edge: (a << SLOT_SHIFT) | h }
 }
+
+
+describe("Taut paths", () => {
+
+    function pathLength(way: number[]): number
+    {
+        let length = 0
+        for (let i = 2; i < way.length; i += 2)
+        {
+            length += Math.hypot(way[i] - way[i - 2], way[i + 1] - way[i - 1])
+        }
+        return length
+    }
+
+    function center(world: PatchWorld, face: number): [number, number]
+    {
+        return [0, 1, 2, 3].reduce<[number, number]>((sum, i) => {
+            const position = [0, 0, 0]
+            world.position(face * 4 + i, position)
+            return [sum[0] + position[0] / 4, sum[1] + position[1] / 4]
+        }, [0, 0])
+    }
+
+    function isInFace(world: PatchWorld, face: number, x: number, y: number): boolean
+    {
+        const signs = [0, 1, 2, 3].map(i => {
+            const a = [0, 0, 0]
+            const b = [0, 0, 0]
+            world.position(face * 4 + i, a)
+            world.position(face * 4 + (i + 1) % 4, b)
+            return (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0])
+        })
+        return signs.every(s => s >= -1e-6) || signs.every(s => s <= 1e-6)
+    }
+
+    /**
+     * Returns the route across two grass patches with some forest in between
+     */
+    function route()
+    {
+        const world = new PatchWorld()
+        const home = world.add(plainPatch(0, 0, GRASS))
+        const other = world.add(plainPatch(1, 0, GRASS))
+        const start = globalFace(home, innerFace(world.getPatch(home)))
+        const goal = innerFace(world.getPatch(other))
+        const { paths } = findRoute(world, start, other, [goal], [home])
+        return { world, path: paths[0] }
+    }
+
+    it("starts and ends in the middle of the first and last face", () => {
+
+        const { world, path } = route()
+        const way = tautPath(world, path)
+        const first = center(world, path[0])
+        const last = center(world, path[path.length - 1])
+        assert.closeTo(way[0], first[0], 1e-9)
+        assert.closeTo(way[1], first[1], 1e-9)
+        assert.closeTo(way[way.length - 2], last[0], 1e-9)
+        assert.closeTo(way[way.length - 1], last[1], 1e-9)
+    })
+
+    it("is shorter than going from face to face, with far fewer points", () => {
+
+        const { world, path } = route()
+        const stairs = path.flatMap(face => center(world, face))
+        const way = tautPath(world, path)
+        assert(pathLength(way) < pathLength(stairs))
+        assert(way.length < stairs.length)
+    })
+
+    it("never leaves the faces of the path", () => {
+
+        const { world, path } = route()
+        const way = tautPath(world, path)
+        for (let i = 2; i < way.length; i += 2)
+        {
+            for (let t = 0; t <= 1; t += 0.02)
+            {
+                const x = way[i - 2] + (way[i] - way[i - 2]) * t
+                const y = way[i - 1] + (way[i + 1] - way[i - 1]) * t
+                assert(path.some(face => isInFace(world, face, x, y)), x + "/" + y)
+            }
+        }
+    })
+
+    it("never leaves the faces of a path on generated land", () => {
+
+        for (const seed of [4711, 99, 7])
+        {
+            const world = new PatchWorld()
+            const castle = generatePatch(0, 0, seed, FACE_SIZE, "CASTLE")
+            const home = world.add(castle.patch)
+            const other = world.add(generatePatch(PATCH_SIZE, 0, seed, FACE_SIZE, "TEMPLE").patch)
+            const { paths } = findRoute(world, globalFace(home, castle.pois[0].face), other, [], [home])
+            const [path] = paths
+            const way = tautPath(world, path)
+            for (let i = 2; i < way.length; i += 2)
+            {
+                for (let t = 0; t <= 1; t += 0.02)
+                {
+                    const x = way[i - 2] + (way[i] - way[i - 2]) * t
+                    const y = way[i - 1] + (way[i + 1] - way[i - 1]) * t
+                    assert(path.some(face => isInFace(world, face, x, y)), seed + ": " + x + "/" + y)
+                }
+            }
+        }
+    })
+
+    it("handles a path of one face", () => {
+
+        const { world, path } = route()
+        const way = tautPath(world, path.slice(0, 1))
+        assert(pathLength(way) === 0)
+        assert.deepEqual(tautPath(world, []), [])
+    })
+
+    it("stops short of the end", () => {
+
+        assert.deepEqual(stopShort([0, 0, 10, 0, 10, 10], 5), [0, 0, 10, 0, 10, 5])
+        assert.deepEqual(stopShort([0, 0, 10, 0, 10, 10], 15), [0, 0, 5, 0])
+        assert.deepEqual(stopShort([0, 0, 10, 0], 50), [0, 0])
+        assert.deepEqual(stopShort([0, 0], 5), [0, 0])
+    })
+})
 
 
 describe("Edge types", () => {
