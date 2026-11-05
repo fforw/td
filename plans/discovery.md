@@ -575,7 +575,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   NONE and draws nothing. Thick walls are the wall ground of marching
   squares raised to wall height, wall edges are thin walls that reach a
   little past their ends and run into each other, without any columns
-  (`render/dungeonMeshes.ts`). Thin walls are scaled cubes for now. The
+  (`render/dungeonMeshes.ts`). Thin walls are scaled cubes for now. Where
+  more than two meet, or two at a tight angle, the corners of faces between
+  them are rounded. Tight corners also get a flat outer side. The
   floor wins the contested samples in levels (`LEVEL_PRIORITY`), the other
   way around than on the overworld, or walls would spread into the floor.
 - Four quads around a vertex aren't a classification, 77% of the vertices
