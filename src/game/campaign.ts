@@ -128,11 +128,13 @@ export interface Hero
 
 /**
  * Journey of a hero to a point of interest on a known patch, over known patches only. Once there, the hero waits outside
- * for the order to enter.
+ * for the order to enter, or to come back without having done so.
  */
 export interface Job extends Journey
 {
     heroId: number
+    /** walking back to the castle, with the days and the way being the ones of that */
+    returning?: boolean
 }
 
 /**

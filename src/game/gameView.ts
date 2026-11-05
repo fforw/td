@@ -10,7 +10,7 @@ import {
     type PatchKind,
     type PatchNode
 } from "./campaign"
-import { enterJob, hasArrived, isAway, jobDays, startJob } from "./heroes"
+import { enterJob, hasArrived, isAway, jobDays, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
 import { dayMarks } from "./journey"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
@@ -304,9 +304,23 @@ export default class GameView
 
         advanceDay(campaign)
 
-        for (const { heroId, target } of arriving)
+        for (const { heroId, target, returning } of arriving)
         {
             const hero = campaign.heroes.find(h => h.id === heroId)!
+            if (returning)
+            {
+                const result = hero.name + " is back at " + campaign.castleName
+                this.reports.unshift("Day " + campaign.day + ": " + result)
+                if (heroId === following)
+                {
+                    this.follow(null)
+                }
+                else
+                {
+                    this.news.unshift("🛡️ " + result)
+                }
+                continue
+            }
             const { kind } = patches[target]
             this.reports.unshift(
                 "Day " + campaign.day + ": " + hero.name + " got to " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
@@ -345,6 +359,12 @@ export default class GameView
         this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
         this.store.save(campaign)
         this.follow(null)
+    }
+
+    private sendHome({ heroId }: Job): void
+    {
+        returnHome(this.campaign, heroId)
+        this.changed()
     }
 
     private sendHero(route: MissionRoute): void
@@ -439,17 +459,17 @@ export default class GameView
     {
         const { campaign, finished } = this
         const { seed, day } = campaign
-        const walker = (id: number, speed: number, journey: Journey): Walker[] => {
+        const walker = (id: number, speed: number, journey: Journey, homeward = false): Walker[] => {
             if (!journey.way)
             {
                 return []
             }
             const [reached, next] = dayMarks(journey, day)
-            return [{ id, look: meepleSitter(seed, id).look, gait: gaitOf(id), way: journey.way, speed, reached, next }]
+            return [{ id, look: meepleSitter(seed, id).look, gait: gaitOf(id), way: journey.way, speed, reached, next, homeward }]
         }
         return [
             ...campaign.missions.flatMap(m => walker(m.explorer.id, m.explorer.speed, m)),
-            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, j)),
+            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, j, j.returning)),
             ...(finished ? walker(finished.explorer.id, finished.explorer.speed, finished) : [])
         ]
     }
@@ -668,7 +688,19 @@ export default class GameView
 
     private jobStatus(job: Job): string
     {
-        return hasArrived(this.campaign, job) ? "waits to enter" : "gets there in " + (job.endDay - this.campaign.day) + "d"
+        const days = job.endDay - this.campaign.day
+        return hasArrived(this.campaign, job) ? "waits to enter" : (job.returning ? "home in " : "gets there in ") + days + "d"
+    }
+
+    /**
+     * Returns the orders for a hero who got to the target of their job
+     */
+    private renderOrders(job: Job): HTMLElement[]
+    {
+        return [
+            el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter"),
+            el("button", { type: "button", onclick: () => this.sendHome(job) }, "Return to " + this.campaign.castleName)
+        ]
     }
 
     /**
@@ -709,7 +741,8 @@ export default class GameView
                 !!way
             )),
             ...campaign.jobs.map(job => this.renderTarget(
-                "🛡️ " + campaign.heroes.find(h => h.id === job.heroId)!.name + " → " + job.target + ", " + this.jobStatus(job),
+                "🛡️ " + campaign.heroes.find(h => h.id === job.heroId)!.name + " → " +
+                    (job.returning ? campaign.castleName : job.target) + ", " + this.jobStatus(job),
                 job.heroId,
                 !!job.way
             ))
@@ -742,11 +775,10 @@ export default class GameView
         const { kind } = overworld(campaign).patches[job.target]
         const place = KIND_ICONS[kind] + " " + KIND_NAMES[kind]
         return hasArrived(campaign, job)
-            ? el("div", { className: "notice followed" },
-                "🛡️ " + name + " is at " + place,
-                el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter")
+            ? el("div", { className: "notice followed" }, "🛡️ " + name + " is at " + place, ...this.renderOrders(job))
+            : el("div", { className: "notice followed" },
+                "🛡️ " + name + " → " + (job.returning ? "🏰 " + campaign.castleName : place) + ", " + this.jobStatus(job)
             )
-            : el("div", { className: "notice followed" }, "🛡️ " + name + " → " + place + ", gets there in " + (job.endDay - campaign.day) + "d")
     }
 
     /**
@@ -763,9 +795,9 @@ export default class GameView
                 const text = "🛡️ " + name + " is at " + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
                 return el("div", { className: "notice" },
                     text,
-                    castle && job.way
-                        ? el("button", { type: "button", onclick: () => this.follow(job.heroId) }, "Go there")
-                        : el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter")
+                    ...castle && job.way
+                        ? [el("button", { type: "button", onclick: () => this.follow(job.heroId) }, "Go there")]
+                        : this.renderOrders(job)
                 )
             })
     }

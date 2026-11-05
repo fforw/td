@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { enterJob, hasArrived, isAway, jobDays, startJob } from "../../src/game/heroes"
+import { enterJob, hasArrived, isAway, jobDays, returnHome, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
@@ -316,6 +316,54 @@ describe("Heroes", () => {
         }
         assert(error !== null)
         assert(isAway(campaign, hero))
+    })
+
+    it("has a hero walk back home without entering, learning nothing", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        const days = jobDays("1/0")
+        startJob(campaign, hero.id, "1/0", { reachable: true, way: [0, 0, 5, 5, 9, 5] })
+        const [job] = campaign.jobs
+        for (let i = 0; i < days; i++)
+        {
+            advanceDay(campaign)
+        }
+
+        const back = campaign.day + days
+        returnHome(campaign, hero.id)
+        assert(job.returning)
+        assert(job.startDay === campaign.day)
+        assert(job.endDay === back)
+        assert.deepEqual(job.way, [9, 5, 5, 5, 0, 0])
+
+        for (let i = 1; i < days; i++)
+        {
+            advanceDay(campaign)
+            assert(isAway(campaign, hero))
+            assert(!hasArrived(campaign, job))
+        }
+        advanceDay(campaign)
+        assert(!isAway(campaign, hero))
+        assert.equal(hero.experience, 0)
+    })
+
+    it("can't return before getting there", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        startJob(campaign, hero.id, "1/0")
+        let error: Error | null = null
+        try
+        {
+            returnHome(campaign, hero.id)
+        }
+        catch (e)
+        {
+            error = e as Error
+        }
+        assert(error !== null)
+        assert(!campaign.jobs[0].returning)
     })
 
     it("keeps the way of a job", () => {

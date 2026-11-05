@@ -1,7 +1,7 @@
 import { assert, describe, it, vi } from "vitest"
 
 import { type Campaign, createCampaign, overworld } from "../../src/game/campaign"
-import { startJob } from "../../src/game/heroes"
+import { returnHome, startJob } from "../../src/game/heroes"
 import { borderArrow, fitSheet, mapContent, type MapMarker, PATCH_DEPTH, PATCH_WIDTH, patchArea, patchCenter } from "../../src/game/mapContent"
 import { advanceDay, type MissionRoute, startMission } from "../../src/game/missions"
 import { generatePatch } from "../../src/map/generatePatch"
@@ -91,6 +91,17 @@ describe("Map content", () => {
 
         const away = marker(campaign, poi.key)
         assert(away?.type === "poi" && away.days === campaign.jobs[0].endDay - campaign.day)
+    })
+
+    it("frees a point of interest for another hero once the hero there returns", () => {
+        const campaign = createCampaign(SEED)
+        const poi = mapContent(campaign).markers.find(m => m.type === "poi")!
+        startJob(campaign, campaign.heroes[0].id, poi.key)
+        campaign.day = campaign.jobs[0].endDay
+        returnHome(campaign, campaign.heroes[0].id)
+
+        const free = marker(campaign, poi.key)
+        assert(free?.type === "poi" && free.days === undefined)
     })
 
     it("shows the days of an explorer on the way instead of a target", () => {

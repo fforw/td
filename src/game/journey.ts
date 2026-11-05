@@ -34,6 +34,22 @@ export function dayMarks({ startDay, endDay }: Pick<Journey, "startDay" | "endDa
 
 
 /**
+ * Returns the given way walked the other way around
+ *
+ * @param way       x and y in map units for each point
+ */
+export function reverseWay(way: readonly number[]): number[]
+{
+    const reversed: number[] = []
+    for (let i = way.length - 2; i >= 0; i -= 2)
+    {
+        reversed.push(way[i], way[i + 1])
+    }
+    return reversed
+}
+
+
+/**
  * Someone walking along a way
  */
 export class Walk

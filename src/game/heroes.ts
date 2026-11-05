@@ -2,6 +2,7 @@ import { patchSeed, withSeed } from "../math/random"
 import { randomCharacter } from "../meeple/character"
 import { meepleNameGenerator } from "../meeple/nameGenerator"
 import { type Campaign, type Hero, type Job, overworld } from "./campaign"
+import { reverseWay } from "./journey"
 import { type MissionRoute, travelDays } from "./missions"
 
 /**
@@ -119,4 +120,25 @@ export function enterJob(campaign: Campaign, heroId: number): void
     }
     campaign.heroes.find(h => h.id === heroId)!.experience++
     campaign.jobs = campaign.jobs.filter(j => j !== job)
+}
+
+
+/**
+ * Has a hero who got to the target of their job walk back to the castle without entering it, which takes as long as
+ * getting there did. The hero is home and learned nothing once the days are up.
+ */
+export function returnHome(campaign: Campaign, heroId: number): void
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job || !hasArrived(campaign, job))
+    {
+        throw new Error("Hero " + heroId + " isn't at a target")
+    }
+    job.returning = true
+    job.startDay = campaign.day
+    job.endDay = campaign.day + jobDays(job.target)
+    if (job.way)
+    {
+        job.way = reverseWay(job.way)
+    }
 }

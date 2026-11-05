@@ -156,6 +156,8 @@ export interface Walker
     reached: number
     /** share of the way to wait at until the next day */
     next: number
+    /** on the way back to the castle, where only the last day of it can be seen */
+    homeward: boolean
 }
 
 interface ShownWalker
@@ -366,7 +368,7 @@ export default class CastleScene
                     visible: false,
                     followed: false,
                     held: walker.reached,
-                    wait: walker.reached > 0 ? 0 : DEPARTURE_DELAY
+                    wait: walker.reached > 0 || walker.homeward ? 0 : DEPARTURE_DELAY
                 })
             }
         }
@@ -391,7 +393,8 @@ export default class CastleScene
 
     /**
      * Lets everyone on a journey walk on. Someone followed walks as far as the days allow and ends the day at the next
-     * mark. Anyone else just gets seen leaving the castle, days don't matter until someone goes after them.
+     * mark. Anyone else just gets seen leaving the castle, days don't matter until someone goes after them. Someone
+     * coming back can't show up before their last day, so they keep to the days out of sight, too.
      */
     private updateWalkers(time: number, delta: number): void
     {
@@ -399,7 +402,7 @@ export default class CastleScene
         for (const entry of this.shown.values())
         {
             const { walker, walk, meeple } = entry
-            const { reached, next, speed } = walker
+            const { reached, next, speed, homeward } = walker
             const followed = walker.id === this.followed
             if (followed !== entry.followed)
             {
@@ -422,7 +425,7 @@ export default class CastleScene
             // ending the day is no reason to stand around any longer
             entry.wait = reached > 0 ? 0 : Math.max(0, entry.wait - delta)
             const step = entry.wait > 0 ? 0 : JOURNEY_SPEED * speed * delta / SCALE
-            meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, 1)
+            meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, homeward ? next : 1)
             walk.position(walkPosition)
             meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
             if (meeple.walking)
@@ -433,7 +436,8 @@ export default class CastleScene
             }
             dayOver ||= followed && next > reached && walk.length > 0 && walk.isAt(next)
 
-            const visible = followed || (!walk.isAt(1) && meeple.position.distanceTo(this.home) <= LEAVE_RADIUS)
+            const visible = followed ||
+                (!walk.isAt(1) && meeple.position.distanceTo(this.home) <= LEAVE_RADIUS && (!homeward || next >= 1))
             if (visible !== entry.visible)
             {
                 entry.visible = visible

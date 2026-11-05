@@ -182,6 +182,7 @@ export function advanceDay(campaign: Campaign): void
 
     const due = campaign.missions.filter(m => m.endDay <= day)
     campaign.missions = campaign.missions.filter(m => m.endDay > day)
+    campaign.jobs = campaign.jobs.filter(j => !j.returning || j.endDay > day)
 
     updateTavern(campaign)
 

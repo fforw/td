@@ -156,7 +156,7 @@ export function mapContent(campaign: Campaign): MapContent
         }
         else if (kind !== "EMPTY" && jobs.includes(key))
         {
-            const job = campaign.jobs.find(j => j.target === key)
+            const job = campaign.jobs.find(j => j.target === key && !j.returning)
             markers.push({ key, q, r, type: "poi", kind, ...(job ? { days: Math.max(0, job.endDay - campaign.day) } : {}) })
         }
     }
