@@ -571,6 +571,11 @@ Glyphs are built from the stroke data of a source kanji per concept
   and wall edges separate everything that touches, so corridors stay one
   face wide with rooms right next to them. Irregular vertices end up in the
   floors.
+- Faces next to floor are `FaceType.WALL`, everything behind them stays
+  NONE and draws nothing. Thick walls are the wall ground of marching
+  squares raised to wall height, wall edges are thin walls that reach a
+  little past their ends and run into each other, without any columns
+  (`render/dungeonMeshes.ts`). Thin walls are scaled cubes for now.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
