@@ -4,7 +4,7 @@ import { findRegions, growRooms, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
-import { faceCount, packPatch, type QuadPatch } from "./QuadPatch"
+import { faceCount, faceOf, packPatch, type QuadPatch } from "./QuadPatch"
 
 
 /**
@@ -91,8 +91,9 @@ export interface DungeonLevel
 
 
 /**
- * Generates a dungeon level. All faces start out as NONE, so only what the dungeon sets gets drawn, which so far is the
- * floor of its rooms and corridors. The same seed and size always give the same level.
+ * Generates a dungeon level. All faces start out as NONE, so only what the dungeon sets gets drawn: the floor of its rooms
+ * and corridors and the thick walls around it, which are the faces next to the floor. Where floor touches floor, wall
+ * edges separate it. The same seed and size always give the same level.
  *
  * @param seed      seed of the level
  * @param size      hexagon size in map units
@@ -140,9 +141,23 @@ export function generateDungeon(
     )
     setLevelEdges(world, rooms, corridors)
 
-    for (const face of [...rooms.flat(), ...corridorFaces])
+    const floor = [...rooms.flat(), ...corridorFaces]
+    const setFaceType = (face: number, type: FaceType) => {
+        patches[face >> (SLOT_SHIFT - 2)].faceType[face & (LOCAL_MASK >> 2)] = type.index
+    }
+    floor.forEach(face => setFaceType(face, FaceType.PAVED))
+
+    // floor stays off the outer edge of the level, so all of its half edges have a twin
+    for (const face of floor)
     {
-        patches[face >> (SLOT_SHIFT - 2)].faceType[face & (LOCAL_MASK >> 2)] = FaceType.PAVED.index
+        for (let h = face * 4; h < face * 4 + 4; h++)
+        {
+            const other = faceOf(world.twin(h))
+            if (world.faceType(other) === FaceType.NONE.index)
+            {
+                setFaceType(other, FaceType.WALL)
+            }
+        }
     }
     return { patches, regions, rooms, corridors }
 }

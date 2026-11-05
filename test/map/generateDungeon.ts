@@ -78,11 +78,24 @@ describe("generateDungeon", () => {
         }
     })
 
-    it("only sets the faces of its rooms and corridors", () => {
+    it("only sets the faces of its rooms and corridors and the walls next to them", () => {
         const { patches, rooms, corridors } = generateDungeon(4711, FACE_SIZE, 2, 2)
         const floor = new Set([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
+        const world = new PatchWorld()
+        patches.forEach(patch => world.add(patch))
+
+        const next = new Set<number>()
+        for (const face of floor)
+        {
+            for (let h = face * 4; h < face * 4 + 4; h++)
+            {
+                next.add(faceOf(world.twin(h)))
+            }
+        }
+
         patches.forEach((patch, slot) => patch.faceType.forEach((type, face) => {
-            const expected = floor.has(globalFace(slot, face)) ? FaceType.PAVED : FaceType.NONE
+            const id = globalFace(slot, face)
+            const expected = floor.has(id) ? FaceType.PAVED : next.has(id) ? FaceType.WALL : FaceType.NONE
             assert(type === expected.index)
         }))
     })
