@@ -193,6 +193,11 @@ All edits come from the main thread, workers never send any back.
   seams and writes face and edge types before handing the patches over.
 - A dungeon is width x height connected patches, sized per dungeon.
   Every face starts as NONE; only what the generator sets gets drawn.
+- A level has its own q/r grid in its own `PatchWorld`, nothing moves far
+  away. Its seed comes from the entrance: parent level seed, grid position
+  of the entrance patch and an index for several entrances on one patch
+  (`levelSeed`). Entrance face and patch kind stay out of it, so the level
+  doesn't change with them.
 
 ### 0.6 Campaign start
 
@@ -540,12 +545,24 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Two candidates can't share an edge, but they can touch at a corner.
   A 2 x 2 level has about 5300 faces and 200 to 240 regions, half of them
   4 faces or fewer, 52 to 58 with 12 or more, the largest 95 to 217.
-- Rooms: keep regions of about 12 faces or more, split or trim big ones
-  at their narrow necks, with a door edge where that keeps the faces, and
-  pick around 10, spaced apart and not touching at corners. Everything
-  else is wall, corridors are carved through it. Small regions along a
-  corridor can become closets or niches. The numbers are a starting
-  point; picking and carving aren't tried yet.
+- Rooms: keep regions of 8 faces or more, split or trim big ones at their
+  narrow necks, with a door edge where that keeps the faces. Pick the
+  largest ones first until 20% of the faces are floor, about 18 rooms on
+  2 x 2 patches (`map/dungeonRooms.ts`). Corridors depend on this: 38% left
+  them stubby at a median of 1 face and at most 7, 20% gives a median of 2
+  and up to 15, 10% a median of 8 and up to 38, but only 6 huge rooms.
+  They can touch at a corner, keeping them apart tops out near 22% floor.
+  Everything else is wall, corridors are carved through it. Small regions
+  along a corridor can become closets or niches. Splitting isn't tried yet.
+- Corridors are one face wide (`map/dungeonCorridors.ts`). The closest
+  room not connected yet gets a shortest way to the connected ones, which
+  makes a tree. A door at each end. They can't cross each other. Loops
+  aren't tried yet.
+- Rooms then grow into the wall around the corridors until 50% of the faces
+  are floor, one random face next to a random room at a time. Corridors
+  come first so growth can't eat them. Rooms end up sharing edges, and wall
+  edges separate everything that touches, so corridors stay one face wide
+  with rooms right next to them. Irregular vertices end up in the floors.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
