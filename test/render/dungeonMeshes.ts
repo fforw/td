@@ -6,6 +6,7 @@ import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { next, prev } from "../../src/map/QuadPatch"
 import { FACE_SIZE } from "../../src/map/scale"
 import {
+    addFlatCorner,
     addRoundedCorner,
     createThickWalls,
     createThinWallCorners,
@@ -80,39 +81,87 @@ describe("createThinWalls", () => {
             world.getPatch(slot).edgeType.forEach(type => edges += type === EdgeType.WALL.index ? 1 : 0)
         }
 
-        const walls = slots.reduce((sum, slot) => sum + createThinWalls(world, slot).count, 0)
+        const walls = createThinWalls(world, slots).count
         assert(walls > 0)
         assert(walls === edges / 2)
     })
 
-    it("stands on the edge and reaches a little past both of its ends", () => {
+    it("stands on its edge and reaches past its ends, except at tight corners", () => {
         const { world, slots } = level()
-        const slot = slots[0]
-        const { positions, vertex, edgeType } = world.getPatch(slot)
+        const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
+        assert(tight.size > 0)
 
-        let h = 0
-        while (edgeType[h] !== EdgeType.WALL.index || (slot << SLOT_SHIFT | h) > world.twin(slot << SLOT_SHIFT | h))
-        {
-            h++
-        }
-        const v0 = vertex[h] * 3
-        const v1 = vertex[next(h)] * 3
-        const from = new Vector3(positions[v0] * SCALE, 0, positions[v0 + 1] * SCALE)
-        const to = new Vector3(positions[v1] * SCALE, 0, positions[v1 + 1] * SCALE)
-
+        const mesh = createThinWalls(world, slots)
         const matrix = new Matrix4()
-        createThinWalls(world, slot).getMatrixAt(0, matrix)
+        let index = 0, ending = 0, reaching = 0
+        for (const slot of slots)
+        {
+            const { positions, vertex, edgeType } = world.getPatch(slot)
+            const base = slot << SLOT_SHIFT
+            edgeType.forEach((type, h) => {
+                if (type !== EdgeType.WALL.index || (base | h) > world.twin(base | h))
+                {
+                    return
+                }
+                const v0 = vertex[h] * 3
+                const v1 = vertex[next(h)] * 3
+                const from = new Vector3(positions[v0] * SCALE, 0, positions[v0 + 1] * SCALE)
+                const to = new Vector3(positions[v1] * SCALE, 0, positions[v1 + 1] * SCALE)
+                const direction = to.clone().sub(from).normalize()
 
-        const reach = from.distanceTo(to) / 2 + THIN_WALL_OVERLAP
-        const direction = to.clone().sub(from).normalize()
-        const end = new Vector3(0.5, -0.5, 0).applyMatrix4(matrix)
-        const expected = from.clone().add(to).multiplyScalar(0.5).addScaledVector(direction, reach)
-        assert(end.distanceTo(expected) < 1e-5)
+                const reach = (point: Vector3) => {
+                    const ends = tight.has(point.x + "," + point.z)
+                    ends ? ending++ : reaching++
+                    return ends ? 0 : THIN_WALL_OVERLAP
+                }
 
-        const center = new Vector3(0, 0, 0).applyMatrix4(matrix)
-        assert(Math.abs(center.y - THIN_WALL_HEIGHT / 2) < 1e-6)
-        const side = new Vector3(0, 0, 0.5).applyMatrix4(matrix).distanceTo(center)
-        assert(Math.abs(side - THIN_WALL_THICKNESS / 2) < 1e-6)
+                mesh.getMatrixAt(index++, matrix)
+                const end = new Vector3(0.5, -0.5, 0).applyMatrix4(matrix)
+                const start = new Vector3(-0.5, -0.5, 0).applyMatrix4(matrix)
+                assert(end.distanceTo(to.clone().addScaledVector(direction, reach(to))) < 1e-5)
+                assert(start.distanceTo(from.clone().addScaledVector(direction, -reach(from))) < 1e-5)
+
+                const center = new Vector3(0, 0, 0).applyMatrix4(matrix)
+                assert(Math.abs(center.y - THIN_WALL_HEIGHT / 2) < 1e-6)
+                const side = new Vector3(0, 0, 0.5).applyMatrix4(matrix).distanceTo(center)
+                assert(Math.abs(side - THIN_WALL_THICKNESS / 2) < 1e-6)
+            })
+        }
+        assert(ending > 0)
+        assert(reaching > 0)
+    })
+})
+
+
+describe("addFlatCorner", () => {
+
+    it("closes the outer side of the walls with a line straight across the corner", () => {
+        for (const degrees of [30, 60, 90, 120])
+        {
+            for (const flip of [1, -1])
+            {
+                const angle = degrees * Math.PI / 180
+                const dx = Math.cos(angle), dz = Math.sin(angle) * flip
+                const triangles: number[] = []
+                addFlatCorner(triangles, 0, 0, 1, 0, dx, dz)
+
+                const [cx, , cz, x0, , z0, x1, , z1] = triangles
+                assert(cx === 0 && cz === 0)
+
+                // both ends of the line are half a thickness behind the walls, opposite of the other wall
+                const side = THIN_WALL_THICKNESS / 2
+                const ends = [[x0, z0], [x1, z1]]
+                const behindFirst = ends.find(([x, z]) => Math.abs(x) < 1e-9 && Math.abs(z + side * flip) < 1e-9)
+                const behindSecond = ends.find(([x, z]) => Math.abs(x * dx + z * dz) < 1e-9 && x < 0)
+                assert(behindFirst)
+                assert(behindSecond)
+                assert(Math.abs(Math.hypot(...behindSecond!) - side) < 1e-9)
+
+                // it runs at a right angle to the middle of the corner
+                const middleX = 1 + dx, middleZ = dz
+                assert(Math.abs((x1 - x0) * middleX + (z1 - z0) * middleZ) < 1e-9)
+            }
+        }
     })
 })
 
@@ -217,7 +266,7 @@ describe("createThinWallCorners", () => {
         assert(findThinWallCorners(world, slots).length === expected)
 
         const position = createThinWallCorners(world, slots).geometry.getAttribute("position")
-        assert(position.count === expected * THIN_WALL_ROUNDING_STEPS * 9)
+        assert(position.count === (expected * THIN_WALL_ROUNDING_STEPS + tight) * 9)
     })
 
     it("gives tops facing up and sides facing away from the corner", () => {

@@ -40,8 +40,8 @@ function show({ patches }: DungeonLevel): void
 {
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
-    slots.forEach(slot => scene.add(createGround(world, slot, LEVEL_PRIORITY), createThickWalls(world, slot), createThinWalls(world, slot)))
-    scene.add(createThinWallCorners(world, slots))
+    slots.forEach(slot => scene.add(createGround(world, slot, LEVEL_PRIORITY), createThickWalls(world, slot)))
+    scene.add(createThinWalls(world, slots), createThinWallCorners(world, slots))
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const { positions } of patches)

@@ -51,7 +51,8 @@ export const THIN_WALL_ROUNDING_STEPS = 2
 const MAX_ROUNDED_ANGLE = Math.PI * 8 / 9
 
 /**
- * Corners narrower than this in radians count as tight where only two thin walls meet, and get rounded
+ * Corners narrower than this in radians count as tight where only two thin walls meet: they get rounded on the inner side
+ * and flat on the outer side.
  */
 export const TIGHT_CORNER_ANGLE = TAU * 0.375
 
@@ -133,6 +134,11 @@ export interface ThinWallCorner
     az: number
     bx: number
     bz: number
+
+    /**
+     * Whether only these two walls meet there
+     */
+    tight: boolean
 }
 
 
@@ -186,7 +192,8 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
                     ax: positions[a] * SCALE,
                     az: positions[a + 1] * SCALE,
                     bx: positions[b] * SCALE,
-                    bz: positions[b + 1] * SCALE
+                    bz: positions[b + 1] * SCALE,
+                    tight
                 })
             }
         }
@@ -196,12 +203,15 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
 
 
 /**
- * Creates the thin walls of the packed patch in the given slot of the world, one scaled cube per wall edge
+ * Creates the thin walls of a level, one scaled cube per wall edge. They reach past their ends to run into each other,
+ * except at tight corners, where createThinWallCorners() closes the outer side.
+ *
+ * @param world     world with all patches of the level
+ * @param slots     slots of the patches of the level
  */
-export function createThinWalls(world: PatchWorld, slot: number): InstancedMesh
+export function createThinWalls(world: PatchWorld, slots: readonly number[]): InstancedMesh
 {
-    const { positions, vertex, edgeType } = world.getPatch(slot)
-    const base = slot << SLOT_SHIFT
+    const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
 
     const matrices: Matrix4[] = []
     const position = new Vector3()
@@ -209,28 +219,38 @@ export function createThinWalls(world: PatchWorld, slot: number): InstancedMesh
     const scale = new Vector3()
     const up = new Vector3(0, 1, 0)
 
-    for (let h = 0; h < edgeType.length; h++)
+    for (const slot of slots)
     {
-        // both half edges have the type, the lower global id draws the wall, also on a seam
-        if (edgeType[h] !== EdgeType.WALL.index || (base | h) > world.twin(base | h))
+        const { positions, vertex, edgeType } = world.getPatch(slot)
+        const base = slot << SLOT_SHIFT
+
+        for (let h = 0; h < edgeType.length; h++)
         {
-            continue
+            // both half edges have the type, the lower global id draws the wall, also on a seam
+            if (edgeType[h] !== EdgeType.WALL.index || (base | h) > world.twin(base | h))
+            {
+                continue
+            }
+
+            const v0 = vertex[h] * 3
+            const v1 = vertex[next(h)] * 3
+            const x0 = positions[v0] * SCALE, z0 = positions[v0 + 1] * SCALE
+            const x1 = positions[v1] * SCALE, z1 = positions[v1 + 1] * SCALE
+            const reach0 = tight.has(x0 + "," + z0) ? 0 : THIN_WALL_OVERLAP
+            const reach1 = tight.has(x1 + "," + z1) ? 0 : THIN_WALL_OVERLAP
+
+            const length = Math.hypot(x1 - x0, z1 - z0)
+            const shift = (reach1 - reach0) / 2 / length
+            matrices.push(new Matrix4().compose(
+                position.set(
+                    (x0 + x1) / 2 + (x1 - x0) * shift,
+                    THIN_WALL_HEIGHT / 2,
+                    (z0 + z1) / 2 + (z1 - z0) * shift
+                ),
+                rotation.setFromAxisAngle(up, Math.atan2(z0 - z1, x1 - x0)),
+                scale.set(length + reach0 + reach1, THIN_WALL_HEIGHT, THIN_WALL_THICKNESS)
+            ))
         }
-
-        const v0 = vertex[h] * 3
-        const v1 = vertex[next(h)] * 3
-        const dx = (positions[v1] - positions[v0]) * SCALE
-        const dz = (positions[v1 + 1] - positions[v0 + 1]) * SCALE
-
-        matrices.push(new Matrix4().compose(
-            position.set(
-                (positions[v0] + positions[v1]) / 2 * SCALE,
-                THIN_WALL_HEIGHT / 2,
-                (positions[v0 + 1] + positions[v1 + 1]) / 2 * SCALE
-            ),
-            rotation.setFromAxisAngle(up, Math.atan2(-dz, dx)),
-            scale.set(Math.hypot(dx, dz) + THIN_WALL_OVERLAP * 2, THIN_WALL_HEIGHT, THIN_WALL_THICKNESS)
-        ))
     }
 
     const mesh = new InstancedMesh(thinWallGeometry, wallMaterial, matrices.length)
@@ -240,7 +260,8 @@ export function createThinWalls(world: PatchWorld, slot: number): InstancedMesh
 
 
 /**
- * Creates the rounding on the inner sides of the corners of thin walls.
+ * Creates what takes the sharp shapes out of the corners of thin walls: the rounding on their inner sides and the flat
+ * outer side of tight corners.
  *
  * @param world     world with all patches of the level
  * @param slots     slots of the patches of the level
@@ -248,9 +269,13 @@ export function createThinWalls(world: PatchWorld, slot: number): InstancedMesh
 export function createThinWallCorners(world: PatchWorld, slots: readonly number[]): Mesh
 {
     const triangles: number[] = []
-    for (const { x, z, ax, az, bx, bz } of findThinWallCorners(world, slots))
+    for (const { x, z, ax, az, bx, bz, tight } of findThinWallCorners(world, slots))
     {
         addRoundedCorner(triangles, x, z, ax, az, bx, bz)
+        if (tight)
+        {
+            addFlatCorner(triangles, x, z, ax, az, bx, bz)
+        }
     }
 
     const geometry = new BufferGeometry()
@@ -332,6 +357,39 @@ export function addRoundedCorner(
     {
         addWedge(triangles, cx, cz, curve[i][0], curve[i][1], curve[i + 1][0], curve[i + 1][1])
     }
+}
+
+
+/**
+ * Adds the flat outer side of a tight corner: walls ending at the corner leave a gap between their outer sides, which this
+ * closes with a straight line.
+ *
+ * @param triangles     receives the positions
+ * @param x             corner of the walls
+ * @param z             corner of the walls
+ * @param ax            other end of the first wall
+ * @param az            other end of the first wall
+ * @param bx            other end of the second wall
+ * @param bz            other end of the second wall
+ */
+export function addFlatCorner(
+    triangles: number[],
+    x: number, z: number,
+    ax: number, az: number,
+    bx: number, bz: number
+): void
+{
+    const aLength = Math.hypot(ax - x, az - z)
+    const bLength = Math.hypot(bx - x, bz - z)
+    const adx = (ax - x) / aLength, adz = (az - z) / aLength
+    const bdx = (bx - x) / bLength, bdz = (bz - z) / bLength
+
+    // the outer side of a wall is the one facing away from the other wall
+    const side = THIN_WALL_THICKNESS / 2
+    const aSide = adz * bdx - adx * bdz < 0 ? side : -side
+    const bSide = bdz * adx - bdx * adz < 0 ? side : -side
+
+    addWedge(triangles, x, z, x + adz * aSide, z - adx * aSide, x + bdz * bSide, z - bdx * bSide)
 }
 
 
