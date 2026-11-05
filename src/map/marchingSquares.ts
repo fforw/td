@@ -347,7 +347,7 @@ export function marchingSquaresPatch(world: PatchWorld, slot: number, cb: Triang
     const base = slot << SLOT_SHIFT
 
     const vertexTypes: (FaceType | undefined)[] = new Array(positions.length / 3)
-    const edgeType = (h: number, type: FaceType) => {
+    const packedEdgeGround = (h: number, type: FaceType) => {
         const twin = world.twin(base | h)
         return twin < 0 ? type : background(type, FaceType.byIndex(world.faceType(faceOf(twin))))
     }
@@ -383,9 +383,9 @@ export function marchingSquaresPatch(world: PatchWorld, slot: number, cb: Triang
             ys[3] = (positions[pv + 1] + positions[v + 1]) / 2
 
             ground[0] = vertexTypes[vertex[h]] ??= packedVertexGround(world, base | h)
-            ground[1] = edgeType(h, type)
+            ground[1] = packedEdgeGround(h, type)
             ground[2] = type
-            ground[3] = edgeType(p, type)
+            ground[3] = packedEdgeGround(p, type)
 
             marchCell(cb)
         }
