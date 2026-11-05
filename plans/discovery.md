@@ -351,9 +351,22 @@ Heroes do everything that happens inside a discovered patch:
 
 ### 1.4 Patch map UI
 
-- Hex map of discovered and targeted patches with their kinds.
-- Pick an explorer and a neighboring unknown patch to start a mission;
-  show running missions and their remaining days.
+- The map is a popup over the 3D view, a sheet of the manuscript map
+  (`game/mapSheet.ts`) a bit smaller than the screen. The 3D view pauses
+  while it is open. Nobody is listed on it, it only shows what's known.
+- Discovered patches are drawn in full detail, patches an explorer only
+  passed through in a raster of 128 pixels, as layers clipped to their
+  cells on the patch grid. Anything else is blank paper. Patches are cells
+  of the grid here, not their jagged shape, the wobble hides the difference.
+- Points of interest of discovered patches are the markers to click for a
+  mission of a hero, one hero per mission for now. Empty patches have
+  nothing to click, so heroes go nowhere but to points of interest.
+- The bounding rectangle of discovered and passed patches fills the sheet,
+  keeping its aspect ratio. A patch an explorer is on the way to takes up no
+  room, its marker stays on the screen. Moving the pointer to the border of a discovered patch next
+  to an unknown one shows a fat floating arrow in the gap around the map,
+  over the edge of the paper and the stopped 3D view. It opens a smaller
+  popup to hire an explorer. Running missions show their remaining days.
 
 ### 1.5 Time
 
@@ -693,8 +706,6 @@ Still to be designed: who needs what and who produces what.
 - The economy (phase 5) beyond gold: resources, facilities, and what
   buildings cost.
 - What wisdom reveals in an explorer's report, exactly.
-- Does the game run in the 3D view of `world.html` with the patch map as
-  an overlay, or is the patch map a view of its own?
 - How do heroes act inside a level: orders from the player, how time
   passes there, how fights work?
 - How are thin walls drawn where they meet at irregular vertices?
