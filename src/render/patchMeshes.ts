@@ -10,7 +10,7 @@ import {
     Vector3
 } from "three"
 import { FaceType } from "../map/geometry"
-import { marchingSquaresPatch } from "../map/marchingSquares"
+import { GROUND_PRIORITY, marchingSquaresPatch } from "../map/marchingSquares"
 import type { PointOfInterest } from "../map/patchGenerators"
 import type PatchWorld from "../map/PatchWorld"
 import type { QuadPatch } from "../map/QuadPatch"
@@ -162,7 +162,7 @@ export function createModels(patch: QuadPatch, pois: readonly PointOfInterest[])
 
 const groundMaterial = new MeshStandardMaterial({ vertexColors: true, roughness: 1 })
 
-export function createGround(world: PatchWorld, slot: number): Mesh
+export function createGround(world: PatchWorld, slot: number, priority = GROUND_PRIORITY): Mesh
 {
     const positions: number[] = []
     const colors: number[] = []
@@ -181,7 +181,7 @@ export function createGround(world: PatchWorld, slot: number): Mesh
             positions.push(x0 * SCALE, 0, z0 * SCALE, x2 * SCALE, 0, z2 * SCALE, x1 * SCALE, 0, z1 * SCALE)
         }
         colors.push(color.r, color.g, color.b, color.r, color.g, color.b, color.r, color.g, color.b)
-    })
+    }, priority)
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))

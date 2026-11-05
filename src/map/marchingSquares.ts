@@ -39,6 +39,20 @@ export const GROUND_PRIORITY: FaceType[] = [
 ]
 
 /**
+ * Ground types of a dungeon level. The floor is the background here, so it keeps all of its faces and walls stay inside of
+ * theirs, which leaves them about half a face thick between floors.
+ */
+export const LEVEL_PRIORITY: FaceType[] = [
+    FaceType.PAVED,
+    FaceType.WALL,
+]
+
+/**
+ * Priority of the running generation
+ */
+let priority = GROUND_PRIORITY
+
+/**
  * Receives a triangle of the given ground type in 2D plan coordinates. The winding is not specified.
  */
 export type TriangleCallback = (type: FaceType, x0: number, y0: number, x1: number, y1: number, x2: number, y2: number) => void
@@ -46,7 +60,7 @@ export type TriangleCallback = (type: FaceType, x0: number, y0: number, x1: numb
 function rank(type: FaceType): number
 {
     // NONE never wins a contested sample, so faces that are set keep their ground up to the end of the level
-    return type === FaceType.NONE ? GROUND_PRIORITY.length : GROUND_PRIORITY.indexOf(type)
+    return type === FaceType.NONE ? priority.length : priority.indexOf(type)
 }
 
 function background(a: FaceType, b: FaceType): FaceType
@@ -242,6 +256,7 @@ function marchCell(cb: TriangleCallback): void
  */
 export default function marchingSquares(faces: Face[], cb: TriangleCallback): void
 {
+    priority = GROUND_PRIORITY
     const vertices = vertexGround(faces)
 
     for (const face of faces)
@@ -340,9 +355,20 @@ function packedVertexGround(world: PatchWorld, h: number): FaceType
  * Creates the ground triangles for the packed patch in the given slot of the world. Edges and vertices on seams take
  * the faces of connected neighbor patches into account, so the ground of a patch has to be created again when its
  * neighbors change.
+ *
+ * @param world             world with the patch
+ * @param slot              slot of the patch
+ * @param cb                receives the triangles
+ * @param groundPriority    ground types from background to foreground
  */
-export function marchingSquaresPatch(world: PatchWorld, slot: number, cb: TriangleCallback): void
+export function marchingSquaresPatch(
+    world: PatchWorld,
+    slot: number,
+    cb: TriangleCallback,
+    groundPriority: FaceType[] = GROUND_PRIORITY
+): void
 {
+    priority = groundPriority
     const { positions, vertex, faceType } = world.getPatch(slot)
     const base = slot << SLOT_SHIFT
 

@@ -10,7 +10,7 @@ import {
     Vector3
 } from "three"
 import { EdgeType, FaceType } from "../map/geometry"
-import { marchingSquaresPatch } from "../map/marchingSquares"
+import { LEVEL_PRIORITY, marchingSquaresPatch } from "../map/marchingSquares"
 import type PatchWorld from "../map/PatchWorld"
 import { SLOT_SHIFT } from "../map/PatchWorld"
 import { next } from "../map/QuadPatch"
@@ -78,7 +78,7 @@ export function createThickWalls(world: PatchWorld, slot: number): Mesh
         addEdge(x0, z0, x1, z1)
         addEdge(x1, z1, x2, z2)
         addEdge(x2, z2, x0, z0)
-    })
+    }, LEVEL_PRIORITY)
 
     for (const [x0, z0, x1, z1] of outline.values())
     {

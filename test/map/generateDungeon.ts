@@ -3,7 +3,7 @@ import { assert, describe, it } from "vitest"
 import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import { FaceType } from "../../src/map/geometry"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
-import { marchingSquaresPatch } from "../../src/map/marchingSquares"
+import { LEVEL_PRIORITY, marchingSquaresPatch } from "../../src/map/marchingSquares"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceCount, faceOf } from "../../src/map/QuadPatch"
 import { DEFAULT_COSTS, globalFace } from "../../src/map/route"
@@ -98,6 +98,41 @@ describe("generateDungeon", () => {
             const expected = floor.has(id) ? FaceType.PAVED : next.has(id) ? FaceType.WALL : FaceType.NONE
             assert(type === expected.index)
         }))
+    })
+
+    it("leaves the floor all of its faces and the walls less than theirs", () => {
+        const { patches, rooms, corridors } = generateDungeon(4711, FACE_SIZE, 2, 2)
+        const world = new PatchWorld()
+        const slots = patches.map(patch => world.add(patch))
+
+        const area = (points: number[][]) => points.reduce((sum, [x, y], i) => {
+            const [nx, ny] = points[(i + 1) % points.length]
+            return sum + x * ny - nx * y
+        }, 0) / 2
+        const faceArea = (face: number) => {
+            const { positions, vertex } = patches[face >> (SLOT_SHIFT - 2)]
+            const local = face & ((1 << (SLOT_SHIFT - 2)) - 1)
+            return Math.abs(area([0, 1, 2, 3].map(i => {
+                const v = vertex[local * 4 + i] * 3
+                return [positions[v], positions[v + 1]]
+            })))
+        }
+
+        const areas = new Map<FaceType, number>()
+        slots.forEach(slot => marchingSquaresPatch(world, slot, (type, x0, y0, x1, y1, x2, y2) => {
+            const triangle = Math.abs(area([[x0, y0], [x1, y1], [x2, y2]]))
+            areas.set(type, (areas.get(type) ?? 0) + triangle)
+        }, LEVEL_PRIORITY))
+
+        const sum = (faces: number[]) => faces.reduce((total, face) => total + faceArea(face), 0)
+        const floor = sum([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
+        const walls = sum(slots.flatMap(slot => [...patches[slot].faceType.entries()]
+            .filter(([, type]) => type === FaceType.WALL.index)
+            .map(([face]) => globalFace(slot, face))))
+
+        // floor can also reach into wall faces at corners where it is the most common type
+        assert(areas.get(FaceType.PAVED)! > floor * 0.999)
+        assert(areas.get(FaceType.WALL)! < walls)
     })
 
     it("always gives the same level for the same seed", () => {
