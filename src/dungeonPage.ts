@@ -17,7 +17,7 @@ function sizeParam(params: URLSearchParams, name: string, fallback: number): num
 
 /**
  * Generates the level the page parameters ask for and sets up the parts of the page around it: the numbers of the level,
- * the button for a new seed.
+ * the button for a new seed and the link to the same level on the other page.
  *
  * @return generated level
  */
@@ -29,6 +29,9 @@ export function loadLevel(): Promise<DungeonLevel>
     const height = sizeParam(params, "height", DUNGEON_HEIGHT)
     const floorShare = Number(params.get("floor") ?? DEFAULT_DUNGEON_STYLE.floorShare)
     const labyrinth = Number(params.get("labyrinth") ?? DEFAULT_DUNGEON_STYLE.labyrinth)
+
+    params.set("seed", String(seed))
+    document.querySelector<HTMLAnchorElement>("#footer .same-level")!.search = params.toString()
 
     document.getElementById("new-seed")!.addEventListener("click", () => {
         params.set("seed", String(randomSeed()))

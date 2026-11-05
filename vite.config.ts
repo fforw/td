@@ -51,7 +51,8 @@ export default defineConfig(({ mode }) => {
                     world: resolve(import.meta.dirname, "world.html"),
                     path: resolve(import.meta.dirname, "path.html"),
                     map: resolve(import.meta.dirname, "map.html"),
-                    dungeon: resolve(import.meta.dirname, "dungeon.html")
+                    dungeon: resolve(import.meta.dirname, "dungeon.html"),
+                    dungeon3d: resolve(import.meta.dirname, "dungeon3d.html")
                 }
             }
         },
