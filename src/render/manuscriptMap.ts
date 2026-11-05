@@ -459,7 +459,8 @@ export default function drawOldMap(
                 throw new Error("No sprite " + style.sprite + " in the map atlas")
             }
 
-            const frame = variants[prando.nextInt(0, variants.length - 1)]
+            // the same castle whatever else is on the map
+            const frame = variants[type === FaceType.WALL ? Math.abs(seed) % variants.length : prando.nextInt(0, variants.length - 1)]
             const largest = Math.max(...variants.map(({ w, h }) => Math.max(w, h)))
             const scale = style.size * view.scale / largest
 
