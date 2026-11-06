@@ -251,6 +251,31 @@ function hitsWall({ segments, cells }: FloorWalls, x0: number, z0: number, x1: n
 
 
 /**
+ * Returns whether there is no wall on the straight line between two points
+ *
+ * @param walls     walls of the level
+ * @param x0        one point in world units
+ * @param z0        one point in world units
+ * @param x1        other point in world units
+ * @param z1        other point in world units
+ */
+export function seesAcross(walls: FloorWalls, x0: number, z0: number, x1: number, z1: number): boolean
+{
+    // steps that small can only leave out a cell of the grid in a corner, and its walls are within reach of the others
+    const steps = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / walls.radius)
+    for (let i = 0; i < steps; i++)
+    {
+        const from = i / steps, to = (i + 1) / steps
+        if (hitsWall(walls, x0 + (x1 - x0) * from, z0 + (z1 - z0) * from, x0 + (x1 - x0) * to, z0 + (z1 - z0) * to))
+        {
+            return false
+        }
+    }
+    return true
+}
+
+
+/**
  * Moves someone over the floor of a level. They slide along the walls in their way, and stay out of them by their radius.
  *
  * @param world     world with all patches of the level

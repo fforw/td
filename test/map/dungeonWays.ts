@@ -2,7 +2,7 @@ import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import { faceCenter, findWallSegments, SEGMENT_SIZE } from "../../src/map/dungeonLights"
-import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor } from "../../src/map/dungeonWays"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../../src/map/dungeonWays"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
@@ -32,6 +32,32 @@ function level(seed: number)
 
 
 describe("Ways through dungeon levels", () => {
+
+    it("sees across the floor up to the first wall", () => {
+
+        for (const seed of [1, 2, 3])
+        {
+            const { world, rooms, corridors, segments, walls } = level(seed)
+            const floor = [...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)].map(face => faceCenter(world, face))
+            let seen = 0, hidden = 0
+            for (let i = 0; i < floor.length; i += 7)
+            {
+                for (let j = 3; j < floor.length; j += 53)
+                {
+                    const [x0, z0] = floor[i], [x1, z1] = floor[j]
+                    if (Math.hypot(x1 - x0, z1 - z0) < 4)
+                    {
+                        const free = !crossesAny(segments, x0, z0, x1, z1)
+                        assert(seesAcross(walls, x0, z0, x1, z1) === free, "seed " + seed + " from " + [x0, z0] + " to " + [x1, z1])
+                        assert(seesAcross(walls, x1, z1, x0, z0) === free, "seed " + seed + " from " + [x1, z1] + " to " + [x0, z0])
+                        seen += free ? 1 : 0
+                        hidden += free ? 0 : 1
+                    }
+                }
+            }
+            assert(seen > 0 && hidden > 0)
+        }
+    })
 
     it("gets to all of the floor from the entrance", () => {
 
@@ -259,4 +285,25 @@ function clearance({ segments }: FloorWalls, x: number, z: number): number
         closest = Math.min(closest, Math.hypot(x - (x0 + t * ex), z - (z0 + t * ez)))
     }
     return closest
+}
+
+
+/**
+ * Returns whether a line crosses any wall, from whichever side
+ */
+function crossesAny(segments: Float64Array, x0: number, z0: number, x1: number, z1: number): boolean
+{
+    const dx = x1 - x0, dz = z1 - z0
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+    {
+        const ax = segments[s], az = segments[s + 1], ex = segments[s + 2] - ax, ez = segments[s + 3] - az
+        const across = dx * ez - dz * ex
+        const t = ((ax - x0) * ez - (az - z0) * ex) / across
+        const u = ((ax - x0) * dz - (az - z0) * dx) / across
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+        {
+            return true
+        }
+    }
+    return false
 }
