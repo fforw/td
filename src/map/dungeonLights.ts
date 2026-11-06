@@ -97,12 +97,6 @@ export const LIGHT_CHANNELS = 4
 export const MAX_LIGHTS = 255
 
 /**
- * Least strength of a flickering light. Placing the lights has to know, because a weaker light brings back rims that strong
- * light takes away.
- */
-export const FLICKER_MIN = 0.8
-
-/**
  * Number of sectors around a light to find the walls of a point quickly
  */
 const LIGHT_SECTORS = 128
@@ -490,7 +484,7 @@ const sampleA: LightSample = { energy: 0, x: 0, z: 0 }
 const sampleB: LightSample = { energy: 0, x: 0, z: 0 }
 
 /**
- * Returns whether there is a point where a meeple would get a rim from both lights, for any strength of flickering lights
+ * Returns whether there is a point where a meeple would get a rim from both lights
  */
 export function rimsOverlap(a: LightView, b: LightView, segments: Float64Array): boolean
 {
@@ -504,7 +498,7 @@ export function rimsOverlap(a: LightView, b: LightView, segments: Float64Array):
             if (Math.hypot(sampleA.x, sampleA.z) >= RIM_FADE_START)
             {
                 lightAt(b, segments, x, z, sampleB)
-                if (Math.hypot(sampleB.x, sampleB.z) >= RIM_FADE_START && sampleA.energy + sampleB.energy < RIM_GATE_END / FLICKER_MIN)
+                if (Math.hypot(sampleB.x, sampleB.z) >= RIM_FADE_START && sampleA.energy + sampleB.energy < RIM_GATE_END)
                 {
                     return true
                 }

@@ -5,7 +5,6 @@ import {
     castWallDistances,
     createLightView,
     findWallSegments,
-    FLICKER_MIN,
     levelBounds,
     LIGHT_CHANNELS,
     LIGHT_RADIUS,
@@ -330,7 +329,7 @@ describe("placeLights", () => {
                             lightAt(views[j], segments, x, z, b)
                             overlaps += Math.hypot(a.x, a.z) < RIM_FADE_START * 1.5 ||
                                 Math.hypot(b.x, b.z) < RIM_FADE_START * 1.5 ||
-                                (a.energy + b.energy) * FLICKER_MIN >= RIM_GATE_END ? 0 : 1
+                                a.energy + b.energy >= RIM_GATE_END ? 0 : 1
                         }
                     }
                 }

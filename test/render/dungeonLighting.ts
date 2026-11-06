@@ -1,8 +1,8 @@
 import type { WebGLRenderer } from "three"
 import { assert, describe, it } from "vitest"
 
-import { bakeLights, type DungeonLight, FLICKER_MIN } from "../../src/map/dungeonLights"
-import { createLightField, discoLights, flickerLights, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
+import { bakeLights, type DungeonLight } from "../../src/map/dungeonLights"
+import { createLightField, discoLights, FLICKER_MIN, flickerLights, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
 
 const LIGHTS: DungeonLight[] = [
     { x: 2, z: 2, color: [1, 0.5, 0], radius: 0.1, reach: 2, channel: 0 },
@@ -66,7 +66,7 @@ describe("updateLightField", () => {
 
 
 describe("flickerLights", () => {
-    it("stays within the strength the placement allows for, with every light on its own", () => {
+    it("stays within its strength, with every light on its own", () => {
         const { field, light } = createField()
         const seen = new Set<number>()
         let apart = 0

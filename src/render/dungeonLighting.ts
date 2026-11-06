@@ -27,7 +27,6 @@ import {
 } from "three"
 import {
     castWallDistances,
-    FLICKER_MIN,
     LIGHT_CHANNELS,
     LIGHT_TEXELS,
     type DungeonLight,
@@ -121,6 +120,11 @@ const HERO_TAPS = 2
  * Number of halvings to find the edge of a shadow between two directions
  */
 const HERO_EDGE_STEPS = 4
+
+/**
+ * Least strength of a flickering light
+ */
+export const FLICKER_MIN = 0.8
 
 /**
  * How fast lights flicker, in radians per second, with how much of the flicker each of the rates has. They have no common
