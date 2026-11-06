@@ -32,6 +32,7 @@ import {
     LIGHT_TEXELS,
     type DungeonLight,
     type LevelLighting,
+    NO_WALL,
     RIM_FADE_END,
     RIM_FADE_START,
     RIM_GATE_END,
@@ -230,6 +231,10 @@ const STAY_ON_SIDE = /* glsl */`
         for (int i = 0; i < 2; i++)
         {
             vec4 wall = texture2D(lightWalls, (position - lightOrigin) / lightSize);
+            if (wall.x >= ${NO_WALL.toFixed(1)})
+            {
+                break;
+            }
             vec2 along = wall.zw - wall.xy;
             vec2 offset = position - wall.xy;
             vec2 away = offset - along * clamp(dot(offset, along) / max(dot(along, along), 1e-6), 0.0, 1.0);
