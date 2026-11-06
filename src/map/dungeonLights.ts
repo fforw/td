@@ -15,8 +15,8 @@ const TAU = Math.PI * 2
  * floor always blocks the way and the shadows on the floor are right in 2D.
  *
  * The field only keeps which share of a light the walls leave at a point. The rest follows from the distance to the light, so
- * the shader works it out, which lets lights change their strength and color without baking them again. A light has one channel
- * of the field everywhere, and lights in the same channel never meet, which limits how many lights can be at a point.
+ * the GPU works it out, which lets lights change their strength and color without baking them again. A light has one channel of
+ * the field everywhere, and lights in the same channel never meet, which limits how many lights can be at a point.
  */
 
 /**
@@ -181,8 +181,7 @@ export interface LevelLighting
     visibility: Uint8Array
 
     /**
-     * Per texel and channel the index of the light of that channel plus 1, or 0 if there is none. It is also there around the
-     * lit texels of a light, as a lookup between two texels only has the id of the closer one.
+     * Per texel and channel the index of the light of that channel plus 1, or 0 if there is none
      */
     lightIds: Uint8Array
 
@@ -600,21 +599,6 @@ function forLitTexels(
 
 
 /**
- * Goes through a texel and the texels around it, which is what a lookup close to the texel can mix it with
- */
-function forTexelsAround(tx: number, tz: number, width: number, height: number, visit: (i: number) => void): void
-{
-    for (let z = Math.max(0, tz - 1); z <= Math.min(height - 1, tz + 1); z++)
-    {
-        for (let x = Math.max(0, tx - 1); x <= Math.min(width - 1, tx + 1); x++)
-        {
-            visit(z * width + x)
-        }
-    }
-}
-
-
-/**
  * Places up to one light in the middle of each room, the biggest rooms first. Big rooms get big lights. The light of a room
  * gets smaller until it no longer gives meeples two rims at the same point and there is a channel it can have, and the room
  * stays dark if even the smallest light can't. Doors count as open.
@@ -636,10 +620,10 @@ export function placeLights(
     return withSeed(patchSeed(seed ^ LIGHT_SALT, 0, 0), () => {
         const lights: DungeonLight[] = []
         const views: LightView[] = []
-        const width = fieldWidth(bounds), height = fieldHeight(bounds)
+        const width = fieldWidth(bounds)
 
         // per texel one bit for each channel that is taken
-        const taken = new Uint8Array(width * height)
+        const taken = new Uint8Array(width * fieldHeight(bounds))
 
         for (const room of [...rooms].sort((a, b) => b.length - a.length))
         {
@@ -686,8 +670,8 @@ export function placeLights(
                     continue
                 }
 
-                const texels = new Set<number>()
-                forLitTexels(view, segments, bounds, (tx, tz) => forTexelsAround(tx, tz, width, height, i => texels.add(i)))
+                const texels: number[] = []
+                forLitTexels(view, segments, bounds, (tx, tz) => texels.push(tz * width + tx))
                 let used = 0
                 for (const i of texels)
                 {
@@ -780,8 +764,9 @@ export function bakeLights(lights: DungeonLight[], segments: Float64Array, bound
 
     lights.forEach(({ x, z, radius, reach, channel }, index) => {
         forLitTexels(createLightView(x, z, segments, radius, reach), segments, bounds, (tx, tz, share) => {
-            visibility[(tz * width + tx) * LIGHT_CHANNELS + channel] = share
-            forTexelsAround(tx, tz, width, height, i => lightIds[i * LIGHT_CHANNELS + channel] = index + 1)
+            const i = (tz * width + tx) * LIGHT_CHANNELS + channel
+            visibility[i] = share
+            lightIds[i] = index + 1
         })
     })
     return { lights, minX, minZ, width, height, visibility, lightIds, walls: bakeWalls(segments, minX, minZ, width, height) }

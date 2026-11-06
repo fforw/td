@@ -29,7 +29,8 @@ import {
     hideHeroLight,
     type LightField,
     moveHeroLight,
-    steadyLights
+    steadyLights,
+    updateLightField
 } from "./render/dungeonLighting"
 import { createThickWalls, createThinWallCorners, createThinWalls } from "./render/dungeonMeshes"
 import { createGround } from "./render/patchMeshes"
@@ -299,6 +300,7 @@ function show(level: DungeonLevel): void
         {
             discoLights(field, lights, timer.getElapsed())
         }
+        updateLightField(renderer, field)
         controls.update()
         crowd.update(camera, timer.getElapsed())
         renderer.render(scene, camera)

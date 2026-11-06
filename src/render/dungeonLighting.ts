@@ -4,16 +4,26 @@ import {
     DataTexture,
     DataUtils,
     FloatType,
+    GLSL3,
     HalfFloatType,
     LinearFilter,
     type Material,
+    Mesh,
     type MeshBasicMaterial,
     NearestFilter,
+    NoBlending,
+    OrthographicCamera,
     type PixelFormat,
+    PlaneGeometry,
+    RawShaderMaterial,
     RedFormat,
     RepeatWrapping,
     RGBAFormat,
-    Vector2
+    Scene,
+    type Texture,
+    Vector2,
+    type WebGLRenderer,
+    WebGLRenderTarget
 } from "three"
 import {
     castWallDistances,
@@ -30,9 +40,10 @@ import {
 } from "../map/dungeonLights"
 
 /*
- * Materials lit by the baked light field of a dungeon level. Everything looks up which lights reach its position and how much
- * of them the walls leave, so moving things cost the same as walls, no matter how many lights there are. What the lights give
- * there is worked out in the shader, so they can change their strength and color at any time.
+ * Materials lit by the light field of a dungeon level. A pass works out what the lights give per texel of the field from the
+ * baked share of them that the walls leave, whenever they change their strength or color. Everything else only looks up the
+ * field by its position, so moving things cost the same as walls, no matter how many lights there are. The field has 8 bits per
+ * channel, as rendering to anything else isn't possible on all devices.
  */
 
 /**
@@ -122,6 +133,11 @@ const FLICKER_RATES: [number, number][] = [[9.1, 0.5], [14.7, 0.3], [4.3, 0.2]]
 const FLICKER_PHASE = 2.399963
 
 /**
+ * Biggest energy the light field can hold. It keeps square roots, which leaves most of its 8 bits to the dark end.
+ */
+const FIELD_RANGE = 16
+
+/**
  * Flashes per minute of the disco lights
  */
 const DISCO_BPM = 60
@@ -132,23 +148,49 @@ const DISCO_BPM = 60
 const NO_HERO = 1e6
 
 /**
- * Adds up the lights of a position, the same way lightAt() does it for a light that the walls don't block: the color and energy
- * of all lights and the sum of their directions. A light without an id comes out empty, as the empty row has no reach.
+ * Looks up the color and energy of all lights at a position and the sum of their directions
  */
 const PARS = /* glsl */`
+    uniform sampler2D lightColors;
+    uniform sampler2D lightDirections;
+    uniform vec2 lightOrigin;
+    uniform vec2 lightSize;
+
+    void readLights(vec2 position, out vec4 field, out vec2 fieldDirection)
+    {
+        vec2 uv = (position - lightOrigin) / lightSize;
+        field = texture2D(lightColors, uv);
+        field *= field * ${FIELD_RANGE.toFixed(1)};
+        vec4 direction = texture2D(lightDirections, uv);
+        fieldDirection = (direction.xy * 2.0 - 1.0) * direction.z * direction.z * ${FIELD_RANGE.toFixed(1)};
+    }
+`
+
+/**
+ * Adds up the lights of a texel of the light field, the same way lightAt() does it for a light that the walls don't block
+ */
+const FIELD_PASS = /* glsl */`
+    precision highp float;
+    precision highp int;
+    precision highp sampler2D;
+
     uniform sampler2D lightVisibility;
     uniform sampler2D lightIds;
     uniform sampler2D lightData;
     uniform vec2 lightOrigin;
-    uniform vec2 lightSize;
 
-    void gatherLights(vec2 position, out vec4 field, out vec2 fieldDirection)
+    layout(location = 0) out vec4 outColor;
+    layout(location = 1) out vec4 outDirection;
+
+    void main()
     {
-        vec2 uv = (position - lightOrigin) / lightSize;
-        vec4 visibility = texture2D(lightVisibility, uv);
-        vec4 ids = texture2D(lightIds, uv);
-        field = vec4(0.0);
-        fieldDirection = vec2(0.0);
+        ivec2 texel = ivec2(gl_FragCoord.xy);
+        vec2 position = lightOrigin + gl_FragCoord.xy / ${LIGHT_TEXELS.toFixed(1)};
+        vec4 visibility = texelFetch(lightVisibility, texel, 0);
+        vec4 ids = texelFetch(lightIds, texel, 0);
+
+        vec4 field = vec4(0.0);
+        vec2 direction = vec2(0.0);
         for (int i = 0; i < ${LIGHT_CHANNELS}; i++)
         {
             if (visibility[i] > 0.0)
@@ -157,7 +199,7 @@ const PARS = /* glsl */`
                 vec4 place = texelFetch(lightData, ivec2(id, 0), 0);
                 vec2 toLight = place.xy - position;
                 float d = length(toLight);
-                float left = 1.0 - d * d / max(place.w * place.w, 1e-6);
+                float left = 1.0 - d * d / (place.w * place.w);
                 if (left > 0.0)
                 {
                     vec4 light = texelFetch(lightData, ivec2(id, 1), 0);
@@ -165,10 +207,14 @@ const PARS = /* glsl */`
                     float fade = left * left / (2.0 * radius) * visibility[i];
                     float near = d > radius ? radius / d : d / radius;
                     field += light * (d > radius ? 2.0 * asin(radius / d) : ${Math.PI.toFixed(6)}) * fade;
-                    fieldDirection += toLight / max(d, 1e-5) * 2.0 * near * fade * light.a;
+                    direction += toLight / max(d, 1e-5) * 2.0 * near * fade * light.a;
                 }
             }
         }
+
+        float own = length(direction);
+        outColor = sqrt(min(field / ${FIELD_RANGE.toFixed(1)}, vec4(1.0)));
+        outDirection = vec4(direction / max(own, 1e-5) * 0.5 + 0.5, sqrt(min(own / ${FIELD_RANGE.toFixed(1)}, 1.0)), 1.0);
     }
 `
 
@@ -265,7 +311,7 @@ const HERO_VISIBILITY = /* glsl */`
 
 
 /**
- * Textures and uniforms of a baked light field
+ * Textures, uniforms and pass of a light field
  */
 export interface LightField
 {
@@ -274,10 +320,21 @@ export interface LightField
      */
     count: number
 
+    /**
+     * Whether the lights changed since the last updateLightField()
+     */
+    stale: boolean
+
+    target: WebGLRenderTarget
+    scene: Scene
+    camera: OrthographicCamera
+
     uniforms: {
         lightVisibility: { value: DataTexture }
         lightIds: { value: DataTexture }
         lightData: { value: DataTexture }
+        lightColors: { value: Texture }
+        lightDirections: { value: Texture }
         lightWalls: { value: DataTexture }
         lightOrigin: { value: Vector2 }
         lightSize: { value: Vector2 }
@@ -318,14 +375,9 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
     heroTexture.wrapS = RepeatWrapping
 
     const visibilityTexture = new DataTexture(visibility, width, height, RGBAFormat)
-    visibilityTexture.magFilter = visibilityTexture.minFilter = LinearFilter
-    visibilityTexture.wrapS = visibilityTexture.wrapT = ClampToEdgeWrapping
     visibilityTexture.needsUpdate = true
 
-    // lights have no business being mixed
     const idTexture = new DataTexture(lightIds, width, height, RGBAFormat)
-    idTexture.magFilter = idTexture.minFilter = NearestFilter
-    idTexture.wrapS = idTexture.wrapT = ClampToEdgeWrapping
     idTexture.needsUpdate = true
 
     // per light its place and size in one row and its color and strength in the next, with the empty id 0 in front
@@ -339,18 +391,66 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
     dataTexture.magFilter = dataTexture.minFilter = NearestFilter
     dataTexture.needsUpdate = true
 
-    return {
-        count: lights.length,
-        uniforms: {
-            lightVisibility: { value: visibilityTexture },
-            lightIds: { value: idTexture },
-            lightData: { value: dataTexture },
-            lightWalls: { value: wallTexture },
-            lightOrigin: { value: new Vector2(minX, minZ) },
-            lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
-            heroDistances: { value: heroTexture },
-            heroPosition: { value: new Vector2(NO_HERO, NO_HERO) }
-        }
+    const target = new WebGLRenderTarget(width, height, {
+        count: 2,
+        minFilter: LinearFilter,
+        magFilter: LinearFilter,
+        depthBuffer: false
+    })
+
+    const uniforms: LightField["uniforms"] = {
+        lightVisibility: { value: visibilityTexture },
+        lightIds: { value: idTexture },
+        lightData: { value: dataTexture },
+        lightColors: { value: target.textures[0] },
+        lightDirections: { value: target.textures[1] },
+        lightWalls: { value: wallTexture },
+        lightOrigin: { value: new Vector2(minX, minZ) },
+        lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
+        heroDistances: { value: heroTexture },
+        heroPosition: { value: new Vector2(NO_HERO, NO_HERO) }
+    }
+
+    const pass = new Mesh(new PlaneGeometry(2, 2), new RawShaderMaterial({
+        glslVersion: GLSL3,
+        uniforms,
+        vertexShader: /* glsl */`
+            in vec3 position;
+
+            void main()
+            {
+                gl_Position = vec4(position.xy, 0.0, 1.0);
+            }
+        `,
+        fragmentShader: FIELD_PASS,
+        blending: NoBlending,
+        depthTest: false,
+        depthWrite: false
+    }))
+    pass.frustumCulled = false
+    const scene = new Scene()
+    scene.add(pass)
+
+    return { count: lights.length, stale: true, target, scene, camera: new OrthographicCamera(), uniforms }
+}
+
+
+/**
+ * Brings the light field up to date with its lights. It has to happen before rendering what is lit by it and costs nothing
+ * while the lights stay the same.
+ *
+ * @param renderer  renderer
+ * @param field     light field
+ */
+export function updateLightField(renderer: WebGLRenderer, field: LightField): void
+{
+    if (field.stale)
+    {
+        const previous = renderer.getRenderTarget()
+        renderer.setRenderTarget(field.target)
+        renderer.render(field.scene, field.camera)
+        renderer.setRenderTarget(previous)
+        field.stale = false
     }
 }
 
@@ -424,6 +524,7 @@ export function flickerLights(field: LightField, lights: readonly DungeonLight[]
         setLightStrength(field, lights, i, FLICKER_MIN + (1 - FLICKER_MIN) * (wave + 1) / 2)
     }
     field.uniforms.lightData.value.needsUpdate = true
+    field.stale = true
 }
 
 
@@ -459,6 +560,7 @@ export function discoLights(field: LightField, lights: readonly DungeonLight[], 
         }
     }
     field.uniforms.lightData.value.needsUpdate = true
+    field.stale = true
 }
 
 
@@ -475,6 +577,7 @@ export function steadyLights(field: LightField, lights: readonly DungeonLight[])
         setLightStrength(field, lights, i, 1)
     }
     field.uniforms.lightData.value.needsUpdate = true
+    field.stale = true
 }
 
 
@@ -513,7 +616,7 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                     {
                         vec4 field;
                         vec2 toLight;
-                        gatherLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight);
+                        readLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight);
                         toLight /= max(length(toLight), 0.02);
                         vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
 
@@ -563,7 +666,7 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
                 mat4 rimMatrix = modelMatrix * instanceMatrix;
                 vec4 rimField;
                 vec2 rimDirection;
-                gatherLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection);
+                readLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection);
                 float rimOwn = length(rimDirection);
 
                 vRim = smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)

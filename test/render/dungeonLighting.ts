@@ -1,7 +1,8 @@
+import type { WebGLRenderer } from "three"
 import { assert, describe, it } from "vitest"
 
 import { bakeLights, type DungeonLight, FLICKER_MIN } from "../../src/map/dungeonLights"
-import { createLightField, discoLights, flickerLights, steadyLights } from "../../src/render/dungeonLighting"
+import { createLightField, discoLights, flickerLights, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
 
 const LIGHTS: DungeonLight[] = [
     { x: 2, z: 2, color: [1, 0.5, 0], radius: 0.1, reach: 2, channel: 0 },
@@ -25,6 +26,41 @@ describe("createLightField", () => {
         assert.deepEqual([...data.subarray(0, 4)], [0, 0, 0, 0])
         assert.deepEqual(place(1).map(v => +v.toFixed(3)), [8, 2, 0.2, 3])
         assert.deepEqual(light(1), [0, 0.5, 1, 1])
+    })
+})
+
+
+describe("updateLightField", () => {
+    it("only renders the field when the lights changed, and leaves the render target alone", () => {
+        const { field } = createField()
+        const previous = {}
+        let current: unknown = previous
+        const rendered: unknown[] = []
+        const renderer = {
+            getRenderTarget: () => current,
+            setRenderTarget: (target: unknown) => current = target,
+            render: () => rendered.push(current)
+        } as unknown as WebGLRenderer
+
+        updateLightField(renderer, field)
+        assert.deepEqual(rendered, [field.target])
+        assert.equal(current, previous)
+
+        updateLightField(renderer, field)
+        assert.equal(rendered.length, 1)
+
+        for (const change of [
+            () => flickerLights(field, LIGHTS, 1),
+            () => discoLights(field, LIGHTS, 1),
+            () => steadyLights(field, LIGHTS)
+        ])
+        {
+            const before = rendered.length
+            change()
+            updateLightField(renderer, field)
+            updateLightField(renderer, field)
+            assert.equal(rendered.length, before + 1)
+        }
     })
 })
 

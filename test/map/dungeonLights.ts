@@ -391,31 +391,6 @@ describe("bakeLights", () => {
         assert.equal(lightIds[near + 1] + lightIds[near + 3], 0)
     })
 
-    it("has the id of a light around every texel the light has a share in", () => {
-        const { width, height, visibility, lightIds } = bakeLights(
-            [{ x: 5, z: 5, color: [1, 1, 1], radius: 0.2, reach: 2, channel: 1 }],
-            new Float64Array(0),
-            { minX: 0, minZ: 0, maxX: 10, maxZ: 10 }
-        )
-        let beyond = 0
-        for (let z = 1; z < height - 1; z++)
-        {
-            for (let x = 1; x < width - 1; x++)
-            {
-                const i = (z * width + x) * LIGHT_CHANNELS + 1
-                beyond += lightIds[i] === 1 && !visibility[i] ? 1 : 0
-                if (visibility[i])
-                {
-                    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]])
-                    {
-                        assert.equal(lightIds[((z + dz) * width + x + dx) * LIGHT_CHANNELS + 1], 1)
-                    }
-                }
-            }
-        }
-        assert(beyond > 0)
-    })
-
     it("finds the closest wall for lookups near walls", () => {
         const segments = new Float64Array([
             2, 1, 2, 9, 0, 0,
@@ -502,36 +477,43 @@ describe("lightDungeon", () => {
         }
     })
 
-    it("never has two lights in one channel around a texel", () => {
+    it("never has two lights in one channel at a texel", () => {
         for (const seed of [4711, 12345])
         {
-            const { lights, width, height, visibility, lightIds } = lightDungeon(seed, generateDungeon(seed, FACE_SIZE, 2, 2))
-            const channels = new Set<number>()
-            for (let z = 1; z < height - 1; z++)
-            {
-                for (let x = 1; x < width - 1; x++)
+            const { segments } = connect(seed)
+            const { lights, minX, minZ, width, height, visibility, lightIds } = lightDungeon(seed, generateDungeon(seed, FACE_SIZE, 2, 2))
+            const out: LightSample = { energy: 0, x: 0, z: 0 }
+            const owners = new Int16Array(width * height * LIGHT_CHANNELS).fill(-1)
+            // counted, as asserting all the texels takes too long
+            let shared = 0, wrong = 0
+            lights.forEach(({ x, z, radius, reach, channel }, index) => {
+                const view = createLightView(x, z, segments, radius, reach)
+                const fromX = Math.max(0, Math.floor((x - reach - minX) * LIGHT_TEXELS))
+                const toX = Math.min(width, Math.ceil((x + reach - minX) * LIGHT_TEXELS))
+                const fromZ = Math.max(0, Math.floor((z - reach - minZ) * LIGHT_TEXELS))
+                const toZ = Math.min(height, Math.ceil((z + reach - minZ) * LIGHT_TEXELS))
+                for (let tz = fromZ; tz < toZ; tz++)
                 {
-                    const i = (z * width + x) * LIGHT_CHANNELS
-                    for (let channel = 0; channel < LIGHT_CHANNELS; channel++)
+                    for (let tx = fromX; tx < toX; tx++)
                     {
-                        const share = visibility[i + channel]
-                        if (share > 0)
+                        const px = minX + (tx + 0.5) / LIGHT_TEXELS, pz = minZ + (tz + 0.5) / LIGHT_TEXELS
+                        lightAt(view, segments, px, pz, out)
+                        if (Math.round(lightShare(view, px, pz, out.energy) * 255) > 0)
                         {
-                            channels.add(channel)
-                            const id = lightIds[i + channel]
-                            assert(id > 0)
-                            assert.equal(lights[id - 1].channel, channel)
-
-                            // every lookup that mixes this texel gets the same light
-                            for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]])
-                            {
-                                assert.equal(lightIds[((z + dz) * width + x + dx) * LIGHT_CHANNELS + channel], id)
-                            }
+                            const i = (tz * width + tx) * LIGHT_CHANNELS + channel
+                            shared += owners[i] === -1 ? 0 : 1
+                            owners[i] = index
                         }
                     }
                 }
+            })
+            for (let i = 0; i < owners.length; i++)
+            {
+                wrong += lightIds[i] === owners[i] + 1 && visibility[i] > 0 === owners[i] >= 0 ? 0 : 1
             }
-            assert(channels.size >= 2)
+            assert.equal(shared, 0)
+            assert.equal(wrong, 0)
+            assert(new Set(lights.map(({ channel }) => channel)).size >= 2)
         }
     })
 })
