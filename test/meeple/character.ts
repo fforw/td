@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, dexWalkFactor, type Stats } from "../../src/meeple/character"
+import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, dexWalkFactor, heldItems, type Stats } from "../../src/meeple/character"
 
 
 const STRONG: Stats = { hp: 20, mp: 20, str: 10, dex: 10 }
@@ -17,6 +17,21 @@ describe("dexWalkFactor", function () {
         assert(dexWalkFactor(1) === 1)
         assert(dexWalkFactor(5) > dexWalkFactor(4))
         assert(dexWalkFactor(10) === 1.45)
+    })
+})
+
+
+describe("heldItems", function () {
+
+    it("gives fighters a sword and shield they can equip", function () {
+        const fighter = character("fighter")
+        const { item, leftItem } = heldItems(fighter)
+        assert(item === "sword_silver" && leftItem === "shield_silver")
+        assert(canEquip(fighter, item, leftItem) === null)
+    })
+
+    it("leaves everyone else with bare hands", function () {
+        assert.deepEqual(heldItems(character("wizard")), {})
     })
 })
 

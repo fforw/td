@@ -29,7 +29,7 @@ export interface Stats
 /**
  * What kind of item something is, which decides who can equip it
  */
-export type ItemType = "weapon" | "twoHanded" | "tool" | "magic" | "misc"
+export type ItemType = "weapon" | "shield" | "twoHanded" | "tool" | "magic" | "misc"
 
 /**
  * Type of each item. Sprites that are only drawn instead of another item, like the nocked bow, have none and cannot
@@ -68,7 +68,7 @@ export interface CharacterClass
  */
 export const CLASSES = {
     peasant: { equip: ["tool", "misc"] },
-    fighter: { equip: ["weapon", "twoHanded", "misc"], min: { hp: 10, str: 6 } },
+    fighter: { equip: ["weapon", "shield", "twoHanded", "misc"], min: { hp: 10, str: 6 } },
     wizard: { equip: ["magic", "misc"], min: { mp: 8 } },
 } as const satisfies Record<string, CharacterClass>
 
@@ -117,6 +117,15 @@ export function checkClasses(character: Character): string | null
 export function dexWalkFactor(dex: number): number
 {
     return 1 + (dex - 1) * DEX_WALK_SPEED
+}
+
+
+/**
+ * Returns what a character carries into a level: a fighter has a sword and a shield, everyone else their bare hands
+ */
+export function heldItems({ classes }: Pick<Character, "classes">): { item?: ItemName, leftItem?: ItemName }
+{
+    return classes.includes("fighter") ? { item: "sword_silver", leftItem: "shield_silver" } : {}
 }
 
 
