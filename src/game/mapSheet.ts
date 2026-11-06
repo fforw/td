@@ -47,9 +47,10 @@ const ARROW_GAP = 4
 const ARROW_SVG = '<svg viewBox="0 0 100 100"><polygon points="8,34 52,34 52,10 94,50 52,90 52,66 8,66"/></svg>'
 
 /**
- * Half the size in pixels of what has to stay on the screen when a marker's patch is beyond the known part
+ * How far in pixels from its center a marker has to stay on the screen when its patch is beyond the known part, enough for
+ * the head over it
  */
-const MARKER_REACH = 24
+const MARKER_REACH = 36
 
 
 function faceCenter({ positions, vertex }: QuadPatch, face: number): [number, number]

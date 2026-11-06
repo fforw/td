@@ -945,13 +945,13 @@ export default class GameView implements PadTarget
         const { type } = marker
         if (type === "poi")
         {
-            const { kind, days } = marker
+            const { kind, days, who } = marker
             if (days !== undefined)
             {
                 return el("span", {
                     className: "marker poi away",
                     title: KIND_NAMES[kind] + ": " + (days ? "a hero gets there in " + days + "d" : "a hero is there")
-                }, KIND_ICONS[kind], el("small", {}, days ? "⏳" + days : "🚪"))
+                }, who ? this.renderMarkerHead(who) : null, KIND_ICONS[kind], el("small", {}, days ? "⏳" + days : "🚪"))
             }
             return el("button", {
                 type: "button",
@@ -962,7 +962,10 @@ export default class GameView implements PadTarget
         }
         if (type === "targeted")
         {
-            return el("span", { className: "marker targeted", title: "Explorer on the way" }, "⏳" + marker.days)
+            return el("span", {
+                className: "marker targeted",
+                title: "Explorer on the way"
+            }, marker.who ? this.renderMarkerHead(marker.who) : null, "⏳" + marker.days)
         }
         return el("span", {
             className: "marker passed",
@@ -1075,6 +1078,15 @@ export default class GameView implements PadTarget
         return src
             ? el("img", { className, src, alt: name, title: name })
             : el("span", { className, title: name })
+    }
+
+    /**
+     * Returns the head of someone on a map marker, to the left or right of it as it happens, which stays the same over all
+     * renders
+     */
+    private renderMarkerHead(who: Pick<Explorer | Hero, "id" | "name">): HTMLElement
+    {
+        return this.renderHead(who, (this.campaign.seed ^ who.id) & 1 ? "head left" : "head")
     }
 
     private jobStatus(job: Job): string

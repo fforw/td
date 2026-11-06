@@ -419,6 +419,23 @@
     opacity: 0.8;
 }
 
+/* on the edge of the marker along a diagonal, where it covers about half of the icon */
+#game .marker .head
+{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2.8rem;
+    height: 2.8rem;
+    margin: 0;
+    transform: translate(-50%, -50%) translate(0.78rem, -0.78rem);
+}
+
+#game .marker .head.left
+{
+    transform: translate(-50%, -50%) translate(-0.78rem, -0.78rem);
+}
+
 #game .marker.poi small
 {
     position: absolute;
