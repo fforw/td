@@ -14,6 +14,12 @@ const SPEED_GAIN = 1.1
 const MAX_SPEED = 2.5
 
 /**
+ * Range of the dexterity of explorers
+ */
+const MIN_DEX = 7
+const MAX_DEX = 10
+
+/**
  * Mixed into the seed of a day so the tavern gets a random sequence of its own
  */
 const TAVERN_SALT = 0x7a7e
@@ -25,6 +31,15 @@ const TAVERN_SALT = 0x7a7e
 export function price(explorer: Explorer): number
 {
     return Math.round(explorer.speed * 40 + explorer.wisdom * 15)
+}
+
+
+/**
+ * Returns a random dexterity for an explorer from the shared random sequence
+ */
+export function randomExplorerDex(): number
+{
+    return rng.nextInt(MIN_DEX, MAX_DEX)
 }
 
 
@@ -59,7 +74,8 @@ export function arrivals(campaign: Campaign, count: number): Explorer[]
                 speed: Math.round(rng.next(0.8, 1.5) * 100) / 100,
                 wisdom: rng.nextInt(1, 5),
                 experience: 0,
-                leavesOn: stay(day)
+                leavesOn: stay(day),
+                dex: randomExplorerDex()
             })
         }
         return explorers

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { assert, describe, it } from "vitest"
 
-import { type Campaign, createCampaign, overworld, type PatchKind, SAVE_VERSION, START_HEROES } from "../../src/game/campaign"
+import { type Campaign, createCampaign, type Explorer, overworld, type PatchKind, SAVE_VERSION, START_HEROES } from "../../src/game/campaign"
 import { advanceDay, startMission } from "../../src/game/missions"
 import { wantedKind } from "../../src/game/patchKinds"
 import { parseSave, serializeSave } from "../../src/game/storage"
@@ -122,5 +122,24 @@ describe("Save migration", () => {
         assert(overworld(migrated).patches["5/5"].kind === "EMPTY")
         assert(overworld(migrated).patches["0/0"].kind === "CASTLE")
         assert(migrated.missions[0].passed![0].kind === "EMPTY")
+    })
+
+    it("gives the explorers of version 4 saves high dexterity", () => {
+
+        const campaign = createCampaign(9)
+        const [away, ...waiting] = campaign.tavern
+        campaign.tavern = waiting
+        campaign.missions.push({ explorer: away, target: "0/1", startDay: 1, endDay: 3 })
+        for (const explorer of campaign.tavern.concat(away))
+        {
+            delete (explorer as Partial<Explorer>).dex
+        }
+        campaign.saveVersion = 4
+
+        const migrated = parseSave(JSON.stringify(campaign))
+        const explorers = migrated.tavern.concat(migrated.missions[0].explorer)
+        assert(explorers.length > 1)
+        assert(explorers.every(e => e.dex >= 7 && e.dex <= 10))
+        assert.deepEqual(parseSave(JSON.stringify(campaign)), migrated)
     })
 })

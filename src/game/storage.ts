@@ -1,6 +1,8 @@
 import { type Campaign, GENERATOR_VERSION, overworld, patchKey, SAVE_VERSION, START_HEROES } from "./campaign"
 import { createHeroes } from "./heroes"
+import { patchSeed, withSeed } from "../math/random"
 import { naturalKind } from "./patchKinds"
+import { randomExplorerDex } from "./tavern"
 
 /**
  * Where campaigns are kept. Only localStorage for now; a server can implement the same interface later.
@@ -44,6 +46,13 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
             {
                 patch.kind = "EMPTY"
             }
+        }
+    },
+    // version 5 gives explorers dexterity
+    4: campaign => {
+        for (const explorer of [...campaign.tavern, ...campaign.missions.map(mission => mission.explorer)])
+        {
+            explorer.dex = withSeed(patchSeed(campaign.seed, explorer.id, 0), randomExplorerDex)
         }
     }
 }

@@ -716,7 +716,7 @@ export default class GameView implements PadTarget
                 this.renderPortrait(explorer),
                 el("span", { className: "name" }, explorer.name),
                 el("span", { className: "stats" },
-                    "speed " + explorer.speed.toFixed(2) + " · wisdom " + explorer.wisdom +
+                    "speed " + explorer.speed.toFixed(2) + " · dex " + explorer.dex + " · wisdom " + explorer.wisdom +
                     (explorer.experience ? " · " + explorer.experience +
                         (explorer.experience === 1 ? " mission" : " missions") : "") +
                     " · leaves in " + (explorer.leavesOn - campaign.day) + "d"

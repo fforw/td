@@ -14,7 +14,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
 export const START_GOLD = 1000
 
@@ -80,6 +80,8 @@ export interface Explorer
     speed: number
     /** how much of a patch the report reveals, 1 to 5 */
     wisdom: number
+    /** dexterity, which is high for all of them as sneaking around is the job */
+    dex: number
     /** number of missions done */
     experience: number
     /** day the explorer leaves the tavern for good unless hired before */

@@ -248,6 +248,16 @@ describe("Missions", () => {
 
 describe("Tavern", () => {
 
+    it("only gets explorers of high dexterity", () => {
+
+        const campaign = createCampaign(11)
+        for (let i = 0; i < 20; i++)
+        {
+            assert(campaign.tavern.every(e => e.dex >= 7 && e.dex <= 10))
+            advanceDay(campaign)
+        }
+    })
+
     it("changes its crowd over the days", () => {
 
         const campaign = createCampaign(11)
