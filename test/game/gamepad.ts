@@ -109,6 +109,35 @@ describe("Reading a controller", () => {
         assert.equal(readPad(pad([6])).zoom, -1)
         assert.isTrue(readPad(pad([6])).active)
     })
+
+    it("reads the sticks for moving from the dead zone to the rim, in any direction", () => {
+
+        assert.equal(readPad(pad([], [0.15, 0, 0, 0])).moveX, 0)
+        assert.closeTo(readPad(pad([], [0.6, 0, 0, 0])).moveX, 0.5, 1e-9)
+        assert.isTrue(readPad(pad([], [0.3, 0, 0, 0])).active)
+
+        const { moveX, moveY } = readPad(pad([], [-1, 1, 0, 0]))
+        assert.closeTo(Math.hypot(moveX, moveY), 1, 1e-9)
+        assert.closeTo(moveX, -moveY, 1e-9)
+    })
+
+    it("only aims with the right stick pushed well off center", () => {
+
+        assert.equal(readPad(pad([], [0, 0, 0.3, 0.2])).aimX, 0)
+        const { aimX, aimY } = readPad(pad([], [0, 0, 0.7, -0.7]))
+        assert.isAbove(aimX, 0)
+        assert.isBelow(aimY, 0)
+    })
+
+    it("has dash, attack and block on the shoulders", () => {
+
+        const dash = readPad(pad([4]))
+        assert.isTrue(dash.dash)
+        assert.isTrue(dash.active)
+        assert.isTrue(readPad(pad([5])).attack)
+        assert.isTrue(readPad(pad([6])).block)
+        assert.isFalse(readPad(pad([7])).block)
+    })
 })
 
 

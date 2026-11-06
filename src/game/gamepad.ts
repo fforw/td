@@ -11,7 +11,7 @@ export type PadAction = "confirm" | "back" | "map" | "endDay" | "menu"
 /**
  * What the game can show an icon for
  */
-export type Glyph = PadAction | "move" | "look" | "zoomOut" | "zoomIn"
+export type Glyph = PadAction | "move" | "look" | "zoomOut" | "zoomIn" | "run" | "dash" | "attack" | "block"
 
 export type Direction = "up" | "down" | "left" | "right"
 
@@ -35,6 +35,18 @@ export interface PadInput
     lookY: number
     /** right trigger minus left trigger */
     zoom: number
+    /** left stick, how far and where a hero is told to go */
+    moveX: number
+    moveY: number
+    /** right stick, only for where it points */
+    aimX: number
+    aimY: number
+    /** left shoulder button */
+    dash: boolean
+    /** right shoulder button */
+    attack: boolean
+    /** left trigger */
+    block: boolean
 }
 
 /**
@@ -45,6 +57,8 @@ const SOUTH = 0
 const EAST = 1
 const WEST = 2
 const NORTH = 3
+const LEFT_SHOULDER = 4
+const RIGHT_SHOULDER = 5
 const LEFT_TRIGGER = 6
 const RIGHT_TRIGGER = 7
 const START = 9
@@ -60,9 +74,19 @@ const STICK_PRESS = 0.5
 const STICK_DEAD_ZONE = 0.2
 
 /**
+ * How far the right stick needs to go to aim, which leaves out where it comes to rest when let go of
+ */
+const AIM_DEAD_ZONE = 0.4
+
+/**
  * How far a trigger needs to go to count as used
  */
 const TRIGGER_DEAD_ZONE = 0.1
+
+/**
+ * How far a trigger needs to go to count as held
+ */
+const TRIGGER_PRESS = 0.3
 
 /**
  * Milliseconds a held direction waits before repeating, and between repeats
@@ -90,7 +114,11 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         move: "xbox_dpad",
         look: "xbox_stick_r",
         zoomOut: "xbox_lt",
-        zoomIn: "xbox_rt"
+        zoomIn: "xbox_rt",
+        run: "xbox_stick_l",
+        dash: "xbox_lb",
+        attack: "xbox_rb",
+        block: "xbox_lt"
     },
     playstation: {
         confirm: "playstation_button_cross",
@@ -101,7 +129,11 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         move: "playstation_dpad",
         look: "playstation_stick_r",
         zoomOut: "playstation_trigger_l2",
-        zoomIn: "playstation_trigger_r2"
+        zoomIn: "playstation_trigger_r2",
+        run: "playstation_stick_l",
+        dash: "playstation_trigger_l1",
+        attack: "playstation_trigger_r1",
+        block: "playstation_trigger_l2"
     },
     switch: {
         confirm: "switch_button_a",
@@ -112,7 +144,11 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         move: "switch_dpad",
         look: "switch_stick_r",
         zoomOut: "switch_button_zl",
-        zoomIn: "switch_button_zr"
+        zoomIn: "switch_button_zr",
+        run: "switch_stick_l",
+        dash: "switch_button_l",
+        attack: "switch_button_r",
+        block: "switch_button_zl"
     },
     steamdeck: {
         confirm: "steamdeck_button_a",
@@ -123,7 +159,11 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         move: "steamdeck_dpad",
         look: "steamdeck_stick_r",
         zoomOut: "steamdeck_button_l2",
-        zoomIn: "steamdeck_button_r2"
+        zoomIn: "steamdeck_button_r2",
+        run: "steamdeck_stick_l",
+        dash: "steamdeck_button_l1",
+        attack: "steamdeck_button_r1",
+        block: "steamdeck_button_l2"
     }
 }
 
@@ -201,6 +241,21 @@ function deadZone(value: number | undefined): number
 }
 
 
+/**
+ * Returns the position of a stick that starts from nothing at the dead zone and gets to its full length at the rim
+ */
+function stickOf(x: number, y: number, dead: number): [number, number]
+{
+    const length = Math.hypot(x, y)
+    if (length < dead)
+    {
+        return [0, 0]
+    }
+    const scale = Math.min(1, (length - dead) / (1 - dead)) / length
+    return [x * scale, y * scale]
+}
+
+
 function directionOf(pad: PadState): Direction | null
 {
     if (isPressed(pad, DPAD_UP))
@@ -251,14 +306,26 @@ export function readPad(pad: PadState): PadInput
     const left = pad.buttons[LEFT_TRIGGER]?.value ?? 0
     const right = pad.buttons[RIGHT_TRIGGER]?.value ?? 0
     const zoom = (right >= TRIGGER_DEAD_ZONE ? right : 0) - (left >= TRIGGER_DEAD_ZONE ? left : 0)
+    const [moveX, moveY] = stickOf(pad.axes[0] ?? 0, pad.axes[1] ?? 0, STICK_DEAD_ZONE)
+    const [aimX, aimY] = stickOf(pad.axes[2] ?? 0, pad.axes[3] ?? 0, AIM_DEAD_ZONE)
+    const dash = isPressed(pad, LEFT_SHOULDER)
+    const attack = isPressed(pad, RIGHT_SHOULDER)
+    const block = left >= TRIGGER_PRESS
     return {
         scheme,
-        active: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom,
+        active: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom || !!moveX || !!moveY || dash || attack,
         actions,
         direction,
         lookX,
         lookY,
-        zoom
+        zoom,
+        moveX,
+        moveY,
+        aimX,
+        aimY,
+        dash,
+        attack,
+        block
     }
 }
 
