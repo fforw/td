@@ -35,6 +35,13 @@ export interface PadTarget
     /** called while the view is being moved, see CastleScene.look() */
     look?(yaw: number, pitch: number, zoom: number): void
 
+    /**
+     * Called for a direction before it moves the focus
+     *
+     * @returns true if it was used for something else and the focus stays
+     */
+    walk?(direction: Direction): boolean
+
     /** called when the controller takes over from mouse and keyboard, or gives back to them */
     setPadMode?(active: boolean): void
 }
@@ -236,7 +243,7 @@ export default class GamepadControl
         if (target)
         {
             const focused = this.updateFocus(target)
-            if (move && focused)
+            if (move && !target.walk?.(move) && focused)
             {
                 this.moveFocus(focused, move, target)
             }
