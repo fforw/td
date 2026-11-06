@@ -149,7 +149,8 @@ const DISCO_BPM = 60
 const NO_HERO = 1e6
 
 /**
- * Looks up the color and energy of all lights at a position and the sum of their directions
+ * Looks up the color of all lights at a position, and their energy and the sum of their directions as if they were at full
+ * strength, with how strong they are at the moment. That way, where a rim shows doesn't change with the strength of the lights.
  */
 const PARS = /* glsl */`
     uniform sampler2D lightColors;
@@ -157,13 +158,14 @@ const PARS = /* glsl */`
     uniform vec2 lightOrigin;
     uniform vec2 lightSize;
 
-    void readLights(vec2 position, out vec4 field, out vec2 fieldDirection)
+    void readLights(vec2 position, out vec4 field, out vec2 fieldDirection, out float fieldStrength)
     {
         vec2 uv = (position - lightOrigin) / lightSize;
         field = texture2D(lightColors, uv);
         field *= field * ${FIELD_RANGE.toFixed(1)};
         vec4 direction = texture2D(lightDirections, uv);
         fieldDirection = (direction.xy * 2.0 - 1.0) * direction.z * direction.z * ${FIELD_RANGE.toFixed(1)};
+        fieldStrength = direction.a;
     }
 `
 
@@ -192,6 +194,7 @@ const FIELD_PASS = /* glsl */`
 
         vec4 field = vec4(0.0);
         vec2 direction = vec2(0.0);
+        float strength = 0.0;
         for (int i = 0; i < ${LIGHT_CHANNELS}; i++)
         {
             if (visibility[i] > 0.0)
@@ -207,15 +210,17 @@ const FIELD_PASS = /* glsl */`
                     float radius = place.z;
                     float fade = left * left / (2.0 * radius) * visibility[i];
                     float near = d > radius ? radius / d : d / radius;
-                    field += light * (d > radius ? 2.0 * asin(radius / d) : ${Math.PI.toFixed(6)}) * fade;
-                    direction += toLight / max(d, 1e-5) * 2.0 * near * fade * light.a;
+                    float energy = (d > radius ? 2.0 * asin(radius / d) : ${Math.PI.toFixed(6)}) * fade;
+                    field += vec4(light.rgb, 1.0) * energy;
+                    direction += toLight / max(d, 1e-5) * 2.0 * near * fade;
+                    strength += light.a * energy;
                 }
             }
         }
 
         float own = length(direction);
         outColor = sqrt(min(field / ${FIELD_RANGE.toFixed(1)}, vec4(1.0)));
-        outDirection = vec4(direction / max(own, 1e-5) * 0.5 + 0.5, sqrt(min(own / ${FIELD_RANGE.toFixed(1)}, 1.0)), 1.0);
+        outDirection = vec4(direction / max(own, 1e-5) * 0.5 + 0.5, sqrt(min(own / ${FIELD_RANGE.toFixed(1)}, 1.0)), field.a > 0.0 ? strength / field.a : 1.0);
     }
 `
 
@@ -621,7 +626,8 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                     {
                         vec4 field;
                         vec2 toLight;
-                        readLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight);
+                        float fieldStrength;
+                        readLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight, fieldStrength);
                         toLight /= max(length(toLight), 0.02);
                         vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
 
@@ -671,10 +677,11 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
                 mat4 rimMatrix = modelMatrix * instanceMatrix;
                 vec4 rimField;
                 vec2 rimDirection;
-                readLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection);
+                float rimStrength;
+                readLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection, rimStrength);
                 float rimOwn = length(rimDirection);
 
-                vRim = smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)
+                vRim = rimStrength * smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)
                     * (1.0 - smoothstep(${RIM_GATE_START.toFixed(3)}, ${RIM_GATE_END.toFixed(3)}, rimField.a))
                     * smoothstep(0.0, 0.7, dot(normalize(mat3(rimMatrix) * normal).xz, rimDirection / max(rimOwn, 1e-4)));
 
