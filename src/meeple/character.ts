@@ -73,6 +73,11 @@ export const CLASSES = {
 
 export type ClassName = keyof typeof CLASSES
 
+/**
+ * Share of the walking speed each point of dexterity above 1 adds
+ */
+const DEX_WALK_SPEED = 0.05
+
 export interface Character
 {
     stats: Stats
@@ -102,6 +107,15 @@ export function checkClasses(character: Character): string | null
 {
     const name = character.classes.find(name => !canHaveClass(character.stats, name))
     return name ? `stats too low for ${name}` : null
+}
+
+
+/**
+ * Returns the factor the given dexterity has on the walking speed
+ */
+export function dexWalkFactor(dex: number): number
+{
+    return 1 + (dex - 1) * DEX_WALK_SPEED
 }
 
 

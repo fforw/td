@@ -23,7 +23,7 @@ import {
     Vector2,
     Vector3
 } from "three"
-import { canEquip, type Character, checkClasses } from "./character"
+import { canEquip, type Character, checkClasses, dexWalkFactor } from "./character"
 import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "../items/itemAnimation"
 import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "../items/itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
@@ -113,6 +113,11 @@ const ITEM_SIZE = 0.7
  * Walk cycle speed in radians per second. Each cycle has two steps.
  */
 const WALK_SPEED = 5.5
+
+/**
+ * Pace in world units per second that fits the walk cycle, for a meeple with a walk speed multiplier of 1
+ */
+export const WADDLE_SPEED = MEEPLE_SCALE * 0.6
 
 /**
  * Height of a step bounce in meeple units, and how much the body stretches with it
@@ -221,6 +226,10 @@ export interface Meeple
      * items.
      */
     character?: Character
+    /**
+     * Dexterity of a meeple without stats
+     */
+    dex?: number
     /**
      * Holds the items readied. Acting readies them as well.
      */
@@ -486,11 +495,15 @@ function blinkDuration(): number
     return BLINK_MIN + rng.next() * (BLINK_MAX - BLINK_MIN)
 }
 
+/**
+ * Returns the factor on the walking speed of a meeple, from its gait and its dexterity. A meeple without any walks like one
+ * of the lowest dexterity.
+ */
 export function walkSpeedMultiplier(meeple: Meeple) : number
 {
-    const { gait } = meeple
+    const { gait, character, dex } = meeple
     const extreme = gait < 0.5 ? WIDE_GAIT : NARROW_GAIT
-    return (1 + (extreme.speed - 1) * Math.abs(gait * 2 - 1))
+    return (1 + (extreme.speed - 1) * Math.abs(gait * 2 - 1)) * dexWalkFactor(character?.stats.dex ?? dex ?? 1)
 }
 
 

@@ -16,7 +16,7 @@ import {
     WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
+import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, WADDLE_SPEED, walkSpeedMultiplier } from "./meeple/Meeple3D"
 import { randomLook } from "./meeple/look"
 import { canEquip, type Character, CLASSES, ITEM_TYPES, type ItemType, randomCharacter } from "./meeple/character"
 import { type ItemName, ITEMS, loadItems } from "./items/itemSprite"
@@ -261,6 +261,7 @@ function showInfo(meeple: Meeple): void
         `${name} (#${crowd.meeples.indexOf(meeple)})`,
         `looking: ${lookAtCamera ? "yes" : "no"}`,
         `gait:    ${gait.toFixed(2)}`,
+        `speed:   ${walkSpeedMultiplier(meeple).toFixed(2)}`,
         `height:  ${look.height.toFixed(2)}`,
         `hair:    ${HairStyle[look.hairStyle].toLowerCase()} ${look.hair.getHexString()}`,
         `skin:    ${look.skin.getHexString()}`,
@@ -305,11 +306,6 @@ window.addEventListener("resize", () => {
 })
 
 /**
- * Walking speed in world units per second for a meeple with a walk speed multiplier of 1
- */
-const WALK_AHEAD_SPEED = MEEPLE_SCALE * 0.6
-
-/**
  * Size of the square the meeples walk in, twice the area of the grid they start in. Leaving it on one side brings
  * them back on the other.
  */
@@ -343,7 +339,7 @@ renderer.setAnimationLoop(t => {
         const dt = Math.min(0.1, timer.getDelta())
         for (const m of crowd.meeples)
         {
-            const step = WALK_AHEAD_SPEED * walkSpeedMultiplier(m) * dt
+            const step = WADDLE_SPEED * walkSpeedMultiplier(m) * dt
             m.position.x = wrap(m.position.x + Math.sin(m.facing) * step)
             m.position.z = wrap(m.position.z + Math.cos(m.facing) * step)
         }
