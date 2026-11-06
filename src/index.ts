@@ -78,12 +78,26 @@ soundButton.addEventListener("click", () => {
  */
 function startOnGesture(ev: Event): void
 {
-    window.removeEventListener("pointerdown", startOnGesture)
-    window.removeEventListener("keydown", startOnGesture)
+    stopWaiting()
     if (ev.target !== soundButton)
     {
         void music.play()
     }
+}
+
+function stopWaiting(): void
+{
+    window.removeEventListener("pointerdown", startOnGesture)
+    window.removeEventListener("keydown", startOnGesture)
+    window.removeEventListener("gamepadconnected", startOnPad)
+}
+
+/**
+ * Not every browser counts a controller as a user gesture, so the other gestures stay in the race unless this works.
+ */
+function startOnPad(): void
+{
+    music.play().then(stopWaiting, () => {})
 }
 
 if (__DISABLE_MUSIC)
@@ -95,5 +109,6 @@ else
     music.play().catch(() => {
         window.addEventListener("pointerdown", startOnGesture)
         window.addEventListener("keydown", startOnGesture)
+        window.addEventListener("gamepadconnected", startOnPad)
     })
 }
