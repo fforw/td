@@ -10,11 +10,13 @@ import {
     type PatchKind,
     type PatchNode
 } from "./campaign"
-import { enterJob, hasArrived, isAway, jobDays, returnHome, startJob } from "./heroes"
+import { levelSeed } from "../map/generateDungeon"
+import { enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
-import type { PadAction } from "./gamepad"
+import type { Direction, PadAction } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
+import LevelScene, { type LevelHero } from "./levelScene"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
 import { loadOptions, saveOptions } from "./options"
@@ -146,6 +148,12 @@ export default class GameView implements PadTarget
     /** null where the browser has no WebGL */
     private castle: CastleScene | null
 
+    /** the level last looked at, kept while the view is elsewhere */
+    private level: LevelScene | null = null
+
+    /** key of the patch the level is at */
+    private levelTarget: string | null = null
+
     private sheet: MapSheet
 
     private sim: SimWorld
@@ -258,6 +266,11 @@ export default class GameView implements PadTarget
     scope(): Element[]
     {
         const { hud, info, notices, popup, dialog, optionsPopup } = this
+        if (this.canWalk())
+        {
+            // the directions walk here, what's left to click on is the order to leave
+            return [notices]
+        }
         if (!optionsPopup.hidden)
         {
             return [optionsPopup]
@@ -273,7 +286,9 @@ export default class GameView implements PadTarget
     prompts(): Prompt[]
     {
         const { dialog, popup, optionsPopup, following, castle } = this
-        const prompts: Prompt[] = [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
+        const prompts: Prompt[] = this.canWalk()
+            ? [{ glyph: "move", label: "Walk" }, { glyph: "confirm", label: "Leave" }]
+            : [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
         if (!dialog.hidden || !optionsPopup.hidden)
         {
             return [...prompts, { glyph: "back", label: "Back" }]
@@ -351,8 +366,43 @@ export default class GameView implements PadTarget
     {
         if (this.popup.hidden && this.optionsPopup.hidden)
         {
-            this.castle?.look(yaw, pitch, zoom)
+            if (this.viewedLevelJob())
+            {
+                this.level?.look(yaw, pitch, zoom)
+            }
+            else
+            {
+                this.castle?.look(yaw, pitch, zoom)
+            }
         }
+    }
+
+    walk(direction: Direction): boolean
+    {
+        if (this.canWalk())
+        {
+            this.level?.step(direction)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Returns the job of the hero the view is with inside a level, if any
+     */
+    private viewedLevelJob(): Job | undefined
+    {
+        const { campaign, following } = this
+        return campaign.jobs.find(job => job.heroId === following && job.inside)
+    }
+
+    /**
+     * Returns whether a controller walks the hero in the level right now
+     */
+    private canWalk(): boolean
+    {
+        const { popup, dialog, optionsPopup } = this
+        return popup.hidden && dialog.hidden && optionsPopup.hidden && !!this.viewedLevelJob()
     }
 
     setPadMode(active: boolean): void
@@ -368,7 +418,6 @@ export default class GameView implements PadTarget
         {
             castle = new CastleScene(this.campaign.seed, () => this.openMap(), () => this.endDay())
             castle.setWaddling(this.options.waddle)
-            castle.setRunning(true)
         }
         catch (e)
         {
@@ -396,7 +445,6 @@ export default class GameView implements PadTarget
     private openMap(): void
     {
         this.popup.hidden = false
-        this.castle?.setRunning(false)
         this.render()
     }
 
@@ -405,7 +453,6 @@ export default class GameView implements PadTarget
         this.popup.hidden = true
         this.selected = null
         this.dialog.hidden = true
-        this.castle?.setRunning(true)
         this.render()
     }
 
@@ -425,19 +472,17 @@ export default class GameView implements PadTarget
     }
 
     /**
-     * Opens the options over whatever is on the screen, with the 3D view paused like for the map
+     * Opens the options over whatever is on the screen, with the 3D view paused like for the map, see updateScenes()
      */
     private openOptions(): void
     {
         this.optionsPopup.hidden = false
-        this.castle?.setRunning(false)
         this.render()
     }
 
     private closeOptions(): void
     {
         this.optionsPopup.hidden = true
-        this.castle?.setRunning(!!this.popup.hidden)
         this.render()
     }
 
@@ -516,16 +561,63 @@ export default class GameView implements PadTarget
     private enter({ heroId, target }: Job): void
     {
         const { campaign } = this
-        enterJob(campaign, heroId)
         const hero = campaign.heroes.find(h => h.id === heroId)!
         const { kind } = overworld(campaign).patches[target]
-        this.reports.unshift(
-            "Day " + campaign.day + ": " + hero.name + " is back from " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] +
-            " at " + target
-        )
-        this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
+        const place = KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + target
+        // only dungeons have levels so far, and it takes the 3D view to be in one
+        const inLevel = kind === "DUNGEON" && !!this.castle
+        if (inLevel)
+        {
+            enterLevel(campaign, heroId)
+        }
+        else
+        {
+            enterJob(campaign, heroId)
+        }
+        this.report(hero.name + (inLevel ? " went into " : " is back from ") + place)
         this.store.save(campaign)
-        this.follow(null)
+        if (inLevel && !this.popup.hidden)
+        {
+            this.closeMap()
+        }
+        this.follow(inLevel ? heroId : null)
+    }
+
+    /**
+     * Tells a hero in a level to come out, which takes walking to the entrance if the level is there to walk in
+     */
+    private leave({ heroId, target }: Job): void
+    {
+        if (this.levelTarget === target)
+        {
+            this.level!.leave(heroId)
+        }
+        else
+        {
+            this.leftLevel(heroId)
+        }
+    }
+
+    private leftLevel(heroId: number): void
+    {
+        const { campaign } = this
+        const job = campaign.jobs.find(j => j.heroId === heroId)!
+        const hero = campaign.heroes.find(h => h.id === heroId)!
+        const { kind } = overworld(campaign).patches[job.target]
+        leaveLevel(campaign, heroId)
+        this.report(hero.name + " came out of " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target)
+        if (this.following === heroId && !job.way)
+        {
+            // nobody gets to see those without a way outside, they are left to the notices
+            this.follow(null)
+        }
+        this.changed()
+    }
+
+    private report(line: string): void
+    {
+        this.reports.unshift("Day " + this.campaign.day + ": " + line)
+        this.reports.length = Math.min(this.reports.length, MAX_REPORTS)
     }
 
     private sendHome({ heroId }: Job): void
@@ -636,7 +728,7 @@ export default class GameView implements PadTarget
         }
         return [
             ...campaign.missions.flatMap(m => walker(m.explorer.id, m.explorer.speed, m.explorer.dex, m)),
-            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, campaign.heroes.find(h => h.id === j.heroId)!.character.stats.dex, j, j.returning)),
+            ...campaign.jobs.filter(j => !j.inside).flatMap(j => walker(j.heroId, HERO_SPEED, campaign.heroes.find(h => h.id === j.heroId)!.character.stats.dex, j, j.returning)),
             ...(finished ? walker(finished.explorer.id, finished.explorer.speed, finished.explorer.dex, finished) : [])
         ]
     }
@@ -655,9 +747,75 @@ export default class GameView implements PadTarget
         ]
     }
 
+    /**
+     * Returns everyone in the level at the given patch
+     */
+    private levelHeroes(target: string): LevelHero[]
+    {
+        const { campaign } = this
+        return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face }) => ({
+            id: heroId,
+            look: meepleSitter(campaign.seed, heroId).look,
+            gait: gaitOf(heroId),
+            dex: campaign.heroes.find(h => h.id === heroId)!.character.stats.dex,
+            ...(face !== undefined ? { face } : {})
+        }))
+    }
+
+    /**
+     * Shows the scene the view is in, which is the level of the hero it is with or else the castle, and runs it unless a
+     * popup with its own way of being paused is over it. One level is kept at a time.
+     */
+    private updateScenes(): void
+    {
+        const { campaign, castle, popup, optionsPopup, root } = this
+        const job = this.viewedLevelJob()
+        if (job && this.levelTarget !== job.target)
+        {
+            this.level?.dispose()
+            const { q, r } = overworld(campaign).patches[job.target]
+            this.level = new LevelScene(
+                levelSeed(campaign.seed, q, r),
+                (id, face) => {
+                    const moved = this.campaign.jobs.find(j => j.heroId === id)
+                    if (moved?.inside)
+                    {
+                        moved.face = face
+                        this.store.save(this.campaign)
+                    }
+                },
+                id => this.leftLevel(id)
+            )
+            this.levelTarget = job.target
+            root.prepend(this.level.element)
+        }
+        const levelTarget = this.levelTarget
+        if (levelTarget !== null)
+        {
+            this.level!.setHeroes(this.levelHeroes(levelTarget))
+        }
+        if (job)
+        {
+            this.level!.setFocus(job.heroId)
+        }
+
+        const running = popup.hidden && optionsPopup.hidden
+        if (this.level)
+        {
+            this.level.element.hidden = !job
+            this.level.setRunning(running && !!job)
+        }
+        if (castle)
+        {
+            castle.element.hidden = castle.compass.hidden = !!job
+            castle.setRunning(running && !job)
+        }
+    }
+
     private render(): void
     {
         const { campaign } = this
+        this.updateScenes()
         this.castle?.show(this.shownPatches())
         this.castle?.setWalkers(this.walkers())
         this.hud.replaceChildren(...present(this.renderHud()))
@@ -725,6 +883,9 @@ export default class GameView implements PadTarget
                             this.heroRoute = null
                             this.following = null
                             this.finished = null
+                            this.level?.dispose()
+                            this.level = null
+                            this.levelTarget = null
                             // the old ones hold the edits of another timeline, even for the same seed
                             this.castle?.dispose()
                             this.castle = this.createCastle()
@@ -772,7 +933,7 @@ export default class GameView implements PadTarget
             {
                 return el("span", {
                     className: "marker poi away",
-                    title: KIND_NAMES[kind] + ": " + (days ? "a hero gets there in " + days + "d" : "a hero waits to enter")
+                    title: KIND_NAMES[kind] + ": " + (days ? "a hero gets there in " + days + "d" : "a hero is there")
                 }, KIND_ICONS[kind], el("small", {}, days ? "⏳" + days : "🚪"))
             }
             return el("button", {
@@ -890,6 +1051,10 @@ export default class GameView implements PadTarget
     private jobStatus(job: Job): string
     {
         const days = job.endDay - this.campaign.day
+        if (job.inside)
+        {
+            return "is inside"
+        }
         return hasArrived(this.campaign, job) ? "waits to enter" : (job.returning ? "home in " : "gets there in ") + days + "d"
     }
 
@@ -898,6 +1063,10 @@ export default class GameView implements PadTarget
      */
     private renderOrders(job: Job): HTMLElement[]
     {
+        if (job.inside)
+        {
+            return [el("button", { type: "button", className: "enter pad-start", onclick: () => this.leave(job) }, "Leave")]
+        }
         return [
             el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter"),
             el("button", { type: "button", onclick: () => this.sendHome(job) }, "Return to " + this.campaign.castleName)
@@ -945,7 +1114,7 @@ export default class GameView implements PadTarget
                 "🛡️ " + campaign.heroes.find(h => h.id === job.heroId)!.name + " → " +
                     (job.returning ? campaign.castleName : job.target) + ", " + this.jobStatus(job),
                 job.heroId,
-                !!job.way
+                !!job.way || !!job.inside
             ))
         )
     }
@@ -976,7 +1145,7 @@ export default class GameView implements PadTarget
         const { kind } = overworld(campaign).patches[job.target]
         const place = KIND_ICONS[kind] + " " + KIND_NAMES[kind]
         return hasArrived(campaign, job)
-            ? el("div", { className: "notice followed" }, "🛡️ " + name + " is at " + place, ...this.renderOrders(job))
+            ? el("div", { className: "notice followed" }, "🛡️ " + name + (job.inside ? " is in " : " is at ") + place, ...this.renderOrders(job))
             : el("div", { className: "notice followed" },
                 "🛡️ " + name + " → " + (job.returning ? "🏰 " + campaign.castleName : place) + ", " + this.jobStatus(job)
             )
@@ -993,10 +1162,10 @@ export default class GameView implements PadTarget
             .map(job => {
                 const { kind } = overworld(campaign).patches[job.target]
                 const { name } = campaign.heroes.find(h => h.id === job.heroId)!
-                const text = "🛡️ " + name + " is at " + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
+                const text = "🛡️ " + name + (job.inside ? " is in " : " is at ") + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
                 return el("div", { className: "notice" },
                     text,
-                    ...castle && job.way
+                    ...castle && (job.way || job.inside)
                         ? [el("button", { type: "button", onclick: () => this.follow(job.heroId) }, "Go there")]
                         : this.renderOrders(job)
                 )

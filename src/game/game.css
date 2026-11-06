@@ -36,13 +36,21 @@
     font-size: 1rem;
 }
 
-#game .castle-scene
+#game .castle-scene,
+#game .level-scene
 {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
     display: block;
+}
+
+#game .castle-scene[hidden],
+#game .level-scene[hidden],
+#game .compass[hidden]
+{
+    display: none;
 }
 
 #game .compass

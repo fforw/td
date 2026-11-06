@@ -349,10 +349,12 @@ Heroes do everything that happens inside a discovered patch:
   have discovered enough of it, the popup for the job says so.
 - A job targets a known patch other than the castle. It is a journey
   of 3 days per ring (1.5), after which the hero waits at the target
-  until told to enter, for as long as that takes. Until levels exist,
-  entering brings the hero straight back with a report. The hero can also
+  until told to enter, for as long as that takes. Entering a dungeon takes
+  them into its level (3.1). Other kinds have no levels yet, entering
+  those brings the hero straight back with a report. The hero can also
   be told to return instead, which takes the same days back along the
-  way and teaches nothing. The target is free for another hero meanwhile.
+  way and teaches nothing unless they went in. The target is free for
+  another hero meanwhile.
 - Attribute for wisdom: inside levels finds hidden traps and passages.
 - They enter levels, take treasure and fight, and are the ones who get
   seen, followed and hated (phase 4).
@@ -564,6 +566,20 @@ Glyphs are built from the stroke data of a source kanji per concept
 - A portal is a fixture linking a face in one level to a face in another,
   e.g. the HOUSE face on the overworld to the entrance of the house
   interior. Stored in both levels as a pair of (level, patch, face).
+- There are no portal fixtures yet. A dungeon patch leads to the level
+  with `levelSeed()` of its position, 2 x 2 patches of the default style,
+  and all a job records is that the hero is inside, the face they last got
+  to and that they went in at all. Someone comes in at the middle of the
+  largest room (`entranceFace()`), and leaving means walking back there.
+  Outside they wait for orders again, which can be going back in.
+- The view swaps to the level of the hero it follows (`game/levelScene.ts`),
+  and back with the view of the castle, while the hero stays inside. That
+  doesn't take swapping level groups in one renderer as 0.1 has it, each
+  has a canvas of its own and only runs while it is shown. One level is
+  kept at a time, the worker only builds it again for another one. Days
+  are still ended at the castle, with heroes in levels just waiting there.
+- Clicking on the floor walks the hero there (`map/dungeonWays.ts`), and
+  controller directions walk face by face instead of moving the focus.
 
 ### 3.2 Fixtures
 
