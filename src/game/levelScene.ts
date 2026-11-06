@@ -1,3 +1,4 @@
+import Prando from "prando"
 import {
     ACESFilmicToneMapping,
     Color,
@@ -13,14 +14,16 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
-import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor } from "../map/dungeonWays"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { tautPath } from "../map/route"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
+import CuboidCrowd from "../monster/CuboidCrowd"
+import CuboidPack, { BIG_CUBOID, type CuboidPrey, HERO_RADIUS, mostCuboids, placeCuboids } from "../monster/cuboids"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
-import HeroMarks from "../render/heroMarks"
+import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerLights, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import MapWorkerClient from "../worker/MapWorkerClient"
@@ -60,7 +63,18 @@ const HERO_SILHOUETTE = new Color("#b8ccf4")
 /**
  * Room a meeple needs around it on the floor, in world units
  */
-const ROOM_AROUND = MEEPLE_SCALE * 0.3
+const ROOM_AROUND = HERO_RADIUS
+
+/**
+ * Hit points a sword takes
+ */
+const SWORD_DAMAGE = 2
+
+/**
+ * What the screen does for a moment when the hero the view is with gets hurt
+ */
+const HURT_FLASH = [{ filter: "sepia(1) saturate(5) hue-rotate(-50deg)" }, { filter: "none" }]
+const HURT_FLASH_TIME = 250
 
 /**
  * Camera offset from the hero, in world units
@@ -107,6 +121,8 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
     dex: number
     /** global id of the face to stand on, the entrance without it */
     face?: number
+    /** hit points left */
+    hp: number
 }
 
 interface ShownHero
@@ -121,6 +137,11 @@ interface ShownHero
     control: HeroControl
     /** moved on orders in the last frame */
     steered: boolean
+    /** what the cuboids need to know about the hero */
+    prey: CuboidPrey
+    hp: number
+    /** when the sword of the attack going on gets there, in seconds, null without one */
+    strikeAt: number | null
 }
 
 
@@ -157,6 +178,8 @@ export default class LevelScene
     private meshes: LevelMeshes | null = null
     private floorWalls: FloorWalls | null = null
     private crowd: MeepleCrowd | null = null
+    private cuboids: CuboidPack | null = null
+    private cuboidCrowd: CuboidCrowd | null = null
     private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
@@ -192,11 +215,15 @@ export default class LevelScene
      * @param seed      seed of the level
      * @param onMoved   called when a hero got to a face
      * @param onLeft    called when a hero told to leave has got out
+     * @param onHurt    called with the hit points left when a hero got hurt
+     * @param onFallen  called when a hero has no hit points left
      */
     constructor(
         seed: number,
         private readonly onMoved: (id: number, face: number) => void,
-        private readonly onLeft: (id: number) => void
+        private readonly onLeft: (id: number) => void,
+        private readonly onHurt: (id: number, hp: number) => void,
+        private readonly onFallen: (id: number) => void
     )
     {
         const canvas = document.createElement("canvas")
@@ -225,15 +252,15 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels(MEEPLE_MODELS),
+            loadModels([...MEEPLE_MODELS, "acidCuboid"]),
             loadItems(HERO_ITEMS)
         ]).then(
-            ([level]) => this.addLevel(level),
+            ([level]) => this.addLevel(level, seed),
             err => console.error("Building level " + seed + " failed", err)
         )
     }
 
-    private addLevel(level: DungeonLevel): void
+    private addLevel(level: DungeonLevel, seed: number): void
     {
         const meshes = createLevelMeshes(level)
         this.level = level
@@ -249,9 +276,30 @@ export default class LevelScene
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
+        this.addCuboids(level, meshes, seed)
 
         this.setHeroes(this.heroes)
         this.client.terminate()
+    }
+
+    private addCuboids({ rooms }: DungeonLevel, { world, segments, field }: LevelMeshes, seed: number): void
+    {
+        const walls = this.floorWalls!
+        const bigWalls = createFloorWalls(segments, BIG_CUBOID.radius)
+        const pack = new CuboidPack({
+            move: (cuboid, dx, dz) => moveOnFloor(world, cuboid.kind === BIG_CUBOID ? bigWalls : walls, cuboid, dx, dz),
+            sees: (x0, z0, x1, z1) => seesAcross(walls, x0, z0, x1, z1)
+        })
+        const placed = placeCuboids(rooms, new Prando(seed))
+        for (const { face, kind } of placed)
+        {
+            const [x, z] = faceCenter(world, face)
+            pack.add(kind, face, x, z)
+        }
+        const cuboidCrowd = new CuboidCrowd(mostCuboids(placed.map(({ kind }) => kind)), field)
+        this.scene.add(cuboidCrowd.group)
+        this.cuboids = pack
+        this.cuboidCrowd = cuboidCrowd
     }
 
     /**
@@ -273,7 +321,7 @@ export default class LevelScene
                 shown.delete(id)
             }
         }
-        for (const { id, look, gait, dex, face = this.entrance, ...held } of heroes)
+        for (const { id, look, gait, dex, face = this.entrance, hp, ...held } of heroes)
         {
             if (!shown.has(id))
             {
@@ -300,7 +348,10 @@ export default class LevelScene
                     walk: null,
                     leaving: false,
                     control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
-                    steered: false
+                    steered: false,
+                    prey: { x, z, facing: 0, blocking: false, hurtWait: 0 },
+                    hp,
+                    strikeAt: null
                 })
             }
         }
@@ -403,7 +454,8 @@ export default class LevelScene
         {
             this.crowd!.act(meeple, 0)
             // comes with the blade, after it has been drawn back
-            this.marks.slash(time + itemAnimation(meeple.item!).action.steps[0].transition.duration)
+            hero.strikeAt = time + itemAnimation(meeple.item!).action.steps[0].transition.duration
+            this.marks.slash(hero.strikeAt)
         }
         if (input)
         {
@@ -496,6 +548,7 @@ export default class LevelScene
                 }
             }
         }
+        this.updateCuboids(time, delta)
         this.crowd?.update(this.camera, time)
 
         const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
@@ -503,6 +556,57 @@ export default class LevelScene
         {
             const { position, facing } = focused.meeple
             this.marks.update(position.x, position.z, facing, !!steering, time)
+        }
+    }
+
+    private updateCuboids(time: number, delta: number): void
+    {
+        const { cuboids, shown } = this
+        if (!cuboids)
+        {
+            return
+        }
+        const heroes = [...shown.entries()]
+        for (const [, { meeple, control, prey }] of heroes)
+        {
+            prey.x = meeple.position.x
+            prey.z = meeple.position.z
+            prey.facing = meeple.facing
+            prey.blocking = control.blocking
+        }
+        cuboids.update(delta, heroes.map(([, { prey }]) => prey))
+
+        for (const [id, hero] of heroes)
+        {
+            const { prey, strikeAt } = hero
+            if (strikeAt !== null && time >= strikeAt)
+            {
+                hero.strikeAt = null
+                cuboids.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, SWORD_DAMAGE)
+            }
+            const damage = cuboids.hurt(prey, delta)
+            if (damage > 0)
+            {
+                this.hurtHero(id, hero, damage)
+            }
+        }
+        this.cuboidCrowd!.update(cuboids.cuboids, time)
+    }
+
+    private hurtHero(id: number, hero: ShownHero, damage: number): void
+    {
+        hero.hp = Math.max(0, hero.hp - damage)
+        if (id === this.focus)
+        {
+            this.element.animate(HURT_FLASH, HURT_FLASH_TIME)
+        }
+        if (hero.hp === 0)
+        {
+            this.onFallen(id)
+        }
+        else
+        {
+            this.onHurt(id, hero.hp)
         }
     }
 

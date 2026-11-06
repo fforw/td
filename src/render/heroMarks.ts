@@ -17,8 +17,8 @@ const AIM_OPACITY = 0.6
  * seconds it takes to fade
  */
 const SLASH_INNER = 0.2
-const SLASH_OUTER = 0.55
-const SLASH_WIDTH = 2.2
+export const SLASH_OUTER = 0.55
+export const SLASH_WIDTH = 2.2
 const SLASH_OPACITY = 0.85
 const SLASH_FADE = 0.2
 

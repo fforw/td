@@ -611,14 +611,14 @@ export default class GameView implements PadTarget
         }
     }
 
-    private leftLevel(heroId: number): void
+    private leftLevel(heroId: number, how = " came out of "): void
     {
         const { campaign } = this
         const job = campaign.jobs.find(j => j.heroId === heroId)!
         const hero = campaign.heroes.find(h => h.id === heroId)!
         const { kind } = overworld(campaign).patches[job.target]
         leaveLevel(campaign, heroId)
-        this.report(hero.name + " came out of " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target)
+        this.report(hero.name + how + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target)
         if (this.following === heroId && !job.way)
         {
             // nobody gets to see those without a way outside, they are left to the notices
@@ -766,13 +766,14 @@ export default class GameView implements PadTarget
     private levelHeroes(target: string): LevelHero[]
     {
         const { campaign } = this
-        return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face }) => {
+        return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face, hp }) => {
             const { character } = campaign.heroes.find(h => h.id === heroId)!
             return {
                 id: heroId,
                 look: meepleSitter(campaign.seed, heroId).look,
                 gait: gaitOf(heroId),
                 dex: character.stats.dex,
+                hp: hp ?? character.stats.hp,
                 ...heldItems(character),
                 ...(face !== undefined ? { face } : {})
             }
@@ -801,7 +802,15 @@ export default class GameView implements PadTarget
                         this.store.save(this.campaign)
                     }
                 },
-                id => this.leftLevel(id)
+                id => this.leftLevel(id),
+                (id, hp) => {
+                    this.campaign.jobs.find(j => j.heroId === id)!.hp = hp
+                    this.changed()
+                },
+                id => {
+                    delete this.campaign.jobs.find(j => j.heroId === id)!.hp
+                    this.leftLevel(id, " got carried out of ")
+                }
             )
             this.levelTarget = job.target
             root.prepend(this.level.element)
@@ -868,9 +877,12 @@ export default class GameView implements PadTarget
 
     private renderHud(): Child[]
     {
-        const { campaign } = this
+        const { campaign, following } = this
+        const job = campaign.jobs.find(j => j.heroId === following && j.inside)
+        const maxHp = campaign.heroes.find(hero => hero.id === following)?.character.stats.hp
         return [
             el("span", { className: "castle" }, campaign.subtitle),
+            !!job && el("span", { className: "hp", title: "Hit points" }, "❤️ " + (job.hp ?? maxHp) + " / " + maxHp),
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
             el("button", {

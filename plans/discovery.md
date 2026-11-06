@@ -596,9 +596,9 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Walls don't fill their faces, so they also have to meet at vertices that
   keep floors apart or the floor from the void (`splitsAtVertex()`). The
   gaps left otherwise would be real ways around them, for heroes and light.
-- There is nothing to hit yet: attacks and blocks only show. The floor
-  shows the aim and the slash (`render/heroMarks.ts`), as items lie along the
-  body and hardly show from above.
+- The floor shows the aim and the slash (`render/heroMarks.ts`), as items lie
+  along the body and hardly show from above. The sword hits what is in that
+  arc, when the blade comes down.
 - Walls hide those walking behind them, so meeples can have a silhouette, a
   dark shape with a light rim showing only where something is in front of
   them (`MeepleCrowd.showSilhouettes()`). Heroes always have one. It is set per
@@ -630,6 +630,16 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Live mobiles are saved while their level is active. On reload,
   unchanged inhabitants are regenerated; the record keeps who is dead,
   fled or moved.
+- The first monster is the acid cuboid (`monster/cuboids.ts`), big or at half
+  the size. They hop after heroes they see, the big ones slower. A big one can
+  lunge half as far again as a hop, after a moment of winding up, and breaks
+  up into 2 to 7 small ones when it dies. A shield stops small ones from the
+  front only. Touching hurts, then no cuboid can hurt that hero for a second,
+  and after that whatever still touches them hurts again.
+- For now cuboids are placed in some rooms at random from the level seed, not
+  by a premise, and aren't saved: a reload brings all of them back. A hero's
+  hit points are kept on the job while they are inside. Without any left they
+  get carried out, and are back at full strength. Dying is still to be decided.
 
 ### 3.4 Dungeon generation
 
