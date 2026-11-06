@@ -12,11 +12,11 @@ import {
     RedFormat,
     RepeatWrapping,
     RGBAFormat,
-    RGFormat,
     Vector2
 } from "three"
 import {
     castWallDistances,
+    LIGHT_CHANNELS,
     LIGHT_TEXELS,
     type LevelLighting,
     RIM_FADE_END,
@@ -27,8 +27,9 @@ import {
 } from "../map/dungeonLights"
 
 /*
- * Materials lit by the baked light field of a dungeon level. Everything looks up the light of its position, so moving things
- * cost the same as walls, no matter how many lights there are.
+ * Materials lit by the baked light field of a dungeon level. Everything looks up which lights reach its position and how much
+ * of them the walls leave, so moving things cost the same as walls, no matter how many lights there are. What the lights give
+ * there is worked out in the shader, so they can change their strength and color at any time.
  */
 
 /**
@@ -111,11 +112,45 @@ const HERO_EDGE_STEPS = 4
  */
 const NO_HERO = 1e6
 
+/**
+ * Adds up the lights of a position, the same way lightAt() does it for a light that the walls don't block: the color and energy
+ * of all lights and the sum of their directions. A light without an id comes out empty, as the empty row has no reach.
+ */
 const PARS = /* glsl */`
-    uniform sampler2D lightColors;
-    uniform sampler2D lightDirections;
+    uniform sampler2D lightVisibility;
+    uniform sampler2D lightIds;
+    uniform sampler2D lightData;
     uniform vec2 lightOrigin;
     uniform vec2 lightSize;
+
+    void gatherLights(vec2 position, out vec4 field, out vec2 fieldDirection)
+    {
+        vec2 uv = (position - lightOrigin) / lightSize;
+        vec4 visibility = texture2D(lightVisibility, uv);
+        vec4 ids = texture2D(lightIds, uv);
+        field = vec4(0.0);
+        fieldDirection = vec2(0.0);
+        for (int i = 0; i < ${LIGHT_CHANNELS}; i++)
+        {
+            if (visibility[i] > 0.0)
+            {
+                int id = int(ids[i] * 255.0 + 0.5);
+                vec4 place = texelFetch(lightData, ivec2(id, 0), 0);
+                vec2 toLight = place.xy - position;
+                float d = length(toLight);
+                float left = 1.0 - d * d / max(place.w * place.w, 1e-6);
+                if (left > 0.0)
+                {
+                    vec4 light = texelFetch(lightData, ivec2(id, 1), 0);
+                    float radius = place.z;
+                    float fade = left * left / (2.0 * radius) * visibility[i];
+                    float near = d > radius ? radius / d : d / radius;
+                    field += light * (d > radius ? 2.0 * asin(radius / d) : ${Math.PI.toFixed(6)}) * fade;
+                    fieldDirection += toLight / max(d, 1e-5) * 2.0 * near * fade * light.a;
+                }
+            }
+        }
+    }
 `
 
 /**
@@ -216,8 +251,9 @@ const HERO_VISIBILITY = /* glsl */`
 export interface LightField
 {
     uniforms: {
-        lightColors: { value: DataTexture }
-        lightDirections: { value: DataTexture }
+        lightVisibility: { value: DataTexture }
+        lightIds: { value: DataTexture }
+        lightData: { value: DataTexture }
         lightWalls: { value: DataTexture }
         lightOrigin: { value: Vector2 }
         lightSize: { value: Vector2 }
@@ -246,7 +282,7 @@ function createTexture(data: Float32Array, width: number, height: number, format
 /**
  * Creates the light field for a baked level
  */
-export function createLightField({ minX, minZ, width, height, colors, directions, walls }: LevelLighting): LightField
+export function createLightField({ lights, minX, minZ, width, height, visibility, lightIds, walls }: LevelLighting): LightField
 {
     // world positions need the full floats, and mixing the ends of different walls makes no sense
     const wallTexture = new DataTexture(walls, width, height, RGBAFormat, FloatType)
@@ -257,10 +293,33 @@ export function createLightField({ minX, minZ, width, height, colors, directions
     const heroTexture = createTexture(new Float32Array(HERO_DIRECTIONS), HERO_DIRECTIONS, 1, RedFormat)
     heroTexture.wrapS = RepeatWrapping
 
+    const visibilityTexture = new DataTexture(visibility, width, height, RGBAFormat)
+    visibilityTexture.magFilter = visibilityTexture.minFilter = LinearFilter
+    visibilityTexture.wrapS = visibilityTexture.wrapT = ClampToEdgeWrapping
+    visibilityTexture.needsUpdate = true
+
+    // lights have no business being mixed
+    const idTexture = new DataTexture(lightIds, width, height, RGBAFormat)
+    idTexture.magFilter = idTexture.minFilter = NearestFilter
+    idTexture.wrapS = idTexture.wrapT = ClampToEdgeWrapping
+    idTexture.needsUpdate = true
+
+    // per light its place and size in one row and its color and strength in the next, with the empty id 0 in front
+    const data = new Float32Array((lights.length + 1) * 2 * 4)
+    const rowLength = (lights.length + 1) * 4
+    lights.forEach(({ x, z, radius, reach, color }, index) => {
+        data.set([x, z, radius, reach], (index + 1) * 4)
+        data.set([...color, 1], rowLength + (index + 1) * 4)
+    })
+    const dataTexture = new DataTexture(data, lights.length + 1, 2, RGBAFormat, FloatType)
+    dataTexture.magFilter = dataTexture.minFilter = NearestFilter
+    dataTexture.needsUpdate = true
+
     return {
         uniforms: {
-            lightColors: { value: createTexture(colors, width, height, RGBAFormat) },
-            lightDirections: { value: createTexture(directions, width, height, RGFormat) },
+            lightVisibility: { value: visibilityTexture },
+            lightIds: { value: idTexture },
+            lightData: { value: dataTexture },
             lightWalls: { value: wallTexture },
             lightOrigin: { value: new Vector2(minX, minZ) },
             lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
@@ -338,12 +397,13 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                     vec3 worldNormal = inverseTransformDirection(normal, viewMatrix);
                     if (${flatTops ? "worldNormal.y < 0.99" : "true"})
                     {
-                        vec2 uv = (stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}) - lightOrigin) / lightSize;
-                        vec2 toLight = texture2D(lightDirections, uv).rg;
+                        vec4 field;
+                        vec2 toLight;
+                        gatherLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight);
                         toLight /= max(length(toLight), 0.02);
                         vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
 
-                        directLight.color = texture2D(lightColors, uv).rgb * ${LIGHT_GAIN.toFixed(3)};
+                        directLight.color = field.rgb * ${LIGHT_GAIN.toFixed(3)};
                         directLight.direction = normalize((viewMatrix * vec4(worldDirection, 0.0)).xyz);
                         directLight.visible = true;
                         RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);
@@ -387,9 +447,9 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
             .replace("#include <begin_vertex>", /* glsl */`
                 #include <begin_vertex>
                 mat4 rimMatrix = modelMatrix * instanceMatrix;
-                vec2 rimUv = ((rimMatrix * vec4(transformed, 1.0)).xz - lightOrigin) / lightSize;
-                vec4 rimField = texture2D(lightColors, rimUv);
-                vec2 rimDirection = texture2D(lightDirections, rimUv).rg;
+                vec4 rimField;
+                vec2 rimDirection;
+                gatherLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection);
                 float rimOwn = length(rimDirection);
 
                 vRim = smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)

@@ -3,7 +3,7 @@ import { wallGround } from "./dungeonWalls"
 import type { DungeonLevel } from "./generateDungeon"
 import { EdgeType } from "./geometry"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
-import { next } from "./QuadPatch"
+import { next, type QuadPatch } from "./QuadPatch"
 import { SCALE } from "./scale"
 
 const TAU = Math.PI * 2
@@ -13,6 +13,10 @@ const TAU = Math.PI * 2
  * gets the angle under which it sees a light, which is what is left of the light after taking away the angles of the walls
  * in front of it. That gives exact soft shadows. Lights are below the top of the walls, so a wall between a light and the
  * floor always blocks the way and the shadows on the floor are right in 2D.
+ *
+ * The field only keeps which share of a light the walls leave at a point. The rest follows from the distance to the light, so
+ * the shader works it out, which lets lights change their strength and color without baking them again. A light has one channel
+ * of the field everywhere, and lights in the same channel never meet, which limits how many lights can be at a point.
  */
 
 /**
@@ -77,6 +81,16 @@ export const WALL_CLEARANCE = Math.SQRT2 / LIGHT_TEXELS
 export const NO_WALL = 1e6
 
 /**
+ * Number of lights that can be at the same point
+ */
+export const LIGHT_CHANNELS = 4
+
+/**
+ * Most lights of a level, with the ids of the field having a byte each and 0 meaning no light
+ */
+export const MAX_LIGHTS = 255
+
+/**
  * Number of sectors around a light to find the walls of a point quickly
  */
 const LIGHT_SECTORS = 128
@@ -116,6 +130,23 @@ export interface DungeonLight
      * How far the light reaches in world units
      */
     reach: number
+
+    /**
+     * Channel of the light field the light is in
+     */
+    channel: number
+}
+
+
+/**
+ * World coordinates of the area of a level
+ */
+export interface LevelBounds
+{
+    minX: number
+    minZ: number
+    maxX: number
+    maxZ: number
 }
 
 
@@ -139,15 +170,15 @@ export interface LevelLighting
     height: number
 
     /**
-     * Per texel the light color times energy of all lights and the energy of all lights
+     * Per texel and channel the share of the light of that channel that the walls leave, from 0 to 255
      */
-    colors: Float32Array
+    visibility: Uint8Array
 
     /**
-     * Per texel the sum of the directions of the seen parts of the lights in x and z. For a single light, its length is the
-     * energy of the light unless that is very close.
+     * Per texel and channel the index of the light of that channel plus 1, or 0 if there is none. It is also there around the
+     * lit texels of a light, as a lookup between two texels only has the id of the closer one.
      */
-    directions: Float32Array
+    lightIds: Uint8Array
 
     /**
      * Per texel the start and end in x and z of the wall closest to it, for lookups to stay on their side of it, or NO_WALL
@@ -421,6 +452,29 @@ export function lightAt(view: LightView, segments: Float64Array, px: number, pz:
 }
 
 
+/**
+ * Returns the share of a light that reaches a point
+ *
+ * @param view      light
+ * @param px        position of the point
+ * @param pz        position of the point
+ * @param energy    energy the point gets from the light
+ *
+ * @return share from 0 to 1, 0 outside of the reach of the light
+ */
+export function lightShare({ x, z, radius, reach }: LightView, px: number, pz: number, energy: number): number
+{
+    const d = Math.hypot(x - px, z - pz)
+    const left = 1 - d * d / (reach * reach)
+    if (left <= 0)
+    {
+        return 0
+    }
+    const seen = d <= radius ? Math.PI : 2 * Math.asin(radius / d)
+    return energy / (seen * left * left / (2 * radius))
+}
+
+
 const sampleA: LightSample = { energy: 0, x: 0, z: 0 }
 const sampleB: LightSample = { energy: 0, x: 0, z: 0 }
 
@@ -468,28 +522,126 @@ export function faceCenter(world: PatchWorld, face: number): [number, number]
 
 
 /**
+ * Returns the world coordinates of the area of the given patches
+ */
+export function levelBounds(patches: readonly QuadPatch[]): LevelBounds
+{
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+    for (const { positions } of patches)
+    {
+        for (let i = 0; i < positions.length; i += 3)
+        {
+            minX = Math.min(minX, positions[i] * SCALE)
+            maxX = Math.max(maxX, positions[i] * SCALE)
+            minZ = Math.min(minZ, positions[i + 1] * SCALE)
+            maxZ = Math.max(maxZ, positions[i + 1] * SCALE)
+        }
+    }
+    return { minX, minZ, maxX, maxZ }
+}
+
+
+function fieldWidth({ minX, maxX }: LevelBounds): number
+{
+    return Math.ceil((maxX - minX) * LIGHT_TEXELS)
+}
+
+
+function fieldHeight({ minZ, maxZ }: LevelBounds): number
+{
+    return Math.ceil((maxZ - minZ) * LIGHT_TEXELS)
+}
+
+
+const sample: LightSample = { energy: 0, x: 0, z: 0 }
+
+/**
+ * Goes through the texels of the light field a light has a share in
+ *
+ * @param view      light
+ * @param segments  segment array the light was prepared with
+ * @param bounds    world coordinates of the area of the level
+ * @param visit     gets the texel and the share of the light there from 0 to 255
+ */
+function forLitTexels(
+    view: LightView,
+    segments: Float64Array,
+    bounds: LevelBounds,
+    visit: (tx: number, tz: number, share: number) => void
+): void
+{
+    const { x, z, reach } = view
+    const { minX, minZ } = bounds
+    const fromX = Math.max(0, Math.floor((x - reach - minX) * LIGHT_TEXELS))
+    const toX = Math.min(fieldWidth(bounds), Math.ceil((x + reach - minX) * LIGHT_TEXELS))
+    const fromZ = Math.max(0, Math.floor((z - reach - minZ) * LIGHT_TEXELS))
+    const toZ = Math.min(fieldHeight(bounds), Math.ceil((z + reach - minZ) * LIGHT_TEXELS))
+
+    for (let tz = fromZ; tz < toZ; tz++)
+    {
+        for (let tx = fromX; tx < toX; tx++)
+        {
+            const px = minX + (tx + 0.5) / LIGHT_TEXELS, pz = minZ + (tz + 0.5) / LIGHT_TEXELS
+            lightAt(view, segments, px, pz, sample)
+            const share = Math.round(lightShare(view, px, pz, sample.energy) * 255)
+            if (share > 0)
+            {
+                visit(tx, tz, share)
+            }
+        }
+    }
+}
+
+
+/**
+ * Goes through a texel and the texels around it, which is what a lookup close to the texel can mix it with
+ */
+function forTexelsAround(tx: number, tz: number, width: number, height: number, visit: (i: number) => void): void
+{
+    for (let z = Math.max(0, tz - 1); z <= Math.min(height - 1, tz + 1); z++)
+    {
+        for (let x = Math.max(0, tx - 1); x <= Math.min(width - 1, tx + 1); x++)
+        {
+            visit(z * width + x)
+        }
+    }
+}
+
+
+/**
  * Places up to one light in the middle of each room, the biggest rooms first. Big rooms get big lights. The light of a room
- * gets smaller until it no longer gives meeples two rims at the same point, and the room stays dark if even the smallest light
- * does. Doors count as open.
+ * gets smaller until it no longer gives meeples two rims at the same point and there is a channel it can have, and the room
+ * stays dark if even the smallest light can't. Doors count as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
  * @param rooms     global face ids per room
  * @param segments  segment array
+ * @param bounds    world coordinates of the area of the level
  */
 export function placeLights(
     seed: number,
     world: PatchWorld,
     rooms: readonly number[][],
-    segments: Float64Array
+    segments: Float64Array,
+    bounds: LevelBounds
 ): DungeonLight[]
 {
     return withSeed(patchSeed(seed ^ LIGHT_SALT, 0, 0), () => {
         const lights: DungeonLight[] = []
         const views: LightView[] = []
+        const width = fieldWidth(bounds), height = fieldHeight(bounds)
+
+        // per texel one bit for each channel that is taken
+        const taken = new Uint8Array(width * height)
 
         for (const room of [...rooms].sort((a, b) => b.length - a.length))
         {
+            if (lights.length === MAX_LIGHTS)
+            {
+                break
+            }
+
             const centers = room.map(face => faceCenter(world, face))
             const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
             const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
@@ -527,8 +679,30 @@ export function placeLights(
                 {
                     continue
                 }
+
+                const texels = new Set<number>()
+                forLitTexels(view, segments, bounds, (tx, tz) => forTexelsAround(tx, tz, width, height, i => texels.add(i)))
+                let used = 0
+                for (const i of texels)
+                {
+                    used |= taken[i]
+                }
+                let channel = 0
+                while (channel < LIGHT_CHANNELS && used & 1 << channel)
+                {
+                    channel++
+                }
+                if (channel === LIGHT_CHANNELS)
+                {
+                    continue
+                }
+                for (const i of texels)
+                {
+                    taken[i] |= 1 << channel
+                }
+
                 views.push(view)
-                lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)], radius, reach })
+                lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)], radius, reach, channel })
                 break
             }
         }
@@ -584,8 +758,6 @@ function bakeWalls(segments: Float64Array, minX: number, minZ: number, width: nu
 }
 
 
-const sample: LightSample = { energy: 0, x: 0, z: 0 }
-
 /**
  * Bakes the given lights into a light field for the given level
  *
@@ -593,44 +765,20 @@ const sample: LightSample = { energy: 0, x: 0, z: 0 }
  * @param segments  segment array
  * @param bounds    world coordinates of the area of the level
  */
-export function bakeLights(
-    lights: DungeonLight[],
-    segments: Float64Array,
-    { minX, minZ, maxX, maxZ }: { minX: number, minZ: number, maxX: number, maxZ: number }
-): LevelLighting
+export function bakeLights(lights: DungeonLight[], segments: Float64Array, bounds: LevelBounds): LevelLighting
 {
-    const width = Math.ceil((maxX - minX) * LIGHT_TEXELS)
-    const height = Math.ceil((maxZ - minZ) * LIGHT_TEXELS)
-    const colors = new Float32Array(width * height * 4)
-    const directions = new Float32Array(width * height * 2)
+    const { minX, minZ } = bounds
+    const width = fieldWidth(bounds), height = fieldHeight(bounds)
+    const visibility = new Uint8Array(width * height * LIGHT_CHANNELS)
+    const lightIds = new Uint8Array(width * height * LIGHT_CHANNELS)
 
-    for (const { x, z, color, radius, reach } of lights)
-    {
-        const view = createLightView(x, z, segments, radius, reach)
-        const fromX = Math.max(0, Math.floor((x - reach - minX) * LIGHT_TEXELS))
-        const toX = Math.min(width, Math.ceil((x + reach - minX) * LIGHT_TEXELS))
-        const fromZ = Math.max(0, Math.floor((z - reach - minZ) * LIGHT_TEXELS))
-        const toZ = Math.min(height, Math.ceil((z + reach - minZ) * LIGHT_TEXELS))
-
-        for (let tz = fromZ; tz < toZ; tz++)
-        {
-            for (let tx = fromX; tx < toX; tx++)
-            {
-                lightAt(view, segments, minX + (tx + 0.5) / LIGHT_TEXELS, minZ + (tz + 0.5) / LIGHT_TEXELS, sample)
-                if (sample.energy > 0)
-                {
-                    const i = tz * width + tx
-                    colors[i * 4] += sample.energy * color[0]
-                    colors[i * 4 + 1] += sample.energy * color[1]
-                    colors[i * 4 + 2] += sample.energy * color[2]
-                    colors[i * 4 + 3] += sample.energy
-                    directions[i * 2] += sample.x
-                    directions[i * 2 + 1] += sample.z
-                }
-            }
-        }
-    }
-    return { lights, minX, minZ, width, height, colors, directions, walls: bakeWalls(segments, minX, minZ, width, height) }
+    lights.forEach(({ x, z, radius, reach, channel }, index) => {
+        forLitTexels(createLightView(x, z, segments, radius, reach), segments, bounds, (tx, tz, share) => {
+            visibility[(tz * width + tx) * LIGHT_CHANNELS + channel] = share
+            forTexelsAround(tx, tz, width, height, i => lightIds[i * LIGHT_CHANNELS + channel] = index + 1)
+        })
+    })
+    return { lights, minX, minZ, width, height, visibility, lightIds, walls: bakeWalls(segments, minX, minZ, width, height) }
 }
 
 
@@ -691,17 +839,6 @@ export function lightDungeon(seed: number, { patches, rooms }: DungeonLevel): Le
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
     const segments = findWallSegments(world, slots)
-
-    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
-    for (const { positions } of patches)
-    {
-        for (let i = 0; i < positions.length; i += 3)
-        {
-            minX = Math.min(minX, positions[i] * SCALE)
-            maxX = Math.max(maxX, positions[i] * SCALE)
-            minZ = Math.min(minZ, positions[i + 1] * SCALE)
-            maxZ = Math.max(maxZ, positions[i + 1] * SCALE)
-        }
-    }
-    return bakeLights(placeLights(seed, world, rooms, segments), segments, { minX, minZ, maxX, maxZ })
+    const bounds = levelBounds(patches)
+    return bakeLights(placeLights(seed, world, rooms, segments, bounds), segments, bounds)
 }

@@ -5,12 +5,16 @@ import {
     castWallDistances,
     createLightView,
     findWallSegments,
+    levelBounds,
+    LIGHT_CHANNELS,
     LIGHT_RADIUS,
     LIGHT_TEXELS,
     lightAt,
     lightDungeon,
     type LightSample,
+    lightShare,
     MAX_INFLUENCE,
+    MAX_LIGHTS,
     MIN_INFLUENCE,
     NO_WALL,
     placeLights,
@@ -102,7 +106,7 @@ function connect(seed: number)
     const level = generateDungeon(seed, FACE_SIZE, 2, 2)
     const world = new PatchWorld()
     const slots = level.patches.map(patch => world.add(patch))
-    return { level, world, slots, segments: findWallSegments(world, slots) }
+    return { level, world, slots, segments: findWallSegments(world, slots), bounds: levelBounds(level.patches) }
 }
 
 
@@ -223,6 +227,45 @@ describe("lightAt", () => {
 })
 
 
+describe("lightShare", () => {
+    it("goes from all of the light in the open to nothing behind a wall", () => {
+        const open = new Float64Array(0)
+        const wall = new Float64Array([2, -3, 2, 3, 0, 0])
+        const out: LightSample = { energy: 0, x: 0, z: 0 }
+        for (const [px, pz] of [[0.1, 0], [1.5, 0], [0, 4]])
+        {
+            const view = createLightView(0, 0, open)
+            lightAt(view, open, px, pz, out)
+            assert.closeTo(lightShare(view, px, pz, out.energy), 1, 1e-9)
+        }
+
+        const view = createLightView(0, 0, wall)
+        lightAt(view, wall, 3, 0, out)
+        assert.equal(lightShare(view, 3, 0, out.energy), 0)
+        assert.equal(lightShare(view, MAX_INFLUENCE, 0, 0), 0)
+    })
+
+    it("gives the energy and direction of lightAt() in the open, the way the shader works them out", () => {
+        const segments = new Float64Array(0)
+        const out: LightSample = { energy: 0, x: 0, z: 0 }
+        const radius = 0.2, reach = 3
+        const view = createLightView(1, 2, segments, radius, reach)
+        for (const [px, pz] of [[1.05, 2], [1.1, 2.1], [1, 2.3], [2, 3], [0, 0.5], [3.5, 2]])
+        {
+            lightAt(view, segments, px, pz, out)
+            const tx = 1 - px, tz = 2 - pz
+            const d = Math.hypot(tx, tz)
+            const left = 1 - d * d / (reach * reach)
+            const fade = left * left / (2 * radius)
+            const near = d > radius ? radius / d : d / radius
+            assert.closeTo((d > radius ? 2 * Math.asin(radius / d) : Math.PI) * fade, out.energy, 1e-9)
+            assert.closeTo(tx / d * 2 * near * fade, out.x, 1e-9)
+            assert.closeTo(tz / d * 2 * near * fade, out.z, 1e-9)
+        }
+    })
+})
+
+
 describe("findWallSegments", () => {
     it("has thick walls seen from the floor and thin walls with both sides", () => {
         const { segments } = connect(4711)
@@ -248,9 +291,10 @@ describe("placeLights", () => {
     it("keeps lights away from walls and from giving two rims at a point", () => {
         for (const seed of [4711, 12345])
         {
-            const { level, world, segments } = connect(seed)
-            const lights = placeLights(seed, world, level.rooms, segments)
+            const { level, world, segments, bounds } = connect(seed)
+            const lights = placeLights(seed, world, level.rooms, segments, bounds)
             assert(lights.length >= 10)
+            assert(lights.length <= MAX_LIGHTS)
 
             // lights of different sizes, and all of them within the limits
             assert(new Set(lights.map(({ reach }) => reach)).size > 1)
@@ -296,43 +340,79 @@ describe("placeLights", () => {
         const first = connect(4711)
         const second = connect(4711)
         assert.deepEqual(
-            placeLights(4711, first.world, first.level.rooms, first.segments),
-            placeLights(4711, second.world, second.level.rooms, second.segments)
+            placeLights(4711, first.world, first.level.rooms, first.segments, first.bounds),
+            placeLights(4711, second.world, second.level.rooms, second.segments, second.bounds)
         )
     })
 })
 
 
 describe("bakeLights", () => {
-    it("adds up the lights at their texels", () => {
-        const segments = new Float64Array(0)
-        const bounds = { minX: 0, minZ: 0, maxX: 20, maxZ: 10 }
-        const { width, height, colors, directions } = bakeLights(
+    it("keeps the share of each light in its channel", () => {
+        // a wall between the east light and the texels west of it
+        const segments = new Float64Array([9, 3, 9, 7, 0, 0])
+        const { width, height, visibility, lightIds } = bakeLights(
             [
-                { x: 7, z: 5, color: [1, 0.5, 0], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE },
-                { x: 13, z: 5, color: [0, 0.5, 1], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE }
+                { x: 7, z: 5, color: [1, 0.5, 0], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE, channel: 0 },
+                { x: 13, z: 5, color: [0, 0.5, 1], radius: LIGHT_RADIUS, reach: MAX_INFLUENCE, channel: 2 }
             ],
             segments,
-            bounds
+            { minX: 0, minZ: 0, maxX: 20, maxZ: 10 }
         )
         assert.equal(width, 20 * LIGHT_TEXELS)
         assert.equal(height, 10 * LIGHT_TEXELS)
-        assert.equal(colors.length, width * height * 4)
-        assert.equal(directions.length, width * height * 2)
+        assert.equal(visibility.length, width * height * LIGHT_CHANNELS)
+        assert.equal(lightIds.length, width * height * LIGHT_CHANNELS)
 
-        const at = (x: number, z: number) => (Math.floor(z * LIGHT_TEXELS) * width + Math.floor(x * LIGHT_TEXELS))
+        const at = (x: number, z: number) => (Math.floor(z * LIGHT_TEXELS) * width + Math.floor(x * LIGHT_TEXELS)) * LIGHT_CHANNELS
 
-        // west of the first light, where the other one doesn't reach
-        const near = at(4, 5)
-        assert(colors[near * 4 + 3] > 0)
-        assert.closeTo(colors[near * 4], colors[near * 4 + 3], 1e-5)
-        assert.closeTo(colors[near * 4 + 2], 0, 1e-5)
-        assert(directions[near * 2] > 0)
+        // in the open, near the first light and with the second one out of reach
+        const near = at(5, 5)
+        assert.equal(visibility[near], 255)
+        assert.equal(lightIds[near], 1)
+        assert.equal(visibility[near + 2], 0)
+        assert.equal(lightIds[near + 2], 0)
 
-        // both reach the middle from opposite sides
-        const middle = at(10, 5)
-        assert(colors[middle * 4] > 0 && colors[middle * 4 + 2] > 0)
-        assert(Math.abs(directions[middle * 2]) < colors[middle * 4 + 3] / 2)
+        // the second light right behind the wall from it
+        const behind = at(8.5, 5)
+        assert.equal(visibility[behind], 255)
+        assert.equal(lightIds[behind], 1)
+        assert.equal(visibility[behind + 2], 0)
+
+        // only the second light
+        const east = at(16, 5)
+        assert.equal(visibility[east], 0)
+        assert.equal(visibility[east + 2], 255)
+        assert.equal(lightIds[east + 2], 2)
+
+        // nothing in other channels
+        assert.equal(visibility[near + 1] + visibility[near + 3], 0)
+        assert.equal(lightIds[near + 1] + lightIds[near + 3], 0)
+    })
+
+    it("has the id of a light around every texel the light has a share in", () => {
+        const { width, height, visibility, lightIds } = bakeLights(
+            [{ x: 5, z: 5, color: [1, 1, 1], radius: 0.2, reach: 2, channel: 1 }],
+            new Float64Array(0),
+            { minX: 0, minZ: 0, maxX: 10, maxZ: 10 }
+        )
+        let beyond = 0
+        for (let z = 1; z < height - 1; z++)
+        {
+            for (let x = 1; x < width - 1; x++)
+            {
+                const i = (z * width + x) * LIGHT_CHANNELS + 1
+                beyond += lightIds[i] === 1 && !visibility[i] ? 1 : 0
+                if (visibility[i])
+                {
+                    for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]])
+                    {
+                        assert.equal(lightIds[((z + dz) * width + x + dx) * LIGHT_CHANNELS + 1], 1)
+                    }
+                }
+            }
+        }
+        assert(beyond > 0)
     })
 
     it("finds the closest wall for lookups near walls", () => {
@@ -411,13 +491,46 @@ describe("lightDungeon", () => {
         assert(faceCount(level.patches[0]) > 0)
         const lighting = lightDungeon(4711, level)
         assert(lighting.lights.length >= 10)
-        assert(lighting.colors.some(value => value > 0))
+        assert(lighting.visibility.some(value => value > 0))
 
         const { minX, minZ, width, height, lights } = lighting
         for (const { x, z } of lights)
         {
             assert(x >= minX && x < minX + width / LIGHT_TEXELS)
             assert(z >= minZ && z < minZ + height / LIGHT_TEXELS)
+        }
+    })
+
+    it("never has two lights in one channel around a texel", () => {
+        for (const seed of [4711, 12345])
+        {
+            const { lights, width, height, visibility, lightIds } = lightDungeon(seed, generateDungeon(seed, FACE_SIZE, 2, 2))
+            const channels = new Set<number>()
+            for (let z = 1; z < height - 1; z++)
+            {
+                for (let x = 1; x < width - 1; x++)
+                {
+                    const i = (z * width + x) * LIGHT_CHANNELS
+                    for (let channel = 0; channel < LIGHT_CHANNELS; channel++)
+                    {
+                        const share = visibility[i + channel]
+                        if (share > 0)
+                        {
+                            channels.add(channel)
+                            const id = lightIds[i + channel]
+                            assert(id > 0)
+                            assert.equal(lights[id - 1].channel, channel)
+
+                            // every lookup that mixes this texel gets the same light
+                            for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]])
+                            {
+                                assert.equal(lightIds[((z + dz) * width + x + dx) * LIGHT_CHANNELS + channel], id)
+                            }
+                        }
+                    }
+                }
+            }
+            assert(channels.size >= 2)
         }
     })
 })
