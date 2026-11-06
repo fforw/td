@@ -1,6 +1,6 @@
 import { faceCenter, SEGMENT_SIZE } from "./dungeonLights"
 import type { DungeonLevel } from "./generateDungeon"
-import { FaceType } from "./geometry"
+import { EdgeType, FaceType } from "./geometry"
 import type PatchWorld from "./PatchWorld"
 import { LOCAL_MASK } from "./PatchWorld"
 import { faceOf, next } from "./QuadPatch"
@@ -39,6 +39,27 @@ export function entranceFace(world: PatchWorld, { rooms }: Pick<DungeonLevel, "r
     const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
     const distances = centers.map(([x, z]) => Math.hypot(x - midX, z - midZ))
     return rooms[0][distances.indexOf(Math.min(...distances))]
+}
+
+
+/**
+ * Returns the faces of a level with a door, on both sides of it
+ *
+ * @param world     world with all patches of the level
+ * @param floor     faces that can be walked on
+ */
+export function doorFaces(world: PatchWorld, floor: readonly number[]): number[]
+{
+    return floor.filter(face => {
+        for (let h = face * 4; h < face * 4 + 4; h++)
+        {
+            if (world.edgeType(h) === EdgeType.DOOR.index)
+            {
+                return true
+            }
+        }
+        return false
+    })
 }
 
 
