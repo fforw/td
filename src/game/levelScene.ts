@@ -25,7 +25,7 @@ import { flickerLights, moveHeroLight, updateLightField } from "../render/dungeo
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadInput } from "./gamepad"
-import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
+import HeroControl, { type HeroOrders, NO_ORDERS, viewTurn } from "./heroControl"
 import { Walk } from "./journey"
 
 const TAU = Math.PI * 2
@@ -175,6 +175,11 @@ export default class LevelScene
     private unplaced = true
     /** what a controller does in the current frame, if it is in charge of the hero the view is with */
     private steering: PadInput | null = null
+    /**
+     * Heading of the view when the aiming started. The view turning toward the aim would otherwise take the aim along with it,
+     * and never get there.
+     */
+    private aimHeading: number | null = null
 
     private running = false
     private lastFrame = 0
@@ -400,6 +405,10 @@ export default class LevelScene
             // comes with the blade, after it has been drawn back
             this.marks.slash(time + itemAnimation(meeple.item!).action.steps[0].transition.duration)
         }
+        if (input)
+        {
+            this.look(viewTurn(this.controls.getAzimuthalAngle(), orders.aimX, orders.aimZ, delta), 0, 1)
+        }
         meeple.leftReady = control.blocking
         if (control.turnTo !== null)
         {
@@ -440,8 +449,10 @@ export default class LevelScene
         const cos = Math.cos(heading), sin = Math.sin(heading)
         orders.moveX = moveX * cos + moveY * sin
         orders.moveZ = -moveX * sin + moveY * cos
-        orders.aimX = aimX * cos + aimY * sin
-        orders.aimZ = -aimX * sin + aimY * cos
+        this.aimHeading = aimX || aimY ? this.aimHeading ?? heading : null
+        const aimCos = Math.cos(this.aimHeading ?? heading), aimSin = Math.sin(this.aimHeading ?? heading)
+        orders.aimX = aimX * aimCos + aimY * aimSin
+        orders.aimZ = -aimX * aimSin + aimY * aimCos
         orders.dash = dash
         orders.attack = attack
         orders.block = block
@@ -452,6 +463,10 @@ export default class LevelScene
     {
         const { steering } = this
         this.steering = null
+        if (!steering)
+        {
+            this.aimHeading = null
+        }
         for (const [id, hero] of this.shown)
         {
             const steered = id === this.focus && !hero.leaving ? steering : null
