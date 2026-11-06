@@ -588,6 +588,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   the hero moves, or else looks, and a tapped attack waits for what's in its
   way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
+- Walls don't fill their faces, so they also have to meet at vertices that
+  keep floors apart or the floor from the void (`splitsAtVertex()`). The
+  gaps left otherwise would be real ways around them, for heroes and light.
 - There is nothing to hit yet: attacks and blocks only show. The floor
   shows the aim and the slash (`render/heroMarks.ts`), as items lie along the
   body and hardly show from above.

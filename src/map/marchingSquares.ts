@@ -1,5 +1,5 @@
 import type { Face, HalfEdge, Vertex } from "./geometry"
-import { FaceType } from "./geometry"
+import { EdgeType, FaceType } from "./geometry"
 import type PatchWorld from "./PatchWorld"
 import { SLOT_SHIFT } from "./PatchWorld"
 import { faceOf, next, prev } from "./QuadPatch"
@@ -297,43 +297,54 @@ export default function marchingSquares(faces: Face[], cb: TriangleCallback): vo
 // face type counts around a vertex by FaceType index
 const typeCounts = new Int32Array(FaceType.typeNames().length)
 
-function countFace(world: PatchWorld, h: number): void
+// half edges starting at a vertex, each one followed by the one across it
+const fan: number[] = []
+
+/**
+ * Collects the fan around the start vertex of the given global half edge. Fans that reach a seam continue in the connected
+ * neighbor patch.
+ *
+ * @returns true if the fan goes all the way around
+ */
+function collectFan(world: PatchWorld, h: number): boolean
 {
-    typeCounts[world.faceType(faceOf(h))]++
+    fan.length = 0
+
+    let curr = h
+    do
+    {
+        fan.push(curr)
+        const twin = world.twin(curr)
+        if (twin < 0)
+        {
+            // we hit an open border, collect the rest of the fan in the other direction
+            curr = h
+            let back
+            while ((back = world.twin(prev(curr))) >= 0)
+            {
+                curr = back
+                fan.unshift(curr)
+            }
+            return false
+        }
+        curr = next(twin)
+    } while (curr !== h)
+
+    return true
 }
 
 /**
  * Most common face type around the start vertex of the given global half edge, ties going to the background type like
- * in vertexGround(). Fans that reach a seam continue in the connected neighbor patch.
+ * in vertexGround().
  */
 function packedVertexGround(world: PatchWorld, h: number): FaceType
 {
     typeCounts.fill(0)
 
-    let curr = h
-    let open = false
-    do
+    collectFan(world, h)
+    for (const edge of fan)
     {
-        countFace(world, curr)
-        const twin = world.twin(curr)
-        if (twin < 0)
-        {
-            open = true
-            break
-        }
-        curr = next(twin)
-    } while (curr !== h)
-
-    if (open)
-    {
-        // we hit an open border, count the rest of the fan in the other direction
-        curr = h
-        let twin
-        while ((twin = world.twin(prev(curr))) >= 0)
-        {
-            curr = twin
-            countFace(world, curr)
-        }
+        typeCounts[world.faceType(faceOf(edge))]++
     }
 
     let best: FaceType | null = null
@@ -349,6 +360,27 @@ function packedVertexGround(world: PatchWorld, h: number): FaceType
         }
     }
     return best!
+}
+
+/**
+ * Returns whether the wall faces around the start vertex of the given global half edge keep things apart, be it parts of the
+ * floor or the floor and the void outside of the level. The walls have to meet at the vertex then.
+ */
+function splitsAtVertex(world: PatchWorld, h: number): boolean
+{
+    const closed = collectFan(world, h)
+    const typeOf = (edge: number) => world.faceType(faceOf(edge))
+
+    let parts = closed ? 0 : 1
+    fan.forEach((edge, i) => {
+        const before = i > 0 ? fan[i - 1] : closed ? fan[fan.length - 1] : -1
+        if (typeOf(edge) !== FaceType.WALL.index &&
+            (before < 0 || typeOf(before) !== typeOf(edge) || world.edgeType(before) === EdgeType.WALL.index))
+        {
+            parts++
+        }
+    })
+    return parts > 1
 }
 
 /**
@@ -373,6 +405,7 @@ export function marchingSquaresPatch(
     const base = slot << SLOT_SHIFT
 
     const vertexTypes: (FaceType | undefined)[] = new Array(positions.length / 3)
+    const splits: (boolean | undefined)[] = new Array(positions.length / 3)
     const packedEdgeGround = (h: number, type: FaceType) => {
         const twin = world.twin(base | h)
         return twin < 0 ? type : background(type, FaceType.byIndex(world.faceType(faceOf(twin))))
@@ -409,6 +442,11 @@ export function marchingSquaresPatch(
             ys[3] = (positions[pv + 1] + positions[v + 1]) / 2
 
             ground[0] = vertexTypes[vertex[h]] ??= packedVertexGround(world, base | h)
+            // the walls of a level reach for each other, without taking anything from the floor
+            if (priority === LEVEL_PRIORITY && type === FaceType.WALL && (splits[vertex[h]] ??= splitsAtVertex(world, base | h)))
+            {
+                ground[0] = type
+            }
             ground[1] = packedEdgeGround(h, type)
             ground[2] = type
             ground[3] = packedEdgeGround(p, type)
