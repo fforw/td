@@ -563,18 +563,18 @@ export default class GameView implements PadTarget
     {
         const { campaign, finished } = this
         const { seed, day } = campaign
-        const walker = (id: number, speed: number, journey: Journey, homeward = false): Walker[] => {
+        const walker = (id: number, speed: number, dex: number, journey: Journey, homeward = false): Walker[] => {
             if (!journey.way)
             {
                 return []
             }
             const [reached, next] = dayMarks(journey, day)
-            return [{ id, look: meepleSitter(seed, id).look, gait: gaitOf(id), way: journey.way, speed, reached, next, homeward }]
+            return [{ id, look: meepleSitter(seed, id).look, gait: gaitOf(id), dex, way: journey.way, speed, reached, next, homeward }]
         }
         return [
-            ...campaign.missions.flatMap(m => walker(m.explorer.id, m.explorer.speed, m)),
-            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, j, j.returning)),
-            ...(finished ? walker(finished.explorer.id, finished.explorer.speed, finished) : [])
+            ...campaign.missions.flatMap(m => walker(m.explorer.id, m.explorer.speed, m.explorer.dex, m)),
+            ...campaign.jobs.flatMap(j => walker(j.heroId, HERO_SPEED, campaign.heroes.find(h => h.id === j.heroId)!.character.stats.dex, j, j.returning)),
+            ...(finished ? walker(finished.explorer.id, finished.explorer.speed, finished.explorer.dex, finished) : [])
         ]
     }
 

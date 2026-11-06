@@ -26,7 +26,7 @@ import PatchWorld from "../map/PatchWorld"
 import { createGround, createModels } from "../render/patchMeshes"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import type { GeneratedPatch } from "../map/patchGenerators"
-import MeepleCrowd, { type Meeple, type MeepleLook } from "../meeple/Meeple3D"
+import MeepleCrowd, { type Meeple, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PatchNode } from "./campaign"
 import { Walk } from "./journey"
@@ -78,7 +78,8 @@ const VIEW_RATE = 3
 const SUN_STEP = 4
 
 /**
- * Speed of someone on a journey with a speed of 1 in world units per second, and how fast they turn in radians per second
+ * Speed of someone hurrying on a journey with speed and walk speed multiplier of 1 in world units per second, and how fast
+ * they turn in radians per second
  */
 const JOURNEY_SPEED = 1.65
 const TURN_RATE = 8
@@ -149,6 +150,8 @@ export interface Walker
     look: MeepleLook
     /** walking style, see Meeple */
     gait: number
+    /** dexterity */
+    dex: number
     /** x and y in map units for each point of the way */
     way: readonly number[]
     /** walking speed, 1 for normal */
@@ -363,6 +366,7 @@ export default class CastleScene
                     phase: walker.id,
                     name: "",
                     gait: walker.gait,
+                    dex: walker.dex,
                     walking: false
                 }
                 shown.set(walker.id, {
@@ -428,7 +432,7 @@ export default class CastleScene
 
             // ending the day is no reason to stand around any longer
             entry.wait = reached > 0 ? 0 : Math.max(0, entry.wait - delta)
-            const step = entry.wait > 0 ? 0 : JOURNEY_SPEED * speed * delta / SCALE
+            const step = entry.wait > 0 ? 0 : JOURNEY_SPEED * speed * walkSpeedMultiplier(meeple) * delta / SCALE
             meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, homeward ? next : 1)
             walk.position(walkPosition)
             meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
