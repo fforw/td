@@ -18,7 +18,10 @@ export let rng = new Prando(randomSeed() )
 
 export function resetRandom(seed: number): void
 {
-    console.log("SEED", seed)
+    if (import.meta.env.DEV && !import.meta.env.VITEST)
+    {
+        console.log("SEED", seed)
+    }
 
     rng = new Prando(seed)
 }

@@ -428,7 +428,10 @@ function relax(faces: Face[]): void
     }
 
 
-    console.log("faces = ", faces.length, ", verts =", set.size)
+    if (import.meta.env.DEV && !import.meta.env.VITEST)
+    {
+        console.log("faces = ", faces.length, ", verts =", set.size)
+    }
 
 }
 
@@ -896,7 +899,10 @@ export default class HexagonPatch
             }
         }
 
-        console.log("Created #" + hexCount + " hexagons")
+        if (import.meta.env.DEV && !import.meta.env.VITEST)
+        {
+            console.log("Created #" + hexCount + " hexagons")
+        }
 
         const borderEdges = this.findBorderEdges(faces)
 

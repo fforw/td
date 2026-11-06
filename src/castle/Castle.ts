@@ -395,7 +395,7 @@ function getOuterPointsOfSegment(segment: Face[]): Vertex[]
         } while (curr !== first)
     }
 
-    console.log("OUTER", segment,out)
+    //console.log("OUTER", segment,out)
 
     return out
 }
@@ -441,7 +441,7 @@ function mergeSegments(segments: Face[][]): Face[][]
 
     if (replacements.size > 0)
     {
-        console.log("MERGES", replacements)
+        //console.log("MERGES", replacements)
         const out: (Face[] | null)[] = []
         for (let i = 0; i < segments.length; i++)
         {
@@ -583,25 +583,25 @@ export default class Castle
         const c = randomConnections()
         if ((c & 1) !== 0)
         {
-            console.log("ROAD NORTH")
+            //console.log("ROAD NORTH")
             const dir = new Vector(0,-1)
             constructRoad(center, dir, this.insideWall)
         }
         if ((c & 2) !== 0)
         {
-            console.log("ROAD EAST")
+            //console.log("ROAD EAST")
             const dir = new Vector(1,0)
             constructRoad(center, dir, this.insideWall)
         }
         if ((c & 4) !== 0)
         {
-            console.log("ROAD SOUTH")
+            //console.log("ROAD SOUTH")
             const dir = new Vector(0,1)
             constructRoad(center, dir, this.insideWall)
         }
         if ((c & 8) !== 0)
         {
-            console.log("ROAD WEST")
+            //console.log("ROAD WEST")
             const dir = new Vector(-1,0)
             constructRoad(center, dir, this.insideWall)
         }

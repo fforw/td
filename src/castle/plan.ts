@@ -206,7 +206,7 @@ export function followEnd(pts: Point[], face: Face, visited: Set<Face>, prev: Po
             }
             else
             {
-                console.log("BACKTRACK")
+                //console.log("BACKTRACK")
                 attempt++
             }
         }
