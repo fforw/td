@@ -343,6 +343,32 @@ describe("Acid cuboids", () => {
         })
     })
 
+    describe("seeing", () => {
+
+        it("goes by distance and walls, whatever the cuboid is up to", () => {
+
+            const close = pack()
+            close.add(SMALL_CUBOID, 0, NOTICE_DISTANCE - 0.1, 0)
+            assert(close.sees(prey()))
+
+            const far = pack()
+            far.add(SMALL_CUBOID, 0, NOTICE_DISTANCE + 0.1, 0)
+            assert(!far.sees(prey()))
+
+            const walled = pack(() => false)
+            walled.add(SMALL_CUBOID, 0, 1, 0)
+            assert(!walled.sees(prey()))
+        })
+
+        it("stops with the last one dead", () => {
+
+            const cuboids = pack()
+            cuboids.add(SMALL_CUBOID, 0, 0, 0.3)
+            cuboids.strike(0, 0, 0, REACH, WIDTH, SMALL_CUBOID.hp)
+            assert(!cuboids.sees(prey()))
+        })
+    })
+
     describe("placing", () => {
 
         const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])

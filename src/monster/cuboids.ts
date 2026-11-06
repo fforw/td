@@ -393,6 +393,14 @@ export default class CuboidPack
         return hits
     }
 
+    /**
+     * Returns whether any cuboid can see a hero right now, whether it has got around to noticing them or not
+     */
+    sees(hero: CuboidPrey): boolean
+    {
+        return this.cuboids.some(cuboid => this.closestSeen(cuboid, [hero]) !== null)
+    }
+
     private kill(cuboid: Cuboid): void
     {
         this.cuboids.splice(this.cuboids.indexOf(cuboid), 1)
