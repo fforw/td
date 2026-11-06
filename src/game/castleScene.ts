@@ -10,6 +10,7 @@ import {
     PerspectiveCamera,
     Raycaster,
     Scene,
+    Spherical,
     Sprite,
     SpriteMaterial,
     SRGBColorSpace,
@@ -203,6 +204,9 @@ export default class CastleScene
     private readonly raycaster = new Raycaster()
     private readonly pointer = new Vector2()
     private hovered = false
+
+    private readonly lookOffset = new Vector3()
+    private readonly lookAngles = new Spherical()
 
     private running = false
 
@@ -648,6 +652,25 @@ export default class CastleScene
             style.left = (50 + Math.sin(a) * COMPASS_RADIUS) + "%"
             style.top = (50 - Math.cos(a) * COMPASS_RADIUS) + "%"
         })
+    }
+
+    /**
+     * Moves the camera around what it looks at, the same as dragging with the mouse. The limits of the controls apply when
+     * they next update.
+     *
+     * @param yaw       radians to turn around the vertical axis
+     * @param pitch     radians to go up or down
+     * @param zoom      factor for the distance
+     */
+    look(yaw: number, pitch: number, zoom: number): void
+    {
+        const { camera, controls, lookOffset, lookAngles } = this
+        lookAngles.setFromVector3(lookOffset.copy(camera.position).sub(controls.target))
+        lookAngles.theta += yaw
+        lookAngles.phi += pitch
+        lookAngles.radius *= zoom
+        lookAngles.makeSafe()
+        camera.position.setFromSpherical(lookAngles).add(controls.target)
     }
 
     /**
