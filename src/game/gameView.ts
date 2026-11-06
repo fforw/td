@@ -225,9 +225,10 @@ export default class GameView implements PadTarget
             }
         })
         window.addEventListener("keydown", ev => {
-            if (ev.key === "Escape")
+            // leaving a hero alone takes a key or the mouse, which is a risk in the middle of a fight, on purpose
+            if (ev.key === "Escape" && !this.closePopup() && this.following !== null)
             {
-                this.closePopup()
+                this.follow(null)
             }
         })
 

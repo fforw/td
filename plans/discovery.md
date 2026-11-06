@@ -650,8 +650,10 @@ Glyphs are built from the stroke data of a source kanji per concept
   hit points are kept on the job while they are inside. Without any left they
   get carried out, and are back at full strength. Dying is still to be decided.
 - A fight only runs while the view is in its level, so the player can go to the
-  castle and send others to help. The day can't end while a monster can see a
-  hero in the level kept (`LevelScene.inFight()`), only once none does.
+  castle and send others to help. Everything in the level freezes meanwhile.
+  The day can't end while a monster can see a hero in the level kept
+  (`LevelScene.inFight()`), only once none does. Going to the castle takes
+  Escape or the mouse, no controller button, which is a risk on purpose.
 - A hero in a level stays there until they find an exit, or get carried out.
   There is one at the end of the main path, and with a chance of 20% another on
   the branch furthest off it (`map/dungeonRoles.ts`, the start of the room roles
