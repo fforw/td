@@ -235,6 +235,10 @@ export interface Meeple
      */
     ready?: boolean
     /**
+     * Holds the item in the left hand readied or not on its own, instead of going with ready. Like raising a shield.
+     */
+    leftReady?: boolean
+    /**
      * Walks or stands no matter what the crowd does
      */
     walking?: boolean
@@ -759,12 +763,15 @@ export default class MeepleCrowd
 
     /**
      * Readies the meeple's items and uses them, again and again if an item's action repeats, until stopActing()
+     *
+     * @param meeple    meeple
+     * @param hand      only the item of this hand, 0 is the right one and 1 the left one
      */
-    act(meeple: Meeple): void
+    act(meeple: Meeple, hand?: 0 | 1): void
     {
         const states = this.itemStates[this.meeples.indexOf(meeple)]
         const items = [meeple.item, meeple.leftItem]
-        items.forEach((item, hand) => item && actItem(itemAnimation(item), states[hand]))
+        items.forEach((item, i) => item && (hand ?? i) === i && actItem(itemAnimation(item), states[i]))
     }
 
     /**
@@ -883,7 +890,7 @@ export default class MeepleCrowd
                 }
                 const animation = itemAnimation(item)
                 const state = this.itemStates[i][hand]
-                advanceItem(animation, state, !!meeple.ready, time)
+                advanceItem(animation, state, !!(hand ? meeple.leftReady ?? meeple.ready : meeple.ready), time)
                 const { pivot, height, angle, lift } = itemPose(animation, state, time, pose)
                 // the drawn image can change with the pose
                 const image = pose.image ?? item
