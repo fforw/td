@@ -44,6 +44,8 @@ const MAX_BAND_SHARE = 0.4
 const ARROW_SIZE = 72
 const ARROW_GAP = 4
 
+const ARROW_SVG = '<svg viewBox="0 0 100 100"><polygon points="8,34 52,34 52,10 94,50 52,90 52,66 8,66"/></svg>'
+
 /**
  * Half the size in pixels of what has to stay on the screen when a marker's patch is beyond the known part
  */
@@ -89,6 +91,7 @@ export default class MapSheet
     private readonly canvas = document.createElement("canvas")
     private readonly markers = document.createElement("div")
     private readonly arrow = document.createElement("button")
+    private readonly allArrows = document.createElement("div")
 
     private readonly client = new MapWorkerClient()
     private readonly terrain: Terrain
@@ -108,6 +111,9 @@ export default class MapSheet
     /** what the arrow shows */
     private shown: BorderArrow | null = null
 
+    /** there is no pointer to bring up the arrow, so all targets have theirs out */
+    private showingAll = false
+
     /** element the pointer is watched on, the popup around the sheet with the gap */
     private surroundings: HTMLElement | null = null
 
@@ -126,17 +132,30 @@ export default class MapSheet
         this.element.className = "map-sheet"
         this.markers.className = "markers"
         this.extras.className = "extras"
+        this.allArrows.className = "all-arrows"
         this.arrow.type = "button"
         this.arrow.hidden = true
-        this.arrow.innerHTML =
-            '<svg viewBox="0 0 100 100"><polygon points="8,34 52,34 52,10 94,50 52,90 52,66 8,66"/></svg>'
+        this.arrow.innerHTML = ARROW_SVG
         this.arrow.addEventListener("click", () => {
             if (this.shown)
             {
                 this.onExplore?.(this.shown.target)
             }
         })
-        this.element.append(this.canvas, this.markers, this.extras, this.arrow)
+        this.element.append(this.canvas, this.markers, this.allArrows, this.extras, this.arrow)
+    }
+
+    /**
+     * Sets whether every target of an explorer has its arrow out, instead of the one under the pointer
+     */
+    showAllArrows(showingAll: boolean): void
+    {
+        if (showingAll !== this.showingAll)
+        {
+            this.showingAll = showingAll
+            this.showArrow(null)
+            this.layout()
+        }
     }
 
     /**
@@ -188,9 +207,9 @@ export default class MapSheet
 
     private pointerAt(ev: PointerEvent): void
     {
-        const { content, view, arrow, element } = this
+        const { content, view, arrow, element, showingAll } = this
         const on = ev.target as Element
-        if (!content || !view || arrow.contains(on))
+        if (!content || !view || arrow.contains(on) || showingAll)
         {
             return
         }
@@ -213,21 +232,23 @@ export default class MapSheet
      */
     private showArrow(next: BorderArrow | null): void
     {
-        const { shown, arrow, view, seed } = this
+        const { shown, arrow, view } = this
         if (next && shown && next.target === shown.target && next.dq === shown.dq && next.dr === shown.dr)
         {
             return
         }
         this.shown = next
         arrow.hidden = !next || !view
-        if (!next || !view)
+        if (next && view)
         {
-            return
+            this.placeArrow(arrow, next, view)
         }
+    }
 
-        const { dq, dr, target } = next
+    private placeArrow(arrow: HTMLElement, { x: borderX, y: borderY, dq, dr, target }: BorderArrow, view: MapView): void
+    {
         const angle = Math.atan2(dr, dq)
-        const [bx, by] = mapProjection(seed, view)(next.x, next.y)
+        const [bx, by] = mapProjection(this.seed, view)(borderX, borderY)
         const offset = ARROW_SIZE / 2 + ARROW_GAP
         const [x, y] = this.onScreen(bx + Math.cos(angle) * offset, by + Math.sin(angle) * offset, ARROW_SIZE / 2)
 
@@ -301,6 +322,27 @@ export default class MapSheet
             }
         }
         this.markers.replaceChildren(...elements)
+        this.allArrows.replaceChildren(...this.showingAll ? this.renderAllArrows(content, view) : [])
+    }
+
+    /**
+     * Returns an arrow for each target of an explorer, the one a pointer on the target would bring up
+     */
+    private renderAllArrows(content: MapContent, view: MapView): HTMLElement[]
+    {
+        return content.targets.flatMap(target => {
+            const next = borderArrow(content, ...patchCenter(target.q, target.r), 0)
+            if (!next)
+            {
+                return []
+            }
+            const arrow = document.createElement("button")
+            arrow.type = "button"
+            arrow.innerHTML = ARROW_SVG
+            arrow.addEventListener("click", () => this.onExplore?.(target))
+            this.placeArrow(arrow, next, view)
+            return [arrow]
+        })
     }
 
     private load(): Promise<[MapAtlas, HTMLCanvasElement, MapSymbol]>

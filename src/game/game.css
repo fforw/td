@@ -512,6 +512,12 @@
     font-size: 0.9rem;
 }
 
+/* keeps the arrows out of the positioning, like the one under the pointer */
+#game .all-arrows
+{
+    display: contents;
+}
+
 @media (max-width: 700px)
 {
     #game .popup
