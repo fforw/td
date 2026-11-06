@@ -3,8 +3,6 @@ import {
     ACESFilmicToneMapping,
     Color,
     HemisphereLight,
-    type Material,
-    type Mesh,
     PerspectiveCamera,
     Scene,
     Timer,
@@ -14,26 +12,21 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { loadLevel } from "./dungeonPage"
 import { loadItems } from "./items/itemSprite"
-import { faceCenter, findWallSegments } from "./map/dungeonLights"
+import { faceCenter } from "./map/dungeonLights"
 import type { DungeonLevel } from "./map/generateDungeon"
-import { LEVEL_PRIORITY } from "./map/marchingSquares"
-import PatchWorld from "./map/PatchWorld"
+import type PatchWorld from "./map/PatchWorld"
 import { faceOf } from "./map/QuadPatch"
 import { randomLook } from "./meeple/look"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
+import { createLevelMeshes } from "./render/dungeonLevel"
 import {
-    applyLightField,
-    createLightField,
     discoLights,
     flickerLights,
     hideHeroLight,
-    type LightField,
     moveHeroLight,
     steadyLights,
     updateLightField
 } from "./render/dungeonLighting"
-import { createThickWalls, createThinWallCorners, createThinWalls } from "./render/dungeonMeshes"
-import { createGround } from "./render/patchMeshes"
 import { loadModels, pixelRatio, SCALE } from "./render/scene3d"
 
 const TAU = Math.PI * 2
@@ -164,38 +157,11 @@ function moveWalker(walker: Walker, dt: number): void
 }
 
 
-/**
- * Gives the meshes copies of their materials that get lit by the field
- */
-function lightMeshes(meshes: Mesh[], field: LightField, flatTops = false): void
-{
-    const lit = new Map<Material, Material>()
-    for (const mesh of meshes)
-    {
-        const material = mesh.material as Material
-        if (!lit.has(material))
-        {
-            const copy = material.clone()
-            applyLightField(copy, field, flatTops)
-            lit.set(material, copy)
-        }
-        mesh.material = lit.get(material)!
-    }
-}
-
-
 function show(level: DungeonLevel): void
 {
     const { patches, lighting } = level
-    const field = createLightField(lighting!)
-
-    const world = new PatchWorld()
-    const slots = patches.map(patch => world.add(patch))
-    const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY))
-    const walls: Mesh[] = [...slots.map(slot => createThickWalls(world, slot)), createThinWalls(world, slots), createThinWallCorners(world, slots)]
-    lightMeshes(ground, field)
-    lightMeshes(walls, field, true)
-    scene.add(...ground, ...walls)
+    const { world, meshes, field, segments } = createLevelMeshes(level)
+    scene.add(...meshes)
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const { positions } of patches)
@@ -219,8 +185,6 @@ function show(level: DungeonLevel): void
     crowd.walking = true
     crowd.setLightField(field)
     scene.add(crowd.group)
-
-    const segments = findWallSegments(world, slots)
 
     // follow one meeple after the other from close up, the one we follow carries the hero light
     let followed = -1
