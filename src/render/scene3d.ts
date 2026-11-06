@@ -53,6 +53,8 @@ export const MODELS = {
     hairCurly: "meeple/curly.glb",
     hairLong: "meeple/long.glb",
     hairSidePart: "meeple/side-part.glb",
+
+    acidCuboid: "monster/acid-cuboid.glb",
 }
 
 export type ModelName = keyof typeof MODELS

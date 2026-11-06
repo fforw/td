@@ -470,17 +470,17 @@ function hairGeometry(name: ModelName): BufferGeometry
 }
 
 
-const NO_SILHOUETTE = new Color(0)
+export const NO_SILHOUETTE = new Color(0)
 
 /**
  * How far the rim of a silhouette reaches out of the meeple in meeple units
  */
-const SILHOUETTE_RIM = OUTLINE * 2.5
+export const SILHOUETTE_RIM = OUTLINE * 2.5
 
 /**
  * Brightness of the fill of a silhouette against its rim
  */
-const SILHOUETTE_FILL = 0.03
+export const SILHOUETTE_FILL = 0.03
 
 
 function createItemPart(sprite: ItemSprite, gradientMap: DataTexture, capacity: number): InstancedMesh
@@ -513,7 +513,7 @@ function createOutlineMaterial(color: Color): MeshBasicMaterial
  * @param brightness    factor on the color of the instances
  * @param grow          how far the shape reaches out of the part in meeple units
  */
-function createSilhouetteMaterial(brightness: number, grow: number): MeshBasicMaterial
+export function createSilhouetteMaterial(brightness: number, grow: number): MeshBasicMaterial
 {
     const material = new MeshBasicMaterial({
         color: new Color(brightness, brightness, brightness),
