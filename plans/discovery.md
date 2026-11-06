@@ -593,21 +593,28 @@ Glyphs are built from the stroke data of a source kanji per concept
   them are rounded. Tight corners also get a flat outer side. The
   floor wins the contested samples in levels (`LEVEL_PRIORITY`), the other
   way around than on the overworld, or walls would spread into the floor.
-- Light is baked into a field over the plan of the level, one texture of
-  color and energy and one of direction, which floors, walls and meeples
-  look up by position (`map/dungeonLights.ts`, `render/dungeonLighting.ts`).
-  A point gets the angle under which it sees a light, minus the angles of
-  the walls in front of it, which needs no rays and gives exact soft
-  shadows. Lights stay below the top of the walls, so 2D is right for the
-  floor. About 25 lights on 2 x 2 patches bake in under a second in the
-  worker. A changed wall means rebaking the lights within `MAX_INFLUENCE`
-  of it, and their shadows reach up to twice as far. Not done yet.
+- Light is baked into a field over the plan of the level, which floors,
+  walls and meeples look up by position (`map/dungeonLights.ts`,
+  `render/dungeonLighting.ts`). A point gets the angle under which it sees
+  a light, minus the angles of the walls in front of it, which needs no
+  rays and gives exact soft shadows. Lights stay below the top of the
+  walls, so 2D is right for the floor. The field only keeps the share of a
+  light that the walls leave, per texel in up to 4 channels with an id for
+  each, and shaders work out the rest from the distance to the light. So
+  lights can flicker and change color without baking, and their falloff is
+  sharper than the field, but their shadows stay where they are. Lights in
+  one channel never meet, including the texels around them. Most of the 30
+  or so lights on 2 x 2 patches fit in 3 channels, and placing and baking
+  them takes about 0.4 s in the worker. A changed wall means rebaking the
+  lights within `MAX_INFLUENCE` of it, and their shadows reach up to twice
+  as far. Not done yet.
 - A meeple gets a rim instead of its outline only where it stands in the
   dark and a light still reaches it, so not close to a light. Rooms get a
   light in the middle, the biggest ones first, sized by the room. A light
   gets smaller until a meeple can't get rims from two lights at the same
-  point, which depends on their reach (`rimLimit()`) and on the walls
-  between them, counting doors as open. Rooms where even the smallest light
+  point, at any strength of their flicker, which depends on their reach
+  (`rimLimit()`) and on the walls between them, counting doors as open. It
+  also has to find a free channel. Rooms where even the smallest light
   doesn't fit stay dark. Meeples have no shadows in levels yet.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
