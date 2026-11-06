@@ -57,6 +57,7 @@ export const MODELS = {
     acidCuboid: "monster/acid-cuboid.glb",
     chest: "treasure/chest.glb",
     coin: "treasure/coin.glb",
+    stairs: "dungeon/stairs.glb",
 }
 
 export type ModelName = keyof typeof MODELS

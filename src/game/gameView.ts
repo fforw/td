@@ -328,6 +328,7 @@ export default class GameView implements PadTarget
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
+            ...(this.level?.nearExit(following!) ? [{ glyph: "confirm", label: "Leave" } as const] : []),
             { glyph: "map", label: "Light" }
         ]
     }
@@ -613,21 +614,6 @@ export default class GameView implements PadTarget
         this.follow(inLevel ? heroId : null)
     }
 
-    /**
-     * Tells a hero in a level to come out, which takes walking to the entrance if the level is there to walk in
-     */
-    private leave({ heroId, target }: Job): void
-    {
-        if (this.levelTarget === target)
-        {
-            this.level!.leave(heroId)
-        }
-        else
-        {
-            this.leftLevel(heroId)
-        }
-    }
-
     private leftLevel(heroId: number, how = " came out of "): void
     {
         const { campaign } = this
@@ -832,7 +818,8 @@ export default class GameView implements PadTarget
                 gold => {
                     this.campaign.gold += gold
                     this.changed()
-                }
+                },
+                () => this.render()
             )
             this.levelTarget = job.target
             root.prepend(this.level.element)
@@ -1141,7 +1128,10 @@ export default class GameView implements PadTarget
     {
         if (job.inside)
         {
-            return [el("button", { type: "button", className: "enter pad-start", onclick: () => this.leave(job) }, "Leave")]
+            // without a 3D view there is no walking to an exit
+            return !this.castle || this.level?.nearExit(job.heroId)
+                ? [el("button", { type: "button", className: "enter", onclick: () => this.leftLevel(job.heroId) }, "Leave")]
+                : []
         }
         return [
             el("button", { type: "button", className: "enter", onclick: () => this.enter(job) }, "Enter"),

@@ -1,7 +1,7 @@
 import Prando from "prando"
 
 import { faceCenter } from "../map/dungeonLights"
-import { findRoomRoles } from "../map/dungeonRoles"
+import { EXIT_HALF_SIZE, findRoomRoles, type LevelExit, placeExits } from "../map/dungeonRoles"
 import { doorFaces } from "../map/dungeonWays"
 import { setAgainstWall } from "../map/fixtures"
 import type { DungeonLevel } from "../map/generateDungeon"
@@ -9,9 +9,10 @@ import type PatchWorld from "../map/PatchWorld"
 import { CHEST_HALF_DEPTH, type ChestSpot, placeChests } from "../treasure/chests"
 
 /**
- * Added to the seed of a level for its chests, to not get the same numbers as anything else
+ * Added to the seed of a level for its chests and its exits, to not get the same numbers as anything else
  */
 const CHEST_SEED = 0x7c3a
+const EXIT_SEED = 0x51d9
 
 
 /**
@@ -28,14 +29,20 @@ export function placeFixtures(
     world: PatchWorld,
     segments: Float64Array,
     seed: number
-): { chests: ChestSpot[] }
+): { exits: LevelExit[], chests: ChestSpot[] }
 {
     const centerOf = (face: number) => faceCenter(world, face)
     const corridorFaces = corridors.flatMap(({ faces }) => faces)
     const openings = [...corridorFaces, ...doorFaces(world, rooms.flat())].map(centerOf)
 
+    const exits = placeExits(rooms, corridors, openings, centerOf, new Prando(seed + EXIT_SEED))
+    for (const exit of exits)
+    {
+        setAgainstWall(exit, segments, EXIT_HALF_SIZE)
+    }
+
     const { depths } = findRoomRoles(rooms, corridors)
-    const taken = new Set<number>()
+    const taken = new Set(exits.map(({ room }) => room))
     depths.forEach((depth, room) => {
         if (depth === Infinity)
         {
@@ -47,5 +54,5 @@ export function placeFixtures(
     {
         setAgainstWall(chest, segments, CHEST_HALF_DEPTH)
     }
-    return { chests }
+    return { exits, chests }
 }

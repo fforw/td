@@ -2,6 +2,7 @@ import { assert, describe, it } from "vitest"
 
 import { placeFixtures } from "../../src/game/levelFixtures"
 import { faceCenter, findWallSegments } from "../../src/map/dungeonLights"
+import { EXIT_HALF_SIZE, EXIT_REACH } from "../../src/map/dungeonRoles"
 import { createFloorWalls, entranceFace, findFaces, type FloorSpot, moveOnFloor } from "../../src/map/dungeonWays"
 import { fixtureSegments } from "../../src/map/fixtures"
 import { EdgeType } from "../../src/map/geometry"
@@ -98,13 +99,26 @@ describe("placeFixtures", () => {
 
         for (const seed of SEEDS)
         {
-            const { level, world, slots, chests } = build(seed)
+            const { level, world, slots, exits, chests } = build(seed)
             const entrance = entranceFace(world, level)
+            assert(exits.length >= 1, "seed " + seed)
             assert(chests.length >= 1, "seed " + seed)
-            for (const { face } of chests)
+            for (const { face } of [...exits, ...chests])
             {
                 assert(findFaces(world, slots, entrance, face), "seed " + seed + ", face " + face)
             }
+        }
+    })
+
+    it("puts an exit at the end of the main path, far from the entrance", () => {
+
+        for (const seed of SEEDS)
+        {
+            const { level, world, slots, exits: [exit] } = build(seed)
+            const way = findFaces(world, slots, entranceFace(world, level), exit.face)!
+            const others = level.rooms.map(room => findFaces(world, slots, entranceFace(world, level), room[0])?.length ?? 0)
+            const longer = others.filter(length => length > way.length).length
+            assert(longer < others.length / 4, "seed " + seed + ": " + longer + " of " + others.length + " rooms are further")
         }
     })
 
@@ -112,9 +126,13 @@ describe("placeFixtures", () => {
 
         for (const seed of SEEDS.slice(0, 3))
         {
-            const { level, world, segments, chests } = build(seed)
-            const solid = Float64Array.of(...segments, ...fixtureSegments(chests, CHEST_HALF_WIDTH, CHEST_HALF_DEPTH))
-            const fixtures = chests.map(spot => ({ spot, reach: CHEST_REACH }))
+            const { level, world, segments, exits, chests } = build(seed)
+            const solid = Float64Array.of(
+                ...segments,
+                ...fixtureSegments(chests, CHEST_HALF_WIDTH, CHEST_HALF_DEPTH),
+                ...fixtureSegments(exits, EXIT_HALF_SIZE, EXIT_HALF_SIZE)
+            )
+            const fixtures = [...exits.map(spot => ({ spot, reach: EXIT_REACH })), ...chests.map(spot => ({ spot, reach: CHEST_REACH }))]
             for (const { spot, reach } of fixtures)
             {
                 const room = level.rooms.find(faces => faces.includes(spot.face))!

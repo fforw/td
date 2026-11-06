@@ -14,6 +14,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
+import { EXIT_HALF_SIZE, EXIT_REACH, type LevelExit } from "../map/dungeonRoles"
 import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
@@ -27,6 +28,7 @@ import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
+import { createExitMeshes } from "../render/exitMeshes"
 import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
 import TreasureView from "../treasure/TreasureView"
 import MapWorkerClient from "../worker/MapWorkerClient"
@@ -140,8 +142,6 @@ interface ShownHero
     /** faces of the way being walked, or just the one the hero stands on */
     faces: number[]
     walk: Walk | null
-    /** on the way out of the level */
-    leaving: boolean
     /** what the hero does on orders, which goes over walking a way */
     control: HeroControl
     /** moved on orders in the last frame */
@@ -192,6 +192,9 @@ export default class LevelScene
     private solidWalls: FloorWalls | null = null
     private chests: ChestHoard | null = null
     private treasure: TreasureView | null = null
+    private exits: LevelExit[] = []
+    /** the hero the view is with was close enough to take an exit in the last frame */
+    private atExit = false
     private crowd: MeepleCrowd | null = null
     private cuboids: CuboidPack | null = null
     private cuboidCrowd: CuboidCrowd | null = null
@@ -229,11 +232,12 @@ export default class LevelScene
     /**
      * @param seed      seed of the level
      * @param onMoved   called when a hero got to a face
-     * @param onLeft    called when a hero told to leave has got out
+     * @param onLeft    called when a hero took an exit
      * @param onHurt    called with the hit points left when a hero got hurt
      * @param onFallen  called when a hero has no hit points left
      * @param opened    what happened to the chests of the level before, gets changed along with them
      * @param onLoot    called when that changed, with the gold that got picked up
+     * @param onExitNear called when the hero the view is with got close enough to an exit to take it, or isn't anymore
      */
     constructor(
         seed: number,
@@ -242,7 +246,8 @@ export default class LevelScene
         private readonly onHurt: (id: number, hp: number) => void,
         private readonly onFallen: (id: number) => void,
         private readonly opened: OpenedChests,
-        private readonly onLoot: (gold: number) => void
+        private readonly onLoot: (gold: number) => void,
+        private readonly onExitNear: () => void
     )
     {
         const canvas = document.createElement("canvas")
@@ -271,7 +276,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "chest", "coin"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "chest", "coin", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -309,8 +314,15 @@ export default class LevelScene
      */
     private addChests(level: DungeonLevel, { world, segments, field }: LevelMeshes, seed: number): Float64Array
     {
-        const { chests: spots } = placeFixtures(level, world, segments, seed)
-        const solid = Float64Array.of(...segments, ...fixtureSegments(spots, CHEST_HALF_WIDTH, CHEST_HALF_DEPTH))
+        const { exits, chests: spots } = placeFixtures(level, world, segments, seed)
+        this.exits = exits
+        this.scene.add(createExitMeshes(exits, field))
+
+        const solid = Float64Array.of(
+            ...segments,
+            ...fixtureSegments(spots, CHEST_HALF_WIDTH, CHEST_HALF_DEPTH),
+            ...fixtureSegments(exits, EXIT_HALF_SIZE, EXIT_HALF_SIZE)
+        )
         this.solidWalls = createFloorWalls(solid, ROOM_AROUND)
         const chests = new ChestHoard(spots, seed + COIN_SEED, (chest, dx, dz) => this.coinLanding(chest, dx, dz), this.opened)
         const treasure = new TreasureView(chests.chests, field)
@@ -398,7 +410,6 @@ export default class LevelScene
                     meeple,
                     faces: [face],
                     walk: null,
-                    leaving: false,
                     control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
                     steered: false,
                     prey: { x, z, facing: 0, blocking: false, hurtWait: 0 },
@@ -419,27 +430,6 @@ export default class LevelScene
         {
             this.focus = id
             this.unplaced = true
-        }
-    }
-
-    /**
-     * Has a hero walk back to the entrance and out of the level. Without a level to walk in, they are just out.
-     */
-    leave(id: number): void
-    {
-        const hero = this.shown.get(id)
-        if (!hero)
-        {
-            this.onLeft(id)
-        }
-        else if (!hero.leaving)
-        {
-            this.walkTo(hero, this.entrance)
-            hero.leaving = true
-            if (!hero.walk)
-            {
-                this.onLeft(id)
-            }
         }
     }
 
@@ -468,7 +458,7 @@ export default class LevelScene
     act(action: PadAction): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || hero.leaving)
+        if (!hero)
         {
             return
         }
@@ -485,7 +475,20 @@ export default class LevelScene
                 this.chests!.open(chest, performance.now() / 1000)
                 this.onLoot(0)
             }
+            else if (this.nearExit(this.focus!))
+            {
+                this.onLeft(this.focus!)
+            }
         }
+    }
+
+    /**
+     * Returns whether the hero with the given id is close enough to an exit to take it
+     */
+    nearExit(id: number): boolean
+    {
+        const hero = this.shown.get(id)
+        return !!hero && this.exits.some(({ x, z }) => Math.hypot(x - hero.meeple.position.x, z - hero.meeple.position.z) <= EXIT_REACH)
     }
 
     /**
@@ -565,7 +568,7 @@ export default class LevelScene
             turnToward(meeple, control.turnTo, AIM_TURN_RATE * delta)
         }
 
-        if (control.moving && !hero.leaving)
+        if (control.moving)
         {
             if (hero.walk)
             {
@@ -619,7 +622,7 @@ export default class LevelScene
         }
         for (const [id, hero] of this.shown)
         {
-            const steered = id === this.focus && !hero.leaving ? steering : null
+            const steered = id === this.focus ? steering : null
             this.steerHero(id, hero, steered, time, delta)
 
             const { meeple, walk, faces } = hero
@@ -640,10 +643,6 @@ export default class LevelScene
                 hero.faces = [face]
                 meeple.walking = false
                 this.onMoved(id, face)
-                if (hero.leaving)
-                {
-                    this.onLeft(id)
-                }
             }
         }
         this.updateCuboids(time, delta)
@@ -655,6 +654,12 @@ export default class LevelScene
         {
             const { position, facing } = focused.meeple
             this.marks.update(position.x, position.z, facing, !!steering, time)
+        }
+        const atExit = this.focus !== null && this.nearExit(this.focus)
+        if (atExit !== this.atExit)
+        {
+            this.atExit = atExit
+            this.onExitNear()
         }
     }
 
@@ -789,7 +794,7 @@ export default class LevelScene
     private walkToPointer(ev: PointerEvent): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || hero.leaving)
+        if (!hero)
         {
             return
         }

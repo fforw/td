@@ -31,15 +31,18 @@ const hero: LevelHero = {
     leftItem: "shield_silver"
 }
 
-const level = new LevelScene(seed, () => {}, () => {}, (_, hp) => showHp(hp), () => {
+function startOver(): void
+{
     // back at the entrance, good as new
     level.setHeroes([])
     level.setHeroes([hero])
     showHp(maxHp)
-}, {}, found => {
+}
+
+const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), startOver, {}, found => {
     gold += found
     showHp(shownHp)
-})
+}, () => {})
 document.body.prepend(level.element)
 level.setHeroes([hero])
 level.setFocus(hero.id)
