@@ -3,7 +3,7 @@ import { PadTracker, readPad } from "./game/gamepad"
 import { randomLook } from "./meeple/look"
 
 /*
- * Test page for fighting in a level with a controller, e.g. fight.html?seed=1&hp=20
+ * Test page for fighting and looting in a level with a controller, e.g. fight.html?seed=1&hp=20
  */
 
 const params = new URLSearchParams(location.search)
@@ -12,9 +12,13 @@ const maxHp = Number(params.get("hp") ?? 20)
 
 const info = document.getElementById("info")!
 
+let shownHp = maxHp
+let gold = 0
+
 function showHp(hp: number): void
 {
-    info.textContent = "hp " + hp + " / " + maxHp
+    shownHp = hp
+    info.textContent = "hp " + hp + " / " + maxHp + ", gold " + gold
 }
 
 const hero: LevelHero = {
@@ -32,6 +36,9 @@ const level = new LevelScene(seed, () => {}, () => {}, (_, hp) => showHp(hp), ()
     level.setHeroes([])
     level.setHeroes([hero])
     showHp(maxHp)
+}, {}, found => {
+    gold += found
+    showHp(shownHp)
 })
 document.body.prepend(level.element)
 level.setHeroes([hero])

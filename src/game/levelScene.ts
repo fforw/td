@@ -15,6 +15,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
 import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
+import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { tautPath } from "../map/route"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
@@ -26,10 +27,13 @@ import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
+import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
+import TreasureView from "../treasure/TreasureView"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS, viewTurn } from "./heroControl"
 import { Walk } from "./journey"
+import { placeFixtures } from "./levelFixtures"
 
 const TAU = Math.PI * 2
 
@@ -75,6 +79,11 @@ const SWORD_DAMAGE = 2
  */
 const HURT_FLASH = [{ filter: "sepia(1) saturate(5) hue-rotate(-50deg)" }, { filter: "none" }]
 const HURT_FLASH_TIME = 250
+
+/**
+ * Added to the seed of a level for the coins of its chests, to not get the same numbers as its cuboids
+ */
+const COIN_SEED = 0x7c3a
 
 /**
  * Camera offset from the hero, in world units
@@ -179,6 +188,10 @@ export default class LevelScene
     private level: DungeonLevel | null = null
     private meshes: LevelMeshes | null = null
     private floorWalls: FloorWalls | null = null
+    /** the walls with the chests, which are in the way without keeping anyone from seeing past them */
+    private solidWalls: FloorWalls | null = null
+    private chests: ChestHoard | null = null
+    private treasure: TreasureView | null = null
     private crowd: MeepleCrowd | null = null
     private cuboids: CuboidPack | null = null
     private cuboidCrowd: CuboidCrowd | null = null
@@ -219,13 +232,17 @@ export default class LevelScene
      * @param onLeft    called when a hero told to leave has got out
      * @param onHurt    called with the hit points left when a hero got hurt
      * @param onFallen  called when a hero has no hit points left
+     * @param opened    what happened to the chests of the level before, gets changed along with them
+     * @param onLoot    called when that changed, with the gold that got picked up
      */
     constructor(
         seed: number,
         private readonly onMoved: (id: number, face: number) => void,
         private readonly onLeft: (id: number) => void,
         private readonly onHurt: (id: number, hp: number) => void,
-        private readonly onFallen: (id: number) => void
+        private readonly onFallen: (id: number) => void,
+        private readonly opened: OpenedChests,
+        private readonly onLoot: (gold: number) => void
     )
     {
         const canvas = document.createElement("canvas")
@@ -254,7 +271,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "chest", "coin"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -272,25 +289,58 @@ export default class LevelScene
         this.slots = level.patches.map((_, slot) => slot)
         this.entrance = entranceFace(meshes.world, level)
         this.floor = [...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)]
+        const chests = this.addChests(level, meshes, seed)
 
         const crowd = new MeepleCrowd(MAX_HEROES)
         crowd.showSilhouettes()
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
-        this.addCuboids(level, meshes, seed)
+        this.addCuboids(level, meshes, seed, chests)
 
         this.setHeroes(this.heroes)
         this.client.terminate()
     }
 
-    private addCuboids({ rooms }: DungeonLevel, { world, segments, field }: LevelMeshes, seed: number): void
+    /**
+     * Puts the chests into the level
+     *
+     * @returns the walls of the level with the chests, for whatever has to go around them
+     */
+    private addChests(level: DungeonLevel, { world, segments, field }: LevelMeshes, seed: number): Float64Array
     {
-        const walls = this.floorWalls!
-        const bigWalls = createFloorWalls(segments, BIG_CUBOID.radius)
+        const { chests: spots } = placeFixtures(level, world, segments, seed)
+        const solid = Float64Array.of(...segments, ...fixtureSegments(spots, CHEST_HALF_WIDTH, CHEST_HALF_DEPTH))
+        this.solidWalls = createFloorWalls(solid, ROOM_AROUND)
+        const chests = new ChestHoard(spots, seed + COIN_SEED, (chest, dx, dz) => this.coinLanding(chest, dx, dz), this.opened)
+        const treasure = new TreasureView(chests.chests, field)
+        this.scene.add(treasure.group)
+        this.chests = chests
+        this.treasure = treasure
+        return solid
+    }
+
+    /**
+     * Returns where a coin ends up on its way from the front of a chest, which is a place a hero can get to
+     */
+    private coinLanding({ face, x, z, facing }: ChestSpot, dx: number, dz: number): [number, number]
+    {
+        const front = CHEST_HALF_DEPTH + ROOM_AROUND * 1.1
+        spot.face = face
+        spot.x = x + Math.sin(facing) * front
+        spot.z = z + Math.cos(facing) * front
+        moveOnFloor(this.meshes!.world, this.solidWalls!, spot, dx, dz)
+        return [spot.x, spot.z]
+    }
+
+    private addCuboids({ rooms }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
+    {
+        const walls = this.solidWalls!
+        const seeing = this.floorWalls!
+        const bigWalls = createFloorWalls(solid, BIG_CUBOID.radius)
         const pack = new CuboidPack({
             move: (cuboid, dx, dz) => moveOnFloor(world, cuboid.kind === BIG_CUBOID ? bigWalls : walls, cuboid, dx, dz),
-            sees: (x0, z0, x1, z1) => seesAcross(walls, x0, z0, x1, z1)
+            sees: (x0, z0, x1, z1) => seesAcross(seeing, x0, z0, x1, z1)
         })
         const placed = placeCuboids(rooms, new Prando(seed))
         for (const { face, kind } of placed)
@@ -426,6 +476,25 @@ export default class LevelScene
         {
             hero.lightOn = !hero.lightOn
         }
+        else if (action === "confirm")
+        {
+            const { position } = hero.meeple
+            const chest = this.chests?.closedNear(position.x, position.z)
+            if (chest)
+            {
+                this.chests!.open(chest, performance.now() / 1000)
+                this.onLoot(0)
+            }
+        }
+    }
+
+    /**
+     * Returns whether the hero with the given id is close enough to a closed chest to open it
+     */
+    nearChest(id: number): boolean
+    {
+        const hero = this.shown.get(id)
+        return !!hero && !!this.chests?.closedNear(hero.meeple.position.x, hero.meeple.position.z)
     }
 
     /**
@@ -507,7 +576,7 @@ export default class LevelScene
             spot.face = hero.faces[0]
             spot.x = meeple.position.x
             spot.z = meeple.position.z
-            moveOnFloor(this.meshes!.world, this.floorWalls!, spot, control.velocityX * speed, control.velocityZ * speed)
+            moveOnFloor(this.meshes!.world, this.solidWalls!, spot, control.velocityX * speed, control.velocityZ * speed)
             hero.faces[0] = spot.face
             meeple.position.set(spot.x, 0, spot.z)
             meeple.walking = true
@@ -578,6 +647,7 @@ export default class LevelScene
             }
         }
         this.updateCuboids(time, delta)
+        this.updateTreasure(time)
         this.crowd?.update(this.camera, time)
 
         const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
@@ -620,6 +690,28 @@ export default class LevelScene
             }
         }
         this.cuboidCrowd!.update(cuboids.cuboids, time)
+    }
+
+    /**
+     * Has the heroes pick up the coins they walk over
+     */
+    private updateTreasure(time: number): void
+    {
+        const { chests, treasure } = this
+        if (!chests)
+        {
+            return
+        }
+        let taken = 0
+        for (const { meeple: { position } } of this.shown.values())
+        {
+            taken += chests.collect(position.x, position.z, time)
+        }
+        if (taken > 0)
+        {
+            this.onLoot(taken * COIN_VALUE)
+        }
+        treasure!.update(time)
     }
 
     private hurtHero(id: number, hero: ShownHero, damage: number): void

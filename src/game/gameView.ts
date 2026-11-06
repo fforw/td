@@ -327,6 +327,7 @@ export default class GameView implements PadTarget
             { glyph: "dash", label: "Dash" },
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
+            ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
             { glyph: "map", label: "Light" }
         ]
     }
@@ -826,6 +827,11 @@ export default class GameView implements PadTarget
                 id => {
                     delete this.campaign.jobs.find(j => j.heroId === id)!.hp
                     this.leftLevel(id, " got carried out of ")
+                },
+                campaign.chests[job.target] ??= {},
+                gold => {
+                    this.campaign.gold += gold
+                    this.changed()
                 }
             )
             this.levelTarget = job.target

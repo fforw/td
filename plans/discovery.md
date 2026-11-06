@@ -621,6 +621,15 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Interactions per kind: open, disarm, use, rest. House functions
   (crafting, storage, healing) are fixture kinds.
 - Traps can be hidden; detection uses the hero's wisdom attribute.
+- The first fixture is the chest (`treasure/chests.ts`). Some rooms other than
+  the first have one, against a wall and away from doors and corridors, chosen
+  from the level seed for now, not by a premise. It can't be walked through,
+  but can be seen past. A hero close enough opens it, without walking to an
+  anchor yet.
+  Its coins spill to where a hero can get to, and whoever walks over one that
+  has landed picks it up. Each coin adds 10 gold to the campaign right away.
+  `Campaign.chests` keeps which coins of each opened chest are still lying
+  around, per level. Everything else about them follows from the seed.
 
 ### 3.3 Mobiles
 
@@ -647,8 +656,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   there are exits. Until then the order to leave walks back to the entrance.
 - While steering a hero, the four buttons on the face of the controller only
   do things in the level, so the map and the way back to the castle are for the
-  mouse for now. Triangle toggles the light the hero carries, the others are
-  free.
+  mouse for now. Cross (the confirm button) opens a chest,
+  triangle toggles the light the hero carries, and square and circle are free.
 
 ### 3.4 Dungeon generation
 

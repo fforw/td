@@ -1,6 +1,7 @@
 import { withSeed } from "../math/random"
 import { createSubtitle } from "./subtitle"
 import type { Character } from "../meeple/character"
+import type { OpenedChests } from "../treasure/chests"
 import { createHeroes } from "./heroes"
 import { startEdits, startPatches } from "./patchKinds"
 import { arrivals } from "./tavern"
@@ -14,7 +15,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export const START_GOLD = 1000
 
@@ -167,6 +168,8 @@ export interface Campaign
     /** local heroes, on a job or at home */
     heroes: Hero[]
     jobs: Job[]
+    /** what's left of the chests that got opened, by the key of the patch of their level */
+    chests: Record<string, OpenedChests>
     /** id for the next explorer or hero */
     nextId: number
 }
@@ -213,6 +216,7 @@ export function createCampaign(seed: number): Campaign
         missions: [],
         heroes: [],
         jobs: [],
+        chests: {},
         nextId: 1
     }
 

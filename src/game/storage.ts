@@ -54,6 +54,10 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
         {
             explorer.dex = withSeed(patchSeed(campaign.seed, explorer.id, 0), randomExplorerDex)
         }
+    },
+    // version 6 has chests in levels
+    5: campaign => {
+        campaign.chests = {}
     }
 }
 
