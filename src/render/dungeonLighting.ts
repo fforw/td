@@ -115,7 +115,7 @@ const HERO_SEARCH = 0.2
 /**
  * Number of directions to look at on each side
  */
-const HERO_TAPS = 3
+const HERO_TAPS = 2
 
 /**
  * Number of halvings to find the edge of a shadow between two directions
