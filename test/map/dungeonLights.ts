@@ -17,6 +17,7 @@ import {
     MAX_INFLUENCE,
     MAX_LIGHTS,
     MIN_INFLUENCE,
+    RIM_CHECK_STEP,
     NO_WALL,
     placeLights,
     RIM_FADE_START,
@@ -318,10 +319,10 @@ describe("placeLights", () => {
                     {
                         continue
                     }
-                    // finer than the placement, at a level where a rim of a fifth of its strength shows
-                    for (let z = Math.min(az, bz) - RIM_LIMIT; z < Math.max(az, bz) + RIM_LIMIT; z += 1 / LIGHT_TEXELS)
+                    // as fine as the placement, at a level where a rim of a fifth of its strength shows
+                    for (let z = Math.min(az, bz) - RIM_LIMIT; z < Math.max(az, bz) + RIM_LIMIT; z += RIM_CHECK_STEP)
                     {
-                        for (let x = Math.min(ax, bx) - RIM_LIMIT; x < Math.max(ax, bx) + RIM_LIMIT; x += 1 / LIGHT_TEXELS)
+                        for (let x = Math.min(ax, bx) - RIM_LIMIT; x < Math.max(ax, bx) + RIM_LIMIT; x += RIM_CHECK_STEP)
                         {
                             lightAt(views[i], segments, x, z, a)
                             lightAt(views[j], segments, x, z, b)

@@ -68,7 +68,13 @@ export const RIM_LIMIT = 4.2
 /**
  * Resolution of the light field in texels per world unit
  */
-export const LIGHT_TEXELS = 8
+export const LIGHT_TEXELS = 12
+
+/**
+ * How far apart to check points for rims from two lights in world units. Slivers of two rims thinner than this can slip through,
+ * which isn't worth the time of a finer check.
+ */
+export const RIM_CHECK_STEP = 1 / 8
 
 /**
  * How far from a wall a lookup in the light field has to be in world units so that all texels it mixes are on its side
@@ -490,9 +496,9 @@ export function rimsOverlap(a: LightView, b: LightView, segments: Float64Array):
 {
     const minX = Math.max(a.x - a.rimLimit, b.x - b.rimLimit), maxX = Math.min(a.x + a.rimLimit, b.x + b.rimLimit)
     const minZ = Math.max(a.z - a.rimLimit, b.z - b.rimLimit), maxZ = Math.min(a.z + a.rimLimit, b.z + b.rimLimit)
-    for (let z = minZ; z < maxZ; z += 1 / LIGHT_TEXELS)
+    for (let z = minZ; z < maxZ; z += RIM_CHECK_STEP)
     {
-        for (let x = minX; x < maxX; x += 1 / LIGHT_TEXELS)
+        for (let x = minX; x < maxX; x += RIM_CHECK_STEP)
         {
             lightAt(a, segments, x, z, sampleA)
             if (Math.hypot(sampleA.x, sampleA.z) >= RIM_FADE_START)
