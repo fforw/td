@@ -5,7 +5,7 @@ import { findRegions, growRooms, pickRooms } from "./dungeonRooms"
 import { FaceType } from "./geometry"
 import HexagonPatch, { PATCH_SIZE } from "./HexagonPatch"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
-import { faceCount, faceOf, packPatch, type QuadPatch } from "./QuadPatch"
+import { faceCount, faceOf, next, packPatch, prev, type QuadPatch } from "./QuadPatch"
 
 
 /**
@@ -153,15 +153,34 @@ export function generateDungeon(
     }
     floor.forEach(face => setFaceType(face, FaceType.PAVED))
 
-    // floor stays off the outer edge of the level, so all of its half edges have a twin
+    // also around the corners, the ground of the floor reaches into faces that only touch it there and would leave holes in the walls
+    const setWall = (h: number) => {
+        const other = faceOf(h)
+        if (world.faceType(other) === FaceType.NONE.index)
+        {
+            setFaceType(other, FaceType.WALL)
+        }
+    }
     for (const face of floor)
     {
-        for (let h = face * 4; h < face * 4 + 4; h++)
+        for (let start = face * 4; start < face * 4 + 4; start++)
         {
-            const other = faceOf(world.twin(h))
-            if (world.faceType(other) === FaceType.NONE.index)
+            // around the corner the half edge starts at. Floor has no outer edge of the level, but what is around it can have one,
+            // so without getting back around it goes the other way as well.
+            let h = start
+            do
             {
-                setFaceType(other, FaceType.WALL)
+                setWall(h)
+                const twin = world.twin(h)
+                h = twin < 0 ? -1 : next(twin)
+            } while (h >= 0 && h !== start)
+
+            if (h < 0)
+            {
+                for (let twin = world.twin(prev(start)); twin >= 0; twin = world.twin(prev(twin)))
+                {
+                    setWall(twin)
+                }
             }
         }
     }

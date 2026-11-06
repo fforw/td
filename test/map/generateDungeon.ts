@@ -4,7 +4,7 @@ import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, 
 import { FaceType } from "../../src/map/geometry"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { LEVEL_PRIORITY, marchingSquaresPatch } from "../../src/map/marchingSquares"
-import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
+import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceCount, faceOf } from "../../src/map/QuadPatch"
 import { DEFAULT_COSTS, globalFace } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
@@ -78,26 +78,31 @@ describe("generateDungeon", () => {
         }
     })
 
-    it("only sets the faces of its rooms and corridors and the walls next to them", () => {
-        const { patches, rooms, corridors } = generateDungeon(4711, FACE_SIZE, 2, 2)
-        const floor = new Set([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
-        const world = new PatchWorld()
-        patches.forEach(patch => world.add(patch))
-
-        const next = new Set<number>()
-        for (const face of floor)
+    it("only sets the faces of its rooms and corridors and the walls touching them, even at just a corner", () => {
+        for (const [seed, width, height] of [[4711, 2, 2], [700959734, DUNGEON_WIDTH, DUNGEON_HEIGHT]])
         {
-            for (let h = face * 4; h < face * 4 + 4; h++)
-            {
-                next.add(faceOf(world.twin(h)))
-            }
-        }
+            const { patches, rooms, corridors } = generateDungeon(seed, FACE_SIZE, width, height)
+            const floor = new Set([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
+            const world = new PatchWorld()
+            patches.forEach(patch => world.add(patch))
 
-        patches.forEach((patch, slot) => patch.faceType.forEach((type, face) => {
-            const id = globalFace(slot, face)
-            const expected = floor.has(id) ? FaceType.PAVED : next.has(id) ? FaceType.WALL : FaceType.NONE
-            assert(type === expected.index)
-        }))
+            // seams have vertices on both sides, so this goes by the positions
+            const corners = (face: number): string[] => {
+                const { positions, vertex } = world.getPatch(face >> (SLOT_SHIFT - 2))
+                const local = face & (LOCAL_MASK >> 2)
+                return [0, 1, 2, 3].map(i => {
+                    const v = vertex[local * 4 + i]
+                    return positions[v * 3].toFixed(3) + "/" + positions[v * 3 + 1].toFixed(3)
+                })
+            }
+            const floorCorners = new Set([...floor].flatMap(corners))
+
+            patches.forEach((patch, slot) => patch.faceType.forEach((type, face) => {
+                const id = globalFace(slot, face)
+                const expected = floor.has(id) ? FaceType.PAVED : corners(id).some(corner => floorCorners.has(corner)) ? FaceType.WALL : FaceType.NONE
+                assert(type === expected.index, "seed " + seed + ", face " + id)
+            }))
+        }
     })
 
     it("leaves the floor all of its faces and the walls less than theirs", () => {
