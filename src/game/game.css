@@ -519,6 +519,27 @@
     cursor: default;
 }
 
+#game .option
+{
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+
+#game .option:hover
+{
+    background: #444;
+}
+
+#game .option small
+{
+    display: block;
+    color: #bbb;
+}
+
 #game .missions div,
 #game .reports div
 {

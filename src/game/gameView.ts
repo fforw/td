@@ -17,6 +17,7 @@ import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
+import { loadOptions, saveOptions } from "./options"
 import Portraits, { meepleSitter } from "./portraits"
 import { advanceDay, frontier, type MissionRoute, startMission } from "./missions"
 import SimWorld from "./SimWorld"
@@ -162,6 +163,8 @@ export default class GameView implements PadTarget
     private readonly popup = el("div", { className: "popup", hidden: true })
     private readonly dialog = el("div", { className: "popup mission-popup", hidden: true })
     private readonly optionsPopup = el("div", { className: "popup mission-popup", hidden: true })
+
+    private readonly options = loadOptions()
 
     /** marker a mission is being set up for */
     private selected: MissionMarker | null = null
@@ -364,6 +367,7 @@ export default class GameView implements PadTarget
         try
         {
             castle = new CastleScene(this.campaign.seed, () => this.openMap(), () => this.endDay())
+            castle.setWaddling(this.options.waddle)
             castle.setRunning(true)
         }
         catch (e)
@@ -435,6 +439,13 @@ export default class GameView implements PadTarget
         this.optionsPopup.hidden = true
         this.castle?.setRunning(!!this.popup.hidden)
         this.render()
+    }
+
+    private setWaddling(waddle: boolean): void
+    {
+        this.options.waddle = waddle
+        saveOptions(this.options)
+        this.castle?.setWaddling(waddle)
     }
 
     private changed(): void
@@ -735,7 +746,19 @@ export default class GameView implements PadTarget
     {
         return el("section", { className: "mission small" },
             el("button", { type: "button", className: "close", title: "Back to the game", onclick: () => this.closeOptions() }, "✕"),
-            el("h3", {}, "⚙️ Options")
+            el("h3", {}, "⚙️ Options"),
+            el("label", { className: "option" },
+                el("input", {
+                    type: "checkbox",
+                    className: "pad-start",
+                    checked: this.options.waddle,
+                    onchange: ev => this.setWaddling((ev.target as HTMLInputElement).checked)
+                }),
+                el("span", {},
+                    "Waddle to destination",
+                    el("small", {}, "Meeples on a journey go at their own slow pace instead of hurrying.")
+                )
+            )
         )
     }
 
