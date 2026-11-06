@@ -13,7 +13,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
-import { entranceFace, findFaces, type FloorSpot, moveOnFloor } from "../map/dungeonWays"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor } from "../map/dungeonWays"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { tautPath } from "../map/route"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
@@ -150,6 +150,7 @@ export default class LevelScene
     /** null until the level is there */
     private level: DungeonLevel | null = null
     private meshes: LevelMeshes | null = null
+    private floorWalls: FloorWalls | null = null
     private crowd: MeepleCrowd | null = null
     private readonly marks = new HeroMarks()
     private slots: number[] = []
@@ -227,6 +228,7 @@ export default class LevelScene
         const meshes = createLevelMeshes(level)
         this.level = level
         this.meshes = meshes
+        this.floorWalls = createFloorWalls(meshes.segments, ROOM_AROUND)
         this.scene.add(...meshes.meshes)
         this.slots = level.patches.map((_, slot) => slot)
         this.entrance = entranceFace(meshes.world, level)
@@ -408,7 +410,7 @@ export default class LevelScene
             spot.face = hero.faces[0]
             spot.x = meeple.position.x
             spot.z = meeple.position.z
-            moveOnFloor(this.meshes!.world, spot, control.velocityX * speed, control.velocityZ * speed, ROOM_AROUND)
+            moveOnFloor(this.meshes!.world, this.floorWalls!, spot, control.velocityX * speed, control.velocityZ * speed)
             hero.faces[0] = spot.face
             meeple.position.set(spot.x, 0, spot.z)
             meeple.walking = true

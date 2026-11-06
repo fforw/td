@@ -1,13 +1,24 @@
 import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
-import { faceCenter } from "../../src/map/dungeonLights"
-import { entranceFace, findFaces, type FloorSpot, moveOnFloor } from "../../src/map/dungeonWays"
+import { faceCenter, findWallSegments, SEGMENT_SIZE } from "../../src/map/dungeonLights"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor } from "../../src/map/dungeonWays"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
-import PatchWorld from "../../src/map/PatchWorld"
+import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceOf, next } from "../../src/map/QuadPatch"
 import { FACE_SIZE, SCALE } from "../../src/map/scale"
+
+
+const RADIUS = 0.09
+
+const FLOOD_STEP = 0.1
+const FLOOD_STEPS = [[FLOOD_STEP, 0], [-FLOOD_STEP, 0], [0, FLOOD_STEP], [0, -FLOOD_STEP]]
+
+/**
+ * Most faces apart on the way a step of FLOOD_STEP can get someone, as it goes over at most a few faces
+ */
+const MAX_HOPS_ON_STEP = 8
 
 
 function level(seed: number)
@@ -15,7 +26,8 @@ function level(seed: number)
     const generated = generateDungeon(seed, FACE_SIZE, 2, 2)
     const world = new PatchWorld()
     const slots = generated.patches.map(patch => world.add(patch))
-    return { ...generated, world, slots }
+    const segments = findWallSegments(world, slots)
+    return { ...generated, world, slots, segments, walls: createFloorWalls(segments, RADIUS) }
 }
 
 
@@ -60,10 +72,9 @@ describe("Ways through dungeon levels", () => {
 
     it("keeps someone on the floor and out of the walls whatever they do", () => {
 
-        const RADIUS = 0.1
         for (const seed of [1, 2, 3])
         {
-            const { world, rooms } = level(seed)
+            const { world, rooms, walls } = level(seed)
             const face = entranceFace(world, { rooms })
             const [x, z] = faceCenter(world, face)
             const spot: FloorSpot = { face, x, z }
@@ -73,13 +84,11 @@ describe("Ways through dungeon levels", () => {
             {
                 // keeps going one way for a while, to get into corners and through doors
                 const angle = Math.floor(i / 25) * 2.4 + random.next() * 0.4
-                moveOnFloor(world, spot, Math.cos(angle) * 0.3, Math.sin(angle) * 0.3, RADIUS)
+                moveOnFloor(world, walls, spot, Math.cos(angle) * 0.3, Math.sin(angle) * 0.3)
                 seen.add(spot.face)
                 assert(world.faceType(spot.face) === FaceType.PAVED.index)
-                for (const wall of wallPoints(world, spot.face))
-                {
-                    assert(Math.hypot(wall[0] - spot.x, wall[1] - spot.z) > RADIUS * 0.9)
-                }
+                assert(clearance(walls, spot.x, spot.z) > RADIUS * 0.9)
+                assert(!insideWall(walls, spot.x, spot.z))
             }
             assert(seen.size > 5, "gets around, only saw " + seen.size)
         }
@@ -87,7 +96,7 @@ describe("Ways through dungeon levels", () => {
 
     it("slides along a wall instead of stopping at it", () => {
 
-        const { world, rooms } = level(1)
+        const { world, rooms, walls } = level(1)
         for (const face of rooms[0])
         {
             for (let h = face * 4; h < face * 4 + 4; h++)
@@ -105,37 +114,149 @@ describe("Ways through dungeon levels", () => {
                 // start next to the wall and head into it at an angle
                 const spot: FloorSpot = { face, x: x + mx * 0.5, z: z + mz * 0.5 }
                 const along = spot.x * ex + spot.z * ez
-                moveOnFloor(world, spot, mx * 0.3 + ex * 0.1, mz * 0.3 + ez * 0.1, 0.1)
+                moveOnFloor(world, walls, spot, mx * 0.3 + ex * 0.1, mz * 0.3 + ez * 0.1)
                 assert(spot.x * ex + spot.z * ez > along, "got along the wall")
-                assert(wallPoints(world, spot.face).every(([wx, wz]) => Math.hypot(wx - spot.x, wz - spot.z) > 0.09))
+                assert(clearance(walls, spot.x, spot.z) > RADIUS * 0.9)
                 return
             }
         }
         assert.fail("no wall around the largest room")
     })
+
+    it("walks over the part of a wall face no wall got built on", () => {
+
+        const { world, slots, walls } = level(1)
+        let walked = 0
+        for (const slot of slots)
+        {
+            const { faceType } = world.getPatch(slot)
+            for (let local = 0; local < faceType.length; local++)
+            {
+                const face = (slot << (SLOT_SHIFT - 2)) | local
+                if (faceType[local] !== FaceType.PAVED.index)
+                {
+                    continue
+                }
+                for (let h = face * 4; h < face * 4 + 4; h++)
+                {
+                    const twin = world.twin(h)
+                    if (twin < 0 || world.faceType(faceOf(twin)) !== FaceType.WALL.index)
+                    {
+                        continue
+                    }
+                    const a = [0, 0, 0], b = [0, 0, 0]
+                    world.position(h, a)
+                    world.position(next(h), b)
+                    const [cx, cz] = faceCenter(world, face)
+                    const mx = (a[0] + b[0]) / 2 * SCALE, mz = (a[1] + b[1]) / 2 * SCALE
+                    // far enough from the walls to stand on the edge, which the face walls used to block
+                    if (clearance(walls, mx, mz) > RADIUS * 1.5 && clearance(walls, cx, cz) > RADIUS)
+                    {
+                        const spot: FloorSpot = { face, x: cx, z: cz }
+                        moveOnFloor(world, walls, spot, mx - cx, mz - cz)
+                        assert.closeTo(spot.x, mx, 1e-9)
+                        assert.closeTo(spot.z, mz, 1e-9)
+                        assert(world.faceType(spot.face) === FaceType.PAVED.index)
+                        walked++
+                    }
+                }
+            }
+        }
+        assert(walked > 10, "only found " + walked)
+    })
+
+    it("gets to all of the floor, without any way out of the level or around the walls", { timeout: 30000 }, () => {
+
+        for (const seed of [1, 2])
+        {
+            const { world, rooms, corridors, segments, walls } = level(seed)
+            const entrance = entranceFace(world, { rooms })
+
+            const hops = new Map([[entrance, 0]])
+            for (const face of hops.keys())
+            {
+                for (let h = face * 4; h < face * 4 + 4; h++)
+                {
+                    const twin = world.twin(h)
+                    if (twin >= 0 && world.edgeType(h) !== EdgeType.WALL.index && world.faceType(faceOf(twin)) === FaceType.PAVED.index)
+                    {
+                        hops.set(faceOf(twin), hops.get(faceOf(twin)) ?? hops.get(face)! + 1)
+                    }
+                }
+            }
+
+            let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+            for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+            {
+                minX = Math.min(minX, segments[s], segments[s + 2])
+                maxX = Math.max(maxX, segments[s], segments[s + 2])
+                minZ = Math.min(minZ, segments[s + 1], segments[s + 3])
+                maxZ = Math.max(maxZ, segments[s + 1], segments[s + 3])
+            }
+
+            // walks everywhere in small steps
+            const [x, z] = faceCenter(world, entrance)
+            const todo: FloorSpot[] = [{ face: entrance, x, z }]
+            const visited = new Set<string>()
+            const seen = new Set([entrance])
+            while (todo.length)
+            {
+                const from = todo.pop()!
+                for (const [dx, dz] of FLOOD_STEPS)
+                {
+                    const spot = { ...from }
+                    moveOnFloor(world, walls, spot, dx, dz)
+                    const key = Math.round(spot.x / FLOOD_STEP) + "," + Math.round(spot.z / FLOOD_STEP)
+                    if (visited.has(key))
+                    {
+                        continue
+                    }
+                    visited.add(key)
+                    seen.add(spot.face)
+                    todo.push(spot)
+                    assert(spot.x > minX && spot.x < maxX && spot.z > minZ && spot.z < maxZ, "left the level at " + key)
+                    assert.isAtMost(Math.abs(hops.get(spot.face)! - hops.get(from.face)!), MAX_HOPS_ON_STEP, "around a wall at " + key)
+                }
+            }
+
+            const floor = new Set([...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)])
+            assert.equal([...floor].filter(face => !seen.has(face)).length, 0, "floor out of reach on seed " + seed)
+        }
+    })
 })
 
 
 /**
- * Returns points along the walls on all sides of a face
+ * Returns whether a point is inside of a thick wall, where nothing else tells as it is far from the sides
  */
-function wallPoints(world: PatchWorld, face: number): [number, number][]
+function insideWall({ segments }: FloorWalls, x: number, z: number): boolean
 {
-    const points: [number, number][] = []
-    const a = [0, 0, 0], b = [0, 0, 0]
-    for (let h = face * 4; h < face * 4 + 4; h++)
+    let inside = false
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
     {
-        const twin = world.twin(h)
-        if (twin >= 0 && world.edgeType(h) !== EdgeType.WALL.index && world.faceType(faceOf(twin)) === FaceType.PAVED.index)
+        const x0 = segments[s], z0 = segments[s + 1], x1 = segments[s + 2], z1 = segments[s + 3]
+        // thin walls have no inside, and don't have a side given
+        if ((segments[s + 4] || segments[s + 5]) && (z0 > z) !== (z1 > z) && x < x0 + (z - z0) / (z1 - z0) * (x1 - x0))
         {
-            continue
-        }
-        world.position(h, a)
-        world.position(next(h), b)
-        for (let t = 0; t <= 1; t += 0.1)
-        {
-            points.push([(a[0] + (b[0] - a[0]) * t) * SCALE, (a[1] + (b[1] - a[1]) * t) * SCALE])
+            inside = !inside
         }
     }
-    return points
+    return inside
+}
+
+
+/**
+ * Returns how far a point is from the closest wall around it
+ */
+function clearance({ segments }: FloorWalls, x: number, z: number): number
+{
+    let closest = Infinity
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+    {
+        const x0 = segments[s], z0 = segments[s + 1]
+        const ex = segments[s + 2] - x0, ez = segments[s + 3] - z0
+        const t = Math.max(0, Math.min(1, ((x - x0) * ex + (z - z0) * ez) / (ex * ex + ez * ez)))
+        closest = Math.min(closest, Math.hypot(x - (x0 + t * ex), z - (z0 + t * ez)))
+    }
+    return closest
 }

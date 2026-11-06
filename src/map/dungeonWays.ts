@@ -1,23 +1,28 @@
-import { faceCenter } from "./dungeonLights"
+import { faceCenter, SEGMENT_SIZE } from "./dungeonLights"
 import type { DungeonLevel } from "./generateDungeon"
+import { FaceType } from "./geometry"
 import type PatchWorld from "./PatchWorld"
 import { LOCAL_MASK } from "./PatchWorld"
 import { faceOf, next } from "./QuadPatch"
-import { DEFAULT_COSTS, EDGE_COSTS, findRoute, slotOf } from "./route"
+import { findRoute, slotOf } from "./route"
 import { SCALE } from "./scale"
 
 /**
- * How many faces out from someone's face the walls they can bump into are looked for. It takes two for those that only
- * touch a corner of the face.
+ * Most faces between someone and the floor face they go by
  */
-const WALL_RINGS = 2
-
-/**
- * Most faces a single small step goes over
- */
-const MAX_CROSSINGS = 4
+const MAX_CROSSINGS = 32
 
 const PUSH_PASSES = 3
+
+/**
+ * Size of the grid cells of the walls in world units
+ */
+const CELL_SIZE = 1
+
+/**
+ * Keeps the columns of the grid apart, far more than a level has rows
+ */
+const CELL_FACTOR = 1 << 16
 
 const corner = [0, 0, 0]
 const ends = [0, 0, 0, 0]
@@ -64,12 +69,61 @@ export interface FloorSpot
 
 
 /**
- * Returns whether someone can get across a half edge from its own face
+ * Walls of a level as they got built, sorted into a grid for finding the ones close to someone
  */
-function canCross(world: PatchWorld, h: number): boolean
+export interface FloorWalls
 {
-    const twin = world.twin(h)
-    return twin >= 0 && EDGE_COSTS[world.edgeType(h)] + DEFAULT_COSTS[world.faceType(faceOf(twin))] < Infinity
+    segments: Float64Array
+
+    /**
+     * Room someone needs around them, in world units
+     */
+    radius: number
+
+    /**
+     * Offsets of the segments within reach of each cell of the grid
+     */
+    cells: Map<number, number[]>
+}
+
+
+function cellKey(x: number, z: number): number
+{
+    return Math.floor(x / CELL_SIZE) * CELL_FACTOR + Math.floor(z / CELL_SIZE)
+}
+
+
+/**
+ * Prepares the walls of a level for moveOnFloor().
+ *
+ * @param segments  walls from findWallSegments()
+ * @param radius    how much room someone needs around them, in world units
+ */
+export function createFloorWalls(segments: Float64Array, radius: number): FloorWalls
+{
+    const cells = new Map<number, number[]>()
+    for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+    {
+        const minX = Math.min(segments[s], segments[s + 2]) - radius, maxX = Math.max(segments[s], segments[s + 2]) + radius
+        const minZ = Math.min(segments[s + 1], segments[s + 3]) - radius, maxZ = Math.max(segments[s + 1], segments[s + 3]) + radius
+        for (let x = Math.floor(minX / CELL_SIZE); x <= Math.floor(maxX / CELL_SIZE); x++)
+        {
+            for (let z = Math.floor(minZ / CELL_SIZE); z <= Math.floor(maxZ / CELL_SIZE); z++)
+            {
+                const key = x * CELL_FACTOR + z
+                const cell = cells.get(key)
+                if (cell)
+                {
+                    cell.push(s)
+                }
+                else
+                {
+                    cells.set(key, [s])
+                }
+            }
+        }
+    }
+    return { segments, radius, cells }
 }
 
 
@@ -88,36 +142,7 @@ function edgeEnds(world: PatchWorld, h: number, out: number[]): void
 
 
 /**
- * Returns the half edges around a face and the ones next to it that nobody can get across, which is every wall someone on
- * the face can bump into as long as they are less wide than a face.
- */
-function wallsAround(world: PatchWorld, face: number): number[]
-{
-    const walls = new Set<number>()
-    const faces = new Set([face])
-    for (let ring = 0; ring < WALL_RINGS; ring++)
-    {
-        for (const f of [...faces])
-        {
-            for (let h = f * 4; h < f * 4 + 4; h++)
-            {
-                if (canCross(world, h))
-                {
-                    faces.add(faceOf(world.twin(h)))
-                }
-                else
-                {
-                    walls.add(h)
-                }
-            }
-        }
-    }
-    return [...walls]
-}
-
-
-/**
- * Returns the face a point is on when coming from a nearby face, null if it would take going through a wall
+ * Returns the face a point lies on when coming from a nearby face, whatever is in between, null if there is no such face
  */
 function faceAt(world: PatchWorld, from: number, x: number, z: number): number | null
 {
@@ -145,13 +170,83 @@ function faceAt(world: PatchWorld, from: number, x: number, z: number): number |
         {
             return face
         }
-        if (!canCross(world, crossed))
+        const twin = world.twin(crossed)
+        if (twin < 0)
         {
             return null
         }
-        face = faceOf(world.twin(crossed))
+        face = faceOf(twin)
     }
     return null
+}
+
+
+/**
+ * Returns the floor face to go by for someone at a point. Walls don't fill their faces, so someone close to one can be on a
+ * wall face, and then goes by the floor next to it if that is closer than the one they came from.
+ */
+function floorFaceAt(world: PatchWorld, from: number, x: number, z: number): number
+{
+    const face = faceAt(world, from, x, z)
+    if (face === null)
+    {
+        return from
+    }
+    if (world.faceType(face) === FaceType.PAVED.index)
+    {
+        return face
+    }
+
+    const [fromX, fromZ] = faceCenter(world, from)
+    let closest = from
+    let shortest = Math.hypot(fromX - x, fromZ - z)
+    for (let h = face * 4; h < face * 4 + 4; h++)
+    {
+        const twin = world.twin(h)
+        if (twin >= 0 && world.faceType(faceOf(twin)) === FaceType.PAVED.index)
+        {
+            const [cx, cz] = faceCenter(world, faceOf(twin))
+            const distance = Math.hypot(cx - x, cz - z)
+            if (distance < shortest)
+            {
+                closest = faceOf(twin)
+                shortest = distance
+            }
+        }
+    }
+    return closest
+}
+
+
+/**
+ * Returns whether a step would go into or through a wall. Walls with a side can be left, for someone who came in on a way
+ * that cuts a corner to be able to get out again.
+ */
+function hitsWall({ segments, cells }: FloorWalls, x0: number, z0: number, x1: number, z1: number): boolean
+{
+    const dx = x1 - x0, dz = z1 - z0
+    for (const cell of [cells.get(cellKey(x0, z0)), cells.get(cellKey(x1, z1))])
+    {
+        for (const s of cell ?? [])
+        {
+            if (segments[s + 4] * dx + segments[s + 5] * dz > 0)
+            {
+                continue
+            }
+            const ax = segments[s], az = segments[s + 1], ex = segments[s + 2] - ax, ez = segments[s + 3] - az
+            const across = dx * ez - dz * ex
+            if (across !== 0)
+            {
+                const t = ((ax - x0) * ez - (az - z0) * ex) / across
+                const u = ((ax - x0) * dz - (az - z0) * dx) / across
+                if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
+                {
+                    return true
+                }
+            }
+        }
+    }
+    return false
 }
 
 
@@ -159,28 +254,27 @@ function faceAt(world: PatchWorld, from: number, x: number, z: number): number |
  * Moves someone over the floor of a level. They slide along the walls in their way, and stay out of them by their radius.
  *
  * @param world     world with all patches of the level
+ * @param walls     walls of the level
  * @param spot      where they are, gets changed to where they end up
  * @param dx        movement in world units
  * @param dz        movement in world units
- * @param radius    how much room they need around them, in world units and less than half a face
  */
-export function moveOnFloor(world: PatchWorld, spot: FloorSpot, dx: number, dz: number, radius: number): void
+export function moveOnFloor(world: PatchWorld, walls: FloorWalls, spot: FloorSpot, dx: number, dz: number): void
 {
+    const { segments, radius, cells } = walls
     // small enough steps can't jump over a wall
     const steps = Math.ceil(Math.hypot(dx, dz) / radius)
     for (let i = 0; i < steps; i++)
     {
         let x = spot.x + dx / steps
         let z = spot.z + dz / steps
-        const walls = wallsAround(world, spot.face)
         // getting out of one wall can get into another one in a corner
         for (let pass = 0; pass < PUSH_PASSES; pass++)
         {
-            for (const h of walls)
+            for (const s of cells.get(cellKey(x, z)) ?? [])
             {
-                edgeEnds(world, h, ends)
-                const [x0, z0, x1, z1] = ends
-                const ex = x1 - x0, ez = z1 - z0
+                const x0 = segments[s], z0 = segments[s + 1]
+                const ex = segments[s + 2] - x0, ez = segments[s + 3] - z0
                 const t = Math.max(0, Math.min(1, ((x - x0) * ex + (z - z0) * ez) / (ex * ex + ez * ez)))
                 const ox = x - (x0 + t * ex), oz = z - (z0 + t * ez)
                 const distance = Math.hypot(ox, oz)
@@ -191,12 +285,12 @@ export function moveOnFloor(world: PatchWorld, spot: FloorSpot, dx: number, dz: 
                 }
             }
         }
-        const face = faceAt(world, spot.face, x, z)
-        if (face === null)
+        // a gap too narrow pushes back and forth, and can end up on the far side of a wall
+        if (Math.hypot(x - spot.x, z - spot.z) > radius * 2 || hitsWall(walls, spot.x, spot.z, x, z))
         {
             return
         }
-        spot.face = face
+        spot.face = floorFaceAt(world, spot.face, x, z)
         spot.x = x
         spot.z = z
     }

@@ -581,7 +581,8 @@ Glyphs are built from the stroke data of a source kanji per concept
 - Clicking on the floor walks the hero there (`map/dungeonWays.ts`).
 - With a controller, a level plays as a twin-stick action game in real
   time, on the shoulders as the thumbs are busy with the sticks:
-  left stick moves (sliding along walls, `moveOnFloor()`), right stick
+  left stick moves (sliding along the walls as they got built, not the
+  edges of their faces, `moveOnFloor()`), right stick
   aims, L1 dashes, R1 attacks, L2 blocks. R2 is kept for a secondary
   attack. The face buttons keep their jobs (leave, map, options) and the
   view stays where it is, turning it is left to the mouse. A dash goes where

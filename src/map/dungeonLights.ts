@@ -105,7 +105,7 @@ const LIGHT_SECTORS = 128
  * Values per wall segment in a segment array: start x and z, end x and z, x and z of the side a thick wall is seen from, which
  * is 0, 0 for thin walls seen from both sides
  */
-const SEGMENT_SIZE = 6
+export const SEGMENT_SIZE = 6
 
 const LIGHT_SALT = 0x11ab7
 
