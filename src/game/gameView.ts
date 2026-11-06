@@ -271,7 +271,7 @@ export default class GameView implements PadTarget
             }
             prompts.push({ glyph: "map", label: "Map" })
         }
-        prompts.push({ glyph: "menu", label: "End day" })
+        prompts.push({ glyph: "endDay", label: "End day" })
         if (popup.hidden && castle)
         {
             prompts.push(
@@ -293,9 +293,9 @@ export default class GameView implements PadTarget
                 this.follow(null)
             }
         }
-        else if (dialog.hidden)
+        else if (action !== "menu" && dialog.hidden)
         {
-            if (action === "menu")
+            if (action === "endDay")
             {
                 this.endDay()
             }
