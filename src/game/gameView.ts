@@ -161,6 +161,7 @@ export default class GameView implements PadTarget
     private readonly notices = el("div", { className: "notices" })
     private readonly popup = el("div", { className: "popup", hidden: true })
     private readonly dialog = el("div", { className: "popup mission-popup", hidden: true })
+    private readonly optionsPopup = el("div", { className: "popup mission-popup", hidden: true })
 
     /** marker a mission is being set up for */
     private selected: MissionMarker | null = null
@@ -210,6 +211,12 @@ export default class GameView implements PadTarget
                 this.closeDialog()
             }
         })
+        this.optionsPopup.addEventListener("click", ev => {
+            if (ev.target === this.optionsPopup)
+            {
+                this.closeOptions()
+            }
+        })
         window.addEventListener("keydown", ev => {
             if (ev.key === "Escape")
             {
@@ -227,6 +234,11 @@ export default class GameView implements PadTarget
      */
     private closePopup(): boolean
     {
+        if (!this.optionsPopup.hidden)
+        {
+            this.closeOptions()
+            return true
+        }
         if (!this.dialog.hidden)
         {
             this.closeDialog()
@@ -242,7 +254,11 @@ export default class GameView implements PadTarget
 
     scope(): Element[]
     {
-        const { hud, info, notices, popup, dialog } = this
+        const { hud, info, notices, popup, dialog, optionsPopup } = this
+        if (!optionsPopup.hidden)
+        {
+            return [optionsPopup]
+        }
         if (!dialog.hidden)
         {
             return [dialog]
@@ -253,9 +269,9 @@ export default class GameView implements PadTarget
 
     prompts(): Prompt[]
     {
-        const { dialog, popup, following, castle } = this
+        const { dialog, popup, optionsPopup, following, castle } = this
         const prompts: Prompt[] = [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
-        if (!dialog.hidden)
+        if (!dialog.hidden || !optionsPopup.hidden)
         {
             return [...prompts, { glyph: "back", label: "Back" }]
         }
@@ -275,6 +291,7 @@ export default class GameView implements PadTarget
         {
             prompts.push({ glyph: "endDay", label: "End day" })
         }
+        prompts.push({ glyph: "menu", label: "Options" })
         if (popup.hidden && castle)
         {
             prompts.push(
@@ -288,15 +305,26 @@ export default class GameView implements PadTarget
 
     act(action: Exclude<PadAction, "confirm">): void
     {
-        const { dialog, popup, following } = this
-        if (action === "back")
+        const { dialog, popup, optionsPopup, following } = this
+        if (action === "menu")
+        {
+            if (optionsPopup.hidden)
+            {
+                this.openOptions()
+            }
+            else
+            {
+                this.closeOptions()
+            }
+        }
+        else if (action === "back")
         {
             if (!this.closePopup() && following !== null)
             {
                 this.follow(null)
             }
         }
-        else if (action !== "menu" && dialog.hidden)
+        else if (dialog.hidden && optionsPopup.hidden)
         {
             if (action === "endDay")
             {
@@ -318,7 +346,7 @@ export default class GameView implements PadTarget
 
     look(yaw: number, pitch: number, zoom: number): void
     {
-        if (this.popup.hidden)
+        if (this.popup.hidden && this.optionsPopup.hidden)
         {
             this.castle?.look(yaw, pitch, zoom)
         }
@@ -348,7 +376,8 @@ export default class GameView implements PadTarget
             this.info,
             this.notices,
             this.popup,
-            this.dialog
+            this.dialog,
+            this.optionsPopup
         )
         return castle
     }
@@ -388,6 +417,23 @@ export default class GameView implements PadTarget
     {
         this.selected = null
         this.dialog.hidden = true
+        this.render()
+    }
+
+    /**
+     * Opens the options over whatever is on the screen, with the 3D view paused like for the map
+     */
+    private openOptions(): void
+    {
+        this.optionsPopup.hidden = false
+        this.castle?.setRunning(false)
+        this.render()
+    }
+
+    private closeOptions(): void
+    {
+        this.optionsPopup.hidden = true
+        this.castle?.setRunning(!!this.popup.hidden)
         this.render()
     }
 
@@ -627,6 +673,10 @@ export default class GameView implements PadTarget
                 this.selected.type === "explore" ? this.renderExplorers(this.selected) : this.renderHeroes(this.selected)
             )
         }
+        if (!this.optionsPopup.hidden)
+        {
+            this.optionsPopup.replaceChildren(this.renderOptions())
+        }
         document.title = campaign.castleName + ", day " + campaign.day + " - Treasure & Dread"
     }
 
@@ -676,8 +726,17 @@ export default class GameView implements PadTarget
                         e => alert(e.message)
                     )
                 }, "Import")
-            )
+            ),
+            el("button", { type: "button", className: "options", title: "Options", onclick: () => this.openOptions() }, "⚙️")
         ]
+    }
+
+    private renderOptions(): HTMLElement
+    {
+        return el("section", { className: "mission small" },
+            el("button", { type: "button", className: "close", title: "Back to the game", onclick: () => this.closeOptions() }, "✕"),
+            el("h3", {}, "⚙️ Options")
+        )
     }
 
     private renderMarker(marker: MapMarker): HTMLElement

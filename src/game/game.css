@@ -141,6 +141,20 @@
     margin-left: auto;
 }
 
+#game .hud .options
+{
+    margin-left: auto;
+    padding: 0 0.3rem;
+    background: transparent;
+    color: inherit;
+    font-size: 1.3rem;
+}
+
+#game .hud .dev + .options
+{
+    margin-left: 0;
+}
+
 /* stays in front of the map, to go after someone right from there */
 #game .info
 {
