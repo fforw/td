@@ -13,15 +13,19 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
-import { entranceFace, findFaces, nextFace } from "../map/dungeonWays"
+import { entranceFace, findFaces, type FloorSpot, moveOnFloor } from "../map/dungeonWays"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { tautPath } from "../map/route"
+import { actionDuration, itemAnimation } from "../items/itemAnimation"
+import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
+import HeroMarks from "../render/heroMarks"
 import { flickerLights, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import MapWorkerClient from "../worker/MapWorkerClient"
-import type { Direction } from "./gamepad"
+import type { PadInput } from "./gamepad"
+import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
 import { Walk } from "./journey"
 
 const TAU = Math.PI * 2
@@ -44,6 +48,16 @@ const WALK_SPEED = MEEPLE_SCALE * 1.5
 const TURN_RATE = 10
 
 /**
+ * Fastest a meeple turns when told where to look, in radians per second
+ */
+const AIM_TURN_RATE = 30
+
+/**
+ * Room a meeple needs around it on the floor, in world units
+ */
+const ROOM_AROUND = MEEPLE_SCALE * 0.4
+
+/**
  * Camera offset from the hero, in world units
  */
 const CAMERA_OFFSET = new Vector3(0, 3.2, 3.2)
@@ -61,31 +75,24 @@ const CLICK_DISTANCE = 5
  */
 const MAX_FRAME_TIME = 0.1
 
-/**
- * How close to the end of a way in world units someone can already be told where to go next, without stopping there.
- * Has to be further than a held direction gets between its repeats.
- */
-const CHAIN_DISTANCE = 0.3
-
 const FLOOR = new Plane(new Vector3(0, 1, 0), 0)
 
 const walkPosition: number[] = []
 const hit = new Vector3()
 
 /**
- * Directions on the screen as x and z in the view of a camera looking toward -z
+ * What heroes can carry into a level
  */
-const SCREEN_DIRECTIONS: Record<Direction, [number, number]> = {
-    up: [0, -1],
-    down: [0, 1],
-    left: [-1, 0],
-    right: [1, 0]
-}
+const HERO_ITEMS = ["sword_silver", "shield_silver"] as const
+
+const spot: FloorSpot = { face: 0, x: 0, z: 0 }
+
+const orders: HeroOrders = { ...NO_ORDERS }
 
 /**
  * Hero in the level
  */
-export interface LevelHero
+export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
 {
     id: number
     look: MeepleLook
@@ -105,12 +112,26 @@ interface ShownHero
     walk: Walk | null
     /** on the way out of the level */
     leaving: boolean
+    /** what the hero does on orders, which goes over walking a way */
+    control: HeroControl
+    /** moved on orders in the last frame */
+    steered: boolean
+}
+
+
+/**
+ * Turns a meeple the short way toward a facing, by the given radians at most
+ */
+function turnToward(meeple: Meeple, facing: number, most: number): void
+{
+    const turn = ((facing - meeple.facing) % TAU + TAU * 1.5) % TAU - Math.PI
+    meeple.facing += Math.max(-most, Math.min(most, turn))
 }
 
 
 /**
  * A dungeon level in 3D with the heroes inside. The view stays with one of them, who carries the hero light and goes where
- * they are told. Like the castle scene it has a canvas of its own, which saves the two from knowing about each other's
+ * they are told or steered. Like the castle scene it has a canvas of its own, which saves the two from knowing about each other's
  * lights and materials.
  */
 export default class LevelScene
@@ -130,6 +151,7 @@ export default class LevelScene
     private level: DungeonLevel | null = null
     private meshes: LevelMeshes | null = null
     private crowd: MeepleCrowd | null = null
+    private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
 
@@ -145,6 +167,8 @@ export default class LevelScene
     private readonly focusAt = new Vector3()
     /** the camera has to get to the hero first */
     private unplaced = true
+    /** what a controller does in the current frame, if it is in charge of the hero the view is with */
+    private steering: PadInput | null = null
 
     private running = false
     private lastFrame = 0
@@ -190,7 +214,8 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels(MEEPLE_MODELS)
+            loadModels(MEEPLE_MODELS),
+            loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level),
             err => console.error("Building level " + seed + " failed", err)
@@ -209,7 +234,7 @@ export default class LevelScene
 
         const crowd = new MeepleCrowd(MAX_HEROES)
         crowd.setLightField(meshes.field)
-        this.scene.add(crowd.group)
+        this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
 
         this.setHeroes(this.heroes)
@@ -235,7 +260,7 @@ export default class LevelScene
                 shown.delete(id)
             }
         }
-        for (const { id, look, gait, dex, face = this.entrance } of heroes)
+        for (const { id, look, gait, dex, face = this.entrance, ...held } of heroes)
         {
             if (!shown.has(id))
             {
@@ -248,10 +273,21 @@ export default class LevelScene
                     name: "",
                     gait,
                     dex,
-                    walking: false
+                    walking: false,
+                    // the shield only comes up to block
+                    ready: !!held.item,
+                    leftReady: false,
+                    ...held
                 }
                 crowd.add(meeple)
-                shown.set(id, { meeple, faces: [face], walk: null, leaving: false })
+                shown.set(id, {
+                    meeple,
+                    faces: [face],
+                    walk: null,
+                    leaving: false,
+                    control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
+                    steered: false
+                })
             }
         }
     }
@@ -290,36 +326,12 @@ export default class LevelScene
     }
 
     /**
-     * Has the hero the view is with go to the next face in a direction on the screen, once they are about done with the
-     * way they are on.
+     * Tells what a controller does in this frame to the hero the view is with. Nothing happens to them in frames without
+     * this, whatever the reason for it is.
      */
-    step(direction: Direction): void
+    steer(input: PadInput): void
     {
-        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        const { meshes } = this
-        if (!hero || hero.leaving || !meshes)
-        {
-            return
-        }
-        const { walk, faces, meeple } = hero
-        if (walk && (walk.length - walk.share * walk.length) * SCALE > CHAIN_DISTANCE)
-        {
-            return
-        }
-        const [sx, sz] = SCREEN_DIRECTIONS[direction]
-        const heading = this.controls.getAzimuthalAngle()
-        const face = nextFace(
-            meshes.world,
-            faces[faces.length - 1],
-            sx * Math.cos(heading) + sz * Math.sin(heading),
-            -sx * Math.sin(heading) + sz * Math.cos(heading)
-        )
-        if (face !== null)
-        {
-            const [x, z] = faceCenter(meshes.world, face)
-            hero.faces = [faces[faces.length - 1], face]
-            hero.walk = new Walk([meeple.position.x / SCALE, meeple.position.z / SCALE, x / SCALE, z / SCALE], 0)
-        }
+        this.steering = input
     }
 
     /**
@@ -366,10 +378,76 @@ export default class LevelScene
         return closest
     }
 
+    /**
+     * Has a hero do what they are told by the controller, or else finish what they got told before
+     */
+    private steerHero(id: number, hero: ShownHero, input: PadInput | null, time: number, delta: number): void
+    {
+        const { meeple, control } = hero
+        const attacks = control.update(input ? this.ordersOf(input) : NO_ORDERS, delta, meeple.facing)
+        if (attacks)
+        {
+            this.crowd!.act(meeple, 0)
+            // comes with the blade, after it has been drawn back
+            this.marks.slash(time + itemAnimation(meeple.item!).action.steps[0].transition.duration)
+        }
+        meeple.leftReady = control.blocking
+        if (control.turnTo !== null)
+        {
+            turnToward(meeple, control.turnTo, AIM_TURN_RATE * delta)
+        }
+
+        if (control.moving && !hero.leaving)
+        {
+            if (hero.walk)
+            {
+                hero.faces = [this.closestOnWay(hero)]
+                hero.walk = null
+            }
+            const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * delta
+            spot.face = hero.faces[0]
+            spot.x = meeple.position.x
+            spot.z = meeple.position.z
+            moveOnFloor(this.meshes!.world, spot, control.velocityX * speed, control.velocityZ * speed, ROOM_AROUND)
+            hero.faces[0] = spot.face
+            meeple.position.set(spot.x, 0, spot.z)
+            meeple.walking = true
+            hero.steered = true
+        }
+        else if (hero.steered)
+        {
+            hero.steered = false
+            meeple.walking = false
+            this.onMoved(id, hero.faces[0])
+        }
+    }
+
+    /**
+     * Returns what a controller's input tells a hero to do, with the directions turned from the screen into the world
+     */
+    private ordersOf({ moveX, moveY, aimX, aimY, dash, attack, block }: PadInput): HeroOrders
+    {
+        const heading = this.controls.getAzimuthalAngle()
+        const cos = Math.cos(heading), sin = Math.sin(heading)
+        orders.moveX = moveX * cos + moveY * sin
+        orders.moveZ = -moveX * sin + moveY * cos
+        orders.aimX = aimX * cos + aimY * sin
+        orders.aimZ = -aimX * sin + aimY * cos
+        orders.dash = dash
+        orders.attack = attack
+        orders.block = block
+        return orders
+    }
+
     private updateHeroes(time: number, delta: number): void
     {
+        const { steering } = this
+        this.steering = null
         for (const [id, hero] of this.shown)
         {
+            const steered = id === this.focus && !hero.leaving ? steering : null
+            this.steerHero(id, hero, steered, time, delta)
+
             const { meeple, walk, faces } = hero
             if (!walk)
             {
@@ -378,9 +456,7 @@ export default class LevelScene
             walk.advance(WALK_SPEED * walkSpeedMultiplier(meeple) * delta / SCALE, 1)
             walk.position(walkPosition)
             meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
-            // shortest turn in the direction walked in
-            const turn = ((Math.atan2(walkPosition[2], walkPosition[3]) - meeple.facing) % TAU + TAU * 1.5) % TAU - Math.PI
-            meeple.facing += Math.max(-TURN_RATE * delta, Math.min(TURN_RATE * delta, turn))
+            turnToward(meeple, Math.atan2(walkPosition[2], walkPosition[3]), TURN_RATE * delta)
             meeple.walking = true
 
             if (walk.isAt(1))
@@ -397,6 +473,13 @@ export default class LevelScene
             }
         }
         this.crowd?.update(this.camera, time)
+
+        const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (focused)
+        {
+            const { position, facing } = focused.meeple
+            this.marks.update(position.x, position.z, facing, !!steering, time)
+        }
     }
 
     /**

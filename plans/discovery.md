@@ -578,8 +578,19 @@ Glyphs are built from the stroke data of a source kanji per concept
   has a canvas of its own and only runs while it is shown. One level is
   kept at a time, the worker only builds it again for another one. Days
   are still ended at the castle, with heroes in levels just waiting there.
-- Clicking on the floor walks the hero there (`map/dungeonWays.ts`), and
-  controller directions walk face by face instead of moving the focus.
+- Clicking on the floor walks the hero there (`map/dungeonWays.ts`).
+- With a controller, a level plays as a twin-stick action game in real
+  time, on the shoulders as the thumbs are busy with the sticks:
+  left stick moves (sliding along walls, `moveOnFloor()`), right stick
+  aims, L1 dashes, R1 attacks, L2 blocks. R2 is kept for a secondary
+  attack. The face buttons keep their jobs (leave, map, options) and the
+  view stays where it is, turning it is left to the mouse. A dash goes where
+  the hero moves, or else looks, and a tapped attack waits for what's in its
+  way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
+  others have nothing yet to attack or block with.
+- There is nothing to hit yet: attacks and blocks only show. The floor
+  shows the aim and the slash (`render/heroMarks.ts`), as items lie along the
+  body and hardly show from above.
 
 ### 3.2 Fixtures
 

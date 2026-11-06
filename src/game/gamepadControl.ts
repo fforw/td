@@ -4,6 +4,7 @@ import {
     glyphUrl,
     nextInDirection,
     type PadAction,
+    type PadInput,
     PadTracker,
     readPad,
     type Scheme
@@ -36,11 +37,11 @@ export interface PadTarget
     look?(yaw: number, pitch: number, zoom: number): void
 
     /**
-     * Called for a direction before it moves the focus
+     * Called on every frame the controller is in charge
      *
-     * @returns true if it was used for something else and the focus stays
+     * @returns true if the sticks are used to control someone right now, and neither move the focus nor the view
      */
-    walk?(direction: Direction): boolean
+    steer?(input: PadInput): boolean
 
     /** called when the controller takes over from mouse and keyboard, or gives back to them */
     setPadMode?(active: boolean): void
@@ -205,6 +206,7 @@ export default class GamepadControl
         let move: Direction | null = null
         let lookX = 0, lookY = 0, zoom = 0
         let used = false
+        let input: PadInput | null = null
         for (const pad of pads)
         {
             let tracker = this.trackers.get(pad.index)
@@ -213,17 +215,21 @@ export default class GamepadControl
                 tracker = new PadTracker()
                 this.trackers.set(pad.index, tracker)
             }
-            const input = readPad(pad)
-            const change = tracker.update(input, time)
+            const padInput = readPad(pad)
+            const change = tracker.update(padInput, time)
             pressed.push(...change.pressed)
             move ??= change.move
-            if (input.active)
+            if (!input?.active)
+            {
+                input = padInput
+            }
+            if (padInput.active)
             {
                 used = true
-                this.scheme = input.scheme
-                lookX ||= input.lookX
-                lookY ||= input.lookY
-                zoom ||= input.zoom
+                this.scheme = padInput.scheme
+                lookX ||= padInput.lookX
+                lookY ||= padInput.lookY
+                zoom ||= padInput.zoom
             }
         }
 
@@ -237,13 +243,15 @@ export default class GamepadControl
             this.setActive(true)
             pressed.length = 0
             move = null
+            input = null
         }
 
         const { target } = this
         if (target)
         {
             const focused = this.updateFocus(target)
-            if (move && !target.walk?.(move) && focused)
+            const steered = !!input && !!target.steer?.(input)
+            if (move && !steered && focused)
             {
                 this.moveFocus(focused, move, target)
             }
@@ -258,7 +266,7 @@ export default class GamepadControl
                     target.act(action)
                 }
             }
-            if (lookX || lookY || zoom)
+            if (!steered && (lookX || lookY || zoom))
             {
                 target.look?.(-lookX * LOOK_SPEED * delta, -lookY * LOOK_SPEED * delta, Math.exp(-zoom * ZOOM_SPEED * delta))
             }

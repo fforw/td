@@ -2,7 +2,7 @@ import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import { faceCenter } from "../../src/map/dungeonLights"
-import { entranceFace, findFaces, type FloorSpot, moveOnFloor, nextFace } from "../../src/map/dungeonWays"
+import { entranceFace, findFaces, type FloorSpot, moveOnFloor } from "../../src/map/dungeonWays"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld from "../../src/map/PatchWorld"
@@ -58,40 +58,6 @@ describe("Ways through dungeon levels", () => {
         }
     })
 
-    it("steps to the next face in a direction", () => {
-
-        const { world, rooms } = level(1)
-        const entrance = entranceFace(world, { rooms })
-        const [x, z] = faceCenter(world, entrance)
-        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]])
-        {
-            const next = nextFace(world, entrance, dx, dz)
-            if (next !== null)
-            {
-                const [nx, nz] = faceCenter(world, next)
-                assert((nx - x) * dx + (nz - z) * dz > 0)
-                assert(world.faceType(next) === FaceType.PAVED.index)
-            }
-        }
-    })
-
-    it("doesn't step through walls", () => {
-
-        const { world, rooms } = level(1)
-        for (const face of rooms[0])
-        {
-            for (let h = face * 4; h < face * 4 + 4; h++)
-            {
-                const [x, z] = faceCenter(world, face)
-                const other = faceOf(world.twin(h))
-                const [ox, oz] = faceCenter(world, other)
-                if (nextFace(world, face, ox - x, oz - z) === other)
-                {
-                    assert(world.edgeType(h) !== EdgeType.WALL.index)
-                }
-            }
-        }
-    })
     it("keeps someone on the floor and out of the walls whatever they do", () => {
 
         const RADIUS = 0.1

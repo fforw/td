@@ -11,9 +11,10 @@ import {
     type PatchNode
 } from "./campaign"
 import { levelSeed } from "../map/generateDungeon"
+import { heldItems } from "../meeple/character"
 import { enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
-import type { Direction, PadAction } from "./gamepad"
+import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelScene, { type LevelHero } from "./levelScene"
@@ -266,9 +267,9 @@ export default class GameView implements PadTarget
     scope(): Element[]
     {
         const { hud, info, notices, popup, dialog, optionsPopup } = this
-        if (this.canWalk())
+        if (this.canSteer())
         {
-            // the directions walk here, what's left to click on is the order to leave
+            // the sticks steer here, what's left to click on is the order to leave
             return [notices]
         }
         if (!optionsPopup.hidden)
@@ -286,8 +287,9 @@ export default class GameView implements PadTarget
     prompts(): Prompt[]
     {
         const { dialog, popup, optionsPopup, following, castle } = this
-        const prompts: Prompt[] = this.canWalk()
-            ? [{ glyph: "move", label: "Walk" }, { glyph: "confirm", label: "Leave" }]
+        const steering = this.canSteer()
+        const prompts: Prompt[] = steering
+            ? [...this.steerPrompts(), { glyph: "confirm", label: "Leave" }]
             : [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
         if (!dialog.hidden || !optionsPopup.hidden)
         {
@@ -310,7 +312,7 @@ export default class GameView implements PadTarget
             prompts.push({ glyph: "endDay", label: "End day" })
         }
         prompts.push({ glyph: "menu", label: "Options" })
-        if (popup.hidden && castle)
+        if (popup.hidden && castle && !steering)
         {
             prompts.push(
                 { glyph: "look", label: "Look" },
@@ -319,6 +321,22 @@ export default class GameView implements PadTarget
             )
         }
         return prompts
+    }
+
+    /**
+     * Returns what to show for steering the hero the view is with, which depends on what they carry
+     */
+    private steerPrompts(): Prompt[]
+    {
+        const { campaign, following } = this
+        const { item, leftItem } = heldItems(campaign.heroes.find(hero => hero.id === following)!.character)
+        return [
+            { glyph: "run", label: "Move" },
+            { glyph: "look", label: "Aim" },
+            { glyph: "dash", label: "Dash" },
+            ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
+            ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : [])
+        ]
     }
 
     act(action: Exclude<PadAction, "confirm">): void
@@ -377,11 +395,11 @@ export default class GameView implements PadTarget
         }
     }
 
-    walk(direction: Direction): boolean
+    steer(input: PadInput): boolean
     {
-        if (this.canWalk())
+        if (this.canSteer())
         {
-            this.level?.step(direction)
+            this.level?.steer(input)
             return true
         }
         return false
@@ -397,9 +415,9 @@ export default class GameView implements PadTarget
     }
 
     /**
-     * Returns whether a controller walks the hero in the level right now
+     * Returns whether a controller steers the hero in the level right now
      */
-    private canWalk(): boolean
+    private canSteer(): boolean
     {
         const { popup, dialog, optionsPopup } = this
         return popup.hidden && dialog.hidden && optionsPopup.hidden && !!this.viewedLevelJob()
@@ -753,13 +771,17 @@ export default class GameView implements PadTarget
     private levelHeroes(target: string): LevelHero[]
     {
         const { campaign } = this
-        return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face }) => ({
-            id: heroId,
-            look: meepleSitter(campaign.seed, heroId).look,
-            gait: gaitOf(heroId),
-            dex: campaign.heroes.find(h => h.id === heroId)!.character.stats.dex,
-            ...(face !== undefined ? { face } : {})
-        }))
+        return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face }) => {
+            const { character } = campaign.heroes.find(h => h.id === heroId)!
+            return {
+                id: heroId,
+                look: meepleSitter(campaign.seed, heroId).look,
+                gait: gaitOf(heroId),
+                dex: character.stats.dex,
+                ...heldItems(character),
+                ...(face !== undefined ? { face } : {})
+            }
+        })
     }
 
     /**
