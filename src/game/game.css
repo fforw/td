@@ -512,6 +512,103 @@
     font-size: 0.9rem;
 }
 
+/* in front of everything and in the way of nothing, as all it does is show what the controller does */
+.pad-prompts
+{
+    position: fixed;
+    z-index: 5;
+    left: 50%;
+    bottom: 0.5rem;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem 1rem;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.25rem;
+    background: rgba(42, 29, 20, 0.85);
+    color: #e8e0d4;
+    font: 0.9rem system-ui, sans-serif;
+    pointer-events: none;
+}
+
+.pad-prompts[hidden]
+{
+    display: none;
+}
+
+.pad-prompts span
+{
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.pad-prompts img
+{
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.pad-prompts .about
+{
+    font-style: italic;
+}
+
+/* keeps what's along the bottom out from under the prompts */
+body.gamepad #title
+{
+    padding-bottom: 3rem;
+    box-sizing: border-box;
+}
+
+body.gamepad #game .info
+{
+    bottom: 3.75rem;
+}
+
+body.gamepad #game .popup:not(.mission-popup)
+{
+    padding-bottom: 8rem;
+}
+
+body.gamepad button:focus,
+body.gamepad input:focus
+{
+    outline: 3px solid #ffd35c;
+    outline-offset: 2px;
+}
+
+body.gamepad #game button.marker:focus
+{
+    background: #fff4d8;
+    transform: translate(-50%, -50%) scale(1.2);
+}
+
+body.gamepad #game .border-arrow:focus
+{
+    outline: none;
+}
+
+body.gamepad #game .border-arrow:focus polygon
+{
+    fill: #ffd35c;
+}
+
+body.gamepad #game label.explorer:has(input:focus)
+{
+    outline: 3px solid #ffd35c;
+    background: #444;
+}
+
+body.gamepad #game label.explorer input:focus
+{
+    outline: none;
+}
+
 /* keeps the arrows out of the positioning, like the one under the pointer */
 #game .all-arrows
 {

@@ -12,6 +12,8 @@ import {
 } from "./campaign"
 import { enterJob, hasArrived, isAway, jobDays, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
+import type { PadAction } from "./gamepad"
+import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
@@ -134,7 +136,7 @@ function missionResult(campaign: Campaign, mission: Mission): string
  * someone on a journey. The DOM parts are small, so every change renders them all again; the 3D scene and the sheet of the
  * map stay.
  */
-export default class GameView
+export default class GameView implements PadTarget
 {
     private readonly root: HTMLElement
     private campaign: Campaign
@@ -183,6 +185,9 @@ export default class GameView
     /** mission just finished by the explorer the view follows, who stays there for now */
     private finished: Mission | null = null
 
+    /** a controller is in charge */
+    private padMode = false
+
     constructor(root: HTMLElement, campaign: Campaign, store: SaveStore)
     {
         this.root = root
@@ -208,18 +213,115 @@ export default class GameView
         window.addEventListener("keydown", ev => {
             if (ev.key === "Escape")
             {
-                if (!this.dialog.hidden)
-                {
-                    this.closeDialog()
-                }
-                else if (!this.popup.hidden)
-                {
-                    this.closeMap()
-                }
+                this.closePopup()
             }
         })
 
         this.render()
+    }
+
+    /**
+     * Closes the topmost popup, if any
+     *
+     * @returns true if a popup was closed
+     */
+    private closePopup(): boolean
+    {
+        if (!this.dialog.hidden)
+        {
+            this.closeDialog()
+            return true
+        }
+        if (!this.popup.hidden)
+        {
+            this.closeMap()
+            return true
+        }
+        return false
+    }
+
+    scope(): Element[]
+    {
+        const { hud, info, notices, popup, dialog } = this
+        if (!dialog.hidden)
+        {
+            return [dialog]
+        }
+        const around = [hud, info, notices, document.getElementById("sound")!]
+        return popup.hidden ? around : [popup, ...around]
+    }
+
+    prompts(): Prompt[]
+    {
+        const { dialog, popup, following, castle } = this
+        const prompts: Prompt[] = [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
+        if (!dialog.hidden)
+        {
+            return [...prompts, { glyph: "back", label: "Back" }]
+        }
+        if (!popup.hidden)
+        {
+            prompts.push({ glyph: "back", label: "Close map" })
+        }
+        else
+        {
+            if (following !== null)
+            {
+                prompts.push({ glyph: "back", label: "To the castle" })
+            }
+            prompts.push({ glyph: "map", label: "Map" })
+        }
+        prompts.push({ glyph: "menu", label: "End day" })
+        if (popup.hidden && castle)
+        {
+            prompts.push(
+                { glyph: "look", label: "Look" },
+                { glyph: "zoomOut", label: "Out" },
+                { glyph: "zoomIn", label: "In" }
+            )
+        }
+        return prompts
+    }
+
+    act(action: Exclude<PadAction, "confirm">): void
+    {
+        const { dialog, popup, following } = this
+        if (action === "back")
+        {
+            if (!this.closePopup() && following !== null)
+            {
+                this.follow(null)
+            }
+        }
+        else if (dialog.hidden)
+        {
+            if (action === "menu")
+            {
+                this.endDay()
+            }
+            else if (popup.hidden)
+            {
+                this.openMap()
+            }
+            else
+            {
+                this.closeMap()
+            }
+        }
+    }
+
+    look(yaw: number, pitch: number, zoom: number): void
+    {
+        if (this.popup.hidden)
+        {
+            this.castle?.look(yaw, pitch, zoom)
+        }
+    }
+
+    setPadMode(active: boolean): void
+    {
+        this.padMode = active
+        this.sheet.showAllArrows(active)
     }
 
     private createCastle(): CastleScene | null
@@ -247,7 +349,9 @@ export default class GameView
 
     private createSheet(): MapSheet
     {
-        return new MapSheet(this.campaign.seed, () => this.hud.offsetHeight)
+        const sheet = new MapSheet(this.campaign.seed, () => this.hud.offsetHeight)
+        sheet.showAllArrows(this.padMode)
+        return sheet
     }
 
     private openMap(): void
@@ -530,6 +634,7 @@ export default class GameView
             el("button", { type: "button", className: "end-day", onclick: () => this.endDay() }, "End day"),
             el("button", {
                 type: "button",
+                className: "pad-start",
                 onclick: () => this.popup.hidden ? this.openMap() : this.closeMap()
             }, "🗺️ Map"),
             __DEV && el("span", { className: "dev" },
@@ -618,6 +723,7 @@ export default class GameView
                 ),
                 el("button", {
                     type: "button",
+                    className: "pad-start",
                     disabled: sending,
                     onclick: () => this.hire(explorer)
                 }, "🪙 " + price(explorer))
@@ -653,6 +759,7 @@ export default class GameView
                     ),
                     el("input", {
                         type: "radio",
+                        className: "pad-start",
                         name: "hero",
                         checked: pickedHero === hero.id,
                         disabled: isAway(campaign, hero),

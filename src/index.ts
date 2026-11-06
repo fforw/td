@@ -4,6 +4,7 @@ import "./game/game.css"
 import { randomSeed } from "./math/random"
 import { type Campaign, createCampaign } from "./game/campaign"
 import GameView from "./game/gameView"
+import GamepadControl from "./game/gamepadControl"
 import { LocalSaveStore } from "./game/storage"
 
 const store = new LocalSaveStore()
@@ -12,6 +13,14 @@ const title = document.getElementById("title")!
 const game = document.getElementById("game")!
 const subtitle = title.querySelector(".subtitle")!
 const continueButton = title.querySelector<HTMLButtonElement>(".continue")!
+const soundButton = document.getElementById("sound")!
+
+const gamepad = new GamepadControl()
+gamepad.setTarget({
+    scope: () => [title, soundButton],
+    prompts: () => [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }],
+    act: () => {}
+})
 
 /**
  * Campaign shown on the title screen, created from its seed but not saved before play
@@ -31,7 +40,7 @@ function play(campaign: Campaign): void
     store.save(campaign)
     title.hidden = true
     game.hidden = false
-    new GameView(game, campaign, store)
+    gamepad.setTarget(new GameView(game, campaign, store))
 }
 
 const seedParam = new URLSearchParams(location.search).get("seed")
@@ -48,7 +57,6 @@ title.querySelector(".play")!.addEventListener("click", () => play(preview))
 title.querySelector(".reroll")!.addEventListener("click", () => showPreview(randomSeed()))
 
 const music = document.querySelector<HTMLAudioElement>("audio")!
-const soundButton = document.getElementById("sound")!
 
 music.addEventListener("play", () => soundButton.textContent = "🔊")
 music.addEventListener("pause", () => soundButton.textContent = "🔇")
