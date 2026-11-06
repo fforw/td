@@ -2,7 +2,7 @@ import type { WebGLRenderer } from "three"
 import { assert, describe, it } from "vitest"
 
 import { bakeLights, type DungeonLight } from "../../src/map/dungeonLights"
-import { createLightField, discoLights, FLICKER_MIN, flickerLights, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
+import { createLightField, discoLights, FLICKER_MIN, flickerHeroLight, flickerLights, HERO_FLICKER_MIN, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
 
 const LIGHTS: DungeonLight[] = [
     { x: 2, z: 2, color: [1, 0.5, 0], radius: 0.1, reach: 2, channel: 0 },
@@ -61,6 +61,22 @@ describe("updateLightField", () => {
             updateLightField(renderer, field)
             assert.equal(rendered.length, before + 1)
         }
+    })
+})
+
+
+describe("flickerHeroLight", () => {
+    it("stays within its strength and keeps changing", () => {
+        const { field } = createField()
+        const seen = new Set<number>()
+        for (let time = 0; time < 20; time += 0.07)
+        {
+            flickerHeroLight(field, time)
+            const strength = field.uniforms.heroStrength.value
+            assert(strength >= HERO_FLICKER_MIN - 1e-6 && strength <= 1 + 1e-6)
+            seen.add(strength)
+        }
+        assert(seen.size > 100)
     })
 })
 

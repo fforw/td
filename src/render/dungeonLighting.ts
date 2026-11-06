@@ -85,7 +85,7 @@ const HERO_DIRECTIONS = 1024
 /**
  * How far the hero light reaches in world units
  */
-const HERO_REACH = 3.5
+const HERO_REACH = 2.5
 
 /**
  * Radius of the hero light in world units, which sets the size of its soft shadows
@@ -98,7 +98,7 @@ const HERO_RADIUS = 0.12
 const HERO_HEIGHT = 0.5
 
 const HERO_COLOR = "vec3(1.0, 0.8, 0.55)"
-const HERO_GAIN = 3
+const HERO_GAIN = 1.5
 
 /**
  * How far behind a wall in world units the shadow of the hero light starts. Faces of walls look up their distance in front
@@ -127,10 +127,20 @@ const HERO_EDGE_STEPS = 4
 export const FLICKER_MIN = 0.8
 
 /**
+ * Least strength of the hero light, which is a small flame carried around and flickers more than the lights on the walls
+ */
+export const HERO_FLICKER_MIN = 0.55
+
+/**
  * How fast lights flicker, in radians per second, with how much of the flicker each of the rates has. They have no common
  * multiple, so the flicker doesn't visibly repeat.
  */
 const FLICKER_RATES: [number, number][] = [[9.1, 0.5], [14.7, 0.3], [4.3, 0.2]]
+
+/**
+ * The same for the hero light, the fast rates of which make it look unsteady in the hand
+ */
+const HERO_FLICKER_RATES: [number, number][] = [[11.3, 0.4], [23.9, 0.35], [5.7, 0.25]]
 
 /**
  * Golden angle, to give every light its own phase
@@ -261,6 +271,7 @@ const STAY_ON_SIDE = /* glsl */`
 const HERO_VISIBILITY = /* glsl */`
     uniform sampler2D heroDistances;
     uniform vec2 heroPosition;
+    uniform float heroStrength;
 
     float heroDistance(float angle)
     {
@@ -354,6 +365,7 @@ export interface LightField
         lightSize: { value: Vector2 }
         heroDistances: { value: DataTexture }
         heroPosition: { value: Vector2 }
+        heroStrength: { value: number }
     }
 }
 
@@ -422,7 +434,8 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
         lightOrigin: { value: new Vector2(minX, minZ) },
         lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
         heroDistances: { value: heroTexture },
-        heroPosition: { value: new Vector2(NO_HERO, NO_HERO) }
+        heroPosition: { value: new Vector2(NO_HERO, NO_HERO) },
+        heroStrength: { value: 1 }
     }
 
     const pass = new Mesh(new PlaneGeometry(2, 2), new RawShaderMaterial({
@@ -500,6 +513,23 @@ export function moveHeroLight({ uniforms }: LightField, segments: Float64Array, 
 export function hideHeroLight({ uniforms }: LightField): void
 {
     uniforms.heroPosition.value.set(NO_HERO, NO_HERO)
+}
+
+
+/**
+ * Lets the hero light of the field flicker
+ *
+ * @param field     light field
+ * @param time      time in seconds
+ */
+export function flickerHeroLight({ uniforms }: LightField, time: number): void
+{
+    let wave = 0
+    for (const [rate, share] of HERO_FLICKER_RATES)
+    {
+        wave += Math.sin(time * rate) * share
+    }
+    uniforms.heroStrength.value = HERO_FLICKER_MIN + (1 - HERO_FLICKER_MIN) * (wave + 1) / 2
 }
 
 
@@ -647,7 +677,7 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                             vec3 toHero = vec3(-fromHero.x, ${HERO_HEIGHT.toFixed(3)} - vLightHeight, -fromHero.y);
                             float heroFade = 1.0 - heroDistance * heroDistance / ${(HERO_REACH * HERO_REACH).toFixed(3)};
 
-                            directLight.color = ${HERO_COLOR} * ${HERO_GAIN.toFixed(3)} * heroFade * heroFade / length(toHero)
+                            directLight.color = ${HERO_COLOR} * ${HERO_GAIN.toFixed(3)} * heroStrength * heroFade * heroFade / length(toHero)
                                 * heroVisibility(atan(fromHero.y, fromHero.x), heroDistance);
                             directLight.direction = normalize((viewMatrix * vec4(normalize(toHero), 0.0)).xyz);
                             RE_Direct(directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight);

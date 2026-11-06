@@ -24,7 +24,7 @@ import CuboidCrowd from "../monster/CuboidCrowd"
 import CuboidPack, { BIG_CUBOID, type CuboidPrey, HERO_RADIUS, mostCuboids, placeCuboids } from "../monster/cuboids"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
-import { flickerLights, moveHeroLight, updateLightField } from "../render/dungeonLighting"
+import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadInput } from "./gamepad"
@@ -622,7 +622,7 @@ export default class LevelScene
     /**
      * Moves the view along with the hero
      */
-    private updateView(): void
+    private updateView(time: number): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
         if (!hero)
@@ -644,6 +644,7 @@ export default class LevelScene
         }
         focusAt.copy(position)
         moveHeroLight(meshes!.field, meshes!.segments, position.x, position.z)
+        flickerHeroLight(meshes!.field, time)
     }
 
     private listen(canvas: HTMLCanvasElement): void
@@ -757,7 +758,7 @@ export default class LevelScene
             if (level && meshes)
             {
                 this.updateHeroes(time, delta)
-                this.updateView()
+                this.updateView(time)
                 flickerLights(meshes.field, level.lighting!.lights, time)
                 updateLightField(this.renderer, meshes.field)
             }
