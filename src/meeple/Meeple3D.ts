@@ -1,5 +1,6 @@
 import {
     BackSide,
+    GreaterDepth,
     BufferGeometry,
     CanvasTexture,
     Color,
@@ -213,6 +214,10 @@ export interface Meeple
      * Turns the meeple toward the camera with its face up to the viewer, e.g. while the player interacts with it
      */
     lookAtCamera?: boolean
+    /**
+     * Color of the shape showing where something hides the meeple, none without. See showSilhouettes() and setSilhouette().
+     */
+    silhouette?: Color | null
     /**
      * Item held in the right hand. Like the look, it must not change after the meeple was added.
      */
@@ -465,6 +470,19 @@ function hairGeometry(name: ModelName): BufferGeometry
 }
 
 
+const NO_SILHOUETTE = new Color(0)
+
+/**
+ * How far the rim of a silhouette reaches out of the meeple in meeple units
+ */
+const SILHOUETTE_RIM = OUTLINE * 2.5
+
+/**
+ * Brightness of the fill of a silhouette against its rim
+ */
+const SILHOUETTE_FILL = 0.03
+
+
 function createItemPart(sprite: ItemSprite, gradientMap: DataTexture, capacity: number): InstancedMesh
 {
     // the outline is part of the sprite, so the item needs no hull
@@ -483,6 +501,36 @@ function createOutlineMaterial(color: Color): MeshBasicMaterial
         shader.vertexShader = shader.vertexShader.replace(
             "#include <begin_vertex>",
             `#include <begin_vertex>\ntransformed += normal * ${OUTLINE.toFixed(4)};`
+        )
+    }
+    return material
+}
+
+/**
+ * Creates the material of a flat shape only showing where something else is in front of it. Instances without a color stay
+ * hidden.
+ *
+ * @param brightness    factor on the color of the instances
+ * @param grow          how far the shape reaches out of the part in meeple units
+ */
+function createSilhouetteMaterial(brightness: number, grow: number): MeshBasicMaterial
+{
+    const material = new MeshBasicMaterial({
+        color: new Color(brightness, brightness, brightness),
+        depthFunc: GreaterDepth,
+        depthWrite: false,
+        toneMapped: false
+    })
+    // three tells programs apart by the source of onBeforeCompile, which is the same for all of these
+    material.customProgramCacheKey = () => "silhouette" + grow
+    material.onBeforeCompile = shader => {
+        shader.vertexShader = shader.vertexShader.replace(
+            "#include <begin_vertex>",
+            `#include <begin_vertex>\ntransformed += normal * ${grow.toFixed(4)};`
+        )
+        shader.fragmentShader = shader.fragmentShader.replace(
+            "#include <color_fragment>",
+            `#include <color_fragment>\nif (diffuseColor.r + diffuseColor.g + diffuseColor.b == 0.0) discard;`
         )
     }
     return material
@@ -566,6 +614,11 @@ export default class MeepleCrowd
      */
     private readonly itemSizes = new Map<ItemName, number>()
     private readonly outlines: InstancedMesh[] = []
+    /**
+     * Rim of the silhouette per part, once there are any, which holds the colors for its fill as well
+     */
+    private readonly silhouettes = new Map<InstancedMesh, InstancedMesh>()
+    private readonly silhouetteMaterials: Material[] = []
 
     constructor(capacity: number)
     {
@@ -636,6 +689,46 @@ export default class MeepleCrowd
     }
 
     /**
+     * Shows the shape of meeples with a silhouette color where something hides them, as a dark fill with a rim. The crowd
+     * draws after the rest of the scene for it, so that has to be in the depth buffer, and the silhouettes before their own
+     * meeples, which would hide them otherwise. All rims come before all fills, for one rim around the whole figure.
+     */
+    showSilhouettes(): void
+    {
+        this.group.renderOrder = 1
+        const rimMaterial = createSilhouetteMaterial(1, SILHOUETTE_RIM)
+        const fillMaterial = createSilhouetteMaterial(SILHOUETTE_FILL, 0)
+        this.silhouetteMaterials.push(rimMaterial, fillMaterial)
+        for (const part of [this.body, this.head, ...this.hair.values()])
+        {
+            const rim = new InstancedMesh(part.geometry, rimMaterial, this.capacity)
+            const fill = new InstancedMesh(part.geometry, fillMaterial, this.capacity)
+            rim.setColorAt(0, NO_SILHOUETTE)
+            fill.instanceColor = rim.instanceColor
+            rim.renderOrder = -2
+            fill.renderOrder = -1
+            for (const mesh of [rim, fill])
+            {
+                mesh.instanceMatrix = part.instanceMatrix
+                mesh.frustumCulled = false
+                mesh.onBeforeRender = () => mesh.count = part.count
+                this.group.add(mesh)
+            }
+            this.silhouettes.set(part, rim)
+        }
+        this.repaint()
+    }
+
+    /**
+     * Changes the silhouette color of a meeple, e.g. for a monster that starts a fight
+     */
+    setSilhouette(meeple: Meeple, color: Color | null): void
+    {
+        meeple.silhouette = color
+        this.repaint()
+    }
+
+    /**
      * Lights the meeples with the given light field. Their outlines turn into rims where they stand in the dark and a light
      * still reaches them.
      */
@@ -646,6 +739,10 @@ export default class MeepleCrowd
         {
             const material = hull.material as MeshBasicMaterial
             applyRimLight(material, field, OUTLINE)
+            materials.delete(material)
+        }
+        for (const material of this.silhouetteMaterials)
+        {
             materials.delete(material)
         }
         for (const material of materials)
@@ -737,20 +834,37 @@ export default class MeepleCrowd
             list.splice(i, 1)
         }
 
-        // instance colors go by index and hair is packed per style, so all of it moves
+        this.repaint()
+        this.body.count = this.head.count = this.eyes.count = this.meeples.length
+    }
+
+    /**
+     * Sets the colors of all meeples, as instance colors go by index and hair is packed per style
+     */
+    private repaint(): void
+    {
         for (const hair of this.hair.values())
         {
             hair.count = 0
         }
-        this.meeples.forEach((other, index) => this.paint(other, index))
-        this.body.count = this.head.count = this.eyes.count = this.meeples.length
+        this.meeples.forEach((meeple, index) => this.paint(meeple, index))
+    }
+
+    private paintSilhouette(part: InstancedMesh, i: number, color: Color | null | undefined): void
+    {
+        const silhouette = this.silhouettes.get(part)
+        if (silhouette)
+        {
+            silhouette.setColorAt(i, color ?? NO_SILHOUETTE)
+            silhouette.instanceColor!.needsUpdate = true
+        }
     }
 
     /**
      * Sets the colors of the meeple at the given index, which has to come after those of all meeples before it for the
      * hair
      */
-    private paint({ look }: Meeple, i: number): void
+    private paint({ look, silhouette }: Meeple, i: number): void
     {
         this.body.setColorAt(i, look.shirt)
         this.head.setColorAt(i, look.skin)
@@ -758,6 +872,8 @@ export default class MeepleCrowd
         this.body.instanceColor!.needsUpdate = true
         this.head.instanceColor!.needsUpdate = true
         this.eyes.instanceColor!.needsUpdate = true
+        this.paintSilhouette(this.body, i, silhouette)
+        this.paintSilhouette(this.head, i, silhouette)
 
         // hair instances are packed per style in the order the meeples were added
         const hair = this.hair.get(look.hairStyle)
@@ -767,6 +883,7 @@ export default class MeepleCrowd
             const color = look.hairStyle === HairStyle.SHORT ? tmpColor.copy(look.hair).lerp(look.skin, 1 / 3) : look.hair
             hair.setColorAt(hair.count++, color)
             hair.instanceColor!.needsUpdate = true
+            this.paintSilhouette(hair, hair.count - 1, silhouette)
         }
     }
 
