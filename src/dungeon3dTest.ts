@@ -21,7 +21,15 @@ import PatchWorld from "./map/PatchWorld"
 import { faceOf } from "./map/QuadPatch"
 import { randomLook } from "./meeple/look"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
-import { applyLightField, createLightField, hideHeroLight, type LightField, moveHeroLight } from "./render/dungeonLighting"
+import {
+    applyLightField,
+    createLightField,
+    flickerLights,
+    hideHeroLight,
+    type LightField,
+    moveHeroLight,
+    steadyLights
+} from "./render/dungeonLighting"
 import { createThickWalls, createThinWallCorners, createThinWalls } from "./render/dungeonMeshes"
 import { createGround } from "./render/patchMeshes"
 import { loadModels, SCALE } from "./render/scene3d"
@@ -235,7 +243,20 @@ function show(level: DungeonLevel): void
     })
     const heroLightLabel = document.createElement("label")
     heroLightLabel.append(heroLight, " hero light")
-    document.getElementById("ui")!.append(button, " ", heroLightLabel)
+
+    const { lights } = lighting!
+    const flicker = document.createElement("input")
+    flicker.type = "checkbox"
+    flicker.checked = true
+    flicker.addEventListener("change", () => {
+        if (!flicker.checked)
+        {
+            steadyLights(field, lights)
+        }
+    })
+    const flickerLabel = document.createElement("label")
+    flickerLabel.append(flicker, " flicker")
+    document.getElementById("ui")!.append(button, " ", heroLightLabel, " ", flickerLabel)
 
     const timer = new Timer()
     const step = new Vector3()
@@ -262,6 +283,10 @@ function show(level: DungeonLevel): void
         if (hero && heroLight.checked)
         {
             moveHeroLight(field, segments, hero.position.x, hero.position.z)
+        }
+        if (flicker.checked)
+        {
+            flickerLights(field, lights, timer.getElapsed())
         }
         controls.update()
         crowd.update(camera, timer.getElapsed())

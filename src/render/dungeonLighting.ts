@@ -16,8 +16,10 @@ import {
 } from "three"
 import {
     castWallDistances,
+    FLICKER_MIN,
     LIGHT_CHANNELS,
     LIGHT_TEXELS,
+    type DungeonLight,
     type LevelLighting,
     RIM_FADE_END,
     RIM_FADE_START,
@@ -106,6 +108,17 @@ const HERO_TAPS = 3
  * Number of halvings to find the edge of a shadow between two directions
  */
 const HERO_EDGE_STEPS = 4
+
+/**
+ * How fast lights flicker, in radians per second, with how much of the flicker each of the rates has. They have no common
+ * multiple, so the flicker doesn't visibly repeat.
+ */
+const FLICKER_RATES: [number, number][] = [[9.1, 0.5], [14.7, 0.3], [4.3, 0.2]]
+
+/**
+ * Golden angle, to give every light its own phase
+ */
+const FLICKER_PHASE = 2.399963
 
 /**
  * Where the hero light is while there is none
@@ -250,6 +263,11 @@ const HERO_VISIBILITY = /* glsl */`
  */
 export interface LightField
 {
+    /**
+     * Number of lights
+     */
+    count: number
+
     uniforms: {
         lightVisibility: { value: DataTexture }
         lightIds: { value: DataTexture }
@@ -316,6 +334,7 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
     dataTexture.needsUpdate = true
 
     return {
+        count: lights.length,
         uniforms: {
             lightVisibility: { value: visibilityTexture },
             lightIds: { value: idTexture },
@@ -361,6 +380,60 @@ export function moveHeroLight({ uniforms }: LightField, segments: Float64Array, 
 export function hideHeroLight({ uniforms }: LightField): void
 {
     uniforms.heroPosition.value.set(NO_HERO, NO_HERO)
+}
+
+
+/**
+ * Changes the strength of a light, which also dims its color
+ *
+ * @param field     light field
+ * @param lights    lights of the level
+ * @param index     index of the light
+ * @param strength  strength of the light, 1 for what it was baked with
+ */
+function setLightStrength({ uniforms, count }: LightField, lights: readonly DungeonLight[], index: number, strength: number): void
+{
+    const data = uniforms.lightData.value.image.data as Float32Array
+    const [r, g, b] = lights[index].color
+    data.set([r * strength, g * strength, b * strength, strength], (count + 1) * 4 + (index + 1) * 4)
+}
+
+
+/**
+ * Lets all lights flicker, each in its own way
+ *
+ * @param field     light field
+ * @param lights    lights of the level
+ * @param time      time in seconds
+ */
+export function flickerLights(field: LightField, lights: readonly DungeonLight[], time: number): void
+{
+    for (let i = 0; i < lights.length; i++)
+    {
+        let wave = 0, step = 1
+        for (const [rate, share] of FLICKER_RATES)
+        {
+            wave += Math.sin(time * rate + i * FLICKER_PHASE * step++) * share
+        }
+        setLightStrength(field, lights, i, FLICKER_MIN + (1 - FLICKER_MIN) * (wave + 1) / 2)
+    }
+    field.uniforms.lightData.value.needsUpdate = true
+}
+
+
+/**
+ * Stops the flicker and puts all lights back to their full strength
+ *
+ * @param field     light field
+ * @param lights    lights of the level
+ */
+export function steadyLights(field: LightField, lights: readonly DungeonLight[]): void
+{
+    for (let i = 0; i < lights.length; i++)
+    {
+        setLightStrength(field, lights, i, 1)
+    }
+    field.uniforms.lightData.value.needsUpdate = true
 }
 
 
