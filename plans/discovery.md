@@ -614,10 +614,11 @@ Glyphs are built from the stroke data of a source kanji per concept
   dark and a light still reaches it, so not close to a light. Rooms get a
   light in the middle, the biggest ones first, sized by the room. A light
   gets smaller until a meeple can't get rims from two lights at the same
-  point, at any strength of their flicker, which depends on their reach
-  (`rimLimit()`) and on the walls between them, counting doors as open. It
-  also has to find a free channel. Rooms where even the smallest light
-  doesn't fit stay dark. Meeples have no shadows in levels yet.
+  point, which depends on their reach (`rimLimit()`) and on the walls
+  between them, counting doors as open. It also has to find a free channel.
+  Rooms where even the smallest light doesn't fit stay dark. Where a rim
+  shows goes by the lights at full strength, and its brightness follows
+  their strength, so changing lights don't make rims come and go. Meeples have no shadows in levels yet.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
