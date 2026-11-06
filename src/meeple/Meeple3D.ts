@@ -616,6 +616,15 @@ export default class MeepleCrowd
         }
     }
 
+    /**
+     * Leaves out the bodies with their outlines, the first ones made, for heads floating on their own
+     */
+    hideBodies(): void
+    {
+        this.body.visible = false
+        this.outlines[0].visible = false
+    }
+
     get outlinesVisible(): boolean
     {
         return this.outlines[0].visible

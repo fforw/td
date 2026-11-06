@@ -15,7 +15,8 @@ import { HEAD_RADIUS } from "../meeple/meepleParts"
 import { loadModels } from "../render/scene3d"
 
 /*
- * Head and shoulder portraits of meeples, rendered offscreen into images
+ * Portraits of meeples rendered offscreen into images: head and shoulders on their height gradient, and small floating
+ * heads
  */
 
 /**
@@ -36,6 +37,13 @@ const FOV = 24
  */
 const DISTANCE = 0.72
 const LOOK_ABOVE = 0.01
+
+/**
+ * Size of the images of floating heads in pixels and the distance of their camera, which gets closer as there is nothing
+ * but the head and hair to show
+ */
+const HEAD_SIZE = 96
+const HEAD_DISTANCE = 0.62
 
 /**
  * Colors of the background gradient at the feet and at the top of the head of the tallest meeple. The portraits only
@@ -132,13 +140,13 @@ export default class Portraits
     /**
      * Returns the portrait as image url, null while it is being rendered or where there is no WebGL
      */
-    get(key: string, sitter: () => Sitter): string | null
+    get(key: string, sitter: () => Sitter, headOnly = false): string | null
     {
         if (!this.images.has(key))
         {
             this.images.set(key, null)
             this.models.then(() => {
-                const image = this.render(sitter())
+                const image = this.render(sitter(), headOnly)
                 if (image)
                 {
                     this.images.set(key, image)
@@ -149,7 +157,16 @@ export default class Portraits
         return this.images.get(key)!
     }
 
-    private render({ look, facing }: Sitter): string | null
+    /**
+     * Returns the small floating head as image url with a transparent background, null while it is being rendered or where
+     * there is no WebGL
+     */
+    getHead(key: string, sitter: () => Sitter): string | null
+    {
+        return this.get(key + "/head", sitter, true)
+    }
+
+    private render({ look, facing }: Sitter, headOnly: boolean): string | null
     {
         if (this.failed)
         {
@@ -160,7 +177,6 @@ export default class Portraits
             try
             {
                 this.renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
-                this.renderer.setSize(SIZE, SIZE, false)
                 this.renderer.setClearColor(0x000000, 0)
             }
             catch (e)
@@ -171,6 +187,9 @@ export default class Portraits
             }
         }
 
+        const size = headOnly ? HEAD_SIZE : SIZE
+        this.renderer.setSize(size, size, false)
+
         const scene = new Scene()
         scene.add(new HemisphereLight("#dfefff", "#5c6e3c", 1.6))
         const light = new DirectionalLight("#fff4e0", 2)
@@ -179,7 +198,7 @@ export default class Portraits
 
         const head = headHeight(look)
         const camera = new PerspectiveCamera(FOV, 1, 0.01, 10)
-        camera.position.set(0, head, DISTANCE)
+        camera.position.set(0, head, headOnly ? HEAD_DISTANCE : DISTANCE)
         camera.lookAt(new Vector3(0, head + LOOK_ABOVE, 0))
 
         // no items, and the head neither tilted nor leaning, since the camera is at head height
@@ -187,10 +206,14 @@ export default class Portraits
         crowd.headTilt = 0
         crowd.add({ position: new Vector3(), facing, look, phase: 0, name: "", gait: 0.5 })
         crowd.update(camera, 0)
+        if (headOnly)
+        {
+            crowd.hideBodies()
+        }
         scene.add(crowd.group)
 
         this.renderer.render(scene, camera)
-        const image = withBackground(this.renderer.domElement, camera, look)
+        const image = headOnly ? this.renderer.domElement.toDataURL() : withBackground(this.renderer.domElement, camera, look)
 
         crowd.group.traverse(obj => {
             const mesh = obj as Mesh
