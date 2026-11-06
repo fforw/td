@@ -159,12 +159,7 @@ export default class GameView implements PadTarget
 
     private sim: SimWorld
 
-    private readonly portraits = new Portraits(() => {
-        if (!this.dialog.hidden)
-        {
-            this.render()
-        }
-    })
+    private readonly portraits = new Portraits(() => this.render())
 
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
@@ -1070,6 +1065,18 @@ export default class GameView implements PadTarget
             : el("span", { className: "portrait" })
     }
 
+    /**
+     * Returns the small floating head of someone, with their name to hover over
+     */
+    private renderHead({ id, name }: Pick<Explorer | Hero, "id" | "name">, className = "head"): HTMLElement
+    {
+        const { seed } = this.campaign
+        const src = this.portraits.getHead(seed + "/" + id, () => meepleSitter(seed, id))
+        return src
+            ? el("img", { className, src, alt: name, title: name })
+            : el("span", { className, title: name })
+    }
+
     private jobStatus(job: Job): string
     {
         const days = job.endDay - this.campaign.day
@@ -1098,9 +1105,10 @@ export default class GameView implements PadTarget
     /**
      * Returns a line of the mission list, which binds the view to whoever it is about
      */
-    private renderTarget(text: string, id: number | null, canFollow: boolean): HTMLElement
+    private renderTarget(text: string, id: number | null, canFollow: boolean, who?: Explorer | Hero): HTMLElement
     {
         const active = this.following === id
+        const head = who ? this.renderHead(who) : null
         return this.castle && canFollow
             ? el("button", {
                 type: "button",
@@ -1113,8 +1121,8 @@ export default class GameView implements PadTarget
                     }
                     this.follow(id)
                 }
-            }, text)
-            : el("div", {}, text)
+            }, head, text)
+            : el("div", {}, head, text)
     }
 
     private renderMissions(): HTMLElement | null
@@ -1130,14 +1138,18 @@ export default class GameView implements PadTarget
             ...campaign.missions.map(({ explorer, target, endDay, way }) => this.renderTarget(
                 "🧭 " + explorer.name + " → " + target + ", gets there in " + (endDay - campaign.day) + "d",
                 explorer.id,
-                !!way
+                !!way,
+                explorer
             )),
-            ...campaign.jobs.map(job => this.renderTarget(
-                "🛡️ " + campaign.heroes.find(h => h.id === job.heroId)!.name + " → " +
-                    (job.returning ? campaign.castleName : job.target) + ", " + this.jobStatus(job),
-                job.heroId,
-                !!job.way || !!job.inside
-            ))
+            ...campaign.jobs.map(job => {
+                const hero = campaign.heroes.find(h => h.id === job.heroId)!
+                return this.renderTarget(
+                    "🛡️ " + hero.name + " → " + (job.returning ? campaign.castleName : job.target) + ", " + this.jobStatus(job),
+                    job.heroId,
+                    !!job.way || !!job.inside,
+                    hero
+                )
+            })
         )
     }
 

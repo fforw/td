@@ -483,6 +483,18 @@
     background: #b8b8b8;
 }
 
+#game .head
+{
+    display: inline-block;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-right: 0.2rem;
+    vertical-align: middle;
+    /* the middle of the small letters is below the middle of the text */
+    position: relative;
+    top: -0.12rem;
+}
+
 #game .explorer .name
 {
     grid-column: 2;
