@@ -2,7 +2,7 @@ import { PATCH_SIZE } from "../map/HexagonPatch"
 import type { MapArea } from "../map/mapRegions"
 import { FACE_SIZE } from "../map/scale"
 import type { MapView } from "../render/manuscriptMap"
-import { type Campaign, type Impression, overworld, type PatchKind, type PatchNode, patchKey } from "./campaign"
+import { type Campaign, type Explorer, type Hero, type Impression, overworld, type PatchKind, type PatchNode, patchKey } from "./campaign"
 import { jobTargets } from "./heroes"
 import { frontier } from "./missions"
 import { NEIGHBORS } from "./patchKinds"
@@ -29,10 +29,10 @@ export type MapMarker = {
     q: number
     r: number
 } & (
-    /** what's on a discovered patch, starts a mission of a hero unless one is on the way, which gets there in the given days */
-    { type: "poi", kind: PatchKind, days?: number } |
-    /** explorer on the way, gets there in the given days */
-    { type: "targeted", days: number } |
+    /** what's on a discovered patch, starts a mission of a hero unless one is on the way, who gets there in the given days */
+    { type: "poi", kind: PatchKind, days?: number, who?: Pick<Hero, "id" | "name"> } |
+    /** explorer on the way, who gets there in the given days */
+    { type: "targeted", days: number, who?: Pick<Explorer, "id" | "name"> } |
     /** unknown patch an explorer passed through */
     { type: "passed", impression: Impression }
 )
@@ -148,7 +148,14 @@ export function mapContent(campaign: Campaign): MapContent
         if (state === "targeted")
         {
             const mission = campaign.missions.find(m => m.target === key)
-            markers.push({ key, q, r, type: "targeted", days: mission ? mission.endDay - campaign.day : 0 })
+            markers.push({
+                key,
+                q,
+                r,
+                type: "targeted",
+                days: mission ? mission.endDay - campaign.day : 0,
+                ...(mission ? { who: mission.explorer } : {})
+            })
         }
         else if (state === "passed" && impression)
         {
@@ -157,7 +164,14 @@ export function mapContent(campaign: Campaign): MapContent
         else if (kind !== "EMPTY" && jobs.includes(key))
         {
             const job = campaign.jobs.find(j => j.target === key && !j.returning)
-            markers.push({ key, q, r, type: "poi", kind, ...(job ? { days: Math.max(0, job.endDay - campaign.day) } : {}) })
+            markers.push({
+                key,
+                q,
+                r,
+                type: "poi",
+                kind,
+                ...(job ? { days: Math.max(0, job.endDay - campaign.day), who: campaign.heroes.find(h => h.id === job.heroId)! } : {})
+            })
         }
     }
 

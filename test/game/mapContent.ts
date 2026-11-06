@@ -91,6 +91,7 @@ describe("Map content", () => {
 
         const away = marker(campaign, poi.key)
         assert(away?.type === "poi" && away.days === campaign.jobs[0].endDay - campaign.day)
+        assert(away.who?.id === campaign.heroes[0].id, "tells who it is")
     })
 
     it("frees a point of interest for another hero once the hero there returns", () => {
