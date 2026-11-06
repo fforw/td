@@ -114,7 +114,7 @@ export function startJob(campaign: Campaign, heroId: number, target: string, rou
 export function enterJob(campaign: Campaign, heroId: number): void
 {
     const job = campaign.jobs.find(j => j.heroId === heroId)
-    if (!job || !hasArrived(campaign, job))
+    if (!job || !hasArrived(campaign, job) || job.inside)
     {
         throw new Error("Hero " + heroId + " isn't at a target")
     }
@@ -124,13 +124,48 @@ export function enterJob(campaign: Campaign, heroId: number): void
 
 
 /**
- * Has a hero who got to the target of their job walk back to the castle without entering it, which takes as long as
- * getting there did. The hero is home and learned nothing once the days are up.
+ * Has a hero who got to the target of their job go into the level there. The first time teaches them something, however
+ * often they go back in during the job. They come in at the entrance of the level.
+ */
+export function enterLevel(campaign: Campaign, heroId: number): void
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job || !hasArrived(campaign, job) || job.inside || job.returning)
+    {
+        throw new Error("Hero " + heroId + " isn't at a target")
+    }
+    job.inside = true
+    if (!job.entered)
+    {
+        job.entered = true
+        campaign.heroes.find(h => h.id === heroId)!.experience++
+    }
+}
+
+
+/**
+ * Has a hero come out of the level, where they wait outside for orders like before going in
+ */
+export function leaveLevel(campaign: Campaign, heroId: number): void
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job?.inside)
+    {
+        throw new Error("Hero " + heroId + " isn't inside")
+    }
+    delete job.inside
+    delete job.face
+}
+
+
+/**
+ * Has a hero who got to the target of their job walk back to the castle, which takes as long as getting there did. The
+ * hero is home once the days are up, and learned nothing unless they went in.
  */
 export function returnHome(campaign: Campaign, heroId: number): void
 {
     const job = campaign.jobs.find(j => j.heroId === heroId)
-    if (!job || !hasArrived(campaign, job))
+    if (!job || !hasArrived(campaign, job) || job.inside)
     {
         throw new Error("Hero " + heroId + " isn't at a target")
     }

@@ -1,9 +1,10 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { enterJob, hasArrived, isAway, jobDays, returnHome, startJob } from "../../src/game/heroes"
+import { enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
+import { parseSave, serializeSave } from "../../src/game/storage"
 import { MAX_LOITERING, price } from "../../src/game/tavern"
 
 
@@ -308,6 +309,46 @@ describe("Heroes", () => {
         enterJob(campaign, hero.id)
         assert(!isAway(campaign, hero))
         assert(hero.experience === 1)
+    })
+
+    it("goes into a level and comes out to wait outside again", () => {
+
+        const campaign = createCampaign(9)
+        overworld(campaign).patches["1/0"] = { q: 1, r: 0, kind: "DUNGEON", state: "discovered", parent: "0/0" }
+        const hero = campaign.heroes[0]
+        startJob(campaign, hero.id, "1/0")
+        const job = campaign.jobs[0]
+        assert.throws(() => enterLevel(campaign, hero.id))
+        while (!hasArrived(campaign, job))
+        {
+            advanceDay(campaign)
+        }
+
+        enterLevel(campaign, hero.id)
+        assert(job.inside)
+        assert(hero.experience === 1)
+        assert.throws(() => enterJob(campaign, hero.id))
+        assert.throws(() => returnHome(campaign, hero.id))
+        assert.throws(() => enterLevel(campaign, hero.id))
+
+        // days go by for those inside, too
+        job.face = 123
+        advanceDay(campaign)
+        assert(job.inside && isAway(campaign, hero))
+        assert.deepEqual(parseSave(serializeSave(campaign)).jobs[0], job)
+
+        leaveLevel(campaign, hero.id)
+        assert(!job.inside && job.face === undefined && hasArrived(campaign, job))
+        assert.throws(() => leaveLevel(campaign, hero.id))
+
+        // going back in during the job teaches nothing more
+        enterLevel(campaign, hero.id)
+        leaveLevel(campaign, hero.id)
+        assert(hero.experience === 1)
+
+        returnHome(campaign, hero.id)
+        assert(job.returning)
+        assert.throws(() => enterLevel(campaign, hero.id))
     })
 
     it("can't enter before getting there", () => {

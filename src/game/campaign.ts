@@ -137,6 +137,12 @@ export interface Job extends Journey
     heroId: number
     /** walking back to the castle, with the days and the way being the ones of that */
     returning?: boolean
+    /** in the level at the target */
+    inside?: boolean
+    /** global id of the face the hero last got to inside the level, missing before they moved */
+    face?: number
+    /** went into the level at some point of the job */
+    entered?: boolean
 }
 
 /**
