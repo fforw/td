@@ -33,7 +33,7 @@ import {
 } from "./render/dungeonLighting"
 import { createThickWalls, createThinWallCorners, createThinWalls } from "./render/dungeonMeshes"
 import { createGround } from "./render/patchMeshes"
-import { loadModels, SCALE } from "./render/scene3d"
+import { loadModels, pixelRatio, SCALE } from "./render/scene3d"
 
 const TAU = Math.PI * 2
 
@@ -59,7 +59,7 @@ const level = loadLevel(true)
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
 const renderer = new WebGLRenderer({ canvas, antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.toneMapping = ACESFilmicToneMapping
 

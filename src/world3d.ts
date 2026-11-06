@@ -20,7 +20,7 @@ import type { GeneratedPatch } from "./map/patchGenerators"
 import MapWorkerClient from "./worker/MapWorkerClient"
 import PatchWorld from "./map/PatchWorld"
 import { createGround, createModels } from "./render/patchMeshes"
-import { FACE_SIZE, loadModels, SCALE } from "./render/scene3d"
+import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "./render/scene3d"
 import { randomSeed } from "./math/random"
 
 /*
@@ -66,7 +66,7 @@ interface LoadedPatch
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
 const renderer = new WebGLRenderer({ canvas, antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = PCFShadowMap

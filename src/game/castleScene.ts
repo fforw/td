@@ -23,7 +23,7 @@ import type { CastlePlan } from "../castle/castlePlan"
 import { PATCH_SIZE } from "../map/HexagonPatch"
 import PatchWorld from "../map/PatchWorld"
 import { createGround, createModels } from "../render/patchMeshes"
-import { FACE_SIZE, loadModels } from "../render/scene3d"
+import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
 import type { GeneratedPatch } from "../map/patchGenerators"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PatchNode } from "./campaign"
@@ -160,7 +160,7 @@ export default class CastleScene
         this.compass.prepend(needle)
 
         const renderer = new WebGLRenderer({ canvas, antialias: true })
-        renderer.setPixelRatio(window.devicePixelRatio)
+        renderer.setPixelRatio(pixelRatio())
         renderer.shadowMap.enabled = true
         renderer.shadowMap.type = PCFShadowMap
         this.renderer = renderer

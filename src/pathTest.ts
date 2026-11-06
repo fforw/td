@@ -33,7 +33,7 @@ import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, next } from "./map/QuadPatc
 import { globalFace, unpackPath } from "./map/route"
 import { randomSeed } from "./math/random"
 import { createGround, createModels } from "./render/patchMeshes"
-import { FACE_SIZE, loadModels, SCALE } from "./render/scene3d"
+import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "./render/scene3d"
 import type { GeneratedPatch } from "./map/patchGenerators"
 import MapWorkerClient from "./worker/MapWorkerClient"
 
@@ -104,7 +104,7 @@ function createRenderer(): WebGLRenderer | null
     try
     {
         const renderer = new WebGLRenderer({ canvas, antialias: true })
-        renderer.setPixelRatio(window.devicePixelRatio)
+        renderer.setPixelRatio(pixelRatio())
         renderer.setSize(window.innerWidth, window.innerHeight)
         renderer.shadowMap.enabled = true
         renderer.shadowMap.type = PCFShadowMap

@@ -28,7 +28,7 @@ import { planCastle, toWorld } from "./castle/castlePlan"
 import type { Face } from "./map/geometry"
 import { FaceType } from "./map/geometry"
 import marchingSquares from "./map/marchingSquares"
-import { FACE_SIZE, GROUND_COLORS, loadModels, model, type ModelName, SCALE } from "./render/scene3d"
+import { FACE_SIZE, GROUND_COLORS, loadModels, model, type ModelName, pixelRatio, SCALE } from "./render/scene3d"
 
 const TAU = Math.PI * 2;
 
@@ -145,7 +145,7 @@ function createRock(face: Face): Object3D
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
 const renderer = new WebGLRenderer({ canvas, antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = PCFShadowMap

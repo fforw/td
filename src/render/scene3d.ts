@@ -10,6 +10,20 @@ export { FACE_SIZE, SCALE } from "../map/scale"
 
 const MEDIA = import.meta.env.BASE_URL + "media/"
 
+/**
+ * Most pixels to render per CSS pixel. Weak devices often have sharp screens, where this is what costs the most.
+ */
+const MAX_PIXEL_RATIO = 1.5
+
+/**
+ * Returns the pixel ratio to render with
+ */
+export function pixelRatio(): number
+{
+    return Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO)
+}
+
+
 export const MODELS = {
     wall: "castle/wall.glb",
     tower: "castle/tower-square.glb",

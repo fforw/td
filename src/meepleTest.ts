@@ -20,7 +20,7 @@ import MeepleCrowd, { HairStyle, type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, rando
 import { randomLook } from "./meeple/look"
 import { canEquip, type Character, CLASSES, ITEM_TYPES, type ItemType, randomCharacter } from "./meeple/character"
 import { type ItemName, ITEMS, loadItems } from "./items/itemSprite"
-import { loadModels } from "./render/scene3d"
+import { loadModels, pixelRatio } from "./render/scene3d"
 import { randomSeed, resetRandom, rng } from "./math/random"
 import { attempts, cityNameGenerator, resetAttempts } from "./meeple/nameGenerator";
 
@@ -73,7 +73,7 @@ function randomItems(character: Character): Pick<Meeple, "item" | "leftItem">
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 
 const renderer = new WebGLRenderer({ canvas, antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
+renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = PCFShadowMap
