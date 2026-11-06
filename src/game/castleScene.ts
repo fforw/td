@@ -433,7 +433,7 @@ export default class CastleScene
             // ending the day is no reason to stand around any longer
             entry.wait = reached > 0 ? 0 : Math.max(0, entry.wait - delta)
             const step = entry.wait > 0 ? 0 : JOURNEY_SPEED * speed * walkSpeedMultiplier(meeple) * delta / SCALE
-            meeple.walking = followed ? walk.advance(step, reached, next) : walk.advance(step, 0, homeward ? next : 1)
+            meeple.walking = walk.advance(step, followed || homeward ? next : 1)
             walk.position(walkPosition)
             meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
             if (meeple.walking)

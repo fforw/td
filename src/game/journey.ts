@@ -7,11 +7,6 @@ import type { Journey } from "./campaign"
  */
 
 /**
- * How much faster than walking someone runs who has fallen behind the days
- */
-const CATCH_UP = 8
-
-/**
  * What is left of the way in map units that counts as having got somewhere
  */
 const CLOSE_ENOUGH = 1e-3
@@ -105,19 +100,17 @@ export class Walk
     }
 
     /**
-     * Walks on, but only up to one mark. Falling behind the other one means running to catch up.
+     * Walks on, but only up to one mark
      *
      * @param step      distance to walk in map units
-     * @param reached   share of the way that has to be reached at least
      * @param next      share of the way to stop at
      *
      * @return true if that took any walking
      */
-    advance(step: number, reached: number, next: number): boolean
+    advance(step: number, next: number): boolean
     {
         const { distance, length } = this
-        const stride = distance < reached * length ? step * CATCH_UP : step
-        this.distance = Math.max(distance, Math.min(distance + stride, next * length))
+        this.distance = Math.max(distance, Math.min(distance + step, next * length))
         this.seek()
         return this.distance > distance
     }

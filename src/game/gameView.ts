@@ -271,7 +271,10 @@ export default class GameView implements PadTarget
             }
             prompts.push({ glyph: "map", label: "Map" })
         }
-        prompts.push({ glyph: "endDay", label: "End day" })
+        if (following === null)
+        {
+            prompts.push({ glyph: "endDay", label: "End day" })
+        }
         if (popup.hidden && castle)
         {
             prompts.push(
@@ -297,7 +300,10 @@ export default class GameView implements PadTarget
         {
             if (action === "endDay")
             {
-                this.endDay()
+                if (following === null)
+                {
+                    this.endDay()
+                }
             }
             else if (popup.hidden)
             {
@@ -631,7 +637,13 @@ export default class GameView implements PadTarget
             el("span", { className: "castle" }, campaign.subtitle),
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
-            el("button", { type: "button", className: "end-day", onclick: () => this.endDay() }, "End day"),
+            el("button", {
+                type: "button",
+                className: "end-day",
+                // whoever the view follows sets the pace of the days
+                disabled: this.following !== null,
+                onclick: () => this.endDay()
+            }, "End day"),
             el("button", {
                 type: "button",
                 className: "pad-start",

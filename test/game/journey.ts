@@ -54,50 +54,35 @@ describe("Walk", () => {
     it("follows its way around corners", () => {
 
         const walk = new Walk(WAY, 0)
-        walk.advance(50, 0, 1)
+        walk.advance(50, 1)
         assert.deepEqual(positionOf(walk), [50, 0, 100, 0])
-        walk.advance(100, 0, 1)
+        walk.advance(100, 1)
         assert.deepEqual(positionOf(walk), [100, 50, 0, 100])
     })
 
     it("stops at the mark of the next day", () => {
 
         const walk = new Walk(WAY, 0)
-        assert(walk.advance(30, 0, 0.2))
+        assert(walk.advance(30, 0.2))
         assert(!walk.isAt(0.2))
-        assert(walk.advance(30, 0, 0.2))
+        assert(walk.advance(30, 0.2))
         assert(walk.isAt(0.2))
         assert.deepEqual(positionOf(walk).slice(0, 2), [40, 0])
-        assert(!walk.advance(30, 0, 0.2))
+        assert(!walk.advance(30, 0.2))
     })
 
     it("stays at the end of its way", () => {
 
         const walk = new Walk(WAY, 1)
-        assert(!walk.advance(30, 1, 1))
+        assert(!walk.advance(30, 1))
         assert(walk.isAt(1))
         assert.deepEqual(positionOf(walk).slice(0, 2), [100, 100])
-    })
-
-    it("runs when it has fallen behind the days", () => {
-
-        const walk = new Walk(WAY, 0)
-        walk.advance(10, 0.5, 1)
-        assert.deepEqual(positionOf(walk).slice(0, 2), [80, 0])
-    })
-
-    it("doesn't run past the next mark", () => {
-
-        const walk = new Walk(WAY, 0)
-        walk.advance(10, 0.2, 0.3)
-        assert(walk.isAt(0.3))
-        assert(!walk.isAt(0.31))
     })
 
     it("never goes back when the marks are behind it", () => {
 
         const walk = new Walk(WAY, 0.5)
-        assert(!walk.advance(10, 0.1, 0.2))
+        assert(!walk.advance(10, 0.2))
         assert.deepEqual(positionOf(walk).slice(0, 2), [100, 0])
     })
 
@@ -114,7 +99,7 @@ describe("Walk", () => {
     it("has nowhere to go on a way of a single point", () => {
 
         const walk = new Walk([5, 7], 0)
-        assert(!walk.advance(10, 0, 1))
+        assert(!walk.advance(10, 1))
         assert(walk.isAt(1))
         assert.deepEqual(positionOf(walk), [5, 7, 0, 0])
     })

@@ -393,8 +393,9 @@ Heroes do everything that happens inside a discovered patch:
 - Someone sent off stands at the castle for 1.5 seconds first, with the
   mission listed already, counted only while the 3D view runs, so there is
   always time to go after them once the map is closed.
-- Someone followed walks up to the share of the next day. Ending the
-  day by hand makes them run to catch up if they fell behind.
+- Someone followed walks up to the share of the next day, which ends the
+  day. Days can only be ended by hand from the castle, so nobody followed
+  ever falls behind.
 - Anyone else just gets seen leaving: they walk on no matter the days
   until they are well away from the castle or at the end of the way, then
   disappear. Going after them finds them at the share their days have
