@@ -309,6 +309,8 @@ describe("placeLights", () => {
             const views = lights.map(({ x, z, radius, reach }) => createLightView(x, z, segments, radius, reach))
             const a: LightSample = { energy: 0, x: 0, z: 0 }
             const b: LightSample = { energy: 0, x: 0, z: 0 }
+            // counted, as asserting all the points takes too long
+            let overlaps = 0
             for (let i = 0; i < views.length; i++)
             {
                 assert(clearOfWalls(segments, views[i].x, views[i].z, views[i].radius))
@@ -326,15 +328,14 @@ describe("placeLights", () => {
                         {
                             lightAt(views[i], segments, x, z, a)
                             lightAt(views[j], segments, x, z, b)
-                            assert(
-                                Math.hypot(a.x, a.z) < RIM_FADE_START * 1.5 ||
+                            overlaps += Math.hypot(a.x, a.z) < RIM_FADE_START * 1.5 ||
                                 Math.hypot(b.x, b.z) < RIM_FADE_START * 1.5 ||
-                                (a.energy + b.energy) * FLICKER_MIN >= RIM_GATE_END
-                            )
+                                (a.energy + b.energy) * FLICKER_MIN >= RIM_GATE_END ? 0 : 1
                         }
                     }
                 }
             }
+            assert.equal(overlaps, 0)
         }
     })
 
