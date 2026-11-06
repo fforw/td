@@ -1,5 +1,5 @@
 import LevelScene, { type LevelHero } from "./game/levelScene"
-import { readPad } from "./game/gamepad"
+import { PadTracker, readPad } from "./game/gamepad"
 import { randomLook } from "./meeple/look"
 
 /*
@@ -39,15 +39,22 @@ level.setFocus(hero.id)
 level.setRunning(true)
 showHp(maxHp)
 
-function steer(): void
+const tracker = new PadTracker()
+
+function steer(time: number): void
 {
     const pad = navigator.getGamepads().find(pad => pad?.mapping === "standard")
     if (pad)
     {
-        level.steer(readPad(pad))
+        const input = readPad(pad)
+        level.steer(input)
+        for (const action of tracker.update(input, time).pressed)
+        {
+            level.act(action)
+        }
     }
     requestAnimationFrame(steer)
 }
-steer()
+requestAnimationFrame(steer)
 
 Object.assign(window, { level })

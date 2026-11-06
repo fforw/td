@@ -43,6 +43,9 @@ export interface PadTarget
      */
     steer?(input: PadInput): boolean
 
+    /** called for the buttons on the face of the controller while steer() has the sticks, which are all about the one steered */
+    steerAct?(action: Exclude<PadAction, "menu">): void
+
     /** called when the controller takes over from mouse and keyboard, or gives back to them */
     setPadMode?(active: boolean): void
 }
@@ -249,15 +252,19 @@ export default class GamepadControl
         const { target } = this
         if (target)
         {
-            const focused = this.updateFocus(target)
             const steered = !!input && !!target.steer?.(input)
+            const focused = steered ? this.dropFocus() : this.updateFocus(target)
             if (move && !steered && focused)
             {
                 this.moveFocus(focused, move, target)
             }
             for (const action of pressed)
             {
-                if (action === "confirm")
+                if (steered && action !== "menu")
+                {
+                    target.steerAct?.(action)
+                }
+                else if (action === "confirm")
                 {
                     focused?.click()
                 }
@@ -317,6 +324,16 @@ export default class GamepadControl
         }
         this.spots.set(owner, { key: keyOf(focused), ...centerOf(focused) })
         return focused
+    }
+
+    /**
+     * Takes the focus away while the buttons do something else than clicking on it. It comes back with the next updateFocus().
+     */
+    private dropFocus(): null
+    {
+        (document.activeElement as HTMLElement | null)?.blur()
+        this.scopeOwner = null
+        return null
     }
 
     /**

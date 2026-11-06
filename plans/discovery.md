@@ -645,6 +645,10 @@ Glyphs are built from the stroke data of a source kanji per concept
   hero in the level kept (`LevelScene.inFight()`), only once none does.
 - Getting out of a level will take reaching an exit into the overworld, once
   there are exits. Until then the order to leave walks back to the entrance.
+- While steering a hero, the four buttons on the face of the controller only
+  do things in the level, so the map and the way back to the castle are for the
+  mouse for now. Triangle toggles the light the hero carries, the others are
+  free.
 
 ### 3.4 Dungeon generation
 

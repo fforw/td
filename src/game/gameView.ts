@@ -262,11 +262,6 @@ export default class GameView implements PadTarget
     scope(): Element[]
     {
         const { hud, info, notices, popup, dialog, optionsPopup } = this
-        if (this.canSteer())
-        {
-            // the sticks steer here, what's left to click on is the order to leave
-            return [notices]
-        }
         if (!optionsPopup.hidden)
         {
             return [optionsPopup]
@@ -282,10 +277,11 @@ export default class GameView implements PadTarget
     prompts(): Prompt[]
     {
         const { dialog, popup, optionsPopup, following, castle } = this
-        const steering = this.canSteer()
-        const prompts: Prompt[] = steering
-            ? [...this.steerPrompts(), { glyph: "confirm", label: "Leave" }]
-            : [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
+        if (this.canSteer())
+        {
+            return [...this.steerPrompts(), { glyph: "menu", label: "Options" }]
+        }
+        const prompts: Prompt[] = [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
         if (!dialog.hidden || !optionsPopup.hidden)
         {
             return [...prompts, { glyph: "back", label: "Back" }]
@@ -307,7 +303,7 @@ export default class GameView implements PadTarget
             prompts.push({ glyph: "endDay", label: "End day" })
         }
         prompts.push({ glyph: "menu", label: "Options" })
-        if (popup.hidden && castle && !steering)
+        if (popup.hidden && castle)
         {
             prompts.push(
                 { glyph: "look", label: "Look" },
@@ -330,7 +326,8 @@ export default class GameView implements PadTarget
             { glyph: "look", label: "Aim" },
             { glyph: "dash", label: "Dash" },
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
-            ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : [])
+            ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
+            { glyph: "map", label: "Light" }
         ]
     }
 
@@ -398,6 +395,11 @@ export default class GameView implements PadTarget
             return true
         }
         return false
+    }
+
+    steerAct(action: Exclude<PadAction, "menu">): void
+    {
+        this.level?.act(action)
     }
 
     /**

@@ -24,10 +24,10 @@ import CuboidCrowd from "../monster/CuboidCrowd"
 import CuboidPack, { BIG_CUBOID, type CuboidPrey, HERO_RADIUS, mostCuboids, placeCuboids } from "../monster/cuboids"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
-import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "../render/dungeonLighting"
+import { flickerHeroLight, flickerLights, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import MapWorkerClient from "../worker/MapWorkerClient"
-import type { PadInput } from "./gamepad"
+import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS, viewTurn } from "./heroControl"
 import { Walk } from "./journey"
 
@@ -142,6 +142,8 @@ interface ShownHero
     hp: number
     /** when the sword of the attack going on gets there, in seconds, null without one */
     strikeAt: number | null
+    /** has the light on */
+    lightOn: boolean
 }
 
 
@@ -351,7 +353,8 @@ export default class LevelScene
                     steered: false,
                     prey: { x, z, facing: 0, blocking: false, hurtWait: 0 },
                     hp,
-                    strikeAt: null
+                    strikeAt: null,
+                    lightOn: true
                 })
             }
         }
@@ -406,6 +409,23 @@ export default class LevelScene
     steer(input: PadInput): void
     {
         this.steering = input
+    }
+
+    /**
+     * Has the hero the view is with do what the buttons on the face of the controller stand for in a level. The ones that do
+     * nothing yet are kept for more of this.
+     */
+    act(action: PadAction): void
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (!hero || hero.leaving)
+        {
+            return
+        }
+        if (action === "map")
+        {
+            hero.lightOn = !hero.lightOn
+        }
     }
 
     /**
@@ -643,8 +663,15 @@ export default class LevelScene
             controls.target.add(hit)
         }
         focusAt.copy(position)
-        moveHeroLight(meshes!.field, meshes!.segments, position.x, position.z)
-        flickerHeroLight(meshes!.field, time)
+        if (hero.lightOn)
+        {
+            moveHeroLight(meshes!.field, meshes!.segments, position.x, position.z)
+            flickerHeroLight(meshes!.field, time)
+        }
+        else
+        {
+            hideHeroLight(meshes!.field)
+        }
     }
 
     private listen(canvas: HTMLCanvasElement): void
