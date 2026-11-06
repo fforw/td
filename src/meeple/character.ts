@@ -38,6 +38,7 @@ export type ItemType = "weapon" | "twoHanded" | "tool" | "magic" | "misc"
 export const ITEM_TYPES: Partial<Record<ItemName, ItemType>> = {
     sword_silver: "weapon",
     flail_silver: "weapon",
+    shield_silver: "shield",
     // held in one hand, like Gandalf
     staff: "magic",
     axe_silver: "tool",

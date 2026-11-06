@@ -231,6 +231,34 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
     }
     ,
 
+    shield_silver: {
+
+        // flat on the arm, and quickly up in front of the body. Only ever readied, it has no action.
+        idle: {
+            pivot: [0, 0],
+            height: 0.42,
+            angle: 0.85,
+            lift: 0.06,
+            roll: 0,
+            swing: 0.08
+        },
+
+        ready: {
+            pivot: [0, 0],
+            height: 0.5,
+            angle: 0.45,
+            lift: 0.16,
+            roll: 0,
+            swing: 0,
+            transition: {
+                duration: 0.08,
+                easing: "easeOut"
+            }
+        }
+
+    }
+    ,
+
     axe_silver: TOOL,
 
     pick_silver: TOOL,

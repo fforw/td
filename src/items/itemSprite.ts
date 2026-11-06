@@ -286,6 +286,7 @@ const ITEM_DIR = import.meta.env.BASE_URL + "media/items/"
  */
 export const ITEMS = [
     "sword_silver",
+    "shield_silver",
     "axe_silver",
     "pick_silver",
     "hammer_silver",
