@@ -17,6 +17,11 @@ export const DASH_COOLDOWN = 0.55
 export const BLOCK_SPEED = 0.45
 
 /**
+ * Fastest the view turns toward where a hero aims, with the stick pushed all the way, in radians per second
+ */
+export const VIEW_TURN_RATE = 2.5
+
+/**
  * What a hero is told to do at one moment, with the directions in world units
  */
 export interface HeroOrders
@@ -33,6 +38,22 @@ export interface HeroOrders
 }
 
 export const NO_ORDERS: HeroOrders = { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, dash: false, attack: false, block: false }
+
+
+/**
+ * Returns how far to turn the view for it to look where a hero aims, the short way and faster the further the stick is pushed
+ *
+ * @param heading   angle of the view around what it looks at, 0 is looking along -z
+ * @param aimX      where to look in world units, its length is how far the stick is pushed
+ * @param aimZ      where to look in world units
+ * @param delta     seconds since the last frame
+ */
+export function viewTurn(heading: number, aimX: number, aimZ: number, delta: number): number
+{
+    const most = Math.hypot(aimX, aimZ) * VIEW_TURN_RATE * delta
+    const turn = Math.atan2(-aimX, -aimZ) - heading
+    return Math.max(-most, Math.min(most, Math.atan2(Math.sin(turn), Math.cos(turn))))
+}
 
 
 /**

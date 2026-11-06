@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED } from "../../src/game/heroControl"
+import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED, VIEW_TURN_RATE, viewTurn } from "../../src/game/heroControl"
 
 const FRAME = 1 / 60
 const ATTACK_TIME = 0.5
@@ -129,5 +129,33 @@ describe("HeroControl", () => {
         const control = new HeroControl(null, false)
         assert.equal(run(control, 1, { attack: true, block: true }), 0)
         assert(!control.blocking)
+    })
+})
+
+
+describe("viewTurn", () => {
+    it("leaves the view alone without any aim", () => {
+        assert.equal(viewTurn(1, 0, 0, 0.1), 0)
+    })
+
+    it("turns faster the further the stick is pushed", () => {
+        assert.closeTo(viewTurn(0, -1, 0, 0.1), VIEW_TURN_RATE * 0.1, 1e-9)
+        assert.closeTo(viewTurn(0, -0.5, 0, 0.1), VIEW_TURN_RATE * 0.05, 1e-9)
+    })
+
+    it("turns the short way over the wrap of the angles", () => {
+        // both a bit further on than the other, past where the angles jump from one end to the other
+        assert.isAbove(viewTurn(3, 0.1, 1, 0.01), 0)
+        assert.isBelow(viewTurn(-3, -0.1, 1, 0.01), 0)
+    })
+
+    it("ends up looking where the hero aims, and stays there", () => {
+        let heading = 0
+        for (let i = 0; i < 100; i++)
+        {
+            heading += viewTurn(heading, 1, 0, 0.02)
+        }
+        assert.closeTo(heading, -Math.PI / 2, 1e-9)
+        assert.closeTo(viewTurn(heading, 1, 0, 0.02), 0, 1e-9)
     })
 })
