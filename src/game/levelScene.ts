@@ -55,7 +55,7 @@ const AIM_TURN_RATE = 30
 /**
  * Room a meeple needs around it on the floor, in world units
  */
-const ROOM_AROUND = MEEPLE_SCALE * 0.4
+const ROOM_AROUND = MEEPLE_SCALE * 0.3
 
 /**
  * Camera offset from the hero, in world units
