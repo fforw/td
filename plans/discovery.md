@@ -647,8 +647,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   and after that whatever still touches them hurts again.
 - For now cuboids are placed in some rooms at random from the level seed, not
   by a premise, and aren't saved: a reload brings all of them back. A hero's
-  hit points are kept on the job while they are inside. Without any left they
-  get carried out, and are back at full strength. Dying is still to be decided.
+  hit points are kept on the job. Without any left they get carried out with 1,
+  and are only back at full strength with the next job. Dying is still to be
+  decided.
 - A fight only runs while the view is in its level, so the player can go to the
   castle and send others to help. Everything in the level freezes meanwhile.
   The day can't end while a monster can see a hero in the level kept

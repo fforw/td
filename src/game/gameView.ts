@@ -64,6 +64,11 @@ const MAX_REPORTS = 5
 const MAX_NOTICES = 3
 
 /**
+ * Hit points of a hero outside after getting carried out of a level
+ */
+const HP_CARRIED_OUT = 1
+
+/**
  * Walking speed of heroes, explorers have their own
  */
 const HERO_SPEED = 1
@@ -812,7 +817,7 @@ export default class GameView implements PadTarget
                     this.changed()
                 },
                 id => {
-                    delete this.campaign.jobs.find(j => j.heroId === id)!.hp
+                    this.campaign.jobs.find(j => j.heroId === id)!.hp = HP_CARRIED_OUT
                     this.leftLevel(id, " got carried out of ")
                 },
                 campaign.chests[job.target] ??= {},
