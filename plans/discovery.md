@@ -643,6 +643,8 @@ Glyphs are built from the stroke data of a source kanji per concept
 - A fight only runs while the view is in its level, so the player can go to the
   castle and send others to help. The day can't end while a monster can see a
   hero in the level kept (`LevelScene.inFight()`), only once none does.
+- Getting out of a level will take reaching an exit into the overworld, once
+  there are exits. Until then the order to leave walks back to the entrance.
 
 ### 3.4 Dungeon generation
 
