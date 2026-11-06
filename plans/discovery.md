@@ -600,14 +600,16 @@ Glyphs are built from the stroke data of a source kanji per concept
   rays and gives exact soft shadows. Lights stay below the top of the
   walls, so 2D is right for the floor. The field only keeps the share of a
   light that the walls leave, per texel in up to 4 channels with an id for
-  each, and shaders work out the rest from the distance to the light. So
-  lights can flicker and change color without baking, and their falloff is
-  sharper than the field, but their shadows stay where they are. Lights in
-  one channel never meet, including the texels around them. Most of the 30
-  or so lights on 2 x 2 patches fit in 3 channels, and placing and baking
-  them takes about 0.4 s in the worker. A changed wall means rebaking the
-  lights within `MAX_INFLUENCE` of it, and their shadows reach up to twice
-  as far. Not done yet.
+  each. Whenever lights change, a pass works out the rest from the distance
+  to the light into 2 RGBA8 textures that everything looks up, so lights can
+  flicker and change color without baking, but their shadows stay where
+  they are. RGBA8 needs no extension to render to, which keeps weak devices
+  in. Lights in one channel never meet. The field has 12 texels per world
+  unit, which is what keeps shadows from getting blocky near the ends of
+  walls. Most of the 30 or so lights on 2 x 2 patches fit in 3 channels, and
+  placing and baking them takes about 0.55 s in the worker. A changed wall
+  means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
+  reach up to twice as far. Not done yet.
 - A meeple gets a rim instead of its outline only where it stands in the
   dark and a light still reaches it, so not close to a light. Rooms get a
   light in the middle, the biggest ones first, sized by the room. A light
