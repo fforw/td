@@ -302,7 +302,7 @@ export default class GameView implements PadTarget
             }
             prompts.push({ glyph: "map", label: "Map" })
         }
-        if (following === null)
+        if (following === null && !this.inFight())
         {
             prompts.push({ glyph: "endDay", label: "End day" })
         }
@@ -520,8 +520,22 @@ export default class GameView implements PadTarget
         this.render()
     }
 
+    /**
+     * Returns whether a monster can see a hero in the level. A fight waits for as long as it takes for others to get there, but
+     * the days don't go on around it.
+     */
+    private inFight(): boolean
+    {
+        const { campaign, level } = this
+        return !!level && campaign.jobs.some(job => job.inside && level.inFight(job.heroId))
+    }
+
     private endDay(): void
     {
+        if (this.inFight())
+        {
+            return
+        }
         const { campaign, following } = this
         const { patches } = overworld(campaign)
         const due = campaign.missions.filter(m => m.endDay <= campaign.day + 1)
@@ -889,7 +903,8 @@ export default class GameView implements PadTarget
                 type: "button",
                 className: "end-day",
                 // whoever the view follows sets the pace of the days
-                disabled: this.following !== null,
+                disabled: this.following !== null || this.inFight(),
+                title: this.inFight() ? "Not in the middle of a fight" : "",
                 onclick: () => this.endDay()
             }, "End day"),
             el("button", {
@@ -1220,7 +1235,8 @@ export default class GameView implements PadTarget
             .map(job => {
                 const { kind } = overworld(campaign).patches[job.target]
                 const { name } = campaign.heroes.find(h => h.id === job.heroId)!
-                const text = "🛡️ " + name + (job.inside ? " is in " : " is at ") + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
+                const where = job.inside ? this.level?.inFight(job.heroId) ? " is fighting in " : " is in " : " is at "
+                const text = "🛡️ " + name + where + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
                 return el("div", { className: "notice" },
                     text,
                     ...castle && (job.way || job.inside)

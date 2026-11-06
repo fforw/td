@@ -391,6 +391,15 @@ export default class LevelScene
     }
 
     /**
+     * Returns whether a monster can see the hero with the given id, which keeps the days from going on
+     */
+    inFight(id: number): boolean
+    {
+        const hero = this.shown.get(id)
+        return !!hero && !!this.cuboids?.sees(hero.prey)
+    }
+
+    /**
      * Tells what a controller does in this frame to the hero the view is with. Nothing happens to them in frames without
      * this, whatever the reason for it is.
      */
