@@ -1,5 +1,6 @@
 import {
     ClampToEdgeWrapping,
+    Color,
     DataTexture,
     DataUtils,
     FloatType,
@@ -119,6 +120,11 @@ const FLICKER_RATES: [number, number][] = [[9.1, 0.5], [14.7, 0.3], [4.3, 0.2]]
  * Golden angle, to give every light its own phase
  */
 const FLICKER_PHASE = 2.399963
+
+/**
+ * Flashes per minute of the disco lights
+ */
+const DISCO_BPM = 60
 
 /**
  * Where the hero light is while there is none
@@ -421,8 +427,43 @@ export function flickerLights(field: LightField, lights: readonly DungeonLight[]
 }
 
 
+const complement = new Color()
+
 /**
- * Stops the flicker and puts all lights back to their full strength
+ * Lets all lights flash together, every other flash in the color on the opposite side of the color wheel. The color changes
+ * between two flashes, where the lights are off.
+ *
+ * @param field     light field
+ * @param lights    lights of the level
+ * @param time      time in seconds
+ */
+export function discoLights(field: LightField, lights: readonly DungeonLight[], time: number): void
+{
+    const beat = time * DISCO_BPM / 60
+    const wave = Math.sin(beat * Math.PI)
+    const strength = wave * wave
+    const opposite = Math.floor(beat) % 2 === 1
+
+    const data = field.uniforms.lightData.value.image.data as Float32Array
+    for (let i = 0; i < lights.length; i++)
+    {
+        const [r, g, b] = lights[i].color
+        if (opposite)
+        {
+            complement.setRGB(r, g, b).offsetHSL(0.5, 0, 0)
+            data.set([complement.r * strength, complement.g * strength, complement.b * strength, strength], (field.count + 1) * 4 + (i + 1) * 4)
+        }
+        else
+        {
+            setLightStrength(field, lights, i, strength)
+        }
+    }
+    field.uniforms.lightData.value.needsUpdate = true
+}
+
+
+/**
+ * Stops the flicker or disco and puts all lights back to their own color at full strength
  *
  * @param field     light field
  * @param lights    lights of the level

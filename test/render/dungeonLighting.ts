@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { bakeLights, type DungeonLight, FLICKER_MIN } from "../../src/map/dungeonLights"
-import { createLightField, flickerLights, steadyLights } from "../../src/render/dungeonLighting"
+import { createLightField, discoLights, flickerLights, steadyLights } from "../../src/render/dungeonLighting"
 
 const LIGHTS: DungeonLight[] = [
     { x: 2, z: 2, color: [1, 0.5, 0], radius: 0.1, reach: 2, channel: 0 },
@@ -55,5 +55,41 @@ describe("flickerLights", () => {
         steadyLights(field, LIGHTS)
         assert.deepEqual(light(0), [1, 0.5, 0, 1])
         assert.deepEqual(light(1), [0, 0.5, 1, 1])
+    })
+})
+
+
+describe("discoLights", () => {
+    const closeTo = (actual: number[], expected: number[]) => expected.forEach((value, i) => assert.closeTo(actual[i], value, 1e-5))
+
+    it("flashes once per second, every other flash in the opposite color", () => {
+        const { field, light } = createField()
+
+        discoLights(field, LIGHTS, 0.5)
+        closeTo(light(0), [1, 0.5, 0, 1])
+        discoLights(field, LIGHTS, 1.5)
+        closeTo(light(0), [0, 0.5, 1, 1])
+        discoLights(field, LIGHTS, 2.5)
+        closeTo(light(0), [1, 0.5, 0, 1])
+    })
+
+    it("goes off between flashes in the shape of a sine", () => {
+        const { field, light } = createField()
+        for (const time of [0, 1, 2, 3])
+        {
+            discoLights(field, LIGHTS, time)
+            assert.closeTo(light(0)[3], 0, 1e-6)
+            closeTo(light(0).slice(0, 3), [0, 0, 0])
+        }
+
+        discoLights(field, LIGHTS, 0.25)
+        assert.closeTo(light(0)[3], 0.5, 1e-6)
+    })
+
+    it("gives back the own colors when it stops", () => {
+        const { field, light } = createField()
+        discoLights(field, LIGHTS, 1.5)
+        steadyLights(field, LIGHTS)
+        assert.deepEqual(light(0), [1, 0.5, 0, 1])
     })
 })

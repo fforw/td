@@ -24,6 +24,7 @@ import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, wa
 import {
     applyLightField,
     createLightField,
+    discoLights,
     flickerLights,
     hideHeroLight,
     type LightField,
@@ -245,18 +246,24 @@ function show(level: DungeonLevel): void
     heroLightLabel.append(heroLight, " hero light")
 
     const { lights } = lighting!
-    const flicker = document.createElement("input")
-    flicker.type = "checkbox"
-    flicker.checked = true
-    flicker.addEventListener("change", () => {
-        if (!flicker.checked)
-        {
-            steadyLights(field, lights)
-        }
+    let lightMode = "flicker"
+    const lightModes = ["off", "flicker", "disco"].flatMap(mode => {
+        const radio = document.createElement("input")
+        radio.type = "radio"
+        radio.name = "light-mode"
+        radio.checked = mode === lightMode
+        radio.addEventListener("change", () => {
+            lightMode = mode
+            if (mode === "off")
+            {
+                steadyLights(field, lights)
+            }
+        })
+        const label = document.createElement("label")
+        label.append(radio, ` ${mode}`)
+        return [" ", label]
     })
-    const flickerLabel = document.createElement("label")
-    flickerLabel.append(flicker, " flicker")
-    document.getElementById("ui")!.append(button, " ", heroLightLabel, " ", flickerLabel)
+    document.getElementById("ui")!.append(button, " ", heroLightLabel, ...lightModes)
 
     const timer = new Timer()
     const step = new Vector3()
@@ -284,9 +291,13 @@ function show(level: DungeonLevel): void
         {
             moveHeroLight(field, segments, hero.position.x, hero.position.z)
         }
-        if (flicker.checked)
+        if (lightMode === "flicker")
         {
             flickerLights(field, lights, timer.getElapsed())
+        }
+        else if (lightMode === "disco")
+        {
+            discoLights(field, lights, timer.getElapsed())
         }
         controls.update()
         crowd.update(camera, timer.getElapsed())
