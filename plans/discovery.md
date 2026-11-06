@@ -595,6 +595,13 @@ Glyphs are built from the stroke data of a source kanji per concept
 - There is nothing to hit yet: attacks and blocks only show. The floor
   shows the aim and the slash (`render/heroMarks.ts`), as items lie along the
   body and hardly show from above.
+- Walls hide those walking behind them, so meeples can have a silhouette, a
+  dark shape with a light rim showing only where something is in front of
+  them (`MeepleCrowd.showSilhouettes()`). Heroes always have one. It is set per
+  meeple, so monsters can get theirs in another color when they start a
+  fight, and those not fighting yet stay a surprise. Monsters seen behind a
+  wall will need attacks to stop at walls, in both directions. Items have no
+  silhouette, and the aim and slash marks on the floor still get hidden.
 
 ### 3.2 Fixtures
 

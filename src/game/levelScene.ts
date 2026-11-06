@@ -53,6 +53,11 @@ const TURN_RATE = 10
 const AIM_TURN_RATE = 30
 
 /**
+ * Color of a hero where a wall hides them
+ */
+const HERO_SILHOUETTE = new Color("#b8ccf4")
+
+/**
  * Room a meeple needs around it on the floor, in world units
  */
 const ROOM_AROUND = MEEPLE_SCALE * 0.3
@@ -235,6 +240,7 @@ export default class LevelScene
         this.floor = [...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)]
 
         const crowd = new MeepleCrowd(MAX_HEROES)
+        crowd.showSilhouettes()
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
@@ -279,6 +285,7 @@ export default class LevelScene
                     // the shield only comes up to block
                     ready: !!held.item,
                     leftReady: false,
+                    silhouette: HERO_SILHOUETTE,
                     ...held
                 }
                 crowd.add(meeple)
