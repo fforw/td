@@ -194,6 +194,13 @@ const ITEM_ANIMATIONS: Partial<Record<ItemName, ItemAnimationDef>> = {
 
     sword_silver: {
 
+        // out to the side and leaning away from the head, where a camera from above sees it
+        ready: {
+            angle: 0.75,
+            lift: 0.14,
+            roll: 1.05
+        },
+
         // a quick slash and a short pause
         action: {
 
