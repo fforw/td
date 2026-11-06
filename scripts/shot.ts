@@ -10,6 +10,7 @@
  *     --until JS      waits up to 30s for the expression to be truthy
  *     --eval JS       evaluates the expression and prints the result, awaiting promises
  *     --press N       holds gamepad button N for a moment
+ *     --stick A,B,C,D sets the four gamepad axes until the next time
  *     --scale F       scale of the following shots, default 0.5
  *     --clip AREA     area of the following shots: a CSS selector, "x,y,w,h", or "off"
  *     --shot FILE     writes a JPEG
@@ -51,12 +52,13 @@ if (gamepadIndex >= 0)
 
 const GAMEPAD_STUB = `
     window.__pressed = new Set();
+    window.__axes = [0, 0, 0, 0];
     navigator.getGamepads = () => [{
         id: "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
         index: 0,
         connected: true,
         mapping: "standard",
-        axes: [0, 0, 0, 0],
+        axes: window.__axes,
         buttons: Array.from({ length: 17 }, (_, i) => ({
             pressed: window.__pressed.has(i),
             touched: window.__pressed.has(i),
@@ -219,6 +221,9 @@ async function runSteps(): Promise<void>
                 await sleep(PRESS_TIME)
                 await evaluate(`window.__pressed.delete(${Number(value)})`)
                 await sleep(PRESS_TIME)
+                break
+            case "--stick":
+                await evaluate(`window.__axes = [${value}]`)
                 break
             case "--scale":
                 scale = Number(value)
