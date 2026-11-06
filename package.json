@@ -29,6 +29,7 @@
         "typecheck": "tsc",
         "export-meeple": "node scripts/exportMeeple.ts",
         "build-atlas": "node scripts/buildAtlas.ts",
+        "shot": "node scripts/shot.ts",
         "test": "vitest run",
         "test:watch": "vitest"
     },
