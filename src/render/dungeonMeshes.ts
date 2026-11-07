@@ -118,13 +118,9 @@ export interface ThinWallCorner
 
 
 /**
- * Returns the corners of faces with sharp shapes to take care of: where more than two thin walls meet or where two of them
- * meet at a tight angle. A corner only counts if thin walls are on both of its sides, so it's never next to a door.
- *
- * @param world     world with all patches of the level
- * @param slots     slots of the patches of the level
+ * Returns the number of thin walls at each vertex, by its plan position as "x,z"
  */
-export function findThinWallCorners(world: PatchWorld, slots: readonly number[]): ThinWallCorner[]
+function countWallsAt(world: PatchWorld, slots: readonly number[]): Map<string, number>
 {
     // a wall edge has one half edge starting at each of its ends, also on a seam, where patches have vertices of their own
     const wallsAt = new Map<string, number>()
@@ -140,7 +136,20 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
             }
         }
     }
+    return wallsAt
+}
 
+
+/**
+ * Returns the corners of faces with sharp shapes to take care of: where more than two thin walls meet or where two of them
+ * meet at a tight angle. A corner only counts if thin walls are on both of its sides, so it's never next to a door.
+ *
+ * @param world     world with all patches of the level
+ * @param slots     slots of the patches of the level
+ */
+export function findThinWallCorners(world: PatchWorld, slots: readonly number[]): ThinWallCorner[]
+{
+    const wallsAt = countWallsAt(world, slots)
     const corners: ThinWallCorner[] = []
     for (const slot of slots)
     {
