@@ -266,6 +266,11 @@ subtitle on top of that.
   dungeon levels. The estimate is weak, terrain costs about four times
   as much, so the search still looks around a lot: a way around a lake
   takes entering 5 to 12 times the patches it crosses.
+- Explorer routes have no ring to stay in, only a most number of patches
+  the search may get into (`EXPLORER_PATCHES`, 30 for now), after which
+  the mission fails. Without it a target cut off from the castle would
+  have the search build patches forever. Hero routes keep the ring of
+  one beyond what's known, they only cross discovered patches anyway.
 - It runs in the map worker, which builds the patches it needs itself
   once the search gets there, so a route doesn't cost more patches than
   it reaches. `SimWorld` only sends one request with what the worker

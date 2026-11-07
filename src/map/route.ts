@@ -202,7 +202,7 @@ function patchCenter(world: PatchWorld, slot: number): [number, number]
  * @param through   slots of the patches the route may use, besides the target patch
  * @param costs     cost table
  * @param enter     called the first time the search gets to a patch, can connect more patches to the world and returns
- *                  the slots of those the route may use now
+ *                  the slots of those the route may use now, or null to give up the search right there
  * @param step      longest distance between the centers of two faces next to each other in map units, or more. With it,
  *                  the search heads for the target patch first, as no step can get closer to it by more than that, which
  *                  keeps the routes the cheapest. The face size will do, the steps are about 0.7 of it at most.
@@ -216,7 +216,7 @@ export function findRoute(
     goals: readonly number[],
     through: readonly number[],
     costs: CostTable = DEFAULT_COSTS,
-    enter?: (slot: number) => readonly number[],
+    enter?: (slot: number) => readonly number[] | null,
     step?: number
 ): TracedRoute
 {
@@ -281,7 +281,12 @@ export function findRoute(
         if (enter && !entered.has(slot))
         {
             entered.add(slot)
-            enter(slot).forEach(other => allowed.add(other))
+            const opened = enter(slot)
+            if (!opened)
+            {
+                break
+            }
+            opened.forEach(other => allowed.add(other))
         }
         const cost = reached.get(face)!
 

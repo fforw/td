@@ -24,9 +24,16 @@ export interface RouteQuery
     edits: KindEdits
 
     /**
-     * Ring around the castle the route has to stay in
+     * Ring around the castle the route has to stay in, no ring without it
      */
-    radius: number
+    radius?: number
+
+    /**
+     * Most patches the search may get into, the castle included, which are the ones cheapest to get to. It fails once it
+     * would need another one. Without it, a target cut off from the castle would have the search build patches forever,
+     * unless there is a ring.
+     */
+    maxPatches?: number
 
     /**
      * Keys of the only patches the route may cross besides the castle and the target, any patch without them
@@ -165,13 +172,14 @@ export default class RouteFinder
      *
      * @return route
      */
-    find({ target, edits, radius, known }: RouteQuery): RouteResult
+    find({ target, edits, radius = Infinity, maxPatches = Infinity, known }: RouteQuery): RouteResult
     {
         this.applyEdits(edits)
 
         const { world, bySlot } = this
         const castle = this.ensure(0, 0)
         const goal = this.ensure(target.q, target.r)
+        let entered = 0
 
         const { reachable, cost, paths } = findRoute(
             world,
@@ -183,6 +191,10 @@ export default class RouteFinder
             // a patch in reach needs its neighbors, to connect to them before the search looks across the seams
             slot => {
                 const { q, r } = bySlot.get(slot)!
+                if (++entered > maxPatches)
+                {
+                    return null
+                }
                 return NEIGHBORS
                     .map(([dq, dr]) => [q + dq, r + dr])
                     .filter(([nq, nr]) => Math.max(Math.abs(nq), Math.abs(nr)) <= radius)

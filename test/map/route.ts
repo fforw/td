@@ -268,6 +268,23 @@ describe("Route", () => {
         assert(estimated.cost === plain.cost)
     })
 
+    it("gives up where entering a patch is refused", () => {
+
+        const world = new PatchWorld()
+        const a = world.add(plainPatch(0, 0, GRASS))
+        const b = world.add(plainPatch(1, 0, GRASS))
+        const c = world.add(plainPatch(2, 0, GRASS))
+        const start = globalFace(a, innerFace(world.getPatch(a)))
+
+        const entered: number[] = []
+        const route = findRoute(world, start, c, [], [a, b], DEFAULT_COSTS, slot => {
+            entered.push(slot)
+            return slot === b ? null : []
+        })
+        assert(!route.reachable)
+        assert.deepEqual(entered, [a, b])
+    })
+
     it("crosses seams, but only through the patches it may use", () => {
 
         const world = new PatchWorld()

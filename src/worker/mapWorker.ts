@@ -13,14 +13,14 @@ let finder: RouteFinder | null = null
 let finderSeed = NaN
 
 
-function route({ seed, size, target, edits, radius, known }: RouteRequest)
+function route({ seed, size, target, edits, radius, maxPatches, known }: RouteRequest)
 {
     if (seed !== finderSeed)
     {
         finder = new RouteFinder(seed, size)
         finderSeed = seed
     }
-    return finder!.find({ target, edits, radius, known })
+    return finder!.find({ target, edits, radius, maxPatches, known })
 }
 
 

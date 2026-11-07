@@ -129,6 +129,26 @@ describe("RouteFinder", () => {
         assert(finder.built <= 25)
     })
 
+    it("gives up after getting into the most patches it may", () => {
+
+        const finder = new RouteFinder(4711, FACE_SIZE)
+        assert(!finder.find({ target: { q: 3, r: 3 }, edits: {}, maxPatches: 2 }).reachable)
+        assert(finder.built <= 2 * 9)
+    })
+
+    it("goes as far around as it takes without a ring", () => {
+
+        // a lake keeps this target from being reached within one ring beyond it, the way goes through the fourth
+        const seed = 3519082014
+        const edits = { "1/-1": "DUNGEON" } as const
+        const target = { q: -2, r: -2 }
+        assert(!new RouteFinder(seed, FACE_SIZE).find({ target, edits, radius: 3 }).reachable)
+
+        const { reachable, patches } = new RouteFinder(seed, FACE_SIZE).find({ target, edits, maxPatches: 400 })
+        assert(reachable)
+        assert(patches.some(({ q, r }) => Math.max(Math.abs(q), Math.abs(r)) > 3))
+    }, 60000)
+
     it("starts at the castle and ends at the goals of the target", () => {
 
         for (const seed of SEEDS)

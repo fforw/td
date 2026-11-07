@@ -2,7 +2,13 @@ import { FACE_SIZE } from "../map/scale"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import { type Campaign, type KindEdits, overworld, patchKey } from "./campaign"
 import type { MissionRoute } from "./missions"
+import type { RouteQuery } from "./RouteFinder"
 import { unsentEdits } from "./patchKinds"
+
+/**
+ * Most patches the route of an explorer may use, see RouteQuery.maxPatches
+ */
+export const EXPLORER_PATCHES = 30
 
 
 /**
@@ -20,7 +26,11 @@ export default class SimWorld
      */
     private readonly sentEdits: KindEdits = {}
 
-    constructor(seed: number)
+    /**
+     * @param seed              campaign seed
+     * @param explorerPatches   most patches the route of an explorer may use
+     */
+    constructor(seed: number, private readonly explorerPatches = EXPLORER_PATCHES)
     {
         this.seed = seed
     }
@@ -28,8 +38,8 @@ export default class SimWorld
 
     /**
      * Finds the route of a mission from the castle to all points of interest of a patch. It may cross any patch around,
-     * explorers get through unknown land unnoticed, but what they cross that way stays unknown. The way may lead up to
-     * one ring beyond the target and what's known.
+     * explorers get through unknown land unnoticed, but what they cross that way stays unknown. There is no ring the way
+     * has to stay in, however far around it goes, only a most number of patches it may use.
      *
      * @param campaign  campaign
      * @param target    key of the target patch
@@ -38,7 +48,7 @@ export default class SimWorld
      */
     route(campaign: Campaign, target: string): Promise<MissionRoute>
     {
-        return this.find(campaign, target)
+        return this.find(campaign, target, { maxPatches: this.explorerPatches })
     }
 
 
@@ -53,21 +63,23 @@ export default class SimWorld
      */
     heroRoute(campaign: Campaign, target: string): Promise<MissionRoute>
     {
-        const known = Object.entries(overworld(campaign).patches)
-            .filter(([, node]) => node.state === "discovered")
-            .map(([key]) => key)
-        return this.find(campaign, target, known)
+        const discovered = Object.entries(overworld(campaign).patches).filter(([, node]) => node.state === "discovered")
+        const known = discovered.map(([key]) => key)
+        const [q, r] = target.split("/").map(Number)
+        const radius = Math.max(...[...discovered.map(([, node]) => node), { q, r }]
+            .map(node => Math.max(Math.abs(node.q), Math.abs(node.r)))) + 1
+        return this.find(campaign, target, { known, radius })
     }
 
 
-    private async find(campaign: Campaign, target: string, known?: string[]): Promise<MissionRoute>
+    private async find(
+        campaign: Campaign,
+        target: string,
+        limits: Pick<RouteQuery, "known" | "radius" | "maxPatches">
+    ): Promise<MissionRoute>
     {
         const { patches, kindEdits } = overworld(campaign)
         const [q, r] = target.split("/").map(Number)
-
-        const nodes = Object.values(patches)
-        const radius = Math.max(...[...nodes.filter(node => node.state === "discovered"), { q, r }]
-            .map(node => Math.max(Math.abs(node.q), Math.abs(node.r)))) + 1
 
         const edits = unsentEdits(kindEdits, this.sentEdits)
         Object.assign(this.sentEdits, edits)
@@ -77,8 +89,7 @@ export default class SimWorld
             size: FACE_SIZE,
             target: { q, r },
             edits,
-            radius,
-            ...(known ? { known } : {})
+            ...limits
         })
 
         const passed = crossed.filter(patch => {
