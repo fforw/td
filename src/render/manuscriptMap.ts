@@ -91,6 +91,17 @@ export interface MapView
 
 
 /**
+ * How a line of a layer with its own ink gets drawn, its width in pixels changing along the way like the other lines of the
+ * map
+ */
+export interface InkStroke
+{
+    width: number
+    color: string
+}
+
+
+/**
  * Map drawn only within some areas, later layers on top of earlier ones
  */
 export interface MapLayer
@@ -100,6 +111,26 @@ export interface MapLayer
      * Areas to draw in with their outer border, everything if left out
      */
     reveal?: MapArea[]
+    /**
+     * Fill color per region instead of the one of the palette
+     */
+    fills?: ReadonlyMap<FaceType, string>
+    /**
+     * Returns how to draw a line instead of by the travel costs on either side, at full strength over everything but the
+     * symbols. Lines it returns null for are left out.
+     */
+    ink?: (edge: InkEdge) => InkStroke | null
+}
+
+
+/**
+ * Lines of one stroke of a layer with its own ink
+ */
+interface InkGroup
+{
+    stroke: InkStroke
+    /** flat x0, y0, x1, y1 per line in map units */
+    lines: number[]
 }
 
 
@@ -349,9 +380,17 @@ export default function drawOldMap(
         ink.stroke(path)
     })
 
-    for (const { map, reveal } of layers)
+    // lines of layers with their own ink, with the clip of their layer
+    const ownInk: { clip: Path2D | undefined, groups: Map<string, InkGroup> }[] = []
+
+    for (const { map, reveal, fills: ownFills, ink: inkOf } of layers)
     {
         const clip = reveal && revealPath(reveal, REVEAL_OVERLAP / view.scale, screenX, screenY)
+        const groups = new Map<string, InkGroup>()
+        if (inkOf)
+        {
+            ownInk.push({ clip, groups })
+        }
         fills.save()
         ink.save()
         if (clip)
@@ -383,7 +422,7 @@ export default function drawOldMap(
             regions.set(type, path)
 
             // the hairline gaps between the regions end up below the ink
-            fills.fillStyle = SEPIA.regions.get(type) ?? SEPIA.paper
+            fills.fillStyle = ownFills?.get(type) ?? SEPIA.regions.get(type) ?? SEPIA.paper
             fills.fill(path)
         })
 
@@ -392,7 +431,25 @@ export default function drawOldMap(
         for (const edge of map.ink)
         {
             const { x0, y0, x1, y1, type, other } = edge
-            addLine(lines, x0, y0, x1, y1, inkWidth(edge))
+            if (inkOf)
+            {
+                const stroke = inkOf(edge)
+                if (stroke)
+                {
+                    const key = stroke.color + "/" + stroke.width
+                    let group = groups.get(key)
+                    if (!group)
+                    {
+                        group = { stroke, lines: [] }
+                        groups.set(key, group)
+                    }
+                    group.lines.push(x0, y0, x1, y1)
+                }
+            }
+            else
+            {
+                addLine(lines, x0, y0, x1, y1, inkWidth(edge))
+            }
 
             if (type === FaceType.WATER || other === FaceType.WATER)
             {
@@ -446,6 +503,30 @@ export default function drawOldMap(
     }
     strokeLines(border)
     drawLayer(ctx, ink, INK_ALPHA)
+
+    for (const { clip, groups } of ownInk)
+    {
+        ctx.save()
+        if (clip)
+        {
+            ctx.clip(clip)
+        }
+        ctx.lineJoin = ctx.lineCap = "round"
+        for (const { stroke: { width, color }, lines } of groups.values())
+        {
+            ctx.strokeStyle = color
+            const pressed = new Map<number, Path2D>()
+            for (let i = 0; i < lines.length; i += 4)
+            {
+                addLine(pressed, lines[i], lines[i + 1], lines[i + 2], lines[i + 3], width)
+            }
+            pressed.forEach((path, lineWidth) => {
+                ctx.lineWidth = lineWidth
+                ctx.stroke(path)
+            })
+        }
+        ctx.restore()
+    }
 
     const sprites = new Map<AtlasFrame, HTMLCanvasElement>()
     for (const { x, y, type } of layers.flatMap(({ map }) => map.symbols))
