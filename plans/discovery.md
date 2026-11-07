@@ -257,8 +257,15 @@ subtitle on top of that.
 - A route leads from the center of the castle to all points of interest
   of the target and costs as much as the farthest one. If any can't be
   reached, there is no route.
-- Dijkstra over the faces of a level's `PatchWorld`, crossing seams via
-  `twin()`. It reaches several goals, so a heuristic has little to offer.
+- A* over the faces of a level's `PatchWorld`, crossing seams via
+  `twin()`. All goals lie within the circle around the target patch, so
+  the distance to that circle at the cheapest cost per face size is one
+  estimate below the true cost of each of them. Steps between face
+  centers are about 0.7 of the face size at most, so routes stay the
+  cheapest. Without the face size the search is plain Dijkstra, as in
+  dungeon levels. The estimate is weak, terrain costs about four times
+  as much, so the search still looks around a lot: a way around a lake
+  takes entering 5 to 12 times the patches it crosses.
 - It runs in the map worker, which builds the patches it needs itself
   once the search gets there, so a route doesn't cost more patches than
   it reaches. `SimWorld` only sends one request with what the worker

@@ -188,7 +188,8 @@ export default class RouteFinder
                     .filter(([nq, nr]) => Math.max(Math.abs(nq), Math.abs(nr)) <= radius)
                     .filter(([nq, nr]) => !known || known.includes(patchKey(nq, nr)))
                     .map(([nq, nr]) => this.ensure(nq, nr).slot)
-            }
+            },
+            this.size
         )
 
         // of several goals, the one that takes the most faces to get to stands for the farthest one

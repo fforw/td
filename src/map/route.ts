@@ -191,8 +191,9 @@ function patchCenter(world: PatchWorld, slot: number): [number, number]
 
 
 /**
- * Finds the way from a face to all goals of a target patch. The search runs without a heuristic, since it has to reach
- * several goals and no single estimate stays below the true cost of all of them.
+ * Finds the way from a face to all goals of a target patch. All goals are within the circle around the target patch, so
+ * the distance to that circle is an estimate that stays below the true cost of each of them. Goals get the estimate 0,
+ * so they still finish in the order of their cost.
  *
  * @param world     connected patches
  * @param start     global id of the start face, entering it costs nothing
@@ -202,6 +203,9 @@ function patchCenter(world: PatchWorld, slot: number): [number, number]
  * @param costs     cost table
  * @param enter     called the first time the search gets to a patch, can connect more patches to the world and returns
  *                  the slots of those the route may use now
+ * @param step      longest distance between the centers of two faces next to each other in map units, or more. With it,
+ *                  the search heads for the target patch first, as no step can get closer to it by more than that, which
+ *                  keeps the routes the cheapest. The face size will do, the steps are about 0.7 of it at most.
  *
  * @return route
  */
@@ -212,7 +216,8 @@ export function findRoute(
     goals: readonly number[],
     through: readonly number[],
     costs: CostTable = DEFAULT_COSTS,
-    enter?: (slot: number) => readonly number[]
+    enter?: (slot: number) => readonly number[],
+    step?: number
 ): TracedRoute
 {
     const allowed = new Set(through).add(target)
@@ -236,6 +241,29 @@ export function findRoute(
 
     const [targetX, targetY] = patchCenter(world, target)
     const position = [0, 0, 0]
+
+    // the least it takes to get from a face to the circle around the target patch, at the cheapest cost per face
+    let estimate = (_face: number) => 0
+    if (step)
+    {
+        const { positions } = world.getPatch(target)
+        let targetRadius = 0
+        for (let i = 0; i < positions.length; i += 3)
+        {
+            targetRadius = Math.max(targetRadius, Math.hypot(positions[i] - targetX, positions[i + 1] - targetY))
+        }
+        const cheapest = Math.min(...costs)
+        estimate = face => {
+            let x = 0, y = 0
+            for (let h = face * 4; h < face * 4 + 4; h++)
+            {
+                world.position(h, position)
+                x += position[0] / 4
+                y += position[1] / 4
+            }
+            return Math.max(0, Math.hypot(x - targetX, y - targetY) - targetRadius) / step * cheapest
+        }
+    }
     let closest = Infinity
     let closestCost = 0
     let closestFace = start
@@ -257,7 +285,7 @@ export function findRoute(
         }
         const cost = reached.get(face)!
 
-        // faces finish in order of their cost, so the last goal is the farthest one
+        // goals finish in order of their cost, so the last one is the farthest one
         if (anyFace ? face >> FACE_SHIFT === target : open.delete(face) && open.size === 0)
         {
             return {
@@ -294,7 +322,7 @@ export function findRoute(
             {
                 reached.set(next, nextCost)
                 parents.set(next, face)
-                heap.push(nextCost, next)
+                heap.push(nextCost + estimate(next), next)
             }
         }
     }

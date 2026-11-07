@@ -21,6 +21,8 @@ import {
     unpackPath
 } from "../../src/map/route"
 import { FACE_SIZE } from "../../src/map/scale"
+import { generateDungeon } from "../../src/map/generateDungeon"
+import { naturalKind } from "../../src/game/patchKinds"
 import Terrain from "../../src/map/terrain"
 import { patchSeed, resetRandom, rng } from "../../src/math/random"
 
@@ -195,6 +197,75 @@ describe("Route", () => {
 
         patch.faceType[far] = WATER.index
         assert(!findRoute(world, from, slot, [far, near], [slot]).reachable)
+    })
+
+    it("keeps the steps between face centers below the face size, which the estimate takes them to be", () => {
+
+        const center = (world: PatchWorld, face: number) => {
+            const position = [0, 0, 0]
+            let x = 0, y = 0
+            for (let h = face * 4; h < face * 4 + 4; h++)
+            {
+                world.position(h, position)
+                x += position[0] / 4
+                y += position[1] / 4
+            }
+            return [x, y]
+        }
+        const longest = (world: PatchWorld, slots: number[]) => {
+            let most = 0
+            for (const slot of slots)
+            {
+                for (let local = 0; local < faceCount(world.getPatch(slot)); local++)
+                {
+                    const face = globalFace(slot, local)
+                    const [x, y] = center(world, face)
+                    for (let h = face * 4; h < face * 4 + 4; h++)
+                    {
+                        const twin = world.twin(h)
+                        if (twin >= 0)
+                        {
+                            const [nx, ny] = center(world, twin >> 2)
+                            most = Math.max(most, Math.hypot(nx - x, ny - y))
+                        }
+                    }
+                }
+            }
+            return most
+        }
+
+        for (const seed of [1, 99, 4711])
+        {
+            const world = new PatchWorld()
+            const slots: number[] = []
+            for (let r = -1; r <= 1; r++)
+            {
+                for (let q = -1; q <= 1; q++)
+                {
+                    slots.push(world.add(generatePatch(q * PATCH_SIZE, r * PATCH_SIZE, seed, FACE_SIZE, naturalKind(seed, q, r)).patch))
+                }
+            }
+            const dungeon = new PatchWorld()
+            const dungeonSlots = generateDungeon(seed, FACE_SIZE, 2, 2).patches.map(patch => dungeon.add(patch))
+            // measured at about 0.7, a margin for changes to the generators
+            assert(longest(world, slots) < FACE_SIZE * 0.85, "seed " + seed)
+            assert(longest(dungeon, dungeonSlots) < FACE_SIZE * 0.85, "dungeon seed " + seed)
+        }
+    }, 60000)
+
+    it("finds the same with and without the estimate", () => {
+
+        const world = new PatchWorld()
+        const a = world.add(plainPatch(0, 0, GRASS))
+        const b = world.add(plainPatch(1, 0, SAND))
+        const c = world.add(plainPatch(2, 0, GRASS))
+        const start = globalFace(a, innerFace(world.getPatch(a)))
+        const goals = [innerFace(world.getPatch(c))]
+
+        const plain = findRoute(world, start, c, goals, [a, b])
+        const estimated = findRoute(world, start, c, goals, [a, b], DEFAULT_COSTS, undefined, FACE_SIZE)
+        assert(plain.reachable && estimated.reachable)
+        assert(estimated.cost === plain.cost)
     })
 
     it("crosses seams, but only through the patches it may use", () => {
