@@ -58,6 +58,10 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
     // version 6 has chests in levels
     5: campaign => {
         campaign.chests = {}
+    },
+    // version 7 remembers where heroes have been in levels
+    6: campaign => {
+        campaign.explored = {}
     }
 }
 

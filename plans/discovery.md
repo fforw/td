@@ -671,9 +671,24 @@ Glyphs are built from the stroke data of a source kanji per concept
   in 3.4). Both come out at the patch of the level for now, so the side exit is
   only a shortcut until it can lead somewhere else.
 - While steering a hero, the four buttons on the face of the controller only
-  do things in the level, so the map and the way back to the castle are for the
-  mouse for now. Cross (the confirm button) opens a chest or takes an exit,
-  triangle toggles the light the hero carries, and square and circle are free.
+  do things in the level, so the overworld map and the way back to the castle
+  are for the mouse for now. Cross (the confirm button) opens a chest or takes
+  an exit, triangle toggles the light the hero carries, and square opens the
+  map of the level, outside of fights. Circle closes it.
+- The map of a level (`game/levelMap.ts`) is a sheet of the manuscript map
+  over the paused level. Its regions come from one boolean per face: whether a
+  hero has been there, run through the marching squares of the overworld map
+  with the closest face center deciding for a raster point. Heroes visit the
+  floor they can see within 2.5 world units whenever they get to another face.
+  Unvisited faces are open floor or blocked, which look alike on a shade of
+  the paper. The line around visited floor is thick and black toward walls and
+  thin walls, and left out toward open floor, where there is more to find
+  (`MapLayer.ink`). A gap stays readable on a small map, dashes might not.
+  On it are the chests, open or closed, and the exits on visited faces, and
+  an arrow for the hero the view is with, pointing where they look.
+- `Campaign.explored` keeps the visited faces per level as base64 bits
+  (`game/exploration.ts`), counted through the patches in order and without
+  the trailing zero bytes. It stays when a level starts anew.
 
 ### 3.4 Dungeon generation
 

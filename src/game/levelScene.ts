@@ -31,13 +31,20 @@ import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import { createExitMeshes } from "../render/exitMeshes"
 import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
 import TreasureView from "../treasure/TreasureView"
+import type PatchWorld from "../map/PatchWorld"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS, ViewTurn } from "./heroControl"
 import { Walk } from "./journey"
+import Exploration from "./exploration"
 import { placeFixtures } from "./levelFixtures"
 
 const TAU = Math.PI * 2
+
+/**
+ * How far around them in world units a hero gets to know the floor they can see
+ */
+const VISIT_REACH = 2.5
 
 const AMBIENT = 0.2
 
@@ -158,6 +165,26 @@ interface ShownHero
     strikeAt: number | null
     /** has the light on */
     lightOn: boolean
+    /** face the floor around got visited from last, -1 before */
+    visitedFrom: number
+}
+
+
+/**
+ * What the map of a level shows, in world units
+ */
+export interface LevelMapState
+{
+    world: PatchWorld
+    /** slots of the patches of the level */
+    slots: readonly number[]
+    /** every face that can be walked on */
+    floor: ReadonlySet<number>
+    exploration: Exploration
+    chests: { face: number, x: number, z: number, opened: boolean }[]
+    exits: readonly LevelExit[]
+    /** the hero the view is with, null without one */
+    hero: { x: number, z: number, facing: number } | null
 }
 
 
@@ -208,9 +235,12 @@ export default class LevelScene
     private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
+    /** null until the level is there */
+    private exploration: Exploration | null = null
 
     /** every face that can be walked on */
     private floor: number[] = []
+    private floorSet: ReadonlySet<number> = new Set()
 
     private heroes: LevelHero[] = []
     private readonly shown = new Map<number, ShownHero>()
@@ -242,6 +272,8 @@ export default class LevelScene
      * @param opened    what happened to the chests of the level before, gets changed along with them
      * @param onLoot    called when that changed, with the hero and the gold they picked up
      * @param onExitNear called when the hero the view is with got close enough to an exit to take it, or isn't anymore
+     * @param explored  where heroes have been before, see Exploration.encode()
+     * @param onExplored called with the new Exploration.encode() when heroes got to see more of the level
      */
     constructor(
         seed: number,
@@ -251,7 +283,9 @@ export default class LevelScene
         private readonly onFallen: (id: number) => void,
         private readonly opened: OpenedChests,
         private readonly onLoot: (id: number, gold: number) => void,
-        private readonly onExitNear: () => void
+        private readonly onExitNear: () => void,
+        private readonly explored: string | undefined,
+        private readonly onExplored: (explored: string) => void
     )
     {
         const canvas = document.createElement("canvas")
@@ -298,6 +332,8 @@ export default class LevelScene
         this.slots = level.patches.map((_, slot) => slot)
         this.entrance = entranceFace(meshes.world, level)
         this.floor = [...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)]
+        this.floorSet = new Set(this.floor)
+        this.exploration = new Exploration(meshes.world, this.slots, this.explored)
         const chests = this.addChests(level, meshes, seed)
 
         const crowd = new MeepleCrowd(MAX_HEROES)
@@ -419,7 +455,8 @@ export default class LevelScene
                     prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0 },
                     hp,
                     strikeAt: null,
-                    lightOn: true
+                    lightOn: true,
+                    visitedFrom: -1
                 })
             }
         }
@@ -647,6 +684,7 @@ export default class LevelScene
                 this.onMoved(id, face)
             }
         }
+        this.updateExploration()
         this.updateCuboids(time, delta)
         this.updateTreasure(time)
         this.crowd?.update(this.camera, time)
@@ -662,6 +700,88 @@ export default class LevelScene
         {
             this.atExit = atExit
             this.onExitNear()
+        }
+    }
+
+    /**
+     * Has the heroes get to know the floor around them whenever they got to another face
+     */
+    private updateExploration(): void
+    {
+        let changed = false
+        for (const hero of this.shown.values())
+        {
+            const face = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+            if (face !== hero.visitedFrom)
+            {
+                hero.visitedFrom = face
+                changed = this.visitAround(face, hero.meeple.position.x, hero.meeple.position.z) || changed
+            }
+        }
+        if (changed)
+        {
+            this.onExplored(this.exploration!.encode())
+        }
+    }
+
+    /**
+     * Visits the floor faces within reach of a point that can be seen from it, going from face to face from the one it is on
+     *
+     * @returns true if any of them weren't visited before
+     */
+    private visitAround(from: number, x: number, z: number): boolean
+    {
+        const { world } = this.meshes!
+        const exploration = this.exploration!
+        let changed = exploration.visit(from)
+        const seen = new Set([from])
+        const open = [from]
+        while (open.length)
+        {
+            const face = open.pop()!
+            for (let h = face * 4; h < face * 4 + 4; h++)
+            {
+                const twin = world.twin(h)
+                const next = twin >> 2
+                if (twin < 0 || seen.has(next))
+                {
+                    continue
+                }
+                seen.add(next)
+                if (!this.floorSet.has(next))
+                {
+                    continue
+                }
+                const [nx, nz] = faceCenter(world, next)
+                if (Math.hypot(nx - x, nz - z) <= VISIT_REACH && seesAcross(this.floorWalls!, x, z, nx, nz))
+                {
+                    changed = exploration.visit(next) || changed
+                    open.push(next)
+                }
+            }
+        }
+        return changed
+    }
+
+    /**
+     * Returns what the map of the level shows, null until the level is there
+     */
+    mapState(): LevelMapState | null
+    {
+        const { meshes, exploration, chests } = this
+        if (!meshes || !exploration || !chests)
+        {
+            return null
+        }
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        return {
+            world: meshes.world,
+            slots: this.slots,
+            floor: this.floorSet,
+            exploration,
+            chests: chests.chests.map(({ face, x, z, openedAt }) => ({ face, x, z, opened: openedAt !== null })),
+            exits: this.exits,
+            hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null
         }
     }
 

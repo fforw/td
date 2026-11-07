@@ -15,7 +15,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 export const START_GOLD = 1000
 
@@ -172,6 +172,11 @@ export interface Campaign
     jobs: Job[]
     /** what's left of the chests that got opened, by the key of the patch of their level */
     chests: Record<string, OpenedChests>
+    /**
+     * Faces of levels that heroes have been to, by the key of the patch of their level, see Exploration.encode(). It stays
+     * when a level starts anew, the heroes still know their way around.
+     */
+    explored: Record<string, string>
     /** keys of the patches whose levels start anew once nobody is inside, after a hero got carried out, missing without */
     resets?: string[]
     /** id for the next explorer or hero */
@@ -221,6 +226,7 @@ export function createCampaign(seed: number): Campaign
         heroes: [],
         jobs: [],
         chests: {},
+        explored: {},
         nextId: 1
     }
 

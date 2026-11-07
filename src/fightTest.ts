@@ -42,7 +42,7 @@ function startOver(): void
 const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), startOver, {}, (_, found) => {
     gold += found
     showHp(shownHp)
-}, () => {})
+}, () => {}, undefined, () => {})
 document.body.prepend(level.element)
 level.setHeroes([hero])
 level.setFocus(hero.id)

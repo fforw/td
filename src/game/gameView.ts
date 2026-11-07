@@ -17,6 +17,7 @@ import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
+import LevelMap from "./levelMap"
 import LevelScene, { type LevelHero } from "./levelScene"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
@@ -160,6 +161,9 @@ export default class GameView implements PadTarget
     /** key of the patch the level is at */
     private levelTarget: string | null = null
 
+    /** map of the level, made along with it */
+    private levelMap: LevelMap | null = null
+
     private sheet: MapSheet
 
     private sim: SimWorld
@@ -170,6 +174,7 @@ export default class GameView implements PadTarget
     private readonly info = el("div", { className: "info" })
     private readonly notices = el("div", { className: "notices" })
     private readonly popup = el("div", { className: "popup", hidden: true })
+    private readonly levelMapPopup = el("div", { className: "popup", hidden: true })
     private readonly dialog = el("div", { className: "popup mission-popup", hidden: true })
     private readonly optionsPopup = el("div", { className: "popup mission-popup", hidden: true })
 
@@ -217,6 +222,12 @@ export default class GameView implements PadTarget
                 this.closeMap()
             }
         })
+        this.levelMapPopup.addEventListener("click", ev => {
+            if (ev.target === this.levelMapPopup)
+            {
+                this.closeLevelMap()
+            }
+        })
         this.dialog.addEventListener("click", ev => {
             if (ev.target === this.dialog)
             {
@@ -257,6 +268,11 @@ export default class GameView implements PadTarget
             this.closeDialog()
             return true
         }
+        if (!this.levelMapPopup.hidden)
+        {
+            this.closeLevelMap()
+            return true
+        }
         if (!this.popup.hidden)
         {
             this.closeMap()
@@ -276,6 +292,10 @@ export default class GameView implements PadTarget
         {
             return [dialog]
         }
+        if (!this.levelMapPopup.hidden)
+        {
+            return [this.levelMapPopup, hud]
+        }
         const around = [hud, info, notices, document.getElementById("sound")!]
         return popup.hidden ? around : [popup, ...around]
     }
@@ -291,6 +311,10 @@ export default class GameView implements PadTarget
         if (!dialog.hidden || !optionsPopup.hidden)
         {
             return [...prompts, { glyph: "back", label: "Back" }]
+        }
+        if (!this.levelMapPopup.hidden)
+        {
+            return [{ glyph: "back", label: "Close map" }, { glyph: "menu", label: "Options" }]
         }
         if (!popup.hidden)
         {
@@ -335,7 +359,8 @@ export default class GameView implements PadTarget
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
             ...(this.level?.nearExit(following!) ? [{ glyph: "confirm", label: "Leave" } as const] : []),
-            { glyph: "map", label: "Light" }
+            { glyph: "map", label: "Light" },
+            ...(!this.inFight() ? [{ glyph: "endDay", label: "Map" } as const] : [])
         ]
     }
 
@@ -360,7 +385,7 @@ export default class GameView implements PadTarget
                 this.follow(null)
             }
         }
-        else if (dialog.hidden && optionsPopup.hidden)
+        else if (dialog.hidden && optionsPopup.hidden && this.levelMapPopup.hidden)
         {
             if (action === "endDay")
             {
@@ -407,7 +432,15 @@ export default class GameView implements PadTarget
 
     steerAct(action: Exclude<PadAction, "menu">): void
     {
-        this.level?.act(action)
+        // the button for the end of the day, which doesn't come in a level
+        if (action === "endDay")
+        {
+            this.openLevelMap()
+        }
+        else
+        {
+            this.level?.act(action)
+        }
     }
 
     /**
@@ -424,8 +457,8 @@ export default class GameView implements PadTarget
      */
     private canSteer(): boolean
     {
-        const { popup, dialog, optionsPopup } = this
-        return popup.hidden && dialog.hidden && optionsPopup.hidden && !!this.viewedLevelJob()
+        const { popup, dialog, optionsPopup, levelMapPopup } = this
+        return popup.hidden && dialog.hidden && optionsPopup.hidden && levelMapPopup.hidden && !!this.viewedLevelJob()
     }
 
     setPadMode(active: boolean): void
@@ -452,6 +485,7 @@ export default class GameView implements PadTarget
             this.info,
             this.notices,
             this.popup,
+            this.levelMapPopup,
             this.dialog,
             this.optionsPopup
         )
@@ -476,6 +510,44 @@ export default class GameView implements PadTarget
         this.popup.hidden = true
         this.selected = null
         this.dialog.hidden = true
+        this.render()
+    }
+
+    /**
+     * Opens the map of the level the view is in over the paused level, which takes being out of a fight
+     */
+    private openLevelMap(): void
+    {
+        const { levelMap, levelMapPopup } = this
+        const state = this.viewedLevelJob() && !this.inFight() ? this.level?.mapState() : null
+        if (!levelMap || !state)
+        {
+            return
+        }
+        levelMapPopup.hidden = false
+        levelMapPopup.replaceChildren(levelMap.element)
+        levelMap.extras.replaceChildren(
+            el("span", { className: "map-north", title: "North is up, like the view when it starts" }, "N ↑"),
+            el("button", {
+                type: "button",
+                className: "close",
+                title: "Back to the level",
+                onclick: () => this.closeLevelMap()
+            }, "✕")
+        )
+        const { clientWidth, clientHeight } = levelMapPopup
+        const { paddingLeft, paddingRight, paddingTop, paddingBottom } = getComputedStyle(levelMapPopup)
+        levelMap.update(
+            state,
+            clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight),
+            clientHeight - parseFloat(paddingTop) - parseFloat(paddingBottom)
+        )
+        this.render()
+    }
+
+    private closeLevelMap(): void
+    {
+        this.levelMapPopup.hidden = true
         this.render()
     }
 
@@ -525,6 +597,7 @@ export default class GameView implements PadTarget
     private follow(id: number | null): void
     {
         this.following = id
+        this.levelMapPopup.hidden = true
         this.finished = null
         this.castle?.follow(id)
         this.render()
@@ -812,8 +885,11 @@ export default class GameView implements PadTarget
         {
             this.level?.dispose()
             const { q, r } = overworld(campaign).patches[job.target]
+            const { target } = job
+            const seed = levelSeed(campaign.seed, q, r)
+            this.levelMap = new LevelMap(seed)
             this.level = new LevelScene(
-                levelSeed(campaign.seed, q, r),
+                seed,
                 (id, face) => {
                     const moved = this.campaign.jobs.find(j => j.heroId === id)
                     if (moved?.inside)
@@ -839,7 +915,12 @@ export default class GameView implements PadTarget
                     }
                     this.changed()
                 },
-                () => this.render()
+                () => this.render(),
+                campaign.explored[target],
+                explored => {
+                    this.campaign.explored[target] = explored
+                    this.store.save(this.campaign)
+                }
             )
             this.levelTarget = job.target
             root.prepend(this.level.element)
@@ -854,7 +935,7 @@ export default class GameView implements PadTarget
             this.level!.setFocus(job.heroId)
         }
 
-        const running = popup.hidden && optionsPopup.hidden
+        const running = popup.hidden && optionsPopup.hidden && this.levelMapPopup.hidden
         if (this.level)
         {
             this.level.element.hidden = !job
@@ -925,7 +1006,10 @@ export default class GameView implements PadTarget
             el("button", {
                 type: "button",
                 className: "pad-start",
-                onclick: () => this.popup.hidden ? this.openMap() : this.closeMap()
+                // in a level it is the map of the level
+                onclick: () => this.viewedLevelJob()
+                    ? this.levelMapPopup.hidden ? this.openLevelMap() : this.closeLevelMap()
+                    : this.popup.hidden ? this.openMap() : this.closeMap()
             }, "🗺️ Map"),
             __DEV && el("span", { className: "dev" },
                 el("button", { type: "button", onclick: () => exportSave(campaign) }, "Export"),
@@ -944,6 +1028,8 @@ export default class GameView implements PadTarget
                             this.finished = null
                             this.level?.dispose()
                             this.level = null
+                            this.levelMap = null
+                            this.levelMapPopup.hidden = true
                             this.levelTarget = null
                             // the old ones hold the edits of another timeline, even for the same seed
                             this.castle?.dispose()
