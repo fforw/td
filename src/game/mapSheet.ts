@@ -22,9 +22,11 @@ import {
 } from "./mapContent"
 
 /**
- * Distance of the raster points of the map in pixels, for known patches and for patches only passed through
+ * Distance of the raster points of the map in pixels, for known patches, for patches no explorer found a way to and for
+ * patches only passed through
  */
 const RASTER_PIXELS = 8
+const UNREACHABLE_RASTER_PIXELS = 32
 const ROUGH_RASTER_PIXELS = 128
 
 /**
@@ -278,7 +280,7 @@ export default class MapSheet
 
         const { paddingLeft, paddingRight, paddingTop, paddingBottom } = getComputedStyle(surroundings)
         const { width, height, view } = fitSheet(
-            [...content.known, ...content.rough],
+            [...content.known, ...content.rough, ...content.unreachable],
             surroundings.clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight),
             surroundings.clientHeight - parseFloat(paddingTop) - parseFloat(paddingBottom)
         )
@@ -291,6 +293,7 @@ export default class MapSheet
             height,
             content.known.map(({ q, r }) => q + "/" + r),
             content.rough.map(({ q, r }) => q + "/" + r),
+            content.unreachable.map(({ q, r }) => q + "/" + r),
             view.x,
             view.y
         ].join()
@@ -379,7 +382,7 @@ export default class MapSheet
     }
 
     private draw(
-        { known, rough }: MapContent,
+        { known, rough, unreachable }: MapContent,
         view: MapView,
         width: number,
         height: number,
@@ -412,7 +415,11 @@ export default class MapSheet
 
         drawOldMap(
             ctx,
-            [...(rough.length ? [layer(rough, ROUGH_RASTER_PIXELS, [])] : []), layer(known, RASTER_PIXELS, [castle])],
+            [
+                ...(rough.length ? [layer(rough, ROUGH_RASTER_PIXELS, [])] : []),
+                ...(unreachable.length ? [layer(unreachable, UNREACHABLE_RASTER_PIXELS, [])] : []),
+                layer(known, RASTER_PIXELS, [castle])
+            ],
             view,
             width,
             height,

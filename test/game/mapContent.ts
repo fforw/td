@@ -152,6 +152,23 @@ describe("Map content", () => {
         assert(rough.length === 1 && rough[0].q === 3 && rough[0].state === "targeted")
     })
 
+    it("keeps patches no explorer got to apart from the rough ones", () => {
+        const campaign = createCampaign(SEED)
+        hire(campaign, "2/0", { ...ROUTE, reachable: false, kind: "TEMPLE", passed: [{ q: 3, r: 0, kind: "EMPTY" }] })
+        for (let i = 0; i < 10; i++)
+        {
+            advanceDay(campaign)
+        }
+
+        const { known, rough, unreachable } = mapContent(campaign)
+        assert.deepEqual(unreachable.map(({ q, r }) => q + "/" + r), ["2/0"])
+        assert.deepEqual(rough.map(({ q, r }) => q + "/" + r), ["3/0"])
+        assert(!known.some(({ q, r }) => q === 2 && r === 0))
+        // nothing passed it, so there is nothing to tell about it
+        assert(marker(campaign, "2/0") === undefined)
+        assert(mapContent(campaign).targets.some(({ key }) => key === "2/0"))
+    })
+
     it("doesn't tell the kind of a patch that isn't discovered", () => {
         const campaign = createCampaign(SEED)
         hire(campaign, "2/0")

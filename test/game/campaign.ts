@@ -159,7 +159,9 @@ describe("Missions", () => {
         {
             advanceDay(campaign)
         }
-        assert(overworld(campaign).patches["2/0"] === undefined)
+        // still unknown, but noted as out of reach, without telling what it is
+        const node = overworld(campaign).patches["2/0"]
+        assert(node.state === "passed" && node.unreachable && node.parent === null && !node.impression)
         assert(frontier(campaign).indexOf("2/0") >= 0)
 
         const back = campaign.tavern.find(e => e.id === explorer.id)!
@@ -199,6 +201,23 @@ describe("Missions", () => {
         advanceDay(campaign)
         assert(patches["2/0"].state === "passed")
         assert(patches["2/0"].impression === "dangerous")
+        assert(patches["2/0"].unreachable)
+    })
+
+    it("stays unreachable while tried again, until it gets discovered", () => {
+
+        const campaign = createCampaign(7)
+        const { patches } = overworld(campaign)
+        patches["2/0"] = { q: 2, r: 0, kind: "DUNGEON", state: "passed", parent: null, unreachable: true }
+
+        startMission(campaign, campaign.tavern[0].id, "2/0", { ...ROUTE, kind: "DUNGEON" })
+        assert(patches["2/0"].unreachable)
+        for (let i = 0; i < 10; i++)
+        {
+            advanceDay(campaign)
+        }
+        assert(patches["2/0"].state === "discovered")
+        assert(!("unreachable" in patches["2/0"]))
     })
 
     it("takes a coarse number of days, which good explorers bump down", () => {

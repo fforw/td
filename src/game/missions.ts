@@ -146,14 +146,15 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
 
     const [q, r] = parseKey(target)
     const { patches } = overworld(campaign)
-    const impression = patches[target]?.impression
+    const { impression, unreachable } = patches[target] ?? {}
     patches[target] = {
         q,
         r,
         kind: route.kind,
         state: "targeted",
         parent: parentOf(campaign, q, r),
-        ...(impression ? { impression } : {})
+        ...(impression ? { impression } : {}),
+        ...(unreachable ? { unreachable } : {})
     }
 
     campaign.gold -= price(explorer)
@@ -209,16 +210,14 @@ export function advanceDay(campaign: Campaign): void
         if (!mission.failed)
         {
             node.state = "discovered"
-        }
-        else if (node.impression)
-        {
-            // still unknown, it can be tried again
-            node.state = "passed"
-            node.parent = null
+            delete node.unreachable
         }
         else
         {
-            delete patches[mission.target]
+            // still unknown, it can be tried again, maybe from somewhere else one day
+            node.state = "passed"
+            node.parent = null
+            node.unreachable = true
         }
         returnToTavern(campaign, mission.explorer)
     }

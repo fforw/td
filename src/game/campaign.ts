@@ -53,6 +53,11 @@ export interface PatchNode
     parent: string | null
     /** noted by an explorer passing through, stays when the patch gets targeted */
     impression?: Impression
+    /**
+     * an explorer found no way there from the castle, within what they can carry along. Stays when the patch gets
+     * targeted again, until it gets discovered.
+     */
+    unreachable?: true
 }
 
 /**

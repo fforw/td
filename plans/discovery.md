@@ -303,6 +303,11 @@ point of interest, its center, where every route starts.
   discovering: only a patch an explorer was sent to is discovered and can
   affect the story. A patch passed on the way only gets a note on the map,
   "looked safe" or "looked dangerous", and stays a possible target.
+- A mission fails when the route search runs out of patches (1.1). That
+  stands for what an explorer can carry, so it isn't a flaw: the target
+  stays on the map as `unreachable`, still unknown and still a target,
+  until it gets discovered. Friendly cities as other starting points for
+  missions may reach it later.
 - Explorers are freakishly good at this, so missions are no realistic
   journeys: a route cost maps to a few neat day steps of 1, 3, 5, ...
   to get there. They report on arrival and are back in the tavern, the
@@ -379,8 +384,10 @@ Heroes do everything that happens inside a discovered patch:
   in front of it. A line of the list closes the map and goes there.
 - Discovered patches are drawn in full detail, patches an explorer only
   passed through in a raster of 128 pixels, as layers clipped to their
-  cells on the patch grid. Anything else is blank paper. Patches are cells
-  of the grid here, not their jagged shape, the wobble hides the difference.
+  cells on the patch grid. Patches no explorer found a way to get 32
+  pixels, they would stay holes otherwise. Anything else is blank paper.
+  Patches are cells of the grid here, not their jagged shape, the wobble
+  hides the difference.
 - Points of interest of discovered patches are the markers to click for a
   mission of a hero, one hero per mission for now. Empty patches have
   nothing to click, so heroes go nowhere but to points of interest.

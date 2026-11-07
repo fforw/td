@@ -77,6 +77,8 @@ export interface MapContent
     known: PatchNode[]
     /** an explorer only passed through, drawn in a coarse raster */
     rough: PatchNode[]
+    /** no explorer found a way to, drawn in a raster between the two, as they won't be known any better for a while */
+    unreachable: PatchNode[]
     markers: MapMarker[]
     targets: ExploreTarget[]
 }
@@ -177,7 +179,8 @@ export function mapContent(campaign: Campaign): MapContent
 
     return {
         known: nodes.filter(({ state }) => state === "discovered"),
-        rough: nodes.filter(({ state, impression }) => state !== "discovered" && impression),
+        rough: nodes.filter(({ state, impression, unreachable }) => state !== "discovered" && impression && !unreachable),
+        unreachable: nodes.filter(({ state, unreachable }) => state !== "discovered" && unreachable),
         markers,
         targets
     }
