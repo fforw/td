@@ -631,7 +631,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   but can be seen past. A hero close enough opens it, without walking to an
   anchor yet.
   Its coins spill to where a hero can get to, and whoever walks over one that
-  has landed picks it up. Each coin adds 10 gold to the campaign right away.
+  has landed picks it up. Each coin is worth 10 gold, which the hero carries
+  (`Job.gold`) and only adds to the campaign once back at the castle. A hero
+  carried out of a level gets robbed of all they carry.
   `Campaign.chests` keeps which coins of each opened chest are still lying
   around, per level. Everything else about them follows from the seed.
 

@@ -12,7 +12,7 @@ import {
 } from "./campaign"
 import { levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
-import { enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
+import { carryGold, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, robHero, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
@@ -553,12 +553,12 @@ export default class GameView implements PadTarget
 
         advanceDay(campaign)
 
-        for (const { heroId, target, returning } of arriving)
+        for (const { heroId, target, returning, gold } of arriving)
         {
             const hero = campaign.heroes.find(h => h.id === heroId)!
             if (returning)
             {
-                const result = hero.name + " is back at " + campaign.castleName
+                const result = hero.name + " is back at " + campaign.castleName + (gold ? " with 🪙 " + gold : "")
                 this.reports.unshift("Day " + campaign.day + ": " + result)
                 if (heroId === following)
                 {
@@ -620,14 +620,18 @@ export default class GameView implements PadTarget
         this.follow(inLevel ? heroId : null)
     }
 
-    private leftLevel(heroId: number, how = " came out of "): void
+    /**
+     * @param how       what happened between the name and the place
+     * @param after     what happened on top, after the place
+     */
+    private leftLevel(heroId: number, how = " came out of ", after = ""): void
     {
         const { campaign } = this
         const job = campaign.jobs.find(j => j.heroId === heroId)!
         const hero = campaign.heroes.find(h => h.id === heroId)!
         const { kind } = overworld(campaign).patches[job.target]
         leaveLevel(campaign, heroId)
-        this.report(hero.name + how + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target)
+        this.report(hero.name + how + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target + after)
         if (this.following === heroId && !job.way)
         {
             // nobody gets to see those without a way outside, they are left to the notices
@@ -818,11 +822,15 @@ export default class GameView implements PadTarget
                 },
                 id => {
                     this.campaign.jobs.find(j => j.heroId === id)!.hp = HP_CARRIED_OUT
-                    this.leftLevel(id, " got carried out of ")
+                    const robbed = robHero(this.campaign, id)
+                    this.leftLevel(id, " got carried out of ", robbed ? " and robbed of 🪙 " + robbed : "")
                 },
                 campaign.chests[job.target] ??= {},
-                gold => {
-                    this.campaign.gold += gold
+                (id, gold) => {
+                    if (gold > 0)
+                    {
+                        carryGold(this.campaign, id, gold)
+                    }
                     this.changed()
                 },
                 () => this.render()
@@ -1120,11 +1128,12 @@ export default class GameView implements PadTarget
     private jobStatus(job: Job): string
     {
         const days = job.endDay - this.campaign.day
+        const carried = job.gold ? ", carries 🪙 " + job.gold : ""
         if (job.inside)
         {
-            return "is inside"
+            return "is inside" + carried
         }
-        return hasArrived(this.campaign, job) ? "waits to enter" : (job.returning ? "home in " : "gets there in ") + days + "d"
+        return (hasArrived(this.campaign, job) ? "waits to enter" : (job.returning ? "home in " : "gets there in ") + days + "d") + carried
     }
 
     /**

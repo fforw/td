@@ -146,6 +146,8 @@ export interface Job extends Journey
     hp?: number
     /** went into the level at some point of the job */
     entered?: boolean
+    /** gold found in levels and carried along, which only goes to the castle's once the hero is back, missing without */
+    gold?: number
 }
 
 /**

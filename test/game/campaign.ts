@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "../../src/game/heroes"
+import { carryGold, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, robHero, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { parseSave, serializeSave } from "../../src/game/storage"
@@ -349,6 +349,58 @@ describe("Heroes", () => {
         returnHome(campaign, hero.id)
         assert(job.returning)
         assert.throws(() => enterLevel(campaign, hero.id))
+    })
+
+    it("carries the gold found until back at the castle", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        startJob(campaign, hero.id, "1/0")
+        const job = campaign.jobs[0]
+        while (!hasArrived(campaign, job))
+        {
+            advanceDay(campaign)
+        }
+        assert.throws(() => carryGold(campaign, hero.id, 10), undefined, undefined, "only inside")
+        enterLevel(campaign, hero.id)
+        carryGold(campaign, hero.id, 10)
+        carryGold(campaign, hero.id, 20)
+        leaveLevel(campaign, hero.id)
+        assert(job.gold === 30 && campaign.gold === START_GOLD)
+        assert.deepEqual(parseSave(serializeSave(campaign)).jobs[0], job)
+
+        returnHome(campaign, hero.id)
+        while (campaign.jobs.length)
+        {
+            assert(campaign.gold === START_GOLD)
+            advanceDay(campaign)
+        }
+        assert(campaign.gold === START_GOLD + 30)
+    })
+
+    it("loses the gold carried on getting robbed", () => {
+
+        const campaign = createCampaign(21)
+        const hero = campaign.heroes[0]
+        startJob(campaign, hero.id, "1/0")
+        const job = campaign.jobs[0]
+        while (!hasArrived(campaign, job))
+        {
+            advanceDay(campaign)
+        }
+        enterLevel(campaign, hero.id)
+        carryGold(campaign, hero.id, 40)
+        assert(robHero(campaign, hero.id) === 40)
+        assert(job.gold === undefined)
+        assert(robHero(campaign, hero.id) === 0)
+
+        leaveLevel(campaign, hero.id)
+        returnHome(campaign, hero.id)
+        while (campaign.jobs.length)
+        {
+            advanceDay(campaign)
+        }
+        assert(campaign.gold === START_GOLD)
     })
 
     it("can't enter before getting there", () => {

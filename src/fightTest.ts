@@ -39,7 +39,7 @@ function startOver(): void
     showHp(maxHp)
 }
 
-const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), startOver, {}, found => {
+const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), startOver, {}, (_, found) => {
     gold += found
     showHp(shownHp)
 }, () => {})

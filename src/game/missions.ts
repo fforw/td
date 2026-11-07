@@ -171,8 +171,8 @@ export function startMission(campaign: Campaign, explorerId: number, target: str
 
 
 /**
- * Advances the game by one day: explorers who got to their target report and are back in the tavern, and the tavern
- * crowd changes. Heroes who got to theirs wait there until told to enter.
+ * Advances the game by one day: explorers who got to their target report and are back in the tavern, heroes who are
+ * back at the castle hand over the gold they carry, and the tavern crowd changes. Heroes who got to theirs wait there until told to enter.
  */
 export function advanceDay(campaign: Campaign): void
 {
@@ -182,6 +182,14 @@ export function advanceDay(campaign: Campaign): void
 
     const due = campaign.missions.filter(m => m.endDay <= day)
     campaign.missions = campaign.missions.filter(m => m.endDay > day)
+    for (const job of campaign.jobs)
+    {
+        if (job.returning && job.endDay <= day)
+        {
+            // what they carried is the castle's once they are back
+            campaign.gold += job.gold ?? 0
+        }
+    }
     campaign.jobs = campaign.jobs.filter(j => !j.returning || j.endDay > day)
 
     updateTavern(campaign)

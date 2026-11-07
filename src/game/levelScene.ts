@@ -240,7 +240,7 @@ export default class LevelScene
      * @param onHurt    called with the hit points left when a hero got hurt
      * @param onFallen  called when a hero has no hit points left
      * @param opened    what happened to the chests of the level before, gets changed along with them
-     * @param onLoot    called when that changed, with the gold that got picked up
+     * @param onLoot    called when that changed, with the hero and the gold they picked up
      * @param onExitNear called when the hero the view is with got close enough to an exit to take it, or isn't anymore
      */
     constructor(
@@ -250,7 +250,7 @@ export default class LevelScene
         private readonly onHurt: (id: number, hp: number) => void,
         private readonly onFallen: (id: number) => void,
         private readonly opened: OpenedChests,
-        private readonly onLoot: (gold: number) => void,
+        private readonly onLoot: (id: number, gold: number) => void,
         private readonly onExitNear: () => void
     )
     {
@@ -477,7 +477,7 @@ export default class LevelScene
             if (chest)
             {
                 this.chests!.open(chest, performance.now() / 1000)
-                this.onLoot(0)
+                this.onLoot(this.focus!, 0)
             }
             else if (this.nearExit(this.focus!))
             {
@@ -701,7 +701,7 @@ export default class LevelScene
     }
 
     /**
-     * Has the heroes pick up the coins they walk over
+     * Has the heroes pick up the coins they walk over, each for themselves
      */
     private updateTreasure(time: number): void
     {
@@ -710,14 +710,13 @@ export default class LevelScene
         {
             return
         }
-        let taken = 0
-        for (const { meeple: { position } } of this.shown.values())
+        for (const [id, { meeple: { position } }] of this.shown)
         {
-            taken += chests.collect(position.x, position.z, time)
-        }
-        if (taken > 0)
-        {
-            this.onLoot(taken * COIN_VALUE)
+            const taken = chests.collect(position.x, position.z, time)
+            if (taken > 0)
+            {
+                this.onLoot(id, taken * COIN_VALUE)
+            }
         }
         treasure!.update(time)
     }

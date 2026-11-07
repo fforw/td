@@ -159,6 +159,34 @@ export function leaveLevel(campaign: Campaign, heroId: number): void
 
 
 /**
+ * Has a hero pick up gold in a level, which they carry until they are back at the castle
+ */
+export function carryGold(campaign: Campaign, heroId: number, gold: number): void
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job?.inside)
+    {
+        throw new Error("Hero " + heroId + " isn't inside")
+    }
+    job.gold = (job.gold ?? 0) + gold
+}
+
+
+/**
+ * Takes all the gold a hero carries, as happens to those carried out of a level
+ *
+ * @return the gold they lost
+ */
+export function robHero(campaign: Campaign, heroId: number): number
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    const gold = job?.gold ?? 0
+    delete job?.gold
+    return gold
+}
+
+
+/**
  * Has a hero who got to the target of their job walk back to the castle, which takes as long as getting there did. The
  * hero is home once the days are up, and learned nothing unless they went in.
  */
