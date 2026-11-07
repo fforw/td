@@ -23,6 +23,8 @@ import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import CuboidCrowd from "../monster/CuboidCrowd"
+import EyeCrowd from "../monster/EyeCrowd"
+import EyePack, { placeEyes } from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
@@ -239,6 +241,8 @@ export default class LevelScene
     private monsters: Monsters | null = null
     private cuboids: CuboidPack | null = null
     private cuboidCrowd: CuboidCrowd | null = null
+    private eyes: EyePack | null = null
+    private eyeCrowd: EyeCrowd | null = null
     private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
@@ -321,7 +325,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "chest", "coin", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "chest", "coin", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -398,7 +402,8 @@ export default class LevelScene
         const seeing = this.floorWalls!
         const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
         const floor: MonsterFloor = {
-            move: (monster, dx, dz) => moveOnFloor(world, monster.kind.big ? bigWalls : walls, monster, dx, dz),
+            // flying ones go over chests
+            move: (monster, dx, dz) => moveOnFloor(world, monster.kind.flying ? seeing : monster.kind.big ? bigWalls : walls, monster, dx, dz),
             sees: (x0, z0, x1, z1) => seesAcross(seeing, x0, z0, x1, z1)
         }
         const random = new Prando(seed)
@@ -414,7 +419,20 @@ export default class LevelScene
         this.scene.add(cuboidCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
-        this.monsters = new Monsters([cuboids], floor)
+
+        const eyes = new EyePack(floor)
+        const eyesPlaced = placeEyes(rooms, random)
+        for (const { face, kind } of eyesPlaced)
+        {
+            const [x, z] = faceCenter(world, face)
+            eyes.add(kind, face, x, z)
+        }
+        const eyeCrowd = new EyeCrowd(eyesPlaced.length, field)
+        this.scene.add(eyeCrowd.group)
+        this.eyes = eyes
+        this.eyeCrowd = eyeCrowd
+
+        this.monsters = new Monsters([cuboids, eyes], floor)
     }
 
     /**
@@ -829,6 +847,8 @@ export default class LevelScene
             }
         }
         this.cuboidCrowd!.update(this.cuboids!.members, time)
+        const eyes = this.eyes!
+        this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
     }
 
     /**

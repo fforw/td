@@ -673,8 +673,20 @@ Glyphs are built from the stroke data of a source kanji per concept
   the blow, so they rarely land on whoever struck it. A shield stops small ones from the
   front only. Touching hurts, then no cuboid can hurt that hero for a second,
   and after that whatever still touches them hurts again.
-- For now cuboids are placed in some rooms at random from the level seed, not
-  by a premise, and aren't saved: a reload brings all of them back. A hero's
+- What all monsters share is in `monster/monsters.ts`: noticing heroes, the
+  sword arc, the hurt cooldown across all of them, and keeping apart.
+  Monsters are big or small and walk or fly. Those on the same ground keep
+  apart, a flying one only from big ones on the ground and from heroes, who
+  count as big.
+- The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
+  from heroes: it picks a spot that sees them, as far off as it can without a
+  long way there, at least 1 away. While it sees someone it fires a fast bolt
+  every 1.2 to 3.5 seconds, after half a second of showing the lower eye of
+  its texture. A shield stops a bolt coming from within 75 degrees of where
+  the hero looks, dodging lets it pass, walls put it out. A blow knocks the
+  eye back and spoils its shot.
+- For now cuboids and eyes are placed in some rooms at random from the level
+  seed, not by a premise, and aren't saved: a reload brings all of them back. A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
   decided. The level then starts anew, with its chests full and its cuboids
