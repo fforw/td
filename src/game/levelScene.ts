@@ -62,6 +62,11 @@ const TURN_RATE = 10
 const AIM_TURN_RATE = 30
 
 /**
+ * Seconds a meeple takes to follow where they are told to look, which keeps small movements of the stick from twitching them
+ */
+const AIM_TURN_LAG = 0.06
+
+/**
  * Color of a hero where a wall hides them
  */
 const HERO_SILHOUETTE = new Color("#b8ccf4")
@@ -158,10 +163,12 @@ interface ShownHero
 
 /**
  * Turns a meeple the short way toward a facing, by the given radians at most
+ *
+ * @param share     part of the way to turn by at most, for easing in
  */
-function turnToward(meeple: Meeple, facing: number, most: number): void
+function turnToward(meeple: Meeple, facing: number, most: number, share = 1): void
 {
-    const turn = ((facing - meeple.facing) % TAU + TAU * 1.5) % TAU - Math.PI
+    const turn = (((facing - meeple.facing) % TAU + TAU * 1.5) % TAU - Math.PI) * share
     meeple.facing += Math.max(-most, Math.min(most, turn))
 }
 
@@ -562,7 +569,7 @@ export default class LevelScene
         meeple.leftReady = control.blocking
         if (control.turnTo !== null)
         {
-            turnToward(meeple, control.turnTo, AIM_TURN_RATE * delta)
+            turnToward(meeple, control.turnTo, AIM_TURN_RATE * delta, 1 - Math.exp(-delta / AIM_TURN_LAG))
         }
 
         if (control.moving)
