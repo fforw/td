@@ -11,6 +11,7 @@ import {
     createThickWalls,
     createThinWallCorners,
     createThinWalls,
+    findSingleThinWalls,
     findThinWallCorners,
     THICK_WALL_HEIGHT,
     THIN_WALL_HEIGHT,
@@ -81,9 +82,39 @@ describe("createThinWalls", () => {
             world.getPatch(slot).edgeType.forEach(type => edges += type === EdgeType.WALL.index ? 1 : 0)
         }
 
-        const walls = createThinWalls(world, slots).count
-        assert(walls > 0)
-        assert(walls === edges / 2)
+        const joined = createThinWalls(world, slots, false).count
+        const single = createThinWalls(world, slots, true).count
+        assert(joined > 0)
+        assert(single > 0)
+        assert(joined + single === edges / 2)
+    })
+
+    it("puts walls that meet no other wall into the single ones", () => {
+        const { world, slots } = level()
+        const singles = findSingleThinWalls(world, slots)
+        assert(singles.size > 0)
+
+        // walls by their ends, and the ends of each wall
+        const wallsAt = new Map<string, number>()
+        const endsOf = new Map<number, string[]>()
+        for (const slot of slots)
+        {
+            const { positions, vertex, edgeType } = world.getPatch(slot)
+            const base = slot << SLOT_SHIFT
+            edgeType.forEach((type, h) => {
+                if (type === EdgeType.WALL.index && (base | h) < world.twin(base | h))
+                {
+                    const keys = [vertex[h] * 3, vertex[next(h)] * 3].map(v => positions[v] + "," + positions[v + 1])
+                    keys.forEach(key => wallsAt.set(key, (wallsAt.get(key) ?? 0) + 1))
+                    endsOf.set(base | h, keys)
+                }
+            })
+        }
+
+        for (const [wall, keys] of endsOf)
+        {
+            assert(singles.has(wall) === keys.every(key => wallsAt.get(key) === 1))
+        }
     })
 
     it("stands on its edge and reaches past its ends, except at tight corners", () => {
@@ -91,9 +122,11 @@ describe("createThinWalls", () => {
         const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
         assert(tight.size > 0)
 
-        const mesh = createThinWalls(world, slots)
+        const singles = findSingleThinWalls(world, slots)
+        const meshes = [createThinWalls(world, slots, false), createThinWalls(world, slots, true)]
+        const indices = [0, 0]
         const matrix = new Matrix4()
-        let index = 0, ending = 0, reaching = 0
+        let ending = 0, reaching = 0
         for (const slot of slots)
         {
             const { positions, vertex, edgeType } = world.getPatch(slot)
@@ -115,7 +148,8 @@ describe("createThinWalls", () => {
                     return ends ? 0 : THIN_WALL_OVERLAP
                 }
 
-                mesh.getMatrixAt(index++, matrix)
+                const single = singles.has(base | h) ? 1 : 0
+                meshes[single].getMatrixAt(indices[single]++, matrix)
                 const end = new Vector3(0.5, -0.5, 0).applyMatrix4(matrix)
                 const start = new Vector3(-0.5, -0.5, 0).applyMatrix4(matrix)
                 assert(end.distanceTo(to.clone().addScaledVector(direction, reach(to))) < 1e-5)

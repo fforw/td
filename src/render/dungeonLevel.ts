@@ -52,7 +52,12 @@ export function createLevelMeshes({ patches, lighting }: DungeonLevel): LevelMes
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
     const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY))
-    const walls: Mesh[] = [...slots.map(slot => createThickWalls(world, slot)), createThinWalls(world, slots), createThinWallCorners(world, slots)]
+    const walls: Mesh[] = [
+        ...slots.map(slot => createThickWalls(world, slot)),
+        createThinWalls(world, slots, false),
+        createThinWalls(world, slots, true),
+        createThinWallCorners(world, slots)
+    ]
     lightMeshes(ground, field)
     lightMeshes(walls, field, true)
 

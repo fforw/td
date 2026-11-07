@@ -57,6 +57,12 @@ const MAX_ROUNDED_ANGLE = Math.PI * 8 / 9
 export const TIGHT_CORNER_ANGLE = TAU * 0.375
 
 const wallMaterial = new MeshStandardMaterial({ color: "#6e6c72", roughness: 1 })
+
+/**
+ * Material of thin walls that meet no other thin wall, which stand alone between thick walls and would pass for an opening
+ * otherwise. They are darker and glossier to stand out.
+ */
+const singleWallMaterial = new MeshStandardMaterial({ color: "#423935", roughness: 0.3 })
 const thinWallGeometry = new BoxGeometry(1, 1, 1)
 
 
@@ -141,6 +147,40 @@ function countWallsAt(world: PatchWorld, slots: readonly number[]): Map<string, 
 
 
 /**
+ * Returns the thin walls that meet no other thin wall at either end, by the lower global id of their half edges
+ *
+ * @param world     world with all patches of the level
+ * @param slots     slots of the patches of the level
+ */
+export function findSingleThinWalls(world: PatchWorld, slots: readonly number[]): Set<number>
+{
+    const wallsAt = countWallsAt(world, slots)
+    const single = new Set<number>()
+    for (const slot of slots)
+    {
+        const { positions, vertex, edgeType } = world.getPatch(slot)
+        const base = slot << SLOT_SHIFT
+        for (let h = 0; h < edgeType.length; h++)
+        {
+            if (edgeType[h] !== EdgeType.WALL.index || (base | h) > world.twin(base | h))
+            {
+                continue
+            }
+            const v0 = vertex[h] * 3
+            const v1 = vertex[next(h)] * 3
+            const at0 = wallsAt.get(positions[v0] + "," + positions[v0 + 1])
+            const at1 = wallsAt.get(positions[v1] + "," + positions[v1 + 1])
+            if (at0 === 1 && at1 === 1)
+            {
+                single.add(base | h)
+            }
+        }
+    }
+    return single
+}
+
+
+/**
  * Returns the corners of faces with sharp shapes to take care of: where more than two thin walls meet or where two of them
  * meet at a tight angle. A corner only counts if thin walls are on both of its sides, so it's never next to a door.
  *
@@ -188,13 +228,16 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
 
 /**
  * Creates the thin walls of a level, one scaled cube per wall edge. They reach past their ends to run into each other,
- * except at tight corners, where createThinWallCorners() closes the outer side.
+ * except at tight corners, where createThinWallCorners() closes the outer side. Single walls, which meet no other thin wall,
+ * get a mesh of their own with a glossier material.
  *
  * @param world     world with all patches of the level
  * @param slots     slots of the patches of the level
+ * @param single    whether to create the single walls or all others
  */
-export function createThinWalls(world: PatchWorld, slots: readonly number[]): InstancedMesh
+export function createThinWalls(world: PatchWorld, slots: readonly number[], single: boolean): InstancedMesh
 {
+    const singles = findSingleThinWalls(world, slots)
     const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
 
     const matrices: Matrix4[] = []
@@ -211,7 +254,8 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[]): In
         for (let h = 0; h < edgeType.length; h++)
         {
             // both half edges have the type, the lower global id draws the wall, also on a seam
-            if (edgeType[h] !== EdgeType.WALL.index || (base | h) > world.twin(base | h))
+            if (edgeType[h] !== EdgeType.WALL.index || (base | h) > world.twin(base | h)
+                || singles.has(base | h) !== single)
             {
                 continue
             }
@@ -237,7 +281,7 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[]): In
         }
     }
 
-    const mesh = new InstancedMesh(thinWallGeometry, wallMaterial, matrices.length)
+    const mesh = new InstancedMesh(thinWallGeometry, single ? singleWallMaterial : wallMaterial, matrices.length)
     matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix))
     return mesh
 }
