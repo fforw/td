@@ -55,6 +55,7 @@ export const MODELS = {
     hairSidePart: "meeple/side-part.glb",
 
     acidCuboid: "monster/acid-cuboid.glb",
+    flyingEye: "monster/flying-eye.glb",
     chest: "treasure/chest.glb",
     coin: "treasure/coin.glb",
     stairs: "dungeon/stairs.glb",
