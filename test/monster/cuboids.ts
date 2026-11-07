@@ -3,57 +3,67 @@ import { assert, describe, it } from "vitest"
 
 import CuboidPack, {
     BIG_CUBOID,
-    CHASE_TIME,
     type Cuboid,
     type CuboidKind,
-    type CuboidPrey,
-    HERO_RADIUS,
-    HURT_WAIT,
     LUNGE_LENGTH,
     LUNGE_WAIT,
     LUNGE_WINDUP,
     MAX_SPLIT,
     MIN_SPLIT,
     mostCuboids,
-    NOTICE_DISTANCE,
     placeCuboids,
     SMALL_CUBOID
 } from "../../src/monster/cuboids"
+import Monsters, { CHASE_TIME, HERO_RADIUS, HURT_WAIT, type MonsterFloor, NOTICE_DISTANCE, type Prey } from "../../src/monster/monsters"
 
 const FRAME = 1 / 60
 const REACH = 0.55
 const WIDTH = 2.2
 
 
-function pack(sees = (_x0: number, _z0: number, _x1: number, _z1: number) => true): CuboidPack
+function openFloor(sees = (_x0: number, _z0: number, _x1: number, _z1: number) => true): MonsterFloor
 {
-    return new CuboidPack({
-        move(cuboid, dx, dz)
+    return {
+        move(monster, dx, dz)
         {
-            cuboid.x += dx
-            cuboid.z += dz
+            monster.x += dx
+            monster.z += dz
         },
         sees
-    })
+    }
 }
 
-function prey(x = 0, z = 0, changes: Partial<CuboidPrey> = {}): CuboidPrey
+function pack(sees?: (x0: number, z0: number, x1: number, z1: number) => boolean): CuboidPack
+{
+    return new CuboidPack(openFloor(sees))
+}
+
+/**
+ * Returns the hit points a hero loses now
+ */
+function hurt(cuboids: CuboidPack, hero: Prey, delta = FRAME): number
+{
+    return new Monsters([cuboids], openFloor()).hurt(hero, delta)
+}
+
+function prey(x = 0, z = 0, changes: Partial<Prey> = {}): Prey
 {
     return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, ...changes }
 }
 
-function run(cuboids: CuboidPack, seconds: number, heroes: CuboidPrey[]): void
+function run(cuboids: CuboidPack, seconds: number, heroes: Prey[]): void
 {
+    const monsters = new Monsters([cuboids], openFloor())
     for (let t = 0; t < seconds; t += FRAME)
     {
-        cuboids.update(FRAME, heroes)
+        monsters.update(FRAME, heroes)
     }
 }
 
 /**
  * Runs frames until a big cuboid is about to lunge, which takes until it next looks around
  */
-function runToWindup(cuboids: CuboidPack, big: Cuboid, heroes: CuboidPrey[]): void
+function runToWindup(cuboids: CuboidPack, big: Cuboid, heroes: Prey[]): void
 {
     for (let t = 0; t < 1 && big.windup === 0; t += FRAME)
     {
@@ -65,12 +75,12 @@ function runToWindup(cuboids: CuboidPack, big: Cuboid, heroes: CuboidPrey[]): vo
 /**
  * Returns the hit points a hero loses over the given time, without anything moving
  */
-function hurtOver(cuboids: CuboidPack, seconds: number, hero: CuboidPrey): number
+function hurtOver(cuboids: CuboidPack, seconds: number, hero: Prey): number
 {
     let lost = 0
     for (let t = 0; t < seconds; t += FRAME)
     {
-        lost += cuboids.hurt(hero, FRAME)
+        lost += hurt(cuboids, hero)
     }
     return lost
 }
@@ -202,7 +212,7 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             cuboids.add(BIG_CUBOID, 0, 0.1, 0)
             const hero = prey()
-            assert(cuboids.hurt(hero, FRAME) === BIG_CUBOID.damage)
+            assert(hurt(cuboids, hero) === BIG_CUBOID.damage)
             assert(hurtOver(cuboids, HURT_WAIT - FRAME * 2, hero) === 0)
             assert(hurtOver(cuboids, FRAME * 3, hero) === BIG_CUBOID.damage)
         })
@@ -212,10 +222,10 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             const first = cuboids.add(SMALL_CUBOID, 0, 0.1, 0)
             const hero = prey()
-            assert(cuboids.hurt(hero, FRAME) === SMALL_CUBOID.damage)
+            assert(hurt(cuboids, hero) === SMALL_CUBOID.damage)
             first.x = 5
             cuboids.add(BIG_CUBOID, 0, 0, 0.1)
-            assert(cuboids.hurt(hero, FRAME) === 0)
+            assert(hurt(cuboids, hero) === 0)
             assert(hurtOver(cuboids, HURT_WAIT, hero) === BIG_CUBOID.damage)
         })
 
@@ -224,23 +234,23 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             cuboids.add(BIG_CUBOID, 0, 0.1, 0)
             const hero = prey(0, 0, { dodging: true })
-            assert(cuboids.hurt(hero, FRAME) === 0)
+            assert(hurt(cuboids, hero) === 0)
             hero.dodging = false
-            assert(cuboids.hurt(hero, FRAME) === BIG_CUBOID.damage)
+            assert(hurt(cuboids, hero) === BIG_CUBOID.damage)
         })
 
         it("does nothing without touching", () => {
 
             const cuboids = pack()
             cuboids.add(BIG_CUBOID, 0, BIG_CUBOID.radius + HERO_RADIUS + 0.01, 0)
-            assert(cuboids.hurt(prey(), FRAME) === 0)
+            assert(hurt(cuboids, prey()) === 0)
         })
 
         it("doesn't go through walls", () => {
 
             const cuboids = pack(() => false)
             cuboids.add(BIG_CUBOID, 0, 0.1, 0)
-            assert(cuboids.hurt(prey(), FRAME) === 0)
+            assert(hurt(cuboids, prey()) === 0)
         })
 
         it("goes with the worst of what touches a hero", () => {
@@ -248,7 +258,7 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             cuboids.add(SMALL_CUBOID, 0, 0.1, 0)
             cuboids.add(BIG_CUBOID, 0, -0.1, 0)
-            assert(cuboids.hurt(prey(), FRAME) === BIG_CUBOID.damage)
+            assert(hurt(cuboids, prey()) === BIG_CUBOID.damage)
         })
     })
 
@@ -262,7 +272,7 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             const small = cuboids.add(SMALL_CUBOID, 0, 0, 0.1)
             const hero = blocker()
-            assert(cuboids.hurt(hero, FRAME) === 0)
+            assert(hurt(cuboids, hero) === 0)
             assert(hero.hurtWait === 0)
             assert(small.recoiling)
             run(cuboids, 0.3, [])
@@ -273,14 +283,14 @@ describe("Acid cuboids", () => {
 
             const cuboids = pack()
             cuboids.add(SMALL_CUBOID, 0, 0, -0.1)
-            assert(cuboids.hurt(blocker(), FRAME) === SMALL_CUBOID.damage)
+            assert(hurt(cuboids, blocker()) === SMALL_CUBOID.damage)
         })
 
         it("doesn't stop big ones", () => {
 
             const cuboids = pack()
             cuboids.add(BIG_CUBOID, 0, 0, 0.1)
-            assert(cuboids.hurt(blocker(), FRAME) === BIG_CUBOID.damage)
+            assert(hurt(cuboids, blocker()) === BIG_CUBOID.damage)
         })
     })
 
@@ -321,7 +331,7 @@ describe("Acid cuboids", () => {
             const cuboids = pack()
             cuboids.add(SMALL_CUBOID, 0, 0, 0.3)
             cuboids.strike(0, 0, 0, REACH, WIDTH, SMALL_CUBOID.hp)
-            assert(cuboids.cuboids.length === 0)
+            assert(cuboids.members.length === 0)
         })
 
         it("breaks big ones up into 2 to 7 small ones", () => {
@@ -332,8 +342,8 @@ describe("Acid cuboids", () => {
                 const cuboids = pack()
                 cuboids.add(BIG_CUBOID, 0, 0, 0.3)
                 cuboids.strike(0, 0, 0, REACH, WIDTH, BIG_CUBOID.hp)
-                counts.add(cuboids.cuboids.length)
-                assert(cuboids.cuboids.every(({ kind }) => kind === SMALL_CUBOID))
+                counts.add(cuboids.members.length)
+                assert(cuboids.members.every(({ kind }) => kind === SMALL_CUBOID))
             }
             assert.deepEqual([...counts].sort((a, b) => a - b), [2, 3, 4, 5, 6, 7])
             assert(MIN_SPLIT === 2 && MAX_SPLIT === 7)
@@ -345,7 +355,7 @@ describe("Acid cuboids", () => {
             cuboids.add(BIG_CUBOID, 0, 0, 0.3)
             cuboids.strike(0, 0, 0, REACH, WIDTH, BIG_CUBOID.hp)
             run(cuboids, 0.2, [])
-            const { cuboids: small } = cuboids
+            const { members: small } = cuboids
             assert.isAbove(small.reduce((sum, { z }) => sum + z, 0) / small.length, 0.4)
         })
 
@@ -355,7 +365,7 @@ describe("Acid cuboids", () => {
             cuboids.add(BIG_CUBOID, 0, 0, 0)
             cuboids.strike(0, 0, Math.PI / 2, REACH, WIDTH, BIG_CUBOID.hp)
             run(cuboids, 0.2, [])
-            const { cuboids: small } = cuboids
+            const { members: small } = cuboids
             assert.isAbove(small.reduce((sum, { x }) => sum + x, 0) / small.length, 0.1)
         })
 
@@ -365,7 +375,7 @@ describe("Acid cuboids", () => {
             cuboids.add(BIG_CUBOID, 0, 0, 0.3)
             cuboids.strike(0, 0, 0, REACH, WIDTH, BIG_CUBOID.hp)
             run(cuboids, 0.2, [])
-            const { cuboids: small } = cuboids
+            const { members: small } = cuboids
             for (let i = 1; i < small.length; i++)
             {
                 assert(Math.hypot(small[i].x - small[0].x, small[i].z - small[0].z) > 0.01)

@@ -10,7 +10,7 @@ import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../..
 import PatchWorld from "../../src/map/PatchWorld"
 import { faceOf } from "../../src/map/QuadPatch"
 import { FACE_SIZE } from "../../src/map/scale"
-import { HERO_RADIUS } from "../../src/monster/cuboids"
+import { HERO_RADIUS } from "../../src/monster/monsters"
 import { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, CHEST_REACH } from "../../src/treasure/chests"
 
 /**

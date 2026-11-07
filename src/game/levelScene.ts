@@ -23,7 +23,8 @@ import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import CuboidCrowd from "../monster/CuboidCrowd"
-import CuboidPack, { BIG_CUBOID, type CuboidPrey, HERO_RADIUS, mostCuboids, placeCuboids } from "../monster/cuboids"
+import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cuboids"
+import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
@@ -87,6 +88,11 @@ const ROOM_AROUND = HERO_RADIUS
  * Hit points a sword takes
  */
 const SWORD_DAMAGE = 2
+
+/**
+ * Room the biggest monsters on the floor take up, in world units, which keeps them out of narrow places
+ */
+const BIG_MONSTER_RADIUS = BIG_CUBOID.radius
 
 /**
  * What the screen does for a moment when the hero the view is with gets hurt
@@ -158,8 +164,8 @@ interface ShownHero
     control: HeroControl
     /** moved on orders in the last frame */
     steered: boolean
-    /** what the cuboids need to know about the hero */
-    prey: CuboidPrey
+    /** what the monsters need to know about the hero */
+    prey: Prey
     hp: number
     /** when the sword of the attack going on gets there, in seconds, null without one */
     strikeAt: number | null
@@ -230,6 +236,7 @@ export default class LevelScene
     /** the hero the view is with was close enough to take an exit in the last frame */
     private atExit = false
     private crowd: MeepleCrowd | null = null
+    private monsters: Monsters | null = null
     private cuboids: CuboidPack | null = null
     private cuboidCrowd: CuboidCrowd | null = null
     private readonly marks = new HeroMarks()
@@ -341,7 +348,7 @@ export default class LevelScene
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
-        this.addCuboids(level, meshes, seed, chests)
+        this.addMonsters(level, meshes, seed, chests)
 
         this.setHeroes(this.heroes)
         this.client.terminate()
@@ -385,25 +392,29 @@ export default class LevelScene
         return [spot.x, spot.z]
     }
 
-    private addCuboids({ rooms }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
+    private addMonsters({ rooms }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
     {
         const walls = this.solidWalls!
         const seeing = this.floorWalls!
-        const bigWalls = createFloorWalls(solid, BIG_CUBOID.radius)
-        const pack = new CuboidPack({
-            move: (cuboid, dx, dz) => moveOnFloor(world, cuboid.kind === BIG_CUBOID ? bigWalls : walls, cuboid, dx, dz),
+        const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
+        const floor: MonsterFloor = {
+            move: (monster, dx, dz) => moveOnFloor(world, monster.kind.big ? bigWalls : walls, monster, dx, dz),
             sees: (x0, z0, x1, z1) => seesAcross(seeing, x0, z0, x1, z1)
-        })
-        const placed = placeCuboids(rooms, new Prando(seed))
+        }
+        const random = new Prando(seed)
+
+        const cuboids = new CuboidPack(floor)
+        const placed = placeCuboids(rooms, random)
         for (const { face, kind } of placed)
         {
             const [x, z] = faceCenter(world, face)
-            pack.add(kind, face, x, z)
+            cuboids.add(kind, face, x, z)
         }
         const cuboidCrowd = new CuboidCrowd(mostCuboids(placed.map(({ kind }) => kind)), field)
         this.scene.add(cuboidCrowd.group)
-        this.cuboids = pack
+        this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
+        this.monsters = new Monsters([cuboids], floor)
     }
 
     /**
@@ -480,7 +491,7 @@ export default class LevelScene
     inFight(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && !!this.cuboids?.sees(hero.prey)
+        return !!hero && !!this.monsters?.sees(hero.prey)
     }
 
     /**
@@ -685,7 +696,7 @@ export default class LevelScene
             }
         }
         this.updateExploration()
-        this.updateCuboids(time, delta)
+        this.updateMonsters(time, delta)
         this.updateTreasure(time)
         this.crowd?.update(this.camera, time)
 
@@ -785,10 +796,10 @@ export default class LevelScene
         }
     }
 
-    private updateCuboids(time: number, delta: number): void
+    private updateMonsters(time: number, delta: number): void
     {
-        const { cuboids, shown } = this
-        if (!cuboids)
+        const { monsters, shown } = this
+        if (!monsters)
         {
             return
         }
@@ -801,7 +812,7 @@ export default class LevelScene
             prey.blocking = control.blocking
             prey.dodging = control.dodging
         }
-        cuboids.update(delta, heroes.map(([, { prey }]) => prey))
+        monsters.update(delta, heroes.map(([, { prey }]) => prey))
 
         for (const [id, hero] of heroes)
         {
@@ -809,15 +820,15 @@ export default class LevelScene
             if (strikeAt !== null && time >= strikeAt)
             {
                 hero.strikeAt = null
-                cuboids.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, SWORD_DAMAGE)
+                monsters.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, SWORD_DAMAGE)
             }
-            const damage = cuboids.hurt(prey, delta)
+            const damage = monsters.hurt(prey, delta)
             if (damage > 0)
             {
                 this.hurtHero(id, hero, damage)
             }
         }
-        this.cuboidCrowd!.update(cuboids.cuboids, time)
+        this.cuboidCrowd!.update(this.cuboids!.members, time)
     }
 
     /**
