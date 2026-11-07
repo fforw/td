@@ -12,7 +12,7 @@ import {
 } from "./campaign"
 import { levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
-import { carryGold, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, robHero, startJob } from "./heroes"
+import { carryGold, carryOut, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
@@ -621,17 +621,24 @@ export default class GameView implements PadTarget
     }
 
     /**
-     * @param how       what happened between the name and the place
-     * @param after     what happened on top, after the place
+     * @param carried   got carried out rather than walking out
      */
-    private leftLevel(heroId: number, how = " came out of ", after = ""): void
+    private leftLevel(heroId: number, carried = false): void
     {
         const { campaign } = this
         const job = campaign.jobs.find(j => j.heroId === heroId)!
         const hero = campaign.heroes.find(h => h.id === heroId)!
         const { kind } = overworld(campaign).patches[job.target]
-        leaveLevel(campaign, heroId)
-        this.report(hero.name + how + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + job.target + after)
+        const [robbed, reset] = carried ? carryOut(campaign, heroId) : [0, leaveLevel(campaign, heroId)]
+        if (reset && this.levelTarget === job.target)
+        {
+            // built anew when next shown. Not disposed right away, as this can come from the middle of one of its frames.
+            this.levelTarget = null
+        }
+        this.report(
+            hero.name + (carried ? " got carried out of " : " came out of ") + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " +
+            job.target + (robbed ? " and robbed of 🪙 " + robbed : "")
+        )
         if (this.following === heroId && !job.way)
         {
             // nobody gets to see those without a way outside, they are left to the notices
@@ -822,8 +829,7 @@ export default class GameView implements PadTarget
                 },
                 id => {
                     this.campaign.jobs.find(j => j.heroId === id)!.hp = HP_CARRIED_OUT
-                    const robbed = robHero(this.campaign, id)
-                    this.leftLevel(id, " got carried out of ", robbed ? " and robbed of 🪙 " + robbed : "")
+                    this.leftLevel(id, true)
                 },
                 campaign.chests[job.target] ??= {},
                 (id, gold) => {

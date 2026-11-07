@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { carryGold, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, robHero, startJob } from "../../src/game/heroes"
+import { carryGold, carryOut, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { parseSave, serializeSave } from "../../src/game/storage"
@@ -378,7 +378,7 @@ describe("Heroes", () => {
         assert(campaign.gold === START_GOLD + 30)
     })
 
-    it("loses the gold carried on getting robbed", () => {
+    it("loses the gold carried on getting carried out, and the level starts anew", () => {
 
         const campaign = createCampaign(21)
         const hero = campaign.heroes[0]
@@ -390,17 +390,47 @@ describe("Heroes", () => {
         }
         enterLevel(campaign, hero.id)
         carryGold(campaign, hero.id, 40)
-        assert(robHero(campaign, hero.id) === 40)
-        assert(job.gold === undefined)
-        assert(robHero(campaign, hero.id) === 0)
+        campaign.chests["1/0"] = { 3: [1, 2] }
+        assert.deepEqual(carryOut(campaign, hero.id), [40, true])
+        assert(!job.inside && job.gold === undefined)
+        assert(campaign.chests["1/0"] === undefined && campaign.resets === undefined)
+        assert.throws(() => carryOut(campaign, hero.id))
 
-        leaveLevel(campaign, hero.id)
         returnHome(campaign, hero.id)
         while (campaign.jobs.length)
         {
             advanceDay(campaign)
         }
         assert(campaign.gold === START_GOLD)
+    })
+
+    it("starts a level anew only once the last one inside is out", () => {
+
+        const campaign = createCampaign(21)
+        const [first, second] = campaign.heroes
+        startJob(campaign, first.id, "1/0")
+        startJob(campaign, second.id, "1/0")
+        while (!hasArrived(campaign, campaign.jobs[0]))
+        {
+            advanceDay(campaign)
+        }
+        enterLevel(campaign, first.id)
+        enterLevel(campaign, second.id)
+        campaign.chests["1/0"] = { 3: [1, 2] }
+
+        assert.deepEqual(carryOut(campaign, first.id), [0, false])
+        assert.deepEqual(campaign.resets, ["1/0"])
+        assert.deepEqual(parseSave(serializeSave(campaign)).resets, ["1/0"])
+        assert(campaign.chests["1/0"] !== undefined, "not under the feet of the other one")
+
+        assert(leaveLevel(campaign, second.id))
+        assert(campaign.chests["1/0"] === undefined && campaign.resets === undefined)
+
+        // without anyone carried out, it stays as it is
+        enterLevel(campaign, second.id)
+        campaign.chests["1/0"] = { 3: [1] }
+        assert(!leaveLevel(campaign, second.id))
+        assert(campaign.chests["1/0"] !== undefined)
     })
 
     it("can't enter before getting there", () => {

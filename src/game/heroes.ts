@@ -145,8 +145,10 @@ export function enterLevel(campaign: Campaign, heroId: number): void
 
 /**
  * Has a hero come out of the level, where they wait outside for orders like before going in
+ *
+ * @return true if the level started anew, as the last one left after someone got carried out
  */
-export function leaveLevel(campaign: Campaign, heroId: number): void
+export function leaveLevel(campaign: Campaign, heroId: number): boolean
 {
     const job = campaign.jobs.find(j => j.heroId === heroId)
     if (!job?.inside)
@@ -155,6 +157,45 @@ export function leaveLevel(campaign: Campaign, heroId: number): void
     }
     delete job.inside
     delete job.face
+
+    const { target } = job
+    const { resets } = campaign
+    if (!resets?.includes(target) || campaign.jobs.some(j => j.inside && j.target === target))
+    {
+        return false
+    }
+    // the chests fill up again, and whatever lives there is back as it was
+    delete campaign.chests[target]
+    campaign.resets = resets.filter(key => key !== target)
+    if (!campaign.resets.length)
+    {
+        delete campaign.resets
+    }
+    return true
+}
+
+
+/**
+ * Has a hero get carried out of a level, which costs them all they carry. The level starts anew once nobody is inside
+ * anymore, so what they lost goes back into it and it has to be beaten again from the start.
+ *
+ * @return the gold they lost, and whether the level started anew
+ */
+export function carryOut(campaign: Campaign, heroId: number): [number, boolean]
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job?.inside)
+    {
+        throw new Error("Hero " + heroId + " isn't inside")
+    }
+    const gold = job.gold ?? 0
+    delete job.gold
+    const resets = campaign.resets ??= []
+    if (!resets.includes(job.target))
+    {
+        resets.push(job.target)
+    }
+    return [gold, leaveLevel(campaign, heroId)]
 }
 
 
@@ -169,20 +210,6 @@ export function carryGold(campaign: Campaign, heroId: number, gold: number): voi
         throw new Error("Hero " + heroId + " isn't inside")
     }
     job.gold = (job.gold ?? 0) + gold
-}
-
-
-/**
- * Takes all the gold a hero carries, as happens to those carried out of a level
- *
- * @return the gold they lost
- */
-export function robHero(campaign: Campaign, heroId: number): number
-{
-    const job = campaign.jobs.find(j => j.heroId === heroId)
-    const gold = job?.gold ?? 0
-    delete job?.gold
-    return gold
 }
 
 

@@ -172,6 +172,8 @@ export interface Campaign
     jobs: Job[]
     /** what's left of the chests that got opened, by the key of the patch of their level */
     chests: Record<string, OpenedChests>
+    /** keys of the patches whose levels start anew once nobody is inside, after a hero got carried out, missing without */
+    resets?: string[]
     /** id for the next explorer or hero */
     nextId: number
 }

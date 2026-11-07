@@ -633,7 +633,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   Its coins spill to where a hero can get to, and whoever walks over one that
   has landed picks it up. Each coin is worth 10 gold, which the hero carries
   (`Job.gold`) and only adds to the campaign once back at the castle. A hero
-  carried out of a level gets robbed of all they carry.
+  carried out of a level gets robbed of all they carry, and it goes back into
+  the level, see below.
   `Campaign.chests` keeps which coins of each opened chest are still lying
   around, per level. Everything else about them follows from the seed.
 
@@ -656,7 +657,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   by a premise, and aren't saved: a reload brings all of them back. A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
-  decided.
+  decided. The level then starts anew, with its chests full and its cuboids
+  back, once nobody else is inside (`carryOut()`, `Campaign.resets`). So it
+  has to be beaten in one go: on with 1 hit point, or home to heal first.
 - A fight only runs while the view is in its level, so the player can go to the
   castle and send others to help. Everything in the level freezes meanwhile.
   The day can't end while a monster can see a hero in the level kept
