@@ -27,7 +27,7 @@ import {
  */
 const RASTER_PIXELS = 8
 const UNREACHABLE_RASTER_PIXELS = 32
-const ROUGH_RASTER_PIXELS = 128
+const ROUGH_RASTER_PIXELS = 48
 
 /**
  * Map units to scan around the view, as the wobble of the map must not show the open border of the raster

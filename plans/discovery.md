@@ -383,11 +383,12 @@ Heroes do everything that happens inside a discovered patch:
   listed on it, it only shows what's known, but the mission list stays
   in front of it. A line of the list closes the map and goes there.
 - Discovered patches are drawn in full detail, patches an explorer only
-  passed through in a raster of 128 pixels, as layers clipped to their
-  cells on the patch grid. Patches no explorer found a way to get 32
-  pixels, they would stay holes otherwise. Anything else is blank paper.
-  Patches are cells of the grid here, not their jagged shape, the wobble
-  hides the difference.
+  passed through in a raster of 48 pixels, as layers clipped to their
+  cells on the patch grid. A coarser raster suits a big map, but doesn't
+  fit the detailed patches next to it. Patches no explorer found a way to
+  get 32 pixels, they would stay holes otherwise. Anything else is blank
+  paper. Patches are cells of the grid here, not their jagged shape, the
+  wobble hides the difference.
 - Points of interest of discovered patches are the markers to click for a
   mission of a hero, one hero per mission for now. Empty patches have
   nothing to click, so heroes go nowhere but to points of interest.
