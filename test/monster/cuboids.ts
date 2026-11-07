@@ -39,7 +39,7 @@ function pack(sees = (_x0: number, _z0: number, _x1: number, _z1: number) => tru
 
 function prey(x = 0, z = 0, changes: Partial<CuboidPrey> = {}): CuboidPrey
 {
-    return { x, z, facing: 0, blocking: false, hurtWait: 0, ...changes }
+    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, ...changes }
 }
 
 function run(cuboids: CuboidPack, seconds: number, heroes: CuboidPrey[]): void
@@ -217,6 +217,16 @@ describe("Acid cuboids", () => {
             cuboids.add(BIG_CUBOID, 0, 0, 0.1)
             assert(cuboids.hurt(hero, FRAME) === 0)
             assert(hurtOver(cuboids, HURT_WAIT, hero) === BIG_CUBOID.damage)
+        })
+
+        it("doesn't happen while dodging, and right after it does", () => {
+
+            const cuboids = pack()
+            cuboids.add(BIG_CUBOID, 0, 0.1, 0)
+            const hero = prey(0, 0, { dodging: true })
+            assert(cuboids.hurt(hero, FRAME) === 0)
+            hero.dodging = false
+            assert(cuboids.hurt(hero, FRAME) === BIG_CUBOID.damage)
         })
 
         it("does nothing without touching", () => {

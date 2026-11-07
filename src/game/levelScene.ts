@@ -416,7 +416,7 @@ export default class LevelScene
                     walk: null,
                     control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
                     steered: false,
-                    prey: { x, z, facing: 0, blocking: false, hurtWait: 0 },
+                    prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0 },
                     hp,
                     strikeAt: null,
                     lightOn: true
@@ -679,6 +679,7 @@ export default class LevelScene
             prey.z = meeple.position.z
             prey.facing = meeple.facing
             prey.blocking = control.blocking
+            prey.dodging = control.dodging
         }
         cuboids.update(delta, heroes.map(([, { prey }]) => prey))
 

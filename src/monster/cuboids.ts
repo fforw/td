@@ -170,6 +170,8 @@ export interface CuboidPrey
     /** where they look, as a meeple facing */
     facing: number
     blocking: boolean
+    /** can't be hurt right now, e.g. while dashing */
+    dodging: boolean
     /** seconds until cuboids can hurt them again */
     hurtWait: number
 }
@@ -336,7 +338,7 @@ export default class CuboidPack
                     this.recoil(cuboid, dx, dz, distance)
                 }
             }
-            else if (hero.hurtWait === 0)
+            else if (hero.hurtWait === 0 && !hero.dodging)
             {
                 damage = Math.max(damage, kind.damage)
             }

@@ -593,7 +593,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   movements, and speeds up after about a quarter turn at full tilt. Pointing
   back keeps it going the way it turns. A first take turned the view toward a
   fixed aim and stopped there after a quarter turn, which felt abrupt. A dash goes where
-  the hero moves, or else looks, and a tapped attack waits for what's in its
+  the hero moves, or else looks, and nothing can hurt them from its start
+  until a little after it ends (`DODGE_TIME`), and a tapped attack waits for what's in its
   way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
 - Walls don't fill their faces, so they also have to meet at vertices that

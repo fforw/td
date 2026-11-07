@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED, VIEW_TURN_BOOST, VIEW_TURN_LAG, VIEW_TURN_RATE, ViewTurn } from "../../src/game/heroControl"
+import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, DODGE_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED, VIEW_TURN_BOOST, VIEW_TURN_LAG, VIEW_TURN_RATE, ViewTurn } from "../../src/game/heroControl"
 
 const FRAME = 1 / 60
 const ATTACK_TIME = 0.5
@@ -66,6 +66,19 @@ describe("HeroControl", () => {
         control.update(orders({ dash: true }), FRAME, Math.PI / 2)
         assert.closeTo(control.velocityX, RUN_SPEED * DASH_SPEED, 1e-9)
         assert.closeTo(control.velocityZ, 0, 1e-9)
+    })
+
+    it("can't be hurt from the start of a dash until a while after it", () => {
+
+        const control = new HeroControl(ATTACK_TIME, true)
+        assert(!control.dodging)
+        control.update(orders({ dash: true }), FRAME, 0)
+        assert(control.dodging)
+        run(control, DASH_TIME + FRAME)
+        assert(!control.dashing)
+        assert(control.dodging, "still after the dash")
+        run(control, DODGE_TIME - DASH_TIME)
+        assert(!control.dodging)
     })
 
     it("needs a new press and the cooldown for the next dash", () => {

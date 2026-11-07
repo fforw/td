@@ -14,6 +14,12 @@ export const DASH_SPEED = 3.5
 export const DASH_COOLDOWN = 0.55
 
 /**
+ * Seconds from the start of a dash in which nothing can hurt the hero, a bit longer than the dash so that dodging through
+ * something forgives a late press
+ */
+export const DODGE_TIME = 0.2
+
+/**
  * How fast someone moves behind their shield as a share of running
  */
 export const BLOCK_SPEED = 0.45
@@ -145,6 +151,7 @@ export default class HeroControl
     blocking = false
 
     private dashLeft = 0
+    private dodgeLeft = 0
     private dashWait = 0
     private dashX = 0
     private dashZ = 0
@@ -167,6 +174,12 @@ export default class HeroControl
         return this.dashLeft > 0
     }
 
+    /** can't be hurt right now, from dashing */
+    get dodging(): boolean
+    {
+        return this.dodgeLeft > 0
+    }
+
     get moving(): boolean
     {
         return this.velocityX !== 0 || this.velocityZ !== 0
@@ -184,6 +197,7 @@ export default class HeroControl
     update({ moveX, moveZ, aimX, aimZ, dash, attack, block }: HeroOrders, delta: number, facing: number): boolean
     {
         this.dashLeft = Math.max(0, this.dashLeft - delta)
+        this.dodgeLeft = Math.max(0, this.dodgeLeft - delta)
         this.dashWait = Math.max(0, this.dashWait - delta)
         this.attackWait = Math.max(0, this.attackWait - delta)
 
@@ -194,6 +208,7 @@ export default class HeroControl
             this.dashX = moved ? moveX / length : Math.sin(facing)
             this.dashZ = moved ? moveZ / length : Math.cos(facing)
             this.dashLeft = DASH_TIME
+            this.dodgeLeft = DODGE_TIME
             this.dashWait = DASH_COOLDOWN
         }
         this.dashHeld = dash
