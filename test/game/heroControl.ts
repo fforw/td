@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED, VIEW_TURN_RATE, viewTurn } from "../../src/game/heroControl"
+import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED, VIEW_TURN_BOOST, VIEW_TURN_LAG, VIEW_TURN_RATE, ViewTurn } from "../../src/game/heroControl"
 
 const FRAME = 1 / 60
 const ATTACK_TIME = 0.5
@@ -133,29 +133,75 @@ describe("HeroControl", () => {
 })
 
 
-describe("viewTurn", () => {
-    it("leaves the view alone without any aim", () => {
-        assert.equal(viewTurn(1, 0, 0, 0.1), 0)
+/**
+ * Turns for the given time with the stick held and returns the yaw it adds up to
+ */
+function turn(view: ViewTurn, seconds: number, aimX: number, aimY: number): number
+{
+    let yaw = 0
+    for (let t = 0; t < seconds - 1e-9; t += FRAME)
+    {
+        yaw += view.update(aimX, aimY, FRAME)
+    }
+    return yaw
+}
+
+
+describe("ViewTurn", () => {
+
+    it("leaves the view alone without any aim, or aiming ahead", () => {
+
+        const view = new ViewTurn()
+        assert.equal(turn(view, 1, 0, 0), 0)
+        assert.equal(turn(view, 1, 0.1, -1), 0)
     })
 
-    it("turns faster the further the stick is pushed", () => {
-        assert.closeTo(viewTurn(0, -1, 0, 0.1), VIEW_TURN_RATE * 0.1, 1e-9)
-        assert.closeTo(viewTurn(0, -0.5, 0, 0.1), VIEW_TURN_RATE * 0.05, 1e-9)
+    it("gets up to speed with some inertia", () => {
+
+        const view = new ViewTurn()
+        view.update(1, 0, FRAME)
+        assert.isBelow(view.rate, VIEW_TURN_RATE * 0.2, "doesn't jump to full speed")
+        turn(view, VIEW_TURN_LAG * 4, 1, 0)
+        assert.closeTo(view.rate, VIEW_TURN_RATE, VIEW_TURN_RATE * 0.1)
     })
 
-    it("turns the short way over the wrap of the angles", () => {
-        // both a bit further on than the other, past where the angles jump from one end to the other
-        assert.isAbove(viewTurn(3, 0.1, 1, 0.01), 0)
-        assert.isBelow(viewTurn(-3, -0.1, 1, 0.01), 0)
+    it("turns to the right with a negative yaw, and the other way to the left", () => {
+
+        assert.isBelow(turn(new ViewTurn(), 0.5, 1, 0), 0)
+        assert.isAbove(turn(new ViewTurn(), 0.5, -1, 0), 0)
     })
 
-    it("ends up looking where the hero aims, and stays there", () => {
-        let heading = 0
-        for (let i = 0; i < 100; i++)
-        {
-            heading += viewTurn(heading, 1, 0, 0.02)
-        }
-        assert.closeTo(heading, -Math.PI / 2, 1e-9)
-        assert.closeTo(viewTurn(heading, 1, 0, 0.02), 0, 1e-9)
+    it("turns faster the further the stick is pushed and the more it points to the side", () => {
+
+        const full = -turn(new ViewTurn(), 0.5, 1, 0)
+        assert.isBelow(-turn(new ViewTurn(), 0.5, 0.5, 0), full * 0.6)
+        assert.isBelow(-turn(new ViewTurn(), 0.5, Math.SQRT1_2, -Math.SQRT1_2), full * 0.8)
+    })
+
+    it("goes on turning as long as the stick is held, and speeds up", () => {
+
+        const view = new ViewTurn()
+        const first = -turn(view, 1, 1, 0)
+        assert.isAbove(first, Math.PI / 2, "goes past a quarter turn")
+        turn(view, 2, 1, 0)
+        assert.closeTo(view.rate, VIEW_TURN_RATE * VIEW_TURN_BOOST, 1e-3)
+    })
+
+    it("keeps turning the way it does when the stick points back", () => {
+
+        const view = new ViewTurn()
+        turn(view, 0.5, -1, 0)
+        turn(view, 0.5, 0.05, 1)
+        assert.isBelow(view.rate, 0, "still to the left, though slightly right of back")
+    })
+
+    it("comes to rest when let go of, after coasting a little", () => {
+
+        const view = new ViewTurn()
+        turn(view, 1, 1, 0)
+        const coast = -turn(view, 1, 0, 0)
+        assert.isAbove(coast, 0)
+        assert.isBelow(coast, VIEW_TURN_RATE * VIEW_TURN_BOOST * VIEW_TURN_LAG * 1.1)
+        assert.equal(view.rate, 0)
     })
 })

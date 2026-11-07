@@ -33,7 +33,7 @@ import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VA
 import TreasureView from "../treasure/TreasureView"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
-import HeroControl, { type HeroOrders, NO_ORDERS, viewTurn } from "./heroControl"
+import HeroControl, { type HeroOrders, NO_ORDERS, ViewTurn } from "./heroControl"
 import { Walk } from "./journey"
 import { placeFixtures } from "./levelFixtures"
 
@@ -216,11 +216,8 @@ export default class LevelScene
     private unplaced = true
     /** what a controller does in the current frame, if it is in charge of the hero the view is with */
     private steering: PadInput | null = null
-    /**
-     * Heading of the view when the aiming started. The view turning toward the aim would otherwise take the aim along with it,
-     * and never get there.
-     */
-    private aimHeading: number | null = null
+    /** how the right stick turns the view */
+    private readonly viewTurn = new ViewTurn()
 
     private running = false
     private lastFrame = 0
@@ -560,7 +557,7 @@ export default class LevelScene
         }
         if (input)
         {
-            this.look(viewTurn(this.controls.getAzimuthalAngle(), orders.aimX, orders.aimZ, delta), 0, 1)
+            this.look(this.viewTurn.update(input.aimX, input.aimY, delta), 0, 1)
         }
         meeple.leftReady = control.blocking
         if (control.turnTo !== null)
@@ -602,10 +599,8 @@ export default class LevelScene
         const cos = Math.cos(heading), sin = Math.sin(heading)
         orders.moveX = moveX * cos + moveY * sin
         orders.moveZ = -moveX * sin + moveY * cos
-        this.aimHeading = aimX || aimY ? this.aimHeading ?? heading : null
-        const aimCos = Math.cos(this.aimHeading ?? heading), aimSin = Math.sin(this.aimHeading ?? heading)
-        orders.aimX = aimX * aimCos + aimY * aimSin
-        orders.aimZ = -aimX * aimSin + aimY * aimCos
+        orders.aimX = aimX * cos + aimY * sin
+        orders.aimZ = -aimX * sin + aimY * cos
         orders.dash = dash
         orders.attack = attack
         orders.block = block
@@ -618,7 +613,7 @@ export default class LevelScene
         this.steering = null
         if (!steering)
         {
-            this.aimHeading = null
+            this.viewTurn.reset()
         }
         for (const [id, hero] of this.shown)
         {

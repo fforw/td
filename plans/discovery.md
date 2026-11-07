@@ -584,12 +584,15 @@ Glyphs are built from the stroke data of a source kanji per concept
   left stick moves (sliding along the walls as they got built, not the
   edges of their faces, `moveOnFloor()`), right stick
   aims, L1 dashes, R1 attacks, L2 blocks. R2 is kept for a secondary
-  attack. The face buttons keep their jobs (leave, map, options). The view
-  turns to look where the hero aims, faster the further the stick is pushed
-  (`viewTurn()`), and stays there. While the stick is held it goes by the view
-  from when it was pushed, as the aim would turn along with the view and never
-  get there otherwise. So it stops after a quarter turn where a usual camera
-  stick would go on, which is close enough to feel familiar. A dash goes where
+  attack. The face buttons keep their jobs (leave, map, options). The hero
+  looks where the right stick points on the screen, and pointing it off to
+  the side also turns the view, for as long as the stick is held
+  (`ViewTurn`). How far it is pushed and how far off ahead it points sets how
+  fast, with some room around straight ahead to look without turning. The
+  turning follows the stick with a little inertia, which smooths out its small
+  movements, and speeds up after about a quarter turn at full tilt. Pointing
+  back keeps it going the way it turns. A first take turned the view toward a
+  fixed aim and stopped there after a quarter turn, which felt abrupt. A dash goes where
   the hero moves, or else looks, and a tapped attack waits for what's in its
   way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
