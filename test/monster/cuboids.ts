@@ -339,6 +339,26 @@ describe("Acid cuboids", () => {
             assert(MIN_SPLIT === 2 && MAX_SPLIT === 7)
         })
 
+        it("has those coming out of a big one carry on away from the blow, mostly", () => {
+
+            const cuboids = pack()
+            cuboids.add(BIG_CUBOID, 0, 0, 0.3)
+            cuboids.strike(0, 0, 0, REACH, WIDTH, BIG_CUBOID.hp)
+            run(cuboids, 0.2, [])
+            const { cuboids: small } = cuboids
+            assert.isAbove(small.reduce((sum, { z }) => sum + z, 0) / small.length, 0.4)
+        })
+
+        it("has those coming out of a big one on top of the hero go where the blow goes, mostly", () => {
+
+            const cuboids = pack()
+            cuboids.add(BIG_CUBOID, 0, 0, 0)
+            cuboids.strike(0, 0, Math.PI / 2, REACH, WIDTH, BIG_CUBOID.hp)
+            run(cuboids, 0.2, [])
+            const { cuboids: small } = cuboids
+            assert.isAbove(small.reduce((sum, { x }) => sum + x, 0) / small.length, 0.1)
+        })
+
         it("has those coming out of a big one spread out", () => {
 
             const cuboids = pack()

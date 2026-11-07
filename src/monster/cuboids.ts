@@ -68,6 +68,12 @@ export const MIN_SPLIT = 2
 export const MAX_SPLIT = 7
 
 /**
+ * Width in radians of the fan the cuboids coming out of a big one hop in, which goes away from whoever struck it, as they
+ * carry on with the blow and don't land on them
+ */
+export const SPLIT_SPREAD = 2.4
+
+/**
  * How many seconds a cuboid that got hit shows it
  */
 const FLASH_TIME = 0.12
@@ -379,7 +385,9 @@ export default class CuboidPack
                 cuboid.hp -= damage
                 if (cuboid.hp <= 0)
                 {
-                    this.kill(cuboid)
+                    // right on top of the hero, they go where the blow goes
+                    const away = distance > 1e-6 ? Math.atan2(dx, dz) : facing
+                    this.kill(cuboid, away)
                 }
                 else
                 {
@@ -403,18 +411,22 @@ export default class CuboidPack
         return this.cuboids.some(cuboid => this.closestSeen(cuboid, [hero]) !== null)
     }
 
-    private kill(cuboid: Cuboid): void
+    /**
+     * @param away  direction of the blow as a meeple facing, which the cuboids coming out of a big one carry on in
+     */
+    private kill(cuboid: Cuboid, away: number): void
     {
         this.cuboids.splice(this.cuboids.indexOf(cuboid), 1)
         if (cuboid.kind.splits)
         {
             const { face, x, z, chase, goalX, goalZ } = cuboid
             const count = rng.nextInt(MIN_SPLIT, MAX_SPLIT)
-            const start = rng.next() * TAU
+            const gap = SPLIT_SPREAD / count
+            const start = away - SPLIT_SPREAD / 2 + gap * rng.next(0.25, 0.75)
             for (let i = 0; i < count; i++)
             {
                 const small = this.add(SMALL_CUBOID, face, x, z)
-                const angle = start + i / count * TAU
+                const angle = start + i * gap
                 this.hop(small, Math.sin(angle), Math.cos(angle), SPLIT_LENGTH, SPLIT_TIME, SMALL_CUBOID.hopHeight * 2)
                 small.chase = chase
                 small.goalX = goalX

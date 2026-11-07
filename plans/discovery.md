@@ -646,7 +646,8 @@ Glyphs are built from the stroke data of a source kanji per concept
 - The first monster is the acid cuboid (`monster/cuboids.ts`), big or at half
   the size. They hop after heroes they see, the big ones slower. A big one can
   lunge half as far again as a hop, after a moment of winding up, and breaks
-  up into 2 to 7 small ones when it dies. A shield stops small ones from the
+  up into 2 to 7 small ones when it dies. They hop off in a fan away from
+  the blow, so they rarely land on whoever struck it. A shield stops small ones from the
   front only. Touching hurts, then no cuboid can hurt that hero for a second,
   and after that whatever still touches them hurts again.
 - For now cuboids are placed in some rooms at random from the level seed, not
