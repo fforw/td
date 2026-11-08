@@ -42,13 +42,13 @@ export const MIN_INFLUENCE = 2
 const ROOM_REACH = 2
 
 /**
- * How much smaller to try a light that gives meeples two rims or doesn't fit
+ * How much smaller to try a light that doesn't fit
  */
 const LIGHT_SHRINK = 0.8
 
 /**
  * Own light of a point where the rim of a meeple starts to show and where it is fully there. The energy goes down with
- * distance, so the rim fades out at RIM_LIMIT.
+ * distance, so the rim fades out before the reach of the light.
  */
 export const RIM_FADE_START = 0.025
 export const RIM_FADE_END = 0.06
@@ -61,20 +61,9 @@ export const RIM_GATE_START = 0.16
 export const RIM_GATE_END = 0.45
 
 /**
- * How far the biggest light gets a rim out of a meeple in world units. See rimLimit() for other lights.
- */
-export const RIM_LIMIT = 4.2
-
-/**
  * Resolution of the light field in texels per world unit
  */
 export const LIGHT_TEXELS = 12
-
-/**
- * How far apart to check points for rims from two lights in world units. Slivers of two rims thinner than this can slip through,
- * which isn't worth the time of a finer check.
- */
-export const RIM_CHECK_STEP = 1 / 8
 
 /**
  * How far from a wall a lookup in the light field has to be in world units so that all texels it mixes are on its side
@@ -204,11 +193,6 @@ export interface LightView
     reach: number
 
     /**
-     * How far the light gets a rim out of a meeple in world units
-     */
-    rimLimit: number
-
-    /**
      * Offsets into the segment array by the sector a point is in, seen from the light
      */
     sectors: number[][]
@@ -268,33 +252,6 @@ export function findWallSegments(world: PatchWorld, slots: readonly number[]): F
 
 
 /**
- * Returns how far a light with the given reach gets a rim out of a meeple. Without walls, the own light of a point at distance
- * d is (1 - d² / reach²)² / d, whatever the radius of the light is. Lights this far from each other added up can't have rims at
- * the same point, closer lights need walls between them.
- *
- * @param reach     how far the light reaches
- */
-export function rimLimit(reach: number): number
-{
-    let low = 0, high = reach
-    for (let i = 0; i < 30; i++)
-    {
-        const d = (low + high) / 2
-        const fade = 1 - d * d / (reach * reach)
-        if (fade * fade / d > RIM_FADE_START)
-        {
-            low = d
-        }
-        else
-        {
-            high = d
-        }
-    }
-    return high
-}
-
-
-/**
  * Prepares a light for lightAt(). A wall at distance d from the light can only be in the way of a point if the angles of the
  * two seen from the light are less than asin(radius / d) apart.
  *
@@ -335,7 +292,7 @@ export function createLightView(
             sectors[(first + i) % LIGHT_SECTORS].push(s)
         }
     }
-    return { x, z, radius, reach, rimLimit: rimLimit(reach), sectors }
+    return { x, z, radius, reach, sectors }
 }
 
 
@@ -480,35 +437,6 @@ export function lightShare({ x, z, radius, reach }: LightView, px: number, pz: n
 }
 
 
-const sampleA: LightSample = { energy: 0, x: 0, z: 0 }
-const sampleB: LightSample = { energy: 0, x: 0, z: 0 }
-
-/**
- * Returns whether there is a point where a meeple would get a rim from both lights
- */
-export function rimsOverlap(a: LightView, b: LightView, segments: Float64Array): boolean
-{
-    const minX = Math.max(a.x - a.rimLimit, b.x - b.rimLimit), maxX = Math.min(a.x + a.rimLimit, b.x + b.rimLimit)
-    const minZ = Math.max(a.z - a.rimLimit, b.z - b.rimLimit), maxZ = Math.min(a.z + a.rimLimit, b.z + b.rimLimit)
-    for (let z = minZ; z < maxZ; z += RIM_CHECK_STEP)
-    {
-        for (let x = minX; x < maxX; x += RIM_CHECK_STEP)
-        {
-            lightAt(a, segments, x, z, sampleA)
-            if (Math.hypot(sampleA.x, sampleA.z) >= RIM_FADE_START)
-            {
-                lightAt(b, segments, x, z, sampleB)
-                if (Math.hypot(sampleB.x, sampleB.z) >= RIM_FADE_START && sampleA.energy + sampleB.energy < RIM_GATE_END)
-                {
-                    return true
-                }
-            }
-        }
-    }
-    return false
-}
-
-
 /**
  * Returns the center of the given global face in world units
  */
@@ -600,8 +528,8 @@ function forLitTexels(
 
 /**
  * Places up to one light in the middle of each room, the biggest rooms first. Big rooms get big lights. The light of a room
- * gets smaller until it no longer gives meeples two rims at the same point and there is a channel it can have, and the room
- * stays dark if even the smallest light can't. Doors count as open.
+ * gets smaller until it is clear of walls and there is a channel it can have, and the room stays dark if even the smallest
+ * light can't. Doors count as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
@@ -619,7 +547,6 @@ export function placeLights(
 {
     return withSeed(patchSeed(seed ^ LIGHT_SALT, 0, 0), () => {
         const lights: DungeonLight[] = []
-        const views: LightView[] = []
         const width = fieldWidth(bounds)
 
         // per texel one bit for each channel that is taken
@@ -664,12 +591,6 @@ export function placeLights(
 
                 const [x, z] = center
                 const view = createLightView(x, z, segments, radius, reach)
-                if (views.some(other =>
-                    Math.hypot(other.x - x, other.z - z) < other.rimLimit + view.rimLimit && rimsOverlap(other, view, segments)))
-                {
-                    continue
-                }
-
                 const texels: number[] = []
                 forLitTexels(view, segments, bounds, (tx, tz) => texels.push(tz * width + tx))
                 let used = 0
@@ -691,7 +612,6 @@ export function placeLights(
                     taken[i] |= 1 << channel
                 }
 
-                views.push(view)
                 lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)], radius, reach, channel })
                 break
             }

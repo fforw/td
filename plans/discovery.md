@@ -795,10 +795,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   and hue, which the field pass keeps in 2 more textures. Two rims at once
   would look odder than a rim that jumps between lights. Rooms get a light in
   the middle, the biggest ones first, sized by the room. A light gets
-  smaller until a meeple can't get rims from two lights at the same point,
-  which depends on their reach (`rimLimit()`) and on the walls between
-  them, counting doors as open. It also has to find a free channel. Rooms
-  where even the smallest light doesn't fit stay dark.
+  smaller until it is clear of walls and finds a free channel, counting
+  doors as open. Rooms where even the smallest light doesn't fit stay dark.
   Where a rim shows goes by the lights at full strength, and its brightness
   follows their strength, so changing lights don't make rims come and go.
   Meeples have no shadows in levels yet.

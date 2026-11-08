@@ -16,13 +16,8 @@ import {
     MAX_INFLUENCE,
     MAX_LIGHTS,
     MIN_INFLUENCE,
-    RIM_CHECK_STEP,
     NO_WALL,
     placeLights,
-    RIM_FADE_START,
-    RIM_GATE_END,
-    RIM_LIMIT,
-    rimLimit,
     WALL_CLEARANCE
 } from "../../src/map/dungeonLights"
 import { generateDungeon } from "../../src/map/generateDungeon"
@@ -155,13 +150,6 @@ describe("lightAt", () => {
         assert(out.energy > 0)
     })
 
-    it("has no more rim at the rim limit", () => {
-        const segments = new Float64Array(0)
-        const out: LightSample = { energy: 0, x: 0, z: 0 }
-        lightAt(createLightView(0, 0, segments), segments, RIM_LIMIT, 0, out)
-        assert(Math.hypot(out.x, out.z) < RIM_FADE_START)
-    })
-
     it("ends at the reach of a smaller light, with the same light further out whatever its radius", () => {
         const segments = new Float64Array(0)
         const out: LightSample = { energy: 1, x: 1, z: 1 }
@@ -189,21 +177,6 @@ describe("lightAt", () => {
         // inside of the soft shadow of the big light and outside of the one of the small light
         assert(share(0.3, -0.1) > 0.1 && share(0.3, -0.1) < 0.9)
         assert.equal(share(0.05, -0.1), 1)
-    })
-
-    it("has no more rim at the rim limit of any light", () => {
-        const segments = new Float64Array(0)
-        const out: LightSample = { energy: 0, x: 0, z: 0 }
-        assert(rimLimit(MAX_INFLUENCE) <= RIM_LIMIT)
-        for (const reach of [MIN_INFLUENCE, 3, MAX_INFLUENCE])
-        {
-            const limit = rimLimit(reach)
-            const view = createLightView(0, 0, segments, 0.1, reach)
-            lightAt(view, segments, limit + 0.01, 0, out)
-            assert(Math.hypot(out.x, out.z) < RIM_FADE_START)
-            lightAt(view, segments, limit - 0.01, 0, out)
-            assert(Math.hypot(out.x, out.z) > RIM_FADE_START)
-        }
     })
 
     it("keeps its direction going inside of the light", () => {
@@ -289,7 +262,7 @@ describe("findWallSegments", () => {
 
 
 describe("placeLights", () => {
-    it("keeps lights away from walls and from giving two rims at a point", { timeout: 30000 }, () => {
+    it("keeps lights away from walls", { timeout: 30000 }, () => {
         for (const seed of [4711, 12345])
         {
             const { level, world, segments, bounds } = connect(seed)
@@ -299,43 +272,12 @@ describe("placeLights", () => {
 
             // lights of different sizes, and all of them within the limits
             assert(new Set(lights.map(({ reach }) => reach)).size > 1)
-            for (const { radius, reach } of lights)
+            for (const { x, z, radius, reach } of lights)
             {
                 assert(reach >= MIN_INFLUENCE && reach <= MAX_INFLUENCE)
                 assert(radius > 0 && radius <= LIGHT_RADIUS)
+                assert(clearOfWalls(segments, x, z, radius))
             }
-
-            const views = lights.map(({ x, z, radius, reach }) => createLightView(x, z, segments, radius, reach))
-            const a: LightSample = { energy: 0, x: 0, z: 0 }
-            const b: LightSample = { energy: 0, x: 0, z: 0 }
-            // counted, as asserting all the points takes too long
-            let overlaps = 0
-            for (let i = 0; i < views.length; i++)
-            {
-                assert(clearOfWalls(segments, views[i].x, views[i].z, views[i].radius))
-                for (let j = i + 1; j < views.length; j++)
-                {
-                    const { x: ax, z: az } = views[i], { x: bx, z: bz } = views[j]
-                    if (Math.hypot(ax - bx, az - bz) >= RIM_LIMIT * 2)
-                    {
-                        continue
-                    }
-                    // as fine as the placement, at a level where a rim of a fifth of its strength shows
-                    for (let z = Math.min(az, bz) - RIM_LIMIT; z < Math.max(az, bz) + RIM_LIMIT; z += RIM_CHECK_STEP)
-                    {
-                        for (let x = Math.min(ax, bx) - RIM_LIMIT; x < Math.max(ax, bx) + RIM_LIMIT; x += RIM_CHECK_STEP)
-                        {
-                            lightAt(views[i], segments, x, z, a)
-                            lightAt(views[j], segments, x, z, b)
-                            overlaps += Math.hypot(a.x, a.z) < RIM_FADE_START * 1.5 ||
-                                Math.hypot(b.x, b.z) < RIM_FADE_START * 1.5 ||
-                                a.energy + b.energy >= RIM_GATE_END ? 0 : 1
-                        }
-                    }
-                }
-            }
-            // the placement looks at a grid of its own, which leaves single points between its samples
-            assert.isAtMost(overlaps, 5)
         }
     })
 
