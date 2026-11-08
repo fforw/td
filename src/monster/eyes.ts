@@ -22,7 +22,7 @@ const WAY_COST = 0.6
  * How fast an eye gets going and stops, as a share of the difference per second, and how close to a spot it slows down,
  * in world units
  */
-const ACCELERATION = 4
+const ACCELERATION = 5
 const SLOW_DOWN = 0.3
 
 /**
@@ -45,9 +45,9 @@ export const WARN_TIME = 0.5
 /**
  * Speed of a bolt in world units per second, how far it goes, and half its width
  */
-export const BOLT_SPEED = 5
-export const BOLT_RANGE = NOTICE_DISTANCE + 1
-const BOLT_RADIUS = 0.03
+export const BOLT_SPEED = 6
+export const BOLT_RANGE = NOTICE_DISTANCE + 2
+const BOLT_RADIUS = 0.02
 
 /**
  * Most radians between where a hero looks and where a bolt comes from for the shield to stop it
@@ -57,7 +57,7 @@ export const BLOCK_ANGLE = Math.PI * 0.42
 /**
  * Speed in world units per second an eye gets knocked back with
  */
-const RECOIL_SPEED = 2
+const RECOIL_SPEED = 3
 
 /**
  * How fast an eye turns, in radians per second
@@ -94,7 +94,7 @@ export const FLYING_EYE: EyeKind = {
     hp: 4,
     big: false,
     flying: true,
-    damage: 2,
+    damage: 1,
     speed: 0.9
 }
 
