@@ -3,6 +3,7 @@ import type { MapArea } from "../map/mapRegions"
 import type PatchWorld from "../map/PatchWorld"
 import { LOCAL_MASK, SLOT_SHIFT } from "../map/PatchWorld"
 import { faceCount } from "../map/QuadPatch"
+import { faceCenter } from "../map/dungeonLights"
 import { FACE_SIZE } from "../map/scale"
 
 /**
@@ -166,4 +167,53 @@ export function areaAround(points: readonly number[], margin: number): MapArea
         y1 = Math.max(y1, points[i + 1])
     }
     return { x: x0 - margin, y: y0 - margin, width: x1 - x0 + margin * 2, height: y1 - y0 + margin * 2 }
+}
+
+
+/**
+ * Returns where to jump to in the rooms with visited floor: the visited face closest to the middle of each room, in world
+ * units. The room the hero is in is left out.
+ *
+ * @param world         world with all patches of the level
+ * @param rooms         global face ids per room
+ * @param exploration   faces the heroes visited
+ * @param at            face the hero is on
+ */
+export function jumpTargets(
+    world: PatchWorld,
+    rooms: readonly number[][],
+    exploration: Exploration,
+    at: number
+): { face: number, x: number, z: number }[]
+{
+    const targets: { face: number, x: number, z: number }[] = []
+    for (const room of rooms)
+    {
+        if (room.includes(at))
+        {
+            continue
+        }
+        const visited = room.filter(face => exploration.has(face))
+        if (!visited.length)
+        {
+            continue
+        }
+        const centers = room.map(face => faceCenter(world, face))
+        const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
+        const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
+        let best = { face: visited[0], x: 0, z: 0 }
+        let shortest = Infinity
+        for (const face of visited)
+        {
+            const [x, z] = faceCenter(world, face)
+            const distance = Math.hypot(x - midX, z - midZ)
+            if (distance < shortest)
+            {
+                best = { face, x, z }
+                shortest = distance
+            }
+        }
+        targets.push(best)
+    }
+    return targets
 }

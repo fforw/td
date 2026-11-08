@@ -360,6 +360,16 @@
     font-size: 0.9rem;
 }
 
+/* known rooms on the map of a level, to jump to */
+#game .marker.level-marker.room
+{
+    width: 1.3rem;
+    height: 1.3rem;
+    border-style: dotted;
+    background: rgba(236, 220, 182, 0.75);
+    font-size: 0.8rem;
+}
+
 #game .marker.chest.opened
 {
     border-style: dashed;

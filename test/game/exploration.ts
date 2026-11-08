@@ -1,6 +1,7 @@
 import { assert, describe, it } from "vitest"
 
-import Exploration, { BLOCKED_REGION, OPEN_REGION, VISITED_REGION, visitedRegions } from "../../src/game/exploration"
+import Exploration, { BLOCKED_REGION, jumpTargets, OPEN_REGION, VISITED_REGION, visitedRegions } from "../../src/game/exploration"
+import { faceCenter } from "../../src/map/dungeonLights"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceCount } from "../../src/map/QuadPatch"
@@ -57,5 +58,44 @@ describe("Exploration", () => {
         assert(regions.faceType(FACE_SIZE * 1.6, 0) === OPEN_REGION)
         // nothing beyond the faces
         assert(regions.faceType(FACE_SIZE, FACE_SIZE * 1.2) === BLOCKED_REGION)
+    })
+})
+
+
+describe("jumpTargets", () => {
+
+    it("goes to the visited face closest to the middle of each other room with visited floor", () => {
+
+        const { level, world, slots } = build()
+        const { rooms } = level
+        const exploration = new Exploration(world, slots)
+        const [here, whole, part] = rooms
+        for (const face of [...here, ...whole, part[0], part[part.length - 1]])
+        {
+            exploration.visit(face)
+        }
+
+        const targets = jumpTargets(world, rooms, exploration, here[0])
+        assert.equal(targets.length, 2)
+
+        const [toWhole, toPart] = targets
+        assert(whole.includes(toWhole.face))
+        assert.deepEqual([toWhole.x, toWhole.z], faceCenter(world, toWhole.face))
+        assert.include([part[0], part[part.length - 1]], toPart.face)
+
+        // the middle of the whole room, as the closest of all its faces
+        const centers = whole.map(face => faceCenter(world, face))
+        const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
+        const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
+        for (const [x, z] of centers)
+        {
+            assert(Math.hypot(toWhole.x - midX, toWhole.z - midZ) <= Math.hypot(x - midX, z - midZ))
+        }
+
+        // seen from another room, the first one is a target and the room the hero is in isn't
+        const fromWhole = jumpTargets(world, rooms, exploration, whole[0]).map(({ face }) => face)
+        assert.equal(fromWhole.length, 2)
+        assert(fromWhole.some(face => here.includes(face)))
+        assert(!fromWhole.some(face => whole.includes(face)))
     })
 })

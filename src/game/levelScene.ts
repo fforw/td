@@ -39,7 +39,7 @@ import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS, ViewTurn } from "./heroControl"
 import { Walk } from "./journey"
-import Exploration from "./exploration"
+import Exploration, { jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
 
 const TAU = Math.PI * 2
@@ -191,6 +191,8 @@ export interface LevelMapState
     exploration: Exploration
     chests: { face: number, x: number, z: number, opened: boolean }[]
     exits: readonly LevelExit[]
+    /** rooms with visited floor that the hero can jump to, at the visited face closest to their middle */
+    rooms: { face: number, x: number, z: number }[]
     /** the hero the view is with, null without one */
     hero: { x: number, z: number, facing: number } | null
 }
@@ -811,8 +813,43 @@ export default class LevelScene
             exploration,
             chests: chests.chests.map(({ face, x, z, openedAt }) => ({ face, x, z, opened: openedAt !== null })),
             exits: this.exits,
+            rooms: hero ? this.jumpTargets(hero) : [],
             hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null
         }
+    }
+
+    /**
+     * Returns where in the rooms with visited floor the given hero can jump to, leaving out the room they are in
+     */
+    private jumpTargets(hero: ShownHero): LevelMapState["rooms"]
+    {
+        const at = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+        return jumpTargets(this.meshes!.world, this.level!.rooms, this.exploration!, at)
+    }
+
+    /**
+     * Puts the hero the view is with right onto a visited face of a room, out of a fight only
+     *
+     * @returns whether the hero got there
+     */
+    jumpTo(face: number): boolean
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (!hero || !this.meshes || this.monsters?.sees(hero.prey) || !this.jumpTargets(hero).some(target => target.face === face))
+        {
+            return false
+        }
+        const [x, z] = faceCenter(this.meshes.world, face)
+        hero.walk = null
+        hero.faces = [face]
+        hero.steered = false
+        hero.meeple.position.set(x, 0, z)
+        hero.meeple.walking = false
+        hero.prey.x = x
+        hero.prey.z = z
+        this.unplaced = true
+        this.onMoved(this.focus!, face)
+        return true
     }
 
     private updateMonsters(time: number, delta: number): void

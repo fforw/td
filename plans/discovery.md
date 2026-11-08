@@ -721,6 +721,11 @@ Glyphs are built from the stroke data of a source kanji per concept
   (`MapLayer.ink`). A gap stays readable on a small map, dashes might not.
   On it are the chests, open or closed, and the exits on visited faces, and
   an arrow for the hero the view is with, pointing where they look.
+- Every other room with visited floor has a button on the map of the level.
+  Picking it, by mouse or with the controller, puts the hero right onto the
+  visited face closest to the middle of that room and closes the map
+  (`jumpTargets()`). The map only opens outside of fights, and a jump
+  checks that again. It costs nothing for now.
 - `Campaign.explored` keeps the visited faces per level as base64 bits
   (`game/exploration.ts`), counted through the patches in order and without
   the trailing zero bytes. It stays when a level starts anew.

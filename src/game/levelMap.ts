@@ -48,7 +48,7 @@ const HERO_ARROW_SVG = '<svg viewBox="0 0 100 100"><polygon points="50,6 88,90 5
 
 /**
  * The map of a level as a sheet of old paper with what the heroes know: the floor they have seen, the chests and the exits
- * on it, and where the hero the view is with is looking. It shows what the level is like at the moment it gets updated.
+ * on it, and where the hero the view is with is looking. The known rooms have buttons to jump to them. It shows what the level is like at the moment it gets updated.
  */
 export default class LevelMap
 {
@@ -56,6 +56,9 @@ export default class LevelMap
 
     /** for whoever owns the sheet, to put things onto it that move along with its corners */
     readonly extras = document.createElement("div")
+
+    /** called with the face of a known room picked on the map to jump to */
+    onJump: ((face: number) => void) | null = null
 
     private readonly canvas = document.createElement("canvas")
     private readonly markers = document.createElement("div")
@@ -81,7 +84,7 @@ export default class LevelMap
      */
     update(state: LevelMapState, maxWidth: number, maxHeight: number): void
     {
-        const { world, slots, floor, exploration, chests, exits, hero } = state
+        const { world, slots, floor, exploration, chests, exits, rooms, hero } = state
 
         // all faces go into the regions, the walls keep the floor from reaching into them
         const centers: number[] = []
@@ -154,6 +157,15 @@ export default class LevelMap
             return elem
         }
         const elements: HTMLElement[] = [
+            ...rooms.map(({ face, x, z }) => {
+                const button = document.createElement("button")
+                button.type = "button"
+                button.className = "marker level-marker room"
+                button.textContent = "✦"
+                button.title = "Go to this room"
+                button.addEventListener("click", () => this.onJump?.(face))
+                return place(button, x, z)
+            }),
             ...chests.filter(({ face }) => exploration.has(face)).map(({ x, z, opened }) =>
                 place(marker(opened ? "chest opened" : "chest", "🧰", opened ? "Opened chest" : "Chest"), x, z)
             ),

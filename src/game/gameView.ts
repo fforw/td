@@ -314,7 +314,12 @@ export default class GameView implements PadTarget
         }
         if (!this.levelMapPopup.hidden)
         {
-            return [{ glyph: "back", label: "Close map" }, { glyph: "menu", label: "Options" }]
+            return [
+                { glyph: "move", label: "Move" },
+                { glyph: "confirm", label: "Go there" },
+                { glyph: "back", label: "Close map" },
+                { glyph: "menu", label: "Options" }
+            ]
         }
         if (!popup.hidden)
         {
@@ -888,6 +893,12 @@ export default class GameView implements PadTarget
             const { target } = job
             const seed = levelSeed(campaign.seed, q, r)
             this.levelMap = new LevelMap(seed)
+            this.levelMap.onJump = face => {
+                if (this.level?.jumpTo(face))
+                {
+                    this.closeLevelMap()
+                }
+            }
             this.level = new LevelScene(
                 seed,
                 (id, face) => {
