@@ -21,9 +21,9 @@ function sizeParam(params: URLSearchParams, name: string, fallback: number): num
  *
  * @param lit   whether to also place and bake the lights of the level
  *
- * @return generated level
+ * @return generated level with its seed, which is random without a parameter for it
  */
-export function loadLevel(lit = false): Promise<DungeonLevel>
+export function loadLevel(lit = false): Promise<{ level: DungeonLevel, seed: number }>
 {
     const params = new URLSearchParams(location.search)
     const seed = randomSeed(params.has("seed") ? Number(params.get("seed")) : null)
@@ -50,6 +50,6 @@ export function loadLevel(lit = false): Promise<DungeonLevel>
             `seed ${seed}, ${width} x ${height} patches, ${faces} faces, ${regions.length} regions, ` +
             `${rooms.length} rooms ${percent(roomFaces)}, ${corridors.length} corridors ${percent(corridorFaces)}` +
             (lighting ? `, ${lighting.lights.length} lights` : "")
-        return level
+        return { level, seed }
     })
 }

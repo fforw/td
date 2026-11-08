@@ -178,7 +178,7 @@ function draw(level: DungeonLevel): void
 }
 
 
-loadLevel().then(level => {
+loadLevel().then(({ level }) => {
     draw(level)
     window.addEventListener("resize", () => draw(level))
 })

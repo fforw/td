@@ -278,4 +278,4 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
-Promise.all([level, loadModels(MEEPLE_MODELS), loadItems()]).then(([level]) => show(level))
+Promise.all([level, loadModels(MEEPLE_MODELS), loadItems()]).then(([{ level }]) => show(level))
