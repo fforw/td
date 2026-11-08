@@ -532,6 +532,18 @@ function forLitTexels(
 const PAIR_CHANCE = 0.4
 
 /**
+ * Least intensity of a light, which scales its color. Each light gets a random one up to 1.
+ */
+export const MIN_INTENSITY = 0.5
+
+function randomColor(index: number): [number, number, number]
+{
+    const intensity = MIN_INTENSITY + rng.next() * (1 - MIN_INTENSITY)
+    const [r, g, b] = LIGHT_COLORS[index]
+    return [r * intensity, g * intensity, b * intensity]
+}
+
+/**
  * Least distance between the ends of a room for two lights in world units. The lights can be closer, to stay clear of walls.
  */
 export const PAIR_SPAN = 2.5
@@ -549,9 +561,9 @@ const PAIR_OFF_AXIS = 0.5
 
 /**
  * Places the lights of a level, the biggest rooms first. A room gets one light in its middle, or two lights in different
- * colors at its opposite ends, which are smaller. Big rooms get big lights. A light gets smaller until it is clear of walls
- * and there is a channel it can have, and a room stays dark if even the smallest light can't. A room that doesn't fit both
- * of its lights at the ends gets one in its middle. Doors count as open.
+ * colors at its opposite ends, which are smaller. Each light gets a random intensity. Big rooms get big lights. A light gets
+ * smaller until it is clear of walls and there is a channel it can have, and a room stays dark if even the smallest light
+ * can't. A room that doesn't fit both of its lights at the ends gets one in its middle. Doors count as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
@@ -644,6 +656,7 @@ export function placeLights(
             const first = rng.nextInt(0, LIGHT_COLORS.length - 1)
             const second = (first + rng.nextInt(1, LIGHT_COLORS.length - 1)) % LIGHT_COLORS.length
             const paired = rng.next() < PAIR_CHANCE
+            const firstColor = randomColor(first), secondColor = randomColor(second)
 
             if (paired && lights.length <= MAX_LIGHTS - 2)
             {
@@ -669,8 +682,8 @@ export function placeLights(
 
                 if (span >= PAIR_SPAN)
                 {
-                    const one = fit(ends[0], span * PAIR_REACH, LIGHT_COLORS[first])
-                    const other = one && fit(ends[1], span * PAIR_REACH, LIGHT_COLORS[second])
+                    const one = fit(ends[0], span * PAIR_REACH, firstColor)
+                    const other = one && fit(ends[1], span * PAIR_REACH, secondColor)
                     if (one && other)
                     {
                         lights.push(one.light, other.light)
@@ -688,7 +701,7 @@ export function placeLights(
 
             centers.sort((a, b) => Math.hypot(a[0] - midX, a[1] - midZ) - Math.hypot(b[0] - midX, b[1] - midZ))
             const [lastX, lastZ] = centers[centers.length - 1]
-            const single = fit(centers, Math.hypot(lastX - midX, lastZ - midZ) * ROOM_REACH, LIGHT_COLORS[first])
+            const single = fit(centers, Math.hypot(lastX - midX, lastZ - midZ) * ROOM_REACH, firstColor)
             if (single)
             {
                 lights.push(single.light)

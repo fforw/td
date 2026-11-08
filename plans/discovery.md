@@ -796,7 +796,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   would look odder than a rim that jumps between lights. Rooms get a light in
   the middle, sized by the room, or, for 40% of the rooms that are long
   enough, two smaller lights in different colors at the ends of their long
-  axis, each on its own half. The biggest rooms come first. A light gets
+  axis, each on its own half. Each light gets a random intensity from 0.5
+  to 1 that scales its color. The biggest rooms come first. A light gets
   smaller until it is clear of walls and finds a free channel, counting
   doors as open. A room whose two lights don't both fit gets one in the
   middle, and rooms where even the smallest light doesn't fit stay dark.

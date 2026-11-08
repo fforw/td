@@ -17,6 +17,7 @@ import {
     MAX_INFLUENCE,
     MAX_LIGHTS,
     MIN_INFLUENCE,
+    MIN_INTENSITY,
     NO_WALL,
     PAIR_SPAN,
     placeLights,
@@ -272,10 +273,14 @@ describe("placeLights", () => {
             assert(lights.length >= 10)
             assert(lights.length <= MAX_LIGHTS)
 
-            // lights of different sizes, and all of them within the limits
+            // lights of different sizes and intensities, and all of them within the limits
             assert(new Set(lights.map(({ reach }) => reach)).size > 1)
-            for (const { x, z, radius, reach } of lights)
+            const intensities = lights.map(({ color }) => Math.max(...color))
+            assert(Math.min(...intensities) < 0.6 && Math.max(...intensities) > 0.9)
+            for (const { x, z, color, radius, reach } of lights)
             {
+                // the brightest channel of the colors is 0.9 to 1
+                assert(Math.max(...color) >= MIN_INTENSITY * 0.9 && Math.max(...color) <= 1)
                 assert(reach >= MIN_INFLUENCE && reach <= MAX_INFLUENCE)
                 assert(radius > 0 && radius <= LIGHT_RADIUS)
                 assert(clearOfWalls(segments, x, z, radius))
