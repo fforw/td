@@ -132,6 +132,16 @@ export const FLICKER_MIN = 0.8
 export const HERO_FLICKER_MIN = 0.55
 
 /**
+ * Seconds for the hero light to burn down from full strength to HERO_OFF
+ */
+export const HERO_BURN_TIME = 60
+
+/**
+ * Strength of the hero light that counts as off
+ */
+export const HERO_OFF = 0.03
+
+/**
  * How fast lights flicker, in radians per second, with how much of the flicker each of the rates has. They have no common
  * multiple, so the flicker doesn't visibly repeat.
  */
@@ -562,19 +572,32 @@ export function hideHeroLight({ uniforms }: LightField): void
 
 
 /**
+ * Returns the strength of a hero light that has been burning for the given time, which goes down by the same factor every
+ * second, so it seems to fade evenly. It is 0 once the light got down to HERO_OFF.
+ *
+ * @param burnt     seconds the light has been on since it was lit
+ */
+export function heroBurn(burnt: number): number
+{
+    return burnt < HERO_BURN_TIME ? HERO_OFF ** (burnt / HERO_BURN_TIME) : 0
+}
+
+
+/**
  * Lets the hero light of the field flicker
  *
  * @param field     light field
  * @param time      time in seconds
+ * @param burn      strength left of the light, see heroBurn()
  */
-export function flickerHeroLight({ uniforms }: LightField, time: number): void
+export function flickerHeroLight({ uniforms }: LightField, time: number, burn = 1): void
 {
     let wave = 0
     for (const [rate, share] of HERO_FLICKER_RATES)
     {
         wave += Math.sin(time * rate) * share
     }
-    uniforms.heroStrength.value = HERO_FLICKER_MIN + (1 - HERO_FLICKER_MIN) * (wave + 1) / 2
+    uniforms.heroStrength.value = (HERO_FLICKER_MIN + (1 - HERO_FLICKER_MIN) * (wave + 1) / 2) * burn
 }
 
 

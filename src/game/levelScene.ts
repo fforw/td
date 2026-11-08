@@ -29,7 +29,7 @@ import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cu
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
-import { flickerHeroLight, flickerLights, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
+import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
 import { createExitMeshes } from "../render/exitMeshes"
 import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
@@ -173,6 +173,8 @@ interface ShownHero
     strikeAt: number | null
     /** has the light on */
     lightOn: boolean
+    /** seconds the light has been on since it was lit, it goes out after HERO_BURN_TIME */
+    lightBurnt: number
     /** face the floor around got visited from last, -1 before */
     visitedFrom: number
 }
@@ -488,6 +490,7 @@ export default class LevelScene
                     hp,
                     strikeAt: null,
                     lightOn: true,
+                    lightBurnt: 0,
                     visitedFrom: -1
                 })
             }
@@ -538,6 +541,7 @@ export default class LevelScene
         if (action === "map")
         {
             hero.lightOn = !hero.lightOn
+            hero.lightBurnt = 0
         }
         else if (action === "confirm")
         {
@@ -928,9 +932,9 @@ export default class LevelScene
     }
 
     /**
-     * Moves the view along with the hero
+     * Moves the view along with the hero, and burns down their light
      */
-    private updateView(time: number): void
+    private updateView(time: number, delta: number): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
         if (!hero)
@@ -953,8 +957,11 @@ export default class LevelScene
         focusAt.copy(position)
         if (hero.lightOn)
         {
+            hero.lightBurnt += delta
+            const burn = heroBurn(hero.lightBurnt)
+            hero.lightOn = burn > 0
             moveHeroLight(meshes!.field, meshes!.segments, position.x, position.z)
-            flickerHeroLight(meshes!.field, time)
+            flickerHeroLight(meshes!.field, time, burn)
         }
         else
         {
@@ -1073,7 +1080,7 @@ export default class LevelScene
             if (level && meshes)
             {
                 this.updateHeroes(time, delta)
-                this.updateView(time)
+                this.updateView(time, delta)
                 flickerLights(meshes.field, level.lighting!.lights, time)
                 updateLightField(this.renderer, meshes.field)
             }

@@ -21,7 +21,9 @@ import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, wa
 import { createLevelMeshes } from "./render/dungeonLevel"
 import {
     discoLights,
+    flickerHeroLight,
     flickerLights,
+    heroBurn,
     hideHeroLight,
     moveHeroLight,
     steadyLights,
@@ -201,7 +203,10 @@ function show(level: DungeonLevel): void
     const heroLight = document.createElement("input")
     heroLight.type = "checkbox"
     heroLight.checked = true
+    // seconds the hero light has been on since it was lit
+    let heroBurnt = 0
     heroLight.addEventListener("change", () => {
+        heroBurnt = 0
         if (!heroLight.checked)
         {
             hideHeroLight(field)
@@ -254,7 +259,15 @@ function show(level: DungeonLevel): void
         const hero = walkers[Math.max(followed, 0)]?.meeple
         if (hero && heroLight.checked)
         {
+            heroBurnt += dt
+            const burn = heroBurn(heroBurnt)
             moveHeroLight(field, segments, hero.position.x, hero.position.z)
+            flickerHeroLight(field, timer.getElapsed(), burn)
+            if (burn === 0)
+            {
+                heroLight.checked = false
+                hideHeroLight(field)
+            }
         }
         if (lightMode === "flicker")
         {

@@ -710,6 +710,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   are for the mouse for now. Cross (the confirm button) opens a chest or takes
   an exit, triangle toggles the light the hero carries, and square opens the
   map of the level, outside of fights. Circle closes it.
+- The light the hero carries burns down in a minute while it is on, losing
+  the same share of its strength every second, and goes out at 3% of it.
+  Turning it on again lights it at full strength.
 - The map of a level (`game/levelMap.ts`) is a sheet of the manuscript map
   over the paused level. Its regions come from one boolean per face: whether a
   hero has been there, run through the marching squares of the overworld map

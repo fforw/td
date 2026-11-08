@@ -2,7 +2,19 @@ import type { WebGLRenderer } from "three"
 import { assert, describe, it } from "vitest"
 
 import { bakeLights, type DungeonLight } from "../../src/map/dungeonLights"
-import { createLightField, discoLights, FLICKER_MIN, flickerHeroLight, flickerLights, HERO_FLICKER_MIN, steadyLights, updateLightField } from "../../src/render/dungeonLighting"
+import {
+    createLightField,
+    discoLights,
+    FLICKER_MIN,
+    flickerHeroLight,
+    flickerLights,
+    HERO_BURN_TIME,
+    HERO_FLICKER_MIN,
+    HERO_OFF,
+    heroBurn,
+    steadyLights,
+    updateLightField
+} from "../../src/render/dungeonLighting"
 
 const LIGHTS: DungeonLight[] = [
     { x: 2, z: 2, color: [1, 0.5, 0], radius: 0.1, reach: 2, channel: 0 },
@@ -77,6 +89,26 @@ describe("flickerHeroLight", () => {
             seen.add(strength)
         }
         assert(seen.size > 100)
+    })
+
+    it("scales its strength by what is left of the light", () => {
+        const { field } = createField()
+        flickerHeroLight(field, 3)
+        const full = field.uniforms.heroStrength.value
+        flickerHeroLight(field, 3, 0.25)
+        assert.closeTo(field.uniforms.heroStrength.value, full * 0.25, 1e-9)
+    })
+})
+
+
+describe("heroBurn", () => {
+    it("fades by the same factor every second from full strength to off", () => {
+        assert.equal(heroBurn(0), 1)
+        assert.closeTo(heroBurn(HERO_BURN_TIME / 2), Math.sqrt(HERO_OFF), 1e-9)
+        assert.closeTo(heroBurn(10) / heroBurn(0), heroBurn(40) / heroBurn(30), 1e-9)
+        assert.closeTo(heroBurn(HERO_BURN_TIME - 1e-6), HERO_OFF, 1e-6)
+        assert.equal(heroBurn(HERO_BURN_TIME), 0)
+        assert.equal(heroBurn(HERO_BURN_TIME * 2), 0)
     })
 })
 
