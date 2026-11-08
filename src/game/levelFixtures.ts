@@ -1,7 +1,7 @@
 import Prando from "prando"
 
 import { faceCenter } from "../map/dungeonLights"
-import { EXIT_HALF_SIZE, findRoomRoles, type LevelExit, placeExits } from "../map/dungeonRoles"
+import { entranceRoom, EXIT_HALF_SIZE, findRoomRoles, type LevelExit, placeExits } from "../map/dungeonRoles"
 import { doorFaces } from "../map/dungeonWays"
 import { setAgainstWall } from "../map/fixtures"
 import type { DungeonLevel } from "../map/generateDungeon"
@@ -42,7 +42,7 @@ export function placeFixtures(
     }
 
     const { depths } = findRoomRoles(rooms, corridors)
-    const taken = new Set(exits.map(({ room }) => room))
+    const taken = new Set([entranceRoom(rooms, corridors), ...exits.map(({ room }) => room)])
     depths.forEach((depth, room) => {
         if (depth === Infinity)
         {

@@ -64,7 +64,7 @@ describe("Ways through dungeon levels", () => {
         for (const seed of [1, 2, 3])
         {
             const { world, slots, rooms, corridors } = level(seed)
-            const entrance = entranceFace(world, { rooms })
+            const entrance = entranceFace(world, { rooms, corridors })
             assert(world.faceType(entrance) === FaceType.PAVED.index)
 
             const floor = [...rooms.flat(), ...corridors.flatMap(({ faces }) => faces)]
@@ -80,8 +80,8 @@ describe("Ways through dungeon levels", () => {
 
     it("never goes through a wall", () => {
 
-        const { world, slots, rooms } = level(1)
-        const faces = findFaces(world, slots, entranceFace(world, { rooms }), rooms[rooms.length - 1][0])!
+        const { world, slots, rooms, corridors } = level(1)
+        const faces = findFaces(world, slots, entranceFace(world, { rooms, corridors }), rooms[rooms.length - 1][0])!
         for (let i = 1; i < faces.length; i++)
         {
             let crossed = false
@@ -100,8 +100,8 @@ describe("Ways through dungeon levels", () => {
 
         for (const seed of [1, 2, 3])
         {
-            const { world, rooms, walls } = level(seed)
-            const face = entranceFace(world, { rooms })
+            const { world, rooms, corridors, walls } = level(seed)
+            const face = entranceFace(world, { rooms, corridors })
             const [x, z] = faceCenter(world, face)
             const spot: FloorSpot = { face, x, z }
             const random = new Prando(seed)
@@ -196,7 +196,7 @@ describe("Ways through dungeon levels", () => {
         for (const seed of [1, 2])
         {
             const { world, rooms, corridors, segments, walls } = level(seed)
-            const entrance = entranceFace(world, { rooms })
+            const entrance = entranceFace(world, { rooms, corridors })
 
             const hops = new Map([[entrance, 0]])
             for (const face of hops.keys())

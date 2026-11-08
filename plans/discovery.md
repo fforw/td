@@ -590,7 +590,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   with `levelSeed()` of its position, 2 x 2 patches of the default style,
   and all a job records is that the hero is inside, the face they last got
   to and that they went in at all. Someone comes in at the middle of the
-  largest room (`entranceFace()`), and leaving means finding an exit (3.3).
+  room at the far end of the main path (`entranceFace()`), and leaving
+  means finding an exit (3.3).
   Outside they wait for orders again, which can be going back in.
 - The view swaps to the level of the hero it follows (`game/levelScene.ts`),
   and back with the view of the castle, while the hero stays inside. That
@@ -698,9 +699,11 @@ Glyphs are built from the stroke data of a source kanji per concept
   (`LevelScene.inFight()`), only once none does. Going to the castle takes
   Escape or the mouse, no controller button, which is a risk on purpose.
 - A hero in a level stays there until they find an exit, or get carried out.
-  There is one at the end of the main path, and with a chance of 20% another on
-  the branch furthest off it (`map/dungeonRoles.ts`, the start of the room roles
-  in 3.4). Both come out at the patch of the level for now, so the side exit is
+  The main exit is in the largest room, the first one, and the entrance is at
+  the far end of the longest way from there, the main path. With a chance of
+  20% there is another exit on the branch furthest off it
+  (`map/dungeonRoles.ts`, the start of the room roles in 3.4). Monsters and
+  chests stay out of the entrance room. Both come out at the patch of the level for now, so the side exit is
   only a shortcut until it can lead somewhere else.
 - While steering a hero, the four buttons on the face of the controller only
   do things in the level, so the overworld map and the way back to the castle

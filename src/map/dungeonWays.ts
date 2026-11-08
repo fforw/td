@@ -1,4 +1,5 @@
 import { faceCenter, SEGMENT_SIZE } from "./dungeonLights"
+import { entranceRoom } from "./dungeonRoles"
 import type { DungeonLevel } from "./generateDungeon"
 import { EdgeType, FaceType } from "./geometry"
 import type PatchWorld from "./PatchWorld"
@@ -29,16 +30,17 @@ const ends = [0, 0, 0, 0]
 
 
 /**
- * Returns the face of a level someone comes in at: the one closest to the middle of its largest room, which is the first
- * to get a light.
+ * Returns the face of a level someone comes in at: the one closest to the middle of its entrance room, the one furthest
+ * from the main exit.
  */
-export function entranceFace(world: PatchWorld, { rooms }: Pick<DungeonLevel, "rooms">): number
+export function entranceFace(world: PatchWorld, { rooms, corridors }: Pick<DungeonLevel, "rooms" | "corridors">): number
 {
-    const centers = rooms[0].map(face => faceCenter(world, face))
+    const room = rooms[entranceRoom(rooms, corridors)]
+    const centers = room.map(face => faceCenter(world, face))
     const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
     const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
     const distances = centers.map(([x, z]) => Math.hypot(x - midX, z - midZ))
-    return rooms[0][distances.indexOf(Math.min(...distances))]
+    return room[distances.indexOf(Math.min(...distances))]
 }
 
 

@@ -277,14 +277,14 @@ describe("Flying eyes", () => {
 
             for (let seed = 0; seed < 20; seed++)
             {
-                const placed = placeEyes(rooms, new Prando(seed))
-                assert(placed.every(({ face }) => face > 3))
+                const placed = placeEyes(rooms, 3, new Prando(seed))
+                assert(placed.every(({ face }) => face < 10 || face > 12))
             }
         })
 
         it("is the same for the same seed", () => {
 
-            assert.deepEqual(placeEyes(rooms, new Prando(7)), placeEyes(rooms, new Prando(7)))
+            assert.deepEqual(placeEyes(rooms, 3, new Prando(7)), placeEyes(rooms, 3, new Prando(7)))
         })
     })
 })

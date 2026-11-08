@@ -29,12 +29,12 @@ function hoard(opened: OpenedChests = {}): ChestHoard
 
 describe("placeChests", () => {
 
-    it("puts a chest into a level even with little luck, never into the first room", () => {
+    it("puts a chest into a level even with little luck, never into a room that is taken", () => {
 
         const rooms = [[0, 1], [10, 11, 12], [20, 21, 22]]
         for (let seed = 0; seed < 50; seed++)
         {
-            const spots = placeChests(rooms, [], inRow, new Prando(seed))
+            const spots = placeChests(rooms, [], inRow, new Prando(seed), new Set([0]))
             assert(spots.length >= 1)
             assert(spots.every(({ face }) => face >= 10))
         }
@@ -50,7 +50,7 @@ describe("placeChests", () => {
 
         for (let seed = 0; seed < 50; seed++)
         {
-            for (const { face } of placeChests([[0], [10, 11, 12, 13, 14, 15]], [inRow(9)], inRow, new Prando(seed)))
+            for (const { face } of placeChests([[0], [10, 11, 12, 13, 14, 15]], [inRow(9)], inRow, new Prando(seed), new Set([0])))
             {
                 assert(face >= 11)
             }
@@ -61,7 +61,7 @@ describe("placeChests", () => {
 
         for (let seed = 0; seed < 50; seed++)
         {
-            const spots = placeChests([[0], [10, 11, 12], [20, 21, 22]], [], inRow, new Prando(seed), new Set([1]))
+            const spots = placeChests([[0], [10, 11, 12], [20, 21, 22]], [], inRow, new Prando(seed), new Set([0, 1]))
             assert(spots.length === 1 && spots[0].face >= 20)
         }
     })

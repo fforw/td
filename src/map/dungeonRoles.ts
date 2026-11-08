@@ -20,7 +20,8 @@ export const EXIT_REACH = 0.6
 
 /**
  * What the connections of the rooms of a level say about them. The rooms and corridors are a tree, with the first room, which
- * has the entrance, as its root.
+ * is the largest and has the main exit, as its root. The heroes come in at the other end of the main path, in the deepest
+ * room.
  */
 export interface RoomRoles
 {
@@ -28,7 +29,7 @@ export interface RoomRoles
     depths: number[]
     /** room each room gets reached through, -1 for the first room and for rooms that can't be reached */
     parents: number[]
-    /** rooms from the first room to the deepest one, in that order */
+    /** rooms from the first room to the deepest one, in that order, so from the main exit to the entrance */
     mainPath: number[]
     /** room furthest off the main path, in steps along the corridors, null if the main path has all rooms */
     farBranch: number | null
@@ -106,8 +107,22 @@ export function findRoomRoles(rooms: readonly (readonly number[])[], corridors: 
 
 
 /**
- * Returns the exits of a level: always one at the end of the main path, which is as far from the entrance as it gets, and
- * sometimes one on the branch furthest off of it.
+ * Returns the room the heroes come in by: the deepest one, at the end of the main path, which is as far from the main exit
+ * in the first room as it gets
+ *
+ * @param rooms     faces of each room of the level
+ * @param corridors corridors between the rooms
+ */
+export function entranceRoom(rooms: readonly (readonly number[])[], corridors: readonly Pick<Corridor, "from" | "to" | "faces">[]): number
+{
+    const { mainPath } = findRoomRoles(rooms, corridors)
+    return mainPath[mainPath.length - 1]
+}
+
+
+/**
+ * Returns the exits of a level: always one in the first room, the largest, at the start of the main path, which is as far
+ * from the entrance as it gets, and sometimes one on the branch furthest off of it.
  *
  * @param rooms     faces of each room of the level
  * @param corridors corridors between the rooms
@@ -129,7 +144,7 @@ export function placeExits(
         // a level can't go without, even if there is no good place
         ...(outerSpot(rooms[room], openings, centerOf, random) ?? clearestSpot(rooms[room], openings, centerOf))
     })
-    const main = exitIn(mainPath[mainPath.length - 1])
+    const main = exitIn(mainPath[0])
     // after the first number, which hardly changes between seeds next to each other
     return farBranch !== null && random.next() < SIDE_EXIT_CHANCE ? [main, exitIn(farBranch)] : [main]
 }

@@ -417,16 +417,16 @@ describe("Acid cuboids", () => {
 
             for (let seed = 0; seed < 20; seed++)
             {
-                const placed = placeCuboids(rooms, new Prando(seed))
+                const placed = placeCuboids(rooms, 3, new Prando(seed))
                 assert(placed.length > 0)
                 assert(new Set(placed.map(({ face }) => Math.ceil(face / 3))).size < rooms.length / 2)
-                assert(placed.every(({ face }) => face > 3))
+                assert(placed.every(({ face }) => face < 10 || face > 12))
             }
         })
 
         it("is the same for the same seed", () => {
 
-            assert.deepEqual(placeCuboids(rooms, new Prando(7)), placeCuboids(rooms, new Prando(7)))
+            assert.deepEqual(placeCuboids(rooms, 3, new Prando(7)), placeCuboids(rooms, 3, new Prando(7)))
         })
 
         it("knows how many there can be at most", () => {

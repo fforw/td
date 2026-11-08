@@ -110,13 +110,13 @@ describe("placeFixtures", () => {
         }
     })
 
-    it("puts an exit at the end of the main path, far from the entrance", () => {
+    it("puts the entrance at the end of the main path, far from the main exit", () => {
 
         for (const seed of SEEDS)
         {
             const { level, world, slots, exits: [exit] } = build(seed)
-            const way = findFaces(world, slots, entranceFace(world, level), exit.face)!
-            const others = level.rooms.map(room => findFaces(world, slots, entranceFace(world, level), room[0])?.length ?? 0)
+            const way = findFaces(world, slots, exit.face, entranceFace(world, level))!
+            const others = level.rooms.map(room => findFaces(world, slots, exit.face, room[0])?.length ?? 0)
             const longer = others.filter(length => length > way.length).length
             assert(longer < others.length / 4, "seed " + seed + ": " + longer + " of " + others.length + " rooms are further")
         }

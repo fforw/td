@@ -14,7 +14,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
-import { EXIT_HALF_SIZE, EXIT_REACH, type LevelExit } from "../map/dungeonRoles"
+import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, type LevelExit } from "../map/dungeonRoles"
 import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
@@ -396,8 +396,9 @@ export default class LevelScene
         return [spot.x, spot.z]
     }
 
-    private addMonsters({ rooms }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
+    private addMonsters({ rooms, corridors }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
     {
+        const entrance = entranceRoom(rooms, corridors)
         const walls = this.solidWalls!
         const seeing = this.floorWalls!
         const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
@@ -409,7 +410,7 @@ export default class LevelScene
         const random = new Prando(seed)
 
         const cuboids = new CuboidPack(floor)
-        const placed = placeCuboids(rooms, random)
+        const placed = placeCuboids(rooms, entrance, random)
         for (const { face, kind } of placed)
         {
             const [x, z] = faceCenter(world, face)
@@ -421,7 +422,7 @@ export default class LevelScene
         this.cuboidCrowd = cuboidCrowd
 
         const eyes = new EyePack(floor)
-        const eyesPlaced = placeEyes(rooms, random)
+        const eyesPlaced = placeEyes(rooms, entrance, random)
         for (const { face, kind } of eyesPlaced)
         {
             const [x, z] = faceCenter(world, face)

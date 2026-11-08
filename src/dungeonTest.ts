@@ -224,9 +224,9 @@ function draw(level: DungeonLevel, roles: RoomRoles, fixtures: Fixtures): (x: nu
         }
     }
 
-    // room numbers on a disc colored by role, room 1 grew out of the largest region and has the entrance. Rooms that can't
-    // be reached have their floor in the color of the role instead.
-    const last = roles.mainPath[roles.mainPath.length - 1]
+    // room numbers on a disc colored by role, room 1 grew out of the largest region and has the main exit, the entrance is
+    // at the other end of the main path. Rooms that can't be reached have their floor in the color of the role instead.
+    const entrance = roles.mainPath[roles.mainPath.length - 1]
     ctx.font = "bold 12px monospace"
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
@@ -237,7 +237,7 @@ function draw(level: DungeonLevel, roles: RoomRoles, fixtures: Fixtures): (x: nu
         }
         ctx.beginPath()
         ctx.arc(x, y, MARK_RADIUS, 0, Math.PI * 2)
-        ctx.fillStyle = room === 0 ? ENTRANCE_COLOR : room === last ? EXIT_COLOR :
+        ctx.fillStyle = room === entrance ? ENTRANCE_COLOR : room === 0 ? EXIT_COLOR :
             roles.mainPath.includes(room) ? MAIN_PATH_COLOR : ROOM_MARK_COLOR
         ctx.fill()
         ctx.strokeStyle = LABEL_COLOR
@@ -321,11 +321,11 @@ function describeRoom({ rooms, corridors }: DungeonLevel, roles: RoomRoles, { ex
     }
     else
     {
-        lines.push(`depth ${depths[room].toFixed(1)}` + (room === 0 ? ", entrance" : `, reached from room ${parents[room] + 1}`))
-        const step = mainPath.indexOf(room)
-        if (step >= 0)
+        lines.push(`${depths[room].toFixed(1)} from the main exit` + (room === 0 ? ", largest room" : `, on the way through room ${parents[room] + 1}`))
+        const step = mainPath.length - 1 - mainPath.indexOf(room)
+        if (step < mainPath.length)
         {
-            lines.push(`main path, step ${step + 1} of ${mainPath.length}` + (step === mainPath.length - 1 ? ", the deepest room" : ""))
+            lines.push(`main path, step ${step + 1} of ${mainPath.length}` + (step === 0 ? ", entrance" : ""))
         }
         else
         {
@@ -347,7 +347,7 @@ function describeRoom({ rooms, corridors }: DungeonLevel, roles: RoomRoles, { ex
     const children = parents.flatMap((parent, child) => parent === room ? [child + 1] : [])
     if (children.length > 0)
     {
-        lines.push("leads on to " + children.join(", "))
+        lines.push("further from the exit: " + children.join(", "))
     }
 
     exits.forEach((exit, i) => {

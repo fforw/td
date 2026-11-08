@@ -1,7 +1,7 @@
 import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
-import { findRoomRoles, placeExits, SIDE_EXIT_CHANCE } from "../../src/map/dungeonRoles"
+import { entranceRoom, findRoomRoles, placeExits, SIDE_EXIT_CHANCE } from "../../src/map/dungeonRoles"
 
 const inRow = (face: number): number[] => [face, 0]
 
@@ -13,7 +13,7 @@ const roomsOf = (count: number): number[][] => Array.from({ length: count }, (_,
 const corridor = (from: number, to: number, length: number) => ({ from, to, faces: Array.from({ length }, (_, i) => 1000 + from * 100 + i) })
 
 /**
- *      0 - 1 - 2 - 3 (end of the main path)
+ *      0 (main exit) - 1 - 2 - 3 (end of the main path, entrance)
  *          |
  *          4 - 5
  */
@@ -53,15 +53,25 @@ describe("findRoomRoles", () => {
 })
 
 
+describe("entranceRoom", () => {
+
+    it("is at the end of the main path, as far from the main exit as it gets", () => {
+
+        assert.equal(entranceRoom(roomsOf(6), BRANCHED), 3)
+        assert.equal(entranceRoom(roomsOf(1), []), 0)
+    })
+})
+
+
 describe("placeExits", () => {
 
     const exitsOf = (seed: number) => placeExits(roomsOf(6), BRANCHED, [], inRow, new Prando(seed))
 
-    it("always has an exit at the end of the main path", () => {
+    it("always has an exit in the first room, at the start of the main path", () => {
 
         for (let seed = 0; seed < 100; seed++)
         {
-            assert.equal(exitsOf(seed)[0].room, 3)
+            assert.equal(exitsOf(seed)[0].room, 0)
         }
     })
 
@@ -88,8 +98,8 @@ describe("placeExits", () => {
 
     it("still has an exit if all of the room is close to an opening, as far from it as it gets", () => {
 
-        const [exit] = placeExits([[0, 1], [10, 11]], [{ from: 0, to: 1, faces: [] }], [inRow(10)], inRow, new Prando(1))
-        assert.equal(exit.room, 1)
-        assert.equal(exit.face, 11)
+        const [exit] = placeExits([[0, 1], [10, 11]], [{ from: 0, to: 1, faces: [] }], [inRow(1)], inRow, new Prando(1))
+        assert.equal(exit.room, 0)
+        assert.equal(exit.face, 0)
     })
 })

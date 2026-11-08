@@ -141,15 +141,15 @@ export interface Cuboid extends Monster
 
 
 /**
- * Returns who goes where in a level: one big cuboid or a few small ones in some of the rooms, but not the first, which the heroes
- * come in by
+ * Returns who goes where in a level: one big cuboid or a few small ones in some of the rooms, but not the one the heroes come in by
  *
  * @param rooms     faces of each room of the level
+ * @param entrance  index of the room the heroes come in by
  * @param random    random numbers, for the same level to always have the same cuboids
  */
-export function placeCuboids(rooms: readonly (readonly number[])[], random: Prando): { face: number, kind: CuboidKind }[]
+export function placeCuboids(rooms: readonly (readonly number[])[], entrance: number, random: Prando): { face: number, kind: CuboidKind }[]
 {
-    return rooms.slice(1).filter(() => random.next() < ROOMS_TAKEN).flatMap(room => {
+    return rooms.filter((_, index) => index !== entrance).filter(() => random.next() < ROOMS_TAKEN).flatMap(room => {
         const big = random.next() < 0.5
         return Array.from({ length: big ? 1 : random.nextInt(1, 3) }, () => ({
             face: room[random.nextInt(0, room.length - 1)],

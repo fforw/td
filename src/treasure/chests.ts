@@ -135,14 +135,14 @@ export interface CoinPose
 
 
 /**
- * Returns where the chests of a level stand: in some of the rooms other than the first, which is the way in, in the outer part
- * of the room looking toward its middle.
+ * Returns where the chests of a level stand: in some of the rooms that aren't taken, in the outer part of the room looking
+ * toward its middle.
  *
  * @param rooms     faces of each room of the level
  * @param openings  centers of the faces to stay away from
  * @param centerOf  returns the center of a face in world units
  * @param random    random numbers, for the same level to always have the same chests
- * @param taken     rooms to leave out, with something else in them or out of reach
+ * @param taken     rooms to leave out, like the way in, those with something else in them and those out of reach
  */
 export function placeChests(
     rooms: readonly (readonly number[])[],
@@ -152,7 +152,7 @@ export function placeChests(
     taken: ReadonlySet<number> = new Set()
 ): ChestSpot[]
 {
-    const free = rooms.map((_, index) => index).filter(index => index > 0 && !taken.has(index))
+    const free = rooms.map((_, index) => index).filter(index => !taken.has(index))
     const sure = free.length > 0 ? free[random.nextInt(0, free.length - 1)] : -1
     return free.flatMap(index => {
         if (index !== sure && random.next() >= ROOMS_TAKEN)

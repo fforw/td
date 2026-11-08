@@ -148,14 +148,15 @@ export interface Spark
 
 
 /**
- * Returns who goes where in a level: one eye in a few rooms, sometimes two, but not the first, which the heroes come in by
+ * Returns who goes where in a level: one eye in a few rooms, sometimes two, but not the one the heroes come in by
  *
  * @param rooms     faces of each room of the level
+ * @param entrance  index of the room the heroes come in by
  * @param random    random numbers, for the same level to always have the same eyes
  */
-export function placeEyes(rooms: readonly (readonly number[])[], random: Prando): { face: number, kind: EyeKind }[]
+export function placeEyes(rooms: readonly (readonly number[])[], entrance: number, random: Prando): { face: number, kind: EyeKind }[]
 {
-    return rooms.slice(1).filter(() => random.next() < ROOMS_TAKEN).flatMap(room =>
+    return rooms.filter((_, index) => index !== entrance).filter(() => random.next() < ROOMS_TAKEN).flatMap(room =>
         Array.from({ length: random.next() < PAIRS ? 2 : 1 }, () => ({
             face: room[random.nextInt(0, room.length - 1)],
             kind: FLYING_EYE
