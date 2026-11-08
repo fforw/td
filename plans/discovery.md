@@ -785,8 +785,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   they are. RGBA8 needs no extension to render to, which keeps weak devices
   in. Lights in one channel never meet. The field has 12 texels per world
   unit, which is what keeps shadows from getting blocky near the ends of
-  walls. Most of the 30 or so lights on 2 x 2 patches fit in 3 channels, and
-  placing and baking them takes about 0.55 s in the worker. A changed wall
+  walls. The 125 or so lights on 2 x 2 patches need all 4 channels, and
+  placing and baking 30 of them took about 0.55 s in the worker. A changed wall
   means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
   reach up to twice as far. Not done yet.
 - A meeple gets a rim instead of its outline only where it stands in the
@@ -794,9 +794,12 @@ Glyphs are built from the stroke data of a source kanji per concept
   follows the light with the most energy at a point, with its own direction
   and hue, which the field pass keeps in 2 more textures. Two rims at once
   would look odder than a rim that jumps between lights. Rooms get a light in
-  the middle, the biggest ones first, sized by the room. A light gets
+  the middle, sized by the room, or, for 40% of the rooms that are long
+  enough, two smaller lights in different colors at the ends of their long
+  axis, each on its own half. The biggest rooms come first. A light gets
   smaller until it is clear of walls and finds a free channel, counting
-  doors as open. Rooms where even the smallest light doesn't fit stay dark.
+  doors as open. A room whose two lights don't both fit gets one in the
+  middle, and rooms where even the smallest light doesn't fit stay dark.
   Where a rim shows goes by the lights at full strength, and its brightness
   follows their strength, so changing lights don't make rims come and go.
   Meeples have no shadows in levels yet.

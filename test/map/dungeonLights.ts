@@ -4,6 +4,7 @@ import {
     bakeLights,
     castWallDistances,
     createLightView,
+    faceCenter,
     findWallSegments,
     levelBounds,
     LIGHT_CHANNELS,
@@ -17,6 +18,7 @@ import {
     MAX_LIGHTS,
     MIN_INFLUENCE,
     NO_WALL,
+    PAIR_SPAN,
     placeLights,
     WALL_CLEARANCE
 } from "../../src/map/dungeonLights"
@@ -262,7 +264,7 @@ describe("findWallSegments", () => {
 
 
 describe("placeLights", () => {
-    it("keeps lights away from walls", { timeout: 30000 }, () => {
+    it("keeps lights away from walls, with one in the middle or two at the ends of a room", { timeout: 30000 }, () => {
         for (const seed of [4711, 12345])
         {
             const { level, world, segments, bounds } = connect(seed)
@@ -278,6 +280,32 @@ describe("placeLights", () => {
                 assert(radius > 0 && radius <= LIGHT_RADIUS)
                 assert(clearOfWalls(segments, x, z, radius))
             }
+
+            // lights are on face centers, which tells their room
+            const rooms = new Map<number, typeof lights>()
+            for (const light of lights)
+            {
+                const room = level.rooms.findIndex(faces => faces.some(face => {
+                    const [x, z] = faceCenter(world, face)
+                    return Math.hypot(x - light.x, z - light.z) < 1e-9
+                }))
+                assert(room >= 0)
+                rooms.set(room, [...rooms.get(room) ?? [], light])
+            }
+            let pairs = 0
+            for (const inRoom of rooms.values())
+            {
+                assert(inRoom.length <= 2)
+                if (inRoom.length === 2)
+                {
+                    const [a, b] = inRoom
+                    assert.notDeepEqual(a.color, b.color)
+                    // they can move in from the ends to stay clear of walls
+                    assert(Math.hypot(a.x - b.x, a.z - b.z) >= PAIR_SPAN / 2)
+                    pairs++
+                }
+            }
+            assert(pairs > 0 && pairs < rooms.size)
         }
     })
 

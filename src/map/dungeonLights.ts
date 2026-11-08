@@ -527,9 +527,31 @@ function forLitTexels(
 
 
 /**
- * Places up to one light in the middle of each room, the biggest rooms first. Big rooms get big lights. The light of a room
- * gets smaller until it is clear of walls and there is a channel it can have, and the room stays dark if even the smallest
- * light can't. Doors count as open.
+ * Share of the rooms long enough for it that get two smaller lights at their ends instead of one in their middle
+ */
+const PAIR_CHANCE = 0.4
+
+/**
+ * Least distance between the ends of a room for two lights in world units. The lights can be closer, to stay clear of walls.
+ */
+export const PAIR_SPAN = 2.5
+
+/**
+ * Reach of each of the two lights of a room as a multiple of the distance between them, so they meet in the middle
+ */
+const PAIR_REACH = 0.75
+
+/**
+ * How much being off the long axis of a room counts against a place for a light at one of its ends, against being further out
+ */
+const PAIR_OFF_AXIS = 0.5
+
+
+/**
+ * Places the lights of a level, the biggest rooms first. A room gets one light in its middle, or two lights in different
+ * colors at its opposite ends, which are smaller. Big rooms get big lights. A light gets smaller until it is clear of walls
+ * and there is a channel it can have, and a room stays dark if even the smallest light can't. A room that doesn't fit both
+ * of its lights at the ends gets one in its middle. Doors count as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
@@ -552,29 +574,21 @@ export function placeLights(
         // per texel one bit for each channel that is taken
         const taken = new Uint8Array(width * fieldHeight(bounds))
 
-        for (const room of [...rooms].sort((a, b) => b.length - a.length))
-        {
-            if (lights.length === MAX_LIGHTS)
-            {
-                break
-            }
-
-            const centers = room.map(face => faceCenter(world, face))
-            const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
-            const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
-
-            centers.sort((a, b) => Math.hypot(a[0] - midX, a[1] - midZ) - Math.hypot(b[0] - midX, b[1] - midZ))
-            const [lastX, lastZ] = centers[centers.length - 1]
-            const roomReach = Math.hypot(lastX - midX, lastZ - midZ) * ROOM_REACH
-
+        /**
+         * Places a light at the first of the given places that keeps it clear of walls, as big as it fits up to the given
+         * reach, and takes its channel
+         *
+         * @return the light with the texels it has a share in, or null if none fits
+         */
+        const fit = (places: [number, number][], startReach: number, color: [number, number, number]) => {
             for (
-                let reach = Math.max(MIN_INFLUENCE, Math.min(MAX_INFLUENCE, roomReach));
+                let reach = Math.max(MIN_INFLUENCE, Math.min(MAX_INFLUENCE, startReach));
                 reach >= MIN_INFLUENCE;
                 reach *= LIGHT_SHRINK
             )
             {
                 const radius = LIGHT_RADIUS * reach / MAX_INFLUENCE
-                const center = centers.find(([x, z]) => {
+                const place = places.find(([x, z]) => {
                     for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
                     {
                         if (segmentDistance(segments, s, x, z) <= radius)
@@ -584,12 +598,12 @@ export function placeLights(
                     }
                     return true
                 })
-                if (!center)
+                if (!place)
                 {
                     continue
                 }
 
-                const [x, z] = center
+                const [x, z] = place
                 const view = createLightView(x, z, segments, radius, reach)
                 const texels: number[] = []
                 forLitTexels(view, segments, bounds, (tx, tz) => texels.push(tz * width + tx))
@@ -611,9 +625,73 @@ export function placeLights(
                 {
                     taken[i] |= 1 << channel
                 }
+                return { light: { x, z, color, radius, reach, channel }, texels }
+            }
+            return null
+        }
 
-                lights.push({ x, z, color: LIGHT_COLORS[rng.nextInt(0, LIGHT_COLORS.length - 1)], radius, reach, channel })
+        for (const room of [...rooms].sort((a, b) => b.length - a.length))
+        {
+            if (lights.length === MAX_LIGHTS)
+            {
                 break
+            }
+
+            const centers = room.map(face => faceCenter(world, face))
+            const midX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
+            const midZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
+
+            const first = rng.nextInt(0, LIGHT_COLORS.length - 1)
+            const second = (first + rng.nextInt(1, LIGHT_COLORS.length - 1)) % LIGHT_COLORS.length
+            const paired = rng.next() < PAIR_CHANCE
+
+            if (paired && lights.length <= MAX_LIGHTS - 2)
+            {
+                // long axis of the room, from the spread of its faces
+                let xx = 0, xz = 0, zz = 0
+                for (const [x, z] of centers)
+                {
+                    xx += (x - midX) * (x - midX)
+                    xz += (x - midX) * (z - midZ)
+                    zz += (z - midZ) * (z - midZ)
+                }
+                const angle = Math.atan2(2 * xz, xx - zz) / 2
+                const ax = Math.cos(angle), az = Math.sin(angle)
+                const score = ([x, z]: [number, number], side: number) =>
+                    -side * ((x - midX) * ax + (z - midZ) * az) + PAIR_OFF_AXIS * Math.abs((x - midX) * az - (z - midZ) * ax)
+                // each light stays on its own half of the room
+                const ends = [1, -1].map(side => centers
+                    .filter(([x, z]) => side * ((x - midX) * ax + (z - midZ) * az) > 0)
+                    .sort((a, b) => score(a, side) - score(b, side)))
+                const span = ends[0].length && ends[1].length
+                    ? Math.hypot(ends[0][0][0] - ends[1][0][0], ends[0][0][1] - ends[1][0][1])
+                    : 0
+
+                if (span >= PAIR_SPAN)
+                {
+                    const one = fit(ends[0], span * PAIR_REACH, LIGHT_COLORS[first])
+                    const other = one && fit(ends[1], span * PAIR_REACH, LIGHT_COLORS[second])
+                    if (one && other)
+                    {
+                        lights.push(one.light, other.light)
+                        continue
+                    }
+                    if (one)
+                    {
+                        for (const i of one.texels)
+                        {
+                            taken[i] &= ~(1 << one.light.channel)
+                        }
+                    }
+                }
+            }
+
+            centers.sort((a, b) => Math.hypot(a[0] - midX, a[1] - midZ) - Math.hypot(b[0] - midX, b[1] - midZ))
+            const [lastX, lastZ] = centers[centers.length - 1]
+            const single = fit(centers, Math.hypot(lastX - midX, lastZ - midZ) * ROOM_REACH, LIGHT_COLORS[first])
+            if (single)
+            {
+                lights.push(single.light)
             }
         }
         return lights
