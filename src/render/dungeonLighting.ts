@@ -163,23 +163,44 @@ const DISCO_BPM = 60
 const NO_HERO = 1e6
 
 /**
- * Looks up the color of all lights at a position, and their energy and the sum of their directions as if they were at full
- * strength, with how strong they are at the moment. That way, where a rim shows doesn't change with the strength of the lights.
+ * Looks up the color of all lights at a position, with their energy and the sum of their directions as if they were at full
+ * strength. readRim() looks up the direction and hue of the strongest of them at full strength, with how strong it is at the
+ * moment. That way, where a rim shows doesn't change with the strength of the lights, and meeples get one rim, not one per
+ * light.
  */
 const PARS = /* glsl */`
     uniform sampler2D lightColors;
     uniform sampler2D lightDirections;
+    uniform sampler2D lightRims;
+    uniform sampler2D lightRimColors;
     uniform vec2 lightOrigin;
     uniform vec2 lightSize;
 
-    void readLights(vec2 position, out vec4 field, out vec2 fieldDirection, out float fieldStrength)
+    vec2 lightUv(vec2 position)
     {
-        vec2 uv = (position - lightOrigin) / lightSize;
+        return (position - lightOrigin) / lightSize;
+    }
+
+    vec2 decodeDirection(vec4 direction)
+    {
+        return (direction.xy * 2.0 - 1.0) * direction.z * direction.z * ${FIELD_RANGE.toFixed(1)};
+    }
+
+    void readLights(vec2 position, out vec4 field, out vec2 fieldDirection)
+    {
+        vec2 uv = lightUv(position);
         field = texture2D(lightColors, uv);
         field *= field * ${FIELD_RANGE.toFixed(1)};
-        vec4 direction = texture2D(lightDirections, uv);
-        fieldDirection = (direction.xy * 2.0 - 1.0) * direction.z * direction.z * ${FIELD_RANGE.toFixed(1)};
-        fieldStrength = direction.a;
+        fieldDirection = decodeDirection(texture2D(lightDirections, uv));
+    }
+
+    void readRim(vec2 position, out vec2 rimDirection, out vec3 rimHue, out float rimStrength)
+    {
+        vec2 uv = lightUv(position);
+        vec4 rim = texture2D(lightRims, uv);
+        rimDirection = decodeDirection(rim);
+        rimStrength = rim.a;
+        rimHue = texture2D(lightRimColors, uv).rgb;
     }
 `
 
@@ -198,6 +219,14 @@ const FIELD_PASS = /* glsl */`
 
     layout(location = 0) out vec4 outColor;
     layout(location = 1) out vec4 outDirection;
+    layout(location = 2) out vec4 outRim;
+    layout(location = 3) out vec4 outRimColor;
+
+    vec4 encodeDirection(vec2 direction)
+    {
+        float own = length(direction);
+        return vec4(direction / max(own, 1e-5) * 0.5 + 0.5, sqrt(min(own / ${FIELD_RANGE.toFixed(1)}, 1.0)), 0.0);
+    }
 
     void main()
     {
@@ -208,7 +237,11 @@ const FIELD_PASS = /* glsl */`
 
         vec4 field = vec4(0.0);
         vec2 direction = vec2(0.0);
-        float strength = 0.0;
+
+        // the light with the most energy at full strength
+        float rimEnergy = 0.0;
+        vec2 rimDirection = vec2(0.0);
+        vec4 rimLight = vec4(1.0);
         for (int i = 0; i < ${LIGHT_CHANNELS}; i++)
         {
             if (visibility[i] > 0.0)
@@ -225,16 +258,24 @@ const FIELD_PASS = /* glsl */`
                     float fade = left * left / (2.0 * radius) * visibility[i];
                     float near = d > radius ? radius / d : d / radius;
                     float energy = (d > radius ? 2.0 * asin(radius / d) : ${Math.PI.toFixed(6)}) * fade;
+                    vec2 own = toLight / max(d, 1e-5) * 2.0 * near * fade;
                     field += vec4(light.rgb, 1.0) * energy;
-                    direction += toLight / max(d, 1e-5) * 2.0 * near * fade;
-                    strength += light.a * energy;
+                    direction += own;
+                    if (energy > rimEnergy)
+                    {
+                        rimEnergy = energy;
+                        rimDirection = own;
+                        rimLight = light;
+                    }
                 }
             }
         }
 
-        float own = length(direction);
         outColor = sqrt(min(field / ${FIELD_RANGE.toFixed(1)}, vec4(1.0)));
-        outDirection = vec4(direction / max(own, 1e-5) * 0.5 + 0.5, sqrt(min(own / ${FIELD_RANGE.toFixed(1)}, 1.0)), field.a > 0.0 ? strength / field.a : 1.0);
+        outDirection = encodeDirection(direction);
+        outRim = encodeDirection(rimDirection);
+        outRim.a = rimLight.a;
+        outRimColor = vec4(rimLight.rgb / max(max(rimLight.r, max(rimLight.g, rimLight.b)), 1e-4), 1.0);
     }
 `
 
@@ -360,6 +401,8 @@ export interface LightField
         lightData: { value: DataTexture }
         lightColors: { value: Texture }
         lightDirections: { value: Texture }
+        lightRims: { value: Texture }
+        lightRimColors: { value: Texture }
         lightWalls: { value: DataTexture }
         lightOrigin: { value: Vector2 }
         lightSize: { value: Vector2 }
@@ -418,7 +461,7 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
     dataTexture.needsUpdate = true
 
     const target = new WebGLRenderTarget(width, height, {
-        count: 2,
+        count: 4,
         minFilter: LinearFilter,
         magFilter: LinearFilter,
         depthBuffer: false
@@ -430,6 +473,8 @@ export function createLightField({ lights, minX, minZ, width, height, visibility
         lightData: { value: dataTexture },
         lightColors: { value: target.textures[0] },
         lightDirections: { value: target.textures[1] },
+        lightRims: { value: target.textures[2] },
+        lightRimColors: { value: target.textures[3] },
         lightWalls: { value: wallTexture },
         lightOrigin: { value: new Vector2(minX, minZ) },
         lightSize: { value: new Vector2(width / LIGHT_TEXELS, height / LIGHT_TEXELS) },
@@ -660,8 +705,7 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
                     {
                         vec4 field;
                         vec2 toLight;
-                        float fieldStrength;
-                        readLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight, fieldStrength);
+                        readLights(stayOnSide(vLightPosition + worldNormal.xz * ${NORMAL_OFFSET.toFixed(3)}), field, toLight);
                         toLight /= max(length(toLight), 0.02);
                         vec3 worldDirection = normalize(vec3(toLight.x, ${LIGHT_ELEVATION.toFixed(3)}, toLight.y));
 
@@ -692,8 +736,8 @@ export function applyLightField(material: Material, { uniforms }: LightField, fl
 
 
 /**
- * Makes the given outline material turn into a rim on the side a light comes from, where its meeple stands in the dark and
- * the light still reaches it. It replaces what the material does with its shape.
+ * Makes the given outline material turn into a rim on the side the strongest light comes from, where its meeple stands in the
+ * dark and the light still reaches it. It replaces what the material does with its shape.
  *
  * @param material      material of the hull around a part
  * @param field         light field
@@ -709,17 +753,19 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
             .replace("#include <begin_vertex>", /* glsl */`
                 #include <begin_vertex>
                 mat4 rimMatrix = modelMatrix * instanceMatrix;
+                vec2 rimPosition = (rimMatrix * vec4(transformed, 1.0)).xz;
                 vec4 rimField;
                 vec2 rimDirection;
+                vec3 rimHue;
                 float rimStrength;
-                readLights((rimMatrix * vec4(transformed, 1.0)).xz, rimField, rimDirection, rimStrength);
+                readLights(rimPosition, rimField, rimDirection);
+                readRim(rimPosition, rimDirection, rimHue, rimStrength);
                 float rimOwn = length(rimDirection);
 
                 vRim = rimStrength * smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)
                     * (1.0 - smoothstep(${RIM_GATE_START.toFixed(3)}, ${RIM_GATE_END.toFixed(3)}, rimField.a))
                     * smoothstep(0.0, 0.7, dot(normalize(mat3(rimMatrix) * normal).xz, rimDirection / max(rimOwn, 1e-4)));
 
-                vec3 rimHue = rimField.rgb / max(max(rimField.r, max(rimField.g, rimField.b)), 1e-4);
                 vRimColor = mix(rimHue, vec3(1.0), ${RIM_PALE.toFixed(3)}) * ${RIM_BRIGHTNESS.toFixed(3)};
 
                 transformed += normal * ${outline.toFixed(4)} * (1.0 + vRim * ${RIM_WIDEN.toFixed(3)});

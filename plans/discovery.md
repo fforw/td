@@ -780,7 +780,7 @@ Glyphs are built from the stroke data of a source kanji per concept
   walls, so 2D is right for the floor. The field only keeps the share of a
   light that the walls leave, per texel in up to 4 channels with an id for
   each. Whenever lights change, a pass works out the rest from the distance
-  to the light into 2 RGBA8 textures that everything looks up, so lights can
+  to the light into 4 RGBA8 textures that everything looks up, so lights can
   flicker and change color without baking, but their shadows stay where
   they are. RGBA8 needs no extension to render to, which keeps weak devices
   in. Lights in one channel never meet. The field has 12 texels per world
@@ -790,14 +790,18 @@ Glyphs are built from the stroke data of a source kanji per concept
   means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
   reach up to twice as far. Not done yet.
 - A meeple gets a rim instead of its outline only where it stands in the
-  dark and a light still reaches it, so not close to a light. Rooms get a
-  light in the middle, the biggest ones first, sized by the room. A light
-  gets smaller until a meeple can't get rims from two lights at the same
-  point, which depends on their reach (`rimLimit()`) and on the walls
-  between them, counting doors as open. It also has to find a free channel.
-  Rooms where even the smallest light doesn't fit stay dark. Where a rim
-  shows goes by the lights at full strength, and its brightness follows
-  their strength, so changing lights don't make rims come and go. Meeples have no shadows in levels yet.
+  dark and a light still reaches it, so not close to a light. The rim only
+  follows the light with the most energy at a point, with its own direction
+  and hue, which the field pass keeps in 2 more textures. Two rims at once
+  would look odder than a rim that jumps between lights. Rooms get a light in
+  the middle, the biggest ones first, sized by the room. A light gets
+  smaller until a meeple can't get rims from two lights at the same point,
+  which depends on their reach (`rimLimit()`) and on the walls between
+  them, counting doors as open. It also has to find a free channel. Rooms
+  where even the smallest light doesn't fit stay dark.
+  Where a rim shows goes by the lights at full strength, and its brightness
+  follows their strength, so changing lights don't make rims come and go.
+  Meeples have no shadows in levels yet.
 - Four quads around a vertex aren't a classification, 77% of the vertices
   have that. Inside a room such a block is a spot for a 2 x 2 fixture.
 - Room graph roles from structure: entrance, approach, branches, climax
