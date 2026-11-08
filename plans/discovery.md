@@ -812,6 +812,7 @@ Glyphs are built from the stroke data of a source kanji per concept
   smaller until it is clear of walls and finds a free channel, counting
   doors as open. A room whose two lights don't both fit gets one in the
   middle, and rooms where even the smallest light doesn't fit stay dark.
+  5% of the rooms stay dark on purpose.
   Where a rim shows goes by the lights at full strength, and its brightness
   follows their strength, so changing lights don't make rims come and go.
   Meeples have no shadows in levels yet.

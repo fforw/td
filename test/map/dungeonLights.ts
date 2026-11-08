@@ -311,6 +311,10 @@ describe("placeLights", () => {
                 }
             }
             assert(pairs > 0 && pairs < rooms.size)
+
+            // a few rooms stay dark on purpose, and some more if no light fits them
+            const dark = level.rooms.length - rooms.size
+            assert(dark >= 1 && dark <= level.rooms.length * 0.15, `${dark} of ${level.rooms.length} rooms dark`)
         }
     })
 

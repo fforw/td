@@ -532,6 +532,11 @@ function forLitTexels(
 const PAIR_CHANCE = 0.4
 
 /**
+ * Share of the rooms that stay dark on purpose
+ */
+export const DARK_CHANCE = 0.05
+
+/**
  * Least intensity of a light, which scales its color. Each light gets a random one up to 1.
  */
 export const MIN_INTENSITY = 0.5
@@ -560,10 +565,11 @@ const PAIR_OFF_AXIS = 0.5
 
 
 /**
- * Places the lights of a level, the biggest rooms first. A room gets one light in its middle, or two lights in different
- * colors at its opposite ends, which are smaller. Each light gets a random intensity. Big rooms get big lights. A light gets
- * smaller until it is clear of walls and there is a channel it can have, and a room stays dark if even the smallest light
- * can't. A room that doesn't fit both of its lights at the ends gets one in its middle. Doors count as open.
+ * Places the lights of a level, the biggest rooms first. A few rooms stay dark. The others get one light in their middle, or
+ * two lights in different colors at their opposite ends, which are smaller. Each light gets a random intensity. Big rooms get
+ * big lights. A light gets smaller until it is clear of walls and there is a channel it can have, and a room stays dark if
+ * even the smallest light can't. A room that doesn't fit both of its lights at the ends gets one in its middle. Doors count
+ * as open.
  *
  * @param seed      seed of the level
  * @param world     world with all patches of the level
@@ -657,6 +663,10 @@ export function placeLights(
             const second = (first + rng.nextInt(1, LIGHT_COLORS.length - 1)) % LIGHT_COLORS.length
             const paired = rng.next() < PAIR_CHANCE
             const firstColor = randomColor(first), secondColor = randomColor(second)
+            if (rng.next() < DARK_CHANCE)
+            {
+                continue
+            }
 
             if (paired && lights.length <= MAX_LIGHTS - 2)
             {
