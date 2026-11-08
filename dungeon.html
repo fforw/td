@@ -19,6 +19,17 @@
             font-size: 0.8rem;
         }
 
+        #params
+        {
+            margin: 4px 0;
+        }
+
+        #params input[type=number]
+        {
+            width: 4em;
+            margin-right: 0.6em;
+        }
+
         #legend span
         {
             display: inline-block;
@@ -57,6 +68,14 @@
 <div id="ui">
     <span id="info"></span>
     <button id="new-seed" type="button">new seed</button>
+    <form id="params">
+        <input name="seed" type="hidden">
+        <label>width <input name="width" type="number" min="1" step="1"></label>
+        <label>height <input name="height" type="number" min="1" step="1"></label>
+        <label>floor share <input name="floor" type="number" min="0.4" max="1" step="0.05"></label>
+        <label>labyrinth <input name="labyrinth" type="number" min="0" step="0.5"></label>
+        <button type="submit">update</button>
+    </form>
     <div id="legend">
         <span style="background: #40d060"></span>entrance
         <span style="background: #ffd040"></span>main path

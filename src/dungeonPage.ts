@@ -17,7 +17,8 @@ function sizeParam(params: URLSearchParams, name: string, fallback: number): num
 
 /**
  * Generates the level the page parameters ask for and sets up the parts of the page around it: the numbers of the level,
- * the button for a new seed and the link to the same level on the other page.
+ * the button for a new seed, the form for the parameters if the page has one and the link to the same level on the other
+ * page.
  *
  * @param lit   whether to also place and bake the lights of the level
  *
@@ -39,6 +40,17 @@ export function loadLevel(lit = false): Promise<{ level: DungeonLevel, seed: num
         params.set("seed", String(randomSeed()))
         location.search = params.toString()
     })
+
+    // the form gets sent as the parameters of the page, its fields are named like them
+    const form = document.querySelector<HTMLFormElement>("#params")
+    if (form)
+    {
+        const values: Record<string, number> = { seed, width, height, floor: floorShare, labyrinth }
+        for (const [name, value] of Object.entries(values))
+        {
+            form.querySelector<HTMLInputElement>(`[name=${name}]`)!.value = String(value)
+        }
+    }
 
     return new MapWorkerClient().buildDungeon(seed, FACE_SIZE, width, height, { floorShare, labyrinth }, lit).then(level => {
         const { patches, regions, rooms, corridors, lighting } = level
