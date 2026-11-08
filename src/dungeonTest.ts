@@ -1,9 +1,14 @@
 import "./style.css"
 import { loadLevel } from "./dungeonPage"
+import { placeFixtures } from "./game/levelFixtures"
+import { findWallSegments } from "./map/dungeonLights"
+import { findRoomRoles, type LevelExit, type RoomRoles } from "./map/dungeonRoles"
+import type { FixtureSpot } from "./map/fixtures"
 import type { DungeonLevel } from "./map/generateDungeon"
 import { EdgeType, FaceType } from "./map/geometry"
-import { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
+import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
+import { SCALE } from "./map/scale"
 
 /*
  * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2&floor=0.5&labyrinth=5
@@ -19,6 +24,18 @@ const DOOR_COLOR = "#ff3030"
 const MESH_COLOR = "#00000060"
 const OUTLINE_COLOR = "#e0a04060"
 const LABEL_COLOR = "#000"
+const TREE_COLOR = "#000000c0"
+const MAIN_PATH_COLOR = "#ffd040"
+const ENTRANCE_COLOR = "#40d060"
+const ROOM_MARK_COLOR = "#fff"
+const UNREACHABLE_COLOR = "#606068"
+const EXIT_COLOR = "#ff3030"
+const CHEST_COLOR = "#ffb020"
+
+/**
+ * Radius of the disc behind a room number in pixels
+ */
+const MARK_RADIUS = 10
 
 /**
  * Distance between the level and the edge of the canvas in pixels
@@ -34,7 +51,7 @@ const ctx = canvas.getContext("2d")!
  * Returns the fill color per face of each patch: empty by default, then regions, then wall faces, then corridors and
  * rooms with a color of their own
  */
-function faceColors({ patches, regions, rooms, corridors }: DungeonLevel): string[][]
+function faceColors({ patches, regions, rooms, corridors }: DungeonLevel, { depths }: RoomRoles): string[][]
 {
     const colors = patches.map(patch => new Array<string>(faceCount(patch)).fill(EMPTY_COLOR))
     const paint = (faces: number[], color: string) => {
@@ -52,7 +69,7 @@ function faceColors({ patches, regions, rooms, corridors }: DungeonLevel): strin
         }
     }))
     corridors.forEach(({ faces }) => paint(faces, CORRIDOR_COLOR))
-    rooms.forEach((faces, i) => paint(faces, `hsl(${i * 360 / rooms.length} 70% 60%)`))
+    rooms.forEach((faces, i) => paint(faces, depths[i] === Infinity ? UNREACHABLE_COLOR : `hsl(${i * 360 / rooms.length} 70% 60%)`))
     return colors
 }
 
@@ -71,7 +88,19 @@ function traceFace({ positions, vertex }: QuadPatch, face: number, toScreen: (x:
 }
 
 
-function draw(level: DungeonLevel): void
+interface Fixtures
+{
+    exits: LevelExit[]
+    chests: FixtureSpot[]
+}
+
+
+/**
+ * Draws the level with the roles of its rooms
+ *
+ * @return function that returns the index of the room at a point on the page, -1 for none
+ */
+function draw(level: DungeonLevel, roles: RoomRoles, fixtures: Fixtures): (x: number, y: number) => number
 {
     const { patches, rooms } = level
 
@@ -104,8 +133,12 @@ function draw(level: DungeonLevel): void
         window.innerWidth / 2 + (x - (minX + maxX) / 2) * scale,
         window.innerHeight / 2 + (y - (minY + maxY) / 2) * scale
     ]
+    const fromScreen = (x: number, y: number): [number, number] => [
+        (x - window.innerWidth / 2) / scale + (minX + maxX) / 2,
+        (y - window.innerHeight / 2) / scale + (minY + maxY) / 2
+    ]
 
-    const colors = faceColors(level)
+    const colors = faceColors(level, roles)
     ctx.lineWidth = 0.5
     ctx.strokeStyle = MESH_COLOR
     patches.forEach((patch, index) => {
@@ -155,30 +188,223 @@ function draw(level: DungeonLevel): void
         ctx.stroke()
     }
 
-    // room numbers, room 1 grew out of the largest region
-    ctx.fillStyle = LABEL_COLOR
-    ctx.font = "bold 13px monospace"
+    // the tree of the rooms, from each room to the one it gets reached through
+    const marks = rooms.map(faces => toScreen(...roomCenter(patches, faces)))
+    ctx.lineCap = "round"
+    ctx.strokeStyle = TREE_COLOR
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    roles.parents.forEach((parent, room) => {
+        if (parent >= 0)
+        {
+            ctx.moveTo(...marks[parent])
+            ctx.lineTo(...marks[room])
+        }
+    })
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.strokeStyle = MAIN_PATH_COLOR
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    roles.mainPath.forEach(room => ctx.lineTo(...marks[room]))
+    ctx.stroke()
+
+    // exits and chests where they stand
+    for (const [spots, color, half] of [[fixtures.exits, EXIT_COLOR, 5], [fixtures.chests, CHEST_COLOR, 3.5]] as const)
+    {
+        ctx.fillStyle = color
+        ctx.strokeStyle = LABEL_COLOR
+        ctx.lineWidth = 1
+        for (const { x, z } of spots as readonly FixtureSpot[])
+        {
+            const [sx, sy] = toScreen(x / SCALE, z / SCALE)
+            ctx.fillRect(sx - half, sy - half, half * 2, half * 2)
+            ctx.strokeRect(sx - half, sy - half, half * 2, half * 2)
+        }
+    }
+
+    // room numbers on a disc colored by role, room 1 grew out of the largest region and has the entrance. Rooms that can't
+    // be reached have their floor in the color of the role instead.
+    const last = roles.mainPath[roles.mainPath.length - 1]
+    ctx.font = "bold 12px monospace"
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
-    rooms.forEach((faces, i) => {
-        let x = 0, y = 0
-        for (const face of faces)
+    marks.forEach(([x, y], room) => {
+        if (roles.depths[room] === Infinity)
         {
-            const patch = patches[face >> (SLOT_SHIFT - 2)]
-            const local = face & (LOCAL_MASK >> 2)
-            for (let h = local * 4; h < local * 4 + 4; h++)
-            {
-                x += patch.positions[patch.vertex[h] * 3]
-                y += patch.positions[patch.vertex[h] * 3 + 1]
-            }
+            return
         }
-        const count = faces.length * 4
-        ctx.fillText(String(i + 1), ...toScreen(x / count, y / count))
+        ctx.beginPath()
+        ctx.arc(x, y, MARK_RADIUS, 0, Math.PI * 2)
+        ctx.fillStyle = room === 0 ? ENTRANCE_COLOR : room === last ? EXIT_COLOR :
+            roles.mainPath.includes(room) ? MAIN_PATH_COLOR : ROOM_MARK_COLOR
+        ctx.fill()
+        ctx.strokeStyle = LABEL_COLOR
+        ctx.lineWidth = 1.5
+        if (room === roles.farBranch)
+        {
+            ctx.setLineDash([3, 2])
+            ctx.lineWidth = 2.5
+        }
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = LABEL_COLOR
+        ctx.fillText(String(room + 1), x, y + 0.5)
     })
+
+    return (px, py) => {
+        const [x, y] = fromScreen(px, py)
+        return rooms.findIndex(faces => faces.some(face => inFace(patches, face, x, y)))
+    }
 }
 
 
-loadLevel().then(({ level }) => {
-    draw(level)
-    window.addEventListener("resize", () => draw(level))
+/**
+ * Returns the middle of the corners of all faces of a room, in patch coordinates
+ */
+function roomCenter(patches: readonly QuadPatch[], faces: readonly number[]): [number, number]
+{
+    let x = 0, y = 0
+    for (const face of faces)
+    {
+        const { positions, vertex } = patches[face >> (SLOT_SHIFT - 2)]
+        const local = face & (LOCAL_MASK >> 2)
+        for (let h = local * 4; h < local * 4 + 4; h++)
+        {
+            x += positions[vertex[h] * 3]
+            y += positions[vertex[h] * 3 + 1]
+        }
+    }
+    const count = faces.length * 4
+    return [x / count, y / count]
+}
+
+
+/**
+ * Returns whether a point in patch coordinates lies in a face, which is convex
+ */
+function inFace(patches: readonly QuadPatch[], face: number, x: number, y: number): boolean
+{
+    const { positions, vertex } = patches[face >> (SLOT_SHIFT - 2)]
+    const local = face & (LOCAL_MASK >> 2)
+    let sign = 0
+    for (let h = local * 4; h < local * 4 + 4; h++)
+    {
+        const h1 = h === local * 4 + 3 ? local * 4 : h + 1
+        const x0 = positions[vertex[h] * 3], y0 = positions[vertex[h] * 3 + 1]
+        const x1 = positions[vertex[h1] * 3], y1 = positions[vertex[h1] * 3 + 1]
+        const cross = Math.sign((x1 - x0) * (y - y0) - (y1 - y0) * (x - x0))
+        if (cross !== 0)
+        {
+            if (sign !== 0 && cross !== sign)
+            {
+                return false
+            }
+            sign = cross
+        }
+    }
+    return true
+}
+
+
+/**
+ * Returns the lines of text about a room shown while hovering over it
+ */
+function describeRoom({ rooms, corridors }: DungeonLevel, roles: RoomRoles, { exits, chests }: Fixtures, room: number): string[]
+{
+    const { depths, parents, mainPath, farBranch } = roles
+    const lines = [`room ${room + 1}, ${rooms[room].length} faces`]
+    if (depths[room] === Infinity)
+    {
+        lines.push("can't be reached")
+    }
+    else
+    {
+        lines.push(`depth ${depths[room].toFixed(1)}` + (room === 0 ? ", entrance" : `, reached from room ${parents[room] + 1}`))
+        const step = mainPath.indexOf(room)
+        if (step >= 0)
+        {
+            lines.push(`main path, step ${step + 1} of ${mainPath.length}` + (step === mainPath.length - 1 ? ", the deepest room" : ""))
+        }
+        else
+        {
+            let off = 0
+            for (let on = room; !mainPath.includes(on); on = parents[on])
+            {
+                off++
+            }
+            lines.push(`${off} ${off === 1 ? "room" : "rooms"} off the main path, from room ${roomOnMainPath(roles, room) + 1}`)
+        }
+        if (room === farBranch)
+        {
+            lines.push("far branch")
+        }
+    }
+
+    const neighbours = corridors.flatMap(({ from, to }) => from === room ? [to] : to === room ? [from] : [])
+    lines.push("corridors to " + (neighbours.length > 0 ? neighbours.map(other => other + 1).join(", ") : "nowhere"))
+    const children = parents.flatMap((parent, child) => parent === room ? [child + 1] : [])
+    if (children.length > 0)
+    {
+        lines.push("leads on to " + children.join(", "))
+    }
+
+    exits.forEach((exit, i) => {
+        if (exit.room === room)
+        {
+            lines.push(i === 0 ? "main exit" : "side exit")
+        }
+    })
+    const roomFaces = new Set(rooms[room])
+    const chestCount = chests.filter(({ face }) => roomFaces.has(face)).length
+    if (chestCount > 0)
+    {
+        lines.push(chestCount === 1 ? "chest" : `${chestCount} chests`)
+    }
+    return lines
+}
+
+
+/**
+ * Returns the room of the main path a room branches off from
+ */
+function roomOnMainPath({ parents, mainPath }: RoomRoles, room: number): number
+{
+    let on = room
+    while (!mainPath.includes(on))
+    {
+        on = parents[on]
+    }
+    return on
+}
+
+
+loadLevel().then(({ level, seed }) => {
+    const roles = findRoomRoles(level.rooms, level.corridors)
+    // the same exits and chests as in the game, which takes them from the seed of the level
+    const world = new PatchWorld()
+    const slots = level.patches.map(patch => world.add(patch))
+    const fixtures = placeFixtures(level, world, findWallSegments(world, slots), seed)
+
+    let roomAt = draw(level, roles, fixtures)
+    window.addEventListener("resize", () => {
+        roomAt = draw(level, roles, fixtures)
+    })
+
+    const tooltip = document.getElementById("tooltip")!
+    canvas.addEventListener("mousemove", ({ clientX, clientY }) => {
+        const room = roomAt(clientX, clientY)
+        tooltip.hidden = room < 0
+        if (room >= 0)
+        {
+            tooltip.textContent = describeRoom(level, roles, fixtures, room).join("\n")
+            // stays on the page, on the side of the pointer with more room
+            tooltip.style.left = (clientX < window.innerWidth / 2 ? clientX + 16 : clientX - 16 - tooltip.offsetWidth) + "px"
+            tooltip.style.top = Math.min(clientY + 16, window.innerHeight - tooltip.offsetHeight - 8) + "px"
+        }
+    })
+    canvas.addEventListener("mouseleave", () => {
+        tooltip.hidden = true
+    })
 })

@@ -18,6 +18,34 @@
             font-family: monospace;
             font-size: 0.8rem;
         }
+
+        #legend span
+        {
+            display: inline-block;
+            width: 0.8em;
+            height: 0.8em;
+            margin: 0 0.2em 0 0.6em;
+            border: 1px solid #000;
+            border-radius: 50%;
+            vertical-align: -0.1em;
+        }
+
+        #legend span.square
+        {
+            border-radius: 0;
+        }
+
+        #tooltip
+        {
+            position: absolute;
+            padding: 6px 8px;
+            background: #000d;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -29,7 +57,17 @@
 <div id="ui">
     <span id="info"></span>
     <button id="new-seed" type="button">new seed</button>
+    <div id="legend">
+        <span style="background: #40d060"></span>entrance
+        <span style="background: #ffd040"></span>main path
+        <span style="background: #ff3030"></span>deepest
+        <span style="background: #fff; border-style: dashed"></span>far branch
+        <span class="square" style="background: #606068"></span>unreachable
+        <span class="square" style="background: #ff3030"></span>exit
+        <span class="square" style="background: #ffb020"></span>chest
+    </div>
 </div>
+<div id="tooltip" hidden></div>
 <div id="footer">
     <a class="same-level" href="dungeon3d.html">in 3D</a>
     <a href="3d.html">3D</a>
