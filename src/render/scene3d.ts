@@ -1,5 +1,6 @@
-import { InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, type Object3D } from "three"
+import { type AnimationClip, InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, type Object3D } from "three"
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
+import { clone } from "three/addons/utils/SkeletonUtils.js"
 import { FaceType } from "../map/geometry"
 
 /*
@@ -89,6 +90,9 @@ export const GROUND_COLORS = new Map<FaceType, string>([
 
 const templates = new Map<ModelName, Object3D>()
 
+/** animation clips per model, as exported from the Blender actions */
+const clips = new Map<ModelName, AnimationClip[]>()
+
 /**
  * Loads the given models, all by default
  */
@@ -118,6 +122,7 @@ export function loadModels(names = Object.keys(MODELS) as ModelName[]): Promise<
                     }
                 })
                 templates.set(name, gltf.scene)
+                clips.set(name, gltf.animations)
             })
         )
     ).then(() => undefined)
@@ -131,9 +136,21 @@ export function template(name: ModelName): Object3D
     return templates.get(name)!
 }
 
+/**
+ * Returns a copy of the given model. Skinned meshes in it get their own skeleton, so it can be animated apart from the
+ * other copies.
+ */
 export function model(name: ModelName): Object3D
 {
-    return template(name).clone()
+    return clone(template(name))
+}
+
+/**
+ * Returns the animation clips of the given model, which play on its copies with an AnimationMixer per copy
+ */
+export function animations(name: ModelName): readonly AnimationClip[]
+{
+    return clips.get(name)!
 }
 
 
