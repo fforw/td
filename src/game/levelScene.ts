@@ -22,6 +22,8 @@ import { tautPath } from "../map/route"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
+import BruteCrowd from "../monster/BruteCrowd"
+import BrutePack, { placeBrutes } from "../monster/brutes"
 import CuboidCrowd from "../monster/CuboidCrowd"
 import EyeCrowd from "../monster/EyeCrowd"
 import EyePack, { placeEyes } from "../monster/eyes"
@@ -247,6 +249,8 @@ export default class LevelScene
     private cuboidCrowd: CuboidCrowd | null = null
     private eyes: EyePack | null = null
     private eyeCrowd: EyeCrowd | null = null
+    private brutes: BrutePack | null = null
+    private bruteCrowd: BruteCrowd | null = null
     private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
@@ -329,7 +333,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "chest", "coin", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "chest", "coin", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -437,7 +441,19 @@ export default class LevelScene
         this.eyes = eyes
         this.eyeCrowd = eyeCrowd
 
-        this.monsters = new Monsters([cuboids, eyes], floor)
+        // after the others, which keeps their places for the same seed
+        const brutes = new BrutePack(floor)
+        for (const { face, kind } of placeBrutes(rooms, entrance, random))
+        {
+            const [x, z] = faceCenter(world, face)
+            brutes.add(kind, face, x, z)
+        }
+        const bruteCrowd = new BruteCrowd(field)
+        this.scene.add(bruteCrowd.group)
+        this.brutes = brutes
+        this.bruteCrowd = bruteCrowd
+
+        this.monsters = new Monsters([cuboids, eyes, brutes], floor)
     }
 
     /**
@@ -891,6 +907,7 @@ export default class LevelScene
         this.cuboidCrowd!.update(this.cuboids!.members, time)
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
+        this.bruteCrowd!.update(this.brutes!.members, delta)
     }
 
     /**

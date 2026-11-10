@@ -686,7 +686,16 @@ Glyphs are built from the stroke data of a source kanji per concept
   its texture. A shield stops a bolt coming from within 75 degrees of where
   the hero looks, dodging lets it pass, walls put it out. A blow knocks the
   eye back and spoils its shot.
-- For now cuboids and eyes are placed in some rooms at random from the level
+- The brute (`monster/brutes.ts`) walks after heroes at about a third of their
+  running speed and takes 8 sword blows, which don't stop or push it. Within
+  reach it swings its club: it turns after the hero while raising it for 0.75
+  seconds, and the club comes down after 1 second of the 3 second attack. That
+  hurts once for 5, in front only, and no shield stops it, so the way out is
+  to step back or aside, or to dodge. It is the first monster with clips from
+  Blender: each brute has its own rigged copy with an AnimationMixer
+  (`BruteCrowd`), the walk following the ground covered and the attack the
+  time into the swing, so they are for few at a time.
+- For now cuboids, eyes and brutes are placed in some rooms at random from the level
   seed, not by a premise, and aren't saved: a reload brings all of them back. A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
