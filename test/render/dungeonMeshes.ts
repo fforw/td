@@ -13,6 +13,7 @@ import {
     createThinWalls,
     findSingleThinWalls,
     findThinWallCorners,
+    smoothNormals,
     THICK_WALL_HEIGHT,
     THIN_WALL_HEIGHT,
     THIN_WALL_OVERLAP,
@@ -67,6 +68,70 @@ describe("createThickWalls", () => {
         }
         assert(tops > 0)
         assert(sides > 0)
+    })
+
+    it("shades curved sides as one surface and keeps tops flat", () => {
+        const { world, slots } = level()
+        const face = new Vector3(), normal = new Vector3()
+        let bent = 0
+        for (const slot of slots)
+        {
+            const { geometry } = createThickWalls(world, slot)
+            const position = geometry.getAttribute("position"), normals = geometry.getAttribute("normal")
+            for (let i = 0; i < position.count; i += 3)
+            {
+                const [a, b, c] = [0, 1, 2].map(j => new Vector3().fromBufferAttribute(position, i + j))
+                face.subVectors(b, a).cross(c.clone().sub(a)).normalize()
+                for (let j = 0; j < 3; j++)
+                {
+                    normal.fromBufferAttribute(normals, i + j)
+                    assert.closeTo(normal.length(), 1, 1e-6)
+                    assert(normal.dot(face) > 0.3, "leans less than the smoothing allows")
+                    if (face.y > 0.5)
+                    {
+                        assert.closeTo(normal.y, 1, 1e-6)
+                    }
+                    else
+                    {
+                        assert(Math.abs(normal.y) < 1e-6)
+                        bent += normal.dot(face) < 0.999 ? 1 : 0
+                    }
+                }
+            }
+        }
+        assert(bent > 0)
+    })
+})
+
+describe("smoothNormals", () => {
+
+    /**
+     * Two upright squares meeting in the edge along the y axis, the second turned by the given angle
+     */
+    function fold(angle: number): number[]
+    {
+        const x = Math.cos(angle), z = Math.sin(angle)
+        return [
+            -1, 0, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 1, 0, -1, 1, 0,
+            0, 0, 0, x, 0, z, x, 1, z, 0, 0, 0, x, 1, z, 0, 1, 0
+        ]
+    }
+
+    it("shares the normal across a shallow edge", () => {
+        const normals = smoothNormals(fold(Math.PI / 6), Math.PI / 3)
+        // the corner at the origin in both squares
+        const first = normals.slice(3, 6), second = normals.slice(18, 21)
+        assert.deepEqual(first.map(n => n.toFixed(9)), second.map(n => n.toFixed(9)))
+        // half way between both
+        assert.closeTo(Math.atan2(-first[0], first[2]), Math.PI / 12, 1e-9)
+        // the far edges keep their own
+        assert.deepEqual(normals.slice(0, 3).map(n => +n.toFixed(9)), [0, 0, 1])
+    })
+
+    it("keeps a sharp edge", () => {
+        const normals = smoothNormals(fold(Math.PI / 2), Math.PI / 3)
+        assert.deepEqual(normals.slice(3, 6).map(n => +n.toFixed(9)), [0, 0, 1])
+        assert.deepEqual(normals.slice(18, 21).map(n => +n.toFixed(9)), [-1, 0, 0])
     })
 })
 
@@ -177,7 +242,7 @@ describe("addFlatCorner", () => {
                 const angle = degrees * Math.PI / 180
                 const dx = Math.cos(angle), dz = Math.sin(angle) * flip
                 const triangles: number[] = []
-                addFlatCorner(triangles, 0, 0, 1, 0, dx, dz)
+                addFlatCorner(triangles, [], 0, 0, 1, 0, dx, dz)
 
                 const [cx, , cz, x0, , z0, x1, , z1] = triangles
                 assert(cx === 0 && cz === 0)
@@ -213,7 +278,7 @@ describe("addRoundedCorner", () => {
             const angle = degrees * Math.PI / 180
             const dx = Math.cos(angle), dz = Math.sin(angle)
             const triangles: number[] = []
-            addRoundedCorner(triangles, 0, 0, 1, 0, dx, dz)
+            addRoundedCorner(triangles, [], 0, 0, 1, 0, dx, dz)
             assert(triangles.length > 0)
 
             const side = THIN_WALL_THICKNESS / 2
@@ -227,7 +292,7 @@ describe("addRoundedCorner", () => {
         const angle = Math.PI / 3
         const dx = Math.cos(angle), dz = Math.sin(angle)
         const triangles: number[] = []
-        addRoundedCorner(triangles, 0, 0, 1, 0, dx, dz)
+        addRoundedCorner(triangles, [], 0, 0, 1, 0, dx, dz)
 
         const [cx, , cz] = triangles
         const points: number[][] = []
@@ -248,8 +313,8 @@ describe("addRoundedCorner", () => {
     it("leaves corners close to a straight wall and walls too short for it", () => {
         const triangles: number[] = []
         const wide = 170 * Math.PI / 180
-        addRoundedCorner(triangles, 0, 0, 1, 0, Math.cos(wide), Math.sin(wide))
-        addRoundedCorner(triangles, 0, 0, 0.05, 0, 0, 0.05)
+        addRoundedCorner(triangles, [], 0, 0, 1, 0, Math.cos(wide), Math.sin(wide))
+        addRoundedCorner(triangles, [], 0, 0, 0.05, 0, 0, 0.05)
         assert(triangles.length === 0)
     })
 })
@@ -301,6 +366,31 @@ describe("createThinWallCorners", () => {
 
         const position = createThinWallCorners(world, slots).geometry.getAttribute("position")
         assert(position.count === (expected * THIN_WALL_ROUNDING_STEPS + tight) * 9)
+    })
+
+    it("shades rounded corners as the circle, ending as the sides of the walls", () => {
+        const angle = Math.PI / 3
+        const dx = Math.cos(angle), dz = Math.sin(angle)
+        const triangles: number[] = [], normals: number[] = []
+        addRoundedCorner(triangles, normals, 0, 0, 1, 0, dx, dz)
+        assert(normals.length === triangles.length)
+
+        // without the sign of a zero
+        const key = (x: number, z: number) => [x, z].map(n => (Math.round(n * 1e9) + 0) / 1e9).join(",")
+        const sides = new Set<string>()
+        for (let i = 0; i < triangles.length; i += 3)
+        {
+            const [nx, ny, nz] = normals.slice(i, i + 3)
+            assert.closeTo(Math.hypot(nx, ny, nz), 1, 1e-9)
+            if (ny === 0)
+            {
+                sides.add(key(nx, nz))
+            }
+        }
+        // the walls run along x and at 60 degrees, the inner sides face into the corner
+        assert(sides.has(key(0, 1)))
+        assert(sides.has(key(dz, -dx)))
+        assert(sides.size === THIN_WALL_ROUNDING_STEPS + 1)
     })
 
     it("gives tops facing up and sides facing away from the corner", () => {

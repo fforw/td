@@ -51,6 +51,12 @@ export const THIN_WALL_ROUNDING_STEPS = 2
 const MAX_ROUNDED_ANGLE = Math.PI * 8 / 9
 
 /**
+ * Most angle in radians between the sides of thick walls meeting in an edge that still get shaded as one curved surface.
+ * Neighboring sides along curved walls mostly turn by up to 60 degrees, real corners by about 90.
+ */
+const SMOOTH_ANGLE = Math.PI * 7 / 18
+
+/**
  * Corners narrower than this in radians count as tight where only two thin walls meet: they get rounded on the inner side
  * and flat on the outer side.
  */
@@ -91,9 +97,77 @@ export function createThickWalls(world: PatchWorld, slot: number): Mesh
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
-    geometry.computeVertexNormals()
+    // flat sides would each look like a column bulging out under the light, which changes direction along them
+    geometry.setAttribute("normal", new Float32BufferAttribute(smoothNormals(positions, SMOOTH_ANGLE), 3))
     geometry.computeBoundingSphere()
     return new Mesh(geometry, wallMaterial)
+}
+
+
+/**
+ * Returns the normals of separate triangles, shaded as one surface across edges where they meet at a shallow angle and
+ * sharp across the others. A corner shared by triangles gets the average of their normals, each as much as its angle there.
+ *
+ * @param positions     corners of the triangles, three numbers each
+ * @param maxAngle      most angle in radians between triangles to shade as one
+ *
+ * @return normal for each corner
+ */
+export function smoothNormals(positions: readonly number[], maxAngle: number): number[]
+{
+    const count = positions.length / 9
+    const faceNormals: Vector3[] = []
+    const weights: number[] = []
+    const corners = new Map<string, number[]>()
+    const a = new Vector3(), b = new Vector3(), c = new Vector3(), ab = new Vector3(), ac = new Vector3()
+    for (let i = 0; i < count; i++)
+    {
+        a.fromArray(positions, i * 9)
+        b.fromArray(positions, i * 9 + 3)
+        c.fromArray(positions, i * 9 + 6)
+        faceNormals.push(ab.subVectors(b, a).clone().cross(ac.subVectors(c, a)).normalize())
+        weights.push(
+            ab.subVectors(b, a).angleTo(ac.subVectors(c, a)),
+            ab.subVectors(a, b).angleTo(ac.subVectors(c, b)),
+            ab.subVectors(a, c).angleTo(ac.subVectors(b, c))
+        )
+        for (let j = 0; j < 3; j++)
+        {
+            const k = i * 9 + j * 3
+            const key = positions[k] + "," + positions[k + 1] + "," + positions[k + 2]
+            const shared = corners.get(key)
+            if (shared)
+            {
+                shared.push(i * 3 + j)
+            }
+            else
+            {
+                corners.set(key, [i * 3 + j])
+            }
+        }
+    }
+
+    const minCos = Math.cos(maxAngle)
+    const normals = new Array<number>(positions.length)
+    const sum = new Vector3()
+    for (const shared of corners.values())
+    {
+        for (const corner of shared)
+        {
+            const own = faceNormals[Math.floor(corner / 3)]
+            sum.set(0, 0, 0)
+            for (const other of shared)
+            {
+                const normal = faceNormals[Math.floor(other / 3)]
+                if (normal.dot(own) >= minCos)
+                {
+                    sum.addScaledVector(normal, weights[other])
+                }
+            }
+            sum.normalize().toArray(normals, corner * 3)
+        }
+    }
+    return normals
 }
 
 
@@ -297,18 +371,19 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[], sin
 export function createThinWallCorners(world: PatchWorld, slots: readonly number[]): Mesh
 {
     const triangles: number[] = []
+    const normals: number[] = []
     for (const { x, z, ax, az, bx, bz, tight } of findThinWallCorners(world, slots))
     {
-        addRoundedCorner(triangles, x, z, ax, az, bx, bz)
+        addRoundedCorner(triangles, normals, x, z, ax, az, bx, bz)
         if (tight)
         {
-            addFlatCorner(triangles, x, z, ax, az, bx, bz)
+            addFlatCorner(triangles, normals, x, z, ax, az, bx, bz)
         }
     }
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(triangles, 3))
-    geometry.computeVertexNormals()
+    geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3))
     geometry.computeBoundingSphere()
     return new Mesh(geometry, wallMaterial)
 }
@@ -328,6 +403,7 @@ function cornerAngle(ax: number, az: number, bx: number, bz: number): number
  * touching both of them.
  *
  * @param triangles     receives the positions
+ * @param normals       receives the normals
  * @param x             corner of the walls
  * @param z             corner of the walls
  * @param ax            other end of the first wall
@@ -337,6 +413,7 @@ function cornerAngle(ax: number, az: number, bx: number, bz: number): number
  */
 export function addRoundedCorner(
     triangles: number[],
+    normals: number[],
     x: number, z: number,
     ax: number, az: number,
     bx: number, bz: number
@@ -381,9 +458,11 @@ export function addRoundedCorner(
         curve.push([ox + px * scale, oz + pz * scale])
     }
 
+    // shaded as the circle, which makes it one surface with the sides of the walls it touches
+    const toCenter = curve.map(([px, pz]) => [(ox - px) / radius, (oz - pz) / radius])
     for (let i = 0; i < THIN_WALL_ROUNDING_STEPS; i++)
     {
-        addWedge(triangles, cx, cz, curve[i][0], curve[i][1], curve[i + 1][0], curve[i + 1][1])
+        addWedge(triangles, normals, cx, cz, curve[i][0], curve[i][1], curve[i + 1][0], curve[i + 1][1], toCenter[i], toCenter[i + 1])
     }
 }
 
@@ -393,6 +472,7 @@ export function addRoundedCorner(
  * closes with a straight line.
  *
  * @param triangles     receives the positions
+ * @param normals       receives the normals
  * @param x             corner of the walls
  * @param z             corner of the walls
  * @param ax            other end of the first wall
@@ -402,6 +482,7 @@ export function addRoundedCorner(
  */
 export function addFlatCorner(
     triangles: number[],
+    normals: number[],
     x: number, z: number,
     ax: number, az: number,
     bx: number, bz: number
@@ -417,7 +498,7 @@ export function addFlatCorner(
     const aSide = adz * bdx - adx * bdz < 0 ? side : -side
     const bSide = bdz * adx - bdx * adz < 0 ? side : -side
 
-    addWedge(triangles, x, z, x + adz * aSide, z - adx * aSide, x + bdz * bSide, z - bdx * bSide)
+    addWedge(triangles, normals, x, z, x + adz * aSide, z - adx * aSide, x + bdz * bSide, z - bdx * bSide)
 }
 
 
@@ -425,28 +506,44 @@ export function addFlatCorner(
  * Adds a three-sided piece of wall from its top and its outer side, the other two sides are against other walls
  *
  * @param triangles     receives the positions
+ * @param normals       receives the normals
  * @param cx            point of the top that isn't on the outer side
  * @param cz            point of the top that isn't on the outer side
  * @param x0            start of the outer side
  * @param z0            start of the outer side
  * @param x1            end of the outer side
  * @param z1            end of the outer side
+ * @param n0            horizontal normal of the outer side at its start, that of the flat side without it
+ * @param n1            horizontal normal of the outer side at its end
  */
 function addWedge(
     triangles: number[],
+    normals: number[],
     cx: number, cz: number,
     x0: number, z0: number,
-    x1: number, z1: number
+    x1: number, z1: number,
+    n0?: number[],
+    n1?: number[]
 ): void
 {
     // wind the top so the normal points up, its outer edge is the one for the side then
     if ((x0 - cx) * (z1 - cz) - (z0 - cz) * (x1 - cx) > 0)
     {
         [x0, z0, x1, z1] = [x1, z1, x0, z0]
+        ;[n0, n1] = [n1, n0]
     }
     triangles.push(
         cx, THIN_WALL_HEIGHT, cz, x0, THIN_WALL_HEIGHT, z0, x1, THIN_WALL_HEIGHT, z1,
         x0, 0, z0, x1, 0, z1, x1, THIN_WALL_HEIGHT, z1,
         x0, 0, z0, x1, THIN_WALL_HEIGHT, z1, x0, THIN_WALL_HEIGHT, z0
+    )
+
+    const length = Math.hypot(x1 - x0, z1 - z0)
+    const flat = [(z0 - z1) / length, (x1 - x0) / length]
+    const [ax, az] = n0 ?? flat, [bx, bz] = n1 ?? flat
+    normals.push(
+        0, 1, 0, 0, 1, 0, 0, 1, 0,
+        ax, 0, az, bx, 0, bz, bx, 0, bz,
+        ax, 0, az, bx, 0, bz, ax, 0, az
     )
 }
