@@ -685,7 +685,10 @@ Glyphs are built from the stroke data of a source kanji per concept
   every 1.2 to 3.5 seconds, after half a second of showing the lower eye of
   its texture. A shield stops a bolt coming from within 75 degrees of where
   the hero looks, dodging lets it pass, walls put it out. A blow knocks the
-  eye back and spoils its shot.
+  eye back and spoils its shot. The eyes of a level share a memory of where
+  one of them last saw a hero, or got hit from, for 15 seconds: each new
+  sighting replaces it, and eyes that see the spot fly there to look. Others
+  stay put, as eyes don't find ways around walls.
 - The brute (`monster/brutes.ts`) walks after heroes at about a third of their
   running speed and takes 8 sword blows, which don't stop or push it. Within
   reach it swings its club: it turns after the hero while raising it for 0.75

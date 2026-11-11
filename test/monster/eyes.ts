@@ -9,6 +9,7 @@ import EyePack, {
     FIRE_WAIT_MAX,
     FIRE_WAIT_MIN,
     FLYING_EYE,
+    MEMORY_TIME,
     MIN_PERCH,
     placeEyes,
     WARN_TIME
@@ -133,6 +134,68 @@ describe("Flying eyes", () => {
             assert.isAtLeast(Math.hypot(overBig.x - big.x, overBig.z - big.z), FLYING_EYE.radius + BIG_CUBOID.radius - 1e-6)
             assert.isAtLeast(Math.hypot(overHero.x, overHero.z), FLYING_EYE.radius + HERO_RADIUS - 1e-6)
             assert(hero.x === 0 && hero.z === 0)
+        })
+    })
+
+    describe("remembering", () => {
+
+        it("brings others to where one of them saw a hero", () => {
+
+            const [eyes, monsters] = setup()
+            const seer = sniper(eyes, 2, 0)
+            const other = eyes.add(FLYING_EYE, 0, 0, 8)
+            const hero = prey(0, 0, { dodging: true })
+            run(monsters, 0.5, [hero])
+            assert(seer.target === hero)
+            assert(eyes.lastSeen !== null)
+            // the hero gets away
+            run(monsters, 5, [])
+            assert.isBelow(Math.hypot(other.x, other.z), 8 - 3)
+            assert.isAtLeast(Math.hypot(other.x, other.z), MIN_PERCH - 0.05)
+        })
+
+        it("leaves those alone that don't see the spot", () => {
+
+            // a wall along z = 5
+            const sees = (_x0: number, z0: number, _x1: number, z1: number) => (z0 < 5) === (z1 < 5)
+            const [eyes, monsters] = setup(sees)
+            sniper(eyes, 2, 0)
+            const other = eyes.add(FLYING_EYE, 0, 0, 8)
+            run(monsters, 0.5, [prey(0, 0, { dodging: true })])
+            run(monsters, 5, [])
+            assert.isAbove(other.z, 5)
+        })
+
+        it("is updated by every new sighting", () => {
+
+            const [eyes, monsters] = setup()
+            sniper(eyes, 0, 0)
+            const hero = prey(1, 0, { dodging: true })
+            run(monsters, 0.5, [hero])
+            hero.x = 0
+            hero.z = 1.5
+            run(monsters, 0.5, [hero])
+            assert(eyes.lastSeen!.x === 0 && eyes.lastSeen!.z === 1.5)
+        })
+
+        it("fades after a while", () => {
+
+            const [eyes, monsters] = setup()
+            const eye = sniper(eyes, 2, 0)
+            run(monsters, 0.5, [prey(0, 0, { dodging: true })])
+            run(monsters, MEMORY_TIME - 1, [])
+            assert(eyes.lastSeen !== null)
+            run(monsters, 1.5, [])
+            assert(eyes.lastSeen === null)
+            assert(eye.chase === 0)
+        })
+
+        it("includes where a blow came from", () => {
+
+            const [eyes, monsters] = setup()
+            eyes.add(FLYING_EYE, 0, 0, 0.4)
+            monsters.strike(0, 0, 0, 0.55, 2.2, 1)
+            assert(eyes.lastSeen !== null && eyes.lastSeen.x === 0 && eyes.lastSeen.z === 0)
         })
     })
 

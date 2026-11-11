@@ -32,6 +32,11 @@ const WANDER_CHANCE = 0.05
 const WANDER_LENGTH = 0.6
 
 /**
+ * Seconds the eyes of a level remember where one of them last saw a hero
+ */
+export const MEMORY_TIME = 15
+
+/**
  * Least and most seconds between shots, while an eye sees someone
  */
 export const FIRE_WAIT_MIN = 1.2
@@ -120,6 +125,17 @@ export interface Eye extends Monster
     warning: number
 }
 
+/**
+ * Where the eyes of a level last saw a hero
+ */
+export interface Sighting
+{
+    x: number
+    z: number
+    /** seconds until they forget about it */
+    left: number
+}
+
 export interface Bolt
 {
     x: number
@@ -188,6 +204,8 @@ export default class EyePack extends MonsterPack<Eye>
 {
     readonly bolts: Bolt[] = []
     readonly sparks: Spark[] = []
+    /** where any of them last saw a hero, null once they have forgotten */
+    lastSeen: Sighting | null = null
 
     add(kind: EyeKind, face: number, x: number, z: number): Eye
     {
@@ -219,6 +237,7 @@ export default class EyePack extends MonsterPack<Eye>
     update(delta: number, heroes: readonly Prey[]): void
     {
         this.updateShots(delta)
+        this.forget(delta)
         for (const eye of this.members)
         {
             eye.flash = Math.max(0, eye.flash - delta)
@@ -261,6 +280,8 @@ export default class EyePack extends MonsterPack<Eye>
 
     protected struck(eye: Eye, dx: number, dz: number, distance: number): void
     {
+        // the others learn where the blow came from
+        this.remember(eye.goalX, eye.goalZ)
         // a blow puts it off its shot
         eye.warning = 0
         eye.fireWait = fireWait()
@@ -274,6 +295,24 @@ export default class EyePack extends MonsterPack<Eye>
     protected kill(eye: Eye): void
     {
         this.sparks.push({ x: eye.x, z: eye.z, age: 0 })
+    }
+
+    private remember(x: number, z: number): void
+    {
+        this.lastSeen = { x, z, left: MEMORY_TIME }
+    }
+
+    private forget(delta: number): void
+    {
+        const { lastSeen } = this
+        if (lastSeen)
+        {
+            lastSeen.left -= delta
+            if (lastSeen.left <= 0)
+            {
+                this.lastSeen = null
+            }
+        }
     }
 
     private updateShots(delta: number): void
@@ -306,31 +345,36 @@ export default class EyePack extends MonsterPack<Eye>
     }
 
     /**
-     * Has an eye look around and decide where to go
+     * Has an eye look around and decide where to go. What one sees, all of them remember for a while, and those that see the
+     * spot go there to look for them. Without a way around walls, the others stay put.
      */
     private decide(eye: Eye, heroes: readonly Prey[]): void
     {
         const prey = this.closestSeen(eye, heroes)
         eye.target = prey
+        const { lastSeen } = this
         if (prey)
         {
             eye.chase = CHASE_TIME
             eye.goalX = prey.x
             eye.goalZ = prey.z
+            this.remember(prey.x, prey.z)
             if (!eye.going || !this.goodPerch(eye.destX, eye.destZ, prey))
             {
                 this.perch(eye, prey)
             }
         }
+        else if (lastSeen && this.floor.sees(eye.x, eye.z, lastSeen.x, lastSeen.z))
+        {
+            // looks that way for as long as they remember
+            eye.chase = Math.min(CHASE_TIME, lastSeen.left)
+            eye.goalX = lastSeen.x
+            eye.goalZ = lastSeen.z
+            this.approach(eye)
+        }
         else if (eye.chase > 0)
         {
-            // where it last saw them, but no closer than it would perch
-            const dx = eye.x - eye.goalX, dz = eye.z - eye.goalZ
-            const distance = Math.hypot(dx, dz)
-            const stay = Math.min(MIN_PERCH, distance)
-            eye.destX = eye.goalX + (distance > 0 ? dx / distance * stay : 0)
-            eye.destZ = eye.goalZ + (distance > 0 ? dz / distance * stay : 0)
-            eye.going = true
+            this.approach(eye)
         }
         else if (!eye.going && rng.next() < WANDER_CHANCE)
         {
@@ -343,6 +387,19 @@ export default class EyePack extends MonsterPack<Eye>
                 eye.going = true
             }
         }
+    }
+
+    /**
+     * Has an eye go to where they were seen last, but no closer than it would perch
+     */
+    private approach(eye: Eye): void
+    {
+        const dx = eye.x - eye.goalX, dz = eye.z - eye.goalZ
+        const distance = Math.hypot(dx, dz)
+        const stay = Math.min(MIN_PERCH, distance)
+        eye.destX = eye.goalX + (distance > 0 ? dx / distance * stay : 0)
+        eye.destZ = eye.goalZ + (distance > 0 ? dz / distance * stay : 0)
+        eye.going = true
     }
 
     /**
