@@ -721,8 +721,11 @@ Glyphs are built from the stroke data of a source kanji per concept
   rough volume as a few spheres scaled along the axes of the model, with the
   colors of that part, e.g. the brute one for its body and one for its club.
   The cubes fill them by volume, fly out and away from the blow, fall, bounce
-  on the floor and shrink away within 1 to 1.6 seconds. A big cuboid has none,
-  as it breaks up instead.
+  on the floor and shrink away within 1 to 1.6 seconds. A big cuboid bursts
+  only what doesn't go into the small ones it breaks up into, e.g. 3/8 with 5
+  of them. Smiting (`MonsterPack.smite()`) is annihilation, for the temporary
+  god mode on up on the cross (`GOD_MODE`) and maybe mighty weapons later: the
+  monster bursts whole and nothing comes out of it.
 - The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
   from heroes: it picks a spot that sees them, as far off as it can without a
   long way there, at least 1 away. While it sees someone it fires a fast bolt
