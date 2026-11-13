@@ -1,13 +1,21 @@
 import type { Material, Mesh } from "three"
 import { findWallSegments } from "../map/dungeonLights"
 import type { DungeonLevel } from "../map/generateDungeon"
+import { FaceType } from "../map/geometry"
 import { LEVEL_PRIORITY } from "../map/marchingSquares"
 import { createNearWalls, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
 import { createThickWalls, createThinWallCorners, createThinWalls } from "./dungeonMeshes"
 import { createGround } from "./patchMeshes"
+import { GROUND_COLORS } from "./scene3d"
 import { applyWallCut, createWallCut, type WallCut } from "./wallCut"
+
+/**
+ * Ground colors of a level. The ground under thick walls is as dark as their unlit tops, as it shows through the walls
+ * that are cut. The green it has on the overworld is that of the grass around the walls of the castle.
+ */
+const LEVEL_GROUND_COLORS = new Map<FaceType, string>([...GROUND_COLORS, [FaceType.WALL, "#08080a"]])
 
 /**
  * What it takes to show a lit dungeon level
@@ -63,7 +71,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
-    const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY))
+    const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY, LEVEL_GROUND_COLORS))
     const near = createNearWalls(world, slots, level)
     const walls: Mesh[] = [
         ...slots.map(slot => createThickWalls(world, slot, near)),

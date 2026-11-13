@@ -162,14 +162,27 @@ export function createModels(patch: QuadPatch, pois: readonly PointOfInterest[])
 
 const groundMaterial = new MeshStandardMaterial({ vertexColors: true, roughness: 1 })
 
-export function createGround(world: PatchWorld, slot: number, priority = GROUND_PRIORITY): Mesh
+/**
+ * Creates the ground of the packed patch in the given slot of the world
+ *
+ * @param world     world with the patch
+ * @param slot      slot of the patch
+ * @param priority  ground types from background to foreground
+ * @param groundColors colors of the ground by type, in place of those of the types
+ */
+export function createGround(
+    world: PatchWorld,
+    slot: number,
+    priority = GROUND_PRIORITY,
+    groundColors: ReadonlyMap<FaceType, string> = GROUND_COLORS
+): Mesh
 {
     const positions: number[] = []
     const colors: number[] = []
     const color = new Color()
 
     marchingSquaresPatch(world, slot, (type, x0, z0, x1, z1, x2, z2) => {
-        color.set(GROUND_COLORS.get(type) ?? type.color)
+        color.set(groundColors.get(type) ?? type.color)
 
         // wind the triangle so the normal points up
         if ((x1 - x0) * (z2 - z0) - (z1 - z0) * (x2 - x0) < 0)
