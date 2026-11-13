@@ -1,6 +1,7 @@
 import {
     type AnimationAction,
     AnimationClip,
+    type Bone,
     AnimationMixer,
     type Color,
     Group,
@@ -14,6 +15,8 @@ import { createSilhouetteMaterial, MEEPLE_SCALE, NO_SILHOUETTE, SILHOUETTE_FILL,
 import { applyLightField, type LightField } from "../render/dungeonLighting"
 import { animations, model } from "../render/scene3d"
 import { type Brute, ATTACK_TIME } from "./brutes"
+import type Bursts from "./bursts"
+import type { Death } from "./bursts"
 import { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
 
 /**
@@ -26,6 +29,22 @@ const STRIDE = 0.7
  */
 const FADE_TIME = 0.25
 
+/**
+ * Material of the club, which is all that is left of a brute after its body burst
+ */
+const CLUB_MATERIAL = "Wood"
+
+/**
+ * Seconds the club lies still after the die clip before it bursts as well
+ */
+const CLUB_DELAY = 0.4
+
+/**
+ * Length in seconds of the stand-in for a die clip the model doesn't have yet, in which the club goes back to how it
+ * was modelled
+ */
+const STAND_IN_DIE = 0.6
+
 
 interface Figure
 {
@@ -33,12 +52,17 @@ interface Figure
     mixer: AnimationMixer
     walk: AnimationAction
     attack: AnimationAction
-    /** lit materials with their own colors */
-    bodies: { material: MeshStandardMaterial, color: Color }[]
+    die: AnimationAction
+    /** lit materials with their own colors, and their meshes */
+    bodies: { material: MeshStandardMaterial, color: Color, mesh: SkinnedMesh }[]
     rim: MeshBasicMaterial
     fill: MeshBasicMaterial
     walking: boolean
     attacking: boolean
+    /** how it died, null while it lives */
+    death: Death | null
+    /** seconds since it died */
+    dead: number
 }
 
 
@@ -61,20 +85,38 @@ export default class BruteCrowd
     }
 
     /**
-     * Shows the given brutes, and no longer those that died
+     * Shows the given brutes, and what is left of those that died: their bodies burst right away, see Bursts.add(), and
+     * the club plays the die clip and bursts after it. Smitten ones burst whole at once.
      *
      * @param brutes    brutes to show
+     * @param deaths    monsters that died in this frame
+     * @param bursts    where the clubs burst
      * @param delta     seconds since the last call
      */
-    update(brutes: readonly Brute[], delta: number): void
+    update(brutes: readonly Brute[], deaths: readonly Death[], bursts: Bursts, delta: number): void
     {
         const { figures } = this
         for (const [brute, figure] of figures)
         {
-            if (!brutes.includes(brute))
+            if (brutes.includes(brute))
             {
-                this.group.remove(figure.root)
-                figures.delete(brute)
+                continue
+            }
+            if (!figure.death)
+            {
+                const death = deaths.find(({ monster }) => monster === brute)
+                if (!death || death.smite)
+                {
+                    this.remove(brute, figure, death, bursts)
+                    continue
+                }
+                this.startDying(figure, death)
+            }
+            figure.dead += delta
+            figure.mixer.update(delta)
+            if (figure.dead >= figure.die.getClip().duration + CLUB_DELAY)
+            {
+                this.remove(brute, figure, figure.death, bursts)
             }
         }
 
@@ -89,6 +131,44 @@ export default class BruteCrowd
             }
             this.pose(brute, figure, delta)
         }
+    }
+
+    /**
+     * Hides the body, which burst, and has the club go on with the die clip
+     */
+    private startDying(figure: Figure, death: Death): void
+    {
+        figure.death = death
+        for (const { material, mesh } of figure.bodies)
+        {
+            mesh.visible = material.name === CLUB_MATERIAL
+        }
+        figure.walk.fadeOut(FADE_TIME)
+        figure.attack.fadeOut(FADE_TIME)
+        figure.die.reset().fadeIn(FADE_TIME).play()
+        figure.rim.color.copy(NO_SILHOUETTE)
+        figure.fill.color.copy(NO_SILHOUETTE)
+    }
+
+    /**
+     * Takes a figure out of the scene, and has what goes with its bones burst where they are now, after a death
+     */
+    private remove(brute: Brute, figure: Figure, death: Death | null | undefined, bursts: Bursts): void
+    {
+        if (death)
+        {
+            for (const sphere of death.kind.burst)
+            {
+                const bone = sphere.bone ? figure.root.getObjectByName(sphere.bone) as Bone | undefined : undefined
+                if (bone)
+                {
+                    bone.updateWorldMatrix(true, false)
+                    bursts.burst(sphere, bone.matrixWorld, death.away, death.share)
+                }
+            }
+        }
+        this.group.remove(figure.root)
+        this.figures.delete(brute)
     }
 
     private pose(brute: Brute, figure: Figure, delta: number): void
@@ -160,7 +240,7 @@ export default class BruteCrowd
             // the flash and the light field belong to this brute
             const material = (mesh.material as MeshStandardMaterial).clone()
             applyLightField(material, this.field)
-            bodies.push({ material, color: material.color.clone() })
+            bodies.push({ material, color: material.color.clone(), mesh })
             mesh.material = material
             mesh.frustumCulled = false
 
@@ -179,11 +259,14 @@ export default class BruteCrowd
         const mixer = new AnimationMixer(root)
         const walk = mixer.clipAction(AnimationClip.findByName(clips, "walk")!)
         const attack = mixer.clipAction(AnimationClip.findByName(clips, "attack")!)
+        const die = mixer.clipAction(AnimationClip.findByName(clips, "die") ?? new AnimationClip("die", STAND_IN_DIE, []))
+        die.setLoop(LoopOnce, 1)
+        die.clampWhenFinished = true
         // both are posed by hand, by the ground covered and the time into the swing
         walk.timeScale = 0
         attack.timeScale = 0
         attack.setLoop(LoopOnce, 1)
         attack.clampWhenFinished = true
-        return { root, mixer, walk, attack, bodies, rim, fill, walking: false, attacking: false }
+        return { root, mixer, walk, attack, die, bodies, rim, fill, walking: false, attacking: false, death: null, dead: 0 }
     }
 }

@@ -969,16 +969,15 @@ export default class LevelScene
         this.cuboidCrowd!.update(this.cuboids!.members, time)
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
-        this.bruteCrowd!.update(this.brutes!.members, delta)
 
         const { bursts } = this
-        for (const pack of monsters.packs)
+        const deaths = monsters.packs.flatMap(pack => pack.deaths.splice(0))
+        for (const death of deaths)
         {
-            for (const death of pack.deaths.splice(0))
-            {
-                bursts.add(death)
-            }
+            bursts.add(death)
         }
+        // brutes keep their club a while
+        this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }
