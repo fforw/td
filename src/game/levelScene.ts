@@ -15,10 +15,9 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
 import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, type LevelExit } from "../map/dungeonRoles"
-import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
+import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
-import { tautPath } from "../map/route"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
@@ -36,7 +35,7 @@ import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
-import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
+import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
 import { createExitMeshes } from "../render/exitMeshes"
 import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
 import TreasureView from "../treasure/TreasureView"
@@ -44,7 +43,7 @@ import type PatchWorld from "../map/PatchWorld"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS, ViewTurn } from "./heroControl"
-import { Walk } from "./journey"
+import KeySteer, { type KeyInput } from "./keySteer"
 import Exploration, { jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
 
@@ -67,11 +66,6 @@ const MAX_HEROES = 16
  * Walking speed in world units per second for a meeple with a walk speed multiplier of 1
  */
 const WALK_SPEED = MEEPLE_SCALE * 1.5
-
-/**
- * Fastest a meeple turns while walking, in radians per second
- */
-const TURN_RATE = 10
 
 /**
  * Fastest a meeple turns when told where to look, in radians per second
@@ -138,9 +132,10 @@ const MIN_DISTANCE = 1.5
 const MAX_DISTANCE = 10
 
 /**
- * Most a pointer may move in pixels for a press to count as a click
+ * Closest the pointer gets to the hero in world units and still tells them where to look. Any closer, and the smallest
+ * movement would spin them around.
  */
-const CLICK_DISTANCE = 5
+const POINTER_AIM_REACH = 0.15
 
 /**
  * Longest time in seconds a single frame moves things for
@@ -149,7 +144,6 @@ const MAX_FRAME_TIME = 0.1
 
 const FLOOR = new Plane(new Vector3(0, 1, 0), 0)
 
-const walkPosition: number[] = []
 const hit = new Vector3()
 const forward = new Vector3()
 
@@ -182,10 +176,9 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
 interface ShownHero
 {
     meeple: Meeple
-    /** faces of the way being walked, or just the one the hero stands on */
-    faces: number[]
-    walk: Walk | null
-    /** what the hero does on orders, which goes over walking a way */
+    /** the face the hero stands on */
+    face: number
+    /** what the hero does on orders */
     control: HeroControl
     /** moved on orders in the last frame */
     steered: boolean
@@ -237,7 +230,7 @@ function turnToward(meeple: Meeple, facing: number, most: number, share = 1): vo
 
 /**
  * A dungeon level in 3D with the heroes inside. The view stays with one of them, who carries the hero light and goes where
- * they are told or steered. Like the castle scene it has a canvas of its own, which saves the two from knowing about each other's
+ * a controller or keyboard and mouse steer them. Like the castle scene it has a canvas of its own, which saves the two from knowing about each other's
  * lights and materials.
  */
 export default class LevelScene
@@ -252,6 +245,8 @@ export default class LevelScene
     private readonly raycaster = new Raycaster()
     private readonly pointer = new Vector2()
     private readonly lookAngles = new Spherical()
+    /** ends the listening to the window */
+    private readonly listening = new AbortController()
 
     /** null until the level is there */
     private level: DungeonLevel | null = null
@@ -280,7 +275,6 @@ export default class LevelScene
     private exploration: Exploration | null = null
 
     /** every face that can be walked on */
-    private floor: number[] = []
     private floorSet: ReadonlySet<number> = new Set()
 
     private heroes: LevelHero[] = []
@@ -294,6 +288,8 @@ export default class LevelScene
     private unplaced = true
     /** what a controller does in the current frame, if it is in charge of the hero the view is with */
     private steering: PadInput | null = null
+    /** what keyboard and mouse tell the hero the view is with, which they do in frames without a controller steering */
+    readonly keys = new KeySteer()
     /** how the right stick turns the view */
     private readonly viewTurn = new ViewTurn()
 
@@ -373,8 +369,7 @@ export default class LevelScene
         this.scene.add(...meshes.meshes)
         this.slots = level.patches.map((_, slot) => slot)
         this.entrance = entranceFace(meshes.world, level)
-        this.floor = [...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)]
-        this.floorSet = new Set(this.floor)
+        this.floorSet = new Set([...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)])
         this.exploration = new Exploration(meshes.world, this.slots, this.explored)
         const chests = this.addChests(level, meshes, seed)
 
@@ -539,8 +534,7 @@ export default class LevelScene
                 crowd.add(meeple)
                 shown.set(id, {
                     meeple,
-                    faces: [face],
-                    walk: null,
+                    face,
                     control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
                     steered: false,
                     prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0 },
@@ -576,8 +570,8 @@ export default class LevelScene
     }
 
     /**
-     * Tells what a controller does in this frame to the hero the view is with. Nothing happens to them in frames without
-     * this, whatever the reason for it is.
+     * Tells what a controller does in this frame to the hero the view is with. In frames without this, they do what
+     * keyboard and mouse tell them.
      */
     steer(input: PadInput): void
     {
@@ -635,66 +629,20 @@ export default class LevelScene
     }
 
     /**
-     * Sends a hero to a face over the shortest way, from wherever on their way they are right now
+     * Has a hero do what they are told
+     *
+     * @param given     their orders, null for a hero nobody steers
      */
-    private walkTo(hero: ShownHero, goal: number): void
-    {
-        const { meshes } = this
-        const faces = findFaces(meshes!.world, this.slots, this.closestOnWay(hero), goal)
-        if (!faces)
-        {
-            return
-        }
-        if (faces.length === 1 && !hero.walk)
-        {
-            hero.faces = faces
-            return
-        }
-        const way = tautPath(meshes!.world, faces)
-        way[0] = hero.meeple.position.x / SCALE
-        way[1] = hero.meeple.position.z / SCALE
-        hero.faces = faces
-        hero.walk = new Walk(way, 0)
-    }
-
-    /**
-     * Returns the face of the hero's way they are closest to, which they are on or about to get to. It only looks at the
-     * way, the closest of all faces can be behind a wall.
-     */
-    private closestOnWay({ faces, meeple }: ShownHero): number
-    {
-        let closest = faces[0]
-        let shortest = Infinity
-        for (const face of faces)
-        {
-            const [x, z] = faceCenter(this.meshes!.world, face)
-            const distance = Math.hypot(x - meeple.position.x, z - meeple.position.z)
-            if (distance < shortest)
-            {
-                closest = face
-                shortest = distance
-            }
-        }
-        return closest
-    }
-
-    /**
-     * Has a hero do what they are told by the controller, or else finish what they got told before
-     */
-    private steerHero(id: number, hero: ShownHero, input: PadInput | null, time: number, delta: number): void
+    private steerHero(id: number, hero: ShownHero, given: HeroOrders | null, time: number, delta: number): void
     {
         const { meeple, control } = hero
-        const attacks = control.update(input ? this.ordersOf(input) : NO_ORDERS, delta, meeple.facing)
+        const attacks = control.update(given ?? NO_ORDERS, delta, meeple.facing)
         if (attacks)
         {
             this.crowd!.act(meeple, 0)
             // comes with the blade, after it has been drawn back
             hero.strikeAt = time + itemAnimation(meeple.item!).action.steps[0].transition.duration
             this.marks.slash(hero.strikeAt)
-        }
-        if (input)
-        {
-            this.look(FIXED_VIEW ? 0 : this.viewTurn.update(input.aimX, input.aimY, delta), 0, 1)
         }
         meeple.leftReady = control.blocking
         if (control.turnTo !== null)
@@ -704,17 +652,12 @@ export default class LevelScene
 
         if (control.moving)
         {
-            if (hero.walk)
-            {
-                hero.faces = [this.closestOnWay(hero)]
-                hero.walk = null
-            }
             const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * delta
-            spot.face = hero.faces[0]
+            spot.face = hero.face
             spot.x = meeple.position.x
             spot.z = meeple.position.z
             moveOnFloor(this.meshes!.world, this.solidWalls!, spot, control.velocityX * speed, control.velocityZ * speed)
-            hero.faces[0] = spot.face
+            hero.face = spot.face
             meeple.position.set(spot.x, 0, spot.z)
             meeple.walking = true
             hero.steered = true
@@ -723,7 +666,7 @@ export default class LevelScene
         {
             hero.steered = false
             meeple.walking = false
-            this.onMoved(id, hero.faces[0])
+            this.onMoved(id, hero.face)
         }
     }
 
@@ -732,10 +675,9 @@ export default class LevelScene
      */
     private ordersOf({ moveX, moveY, aimX, aimY, dash, attack, block }: PadInput): HeroOrders
     {
+        this.moveOrders(moveX, moveY)
         const heading = this.controls.getAzimuthalAngle()
         const cos = Math.cos(heading), sin = Math.sin(heading)
-        orders.moveX = moveX * cos + moveY * sin
-        orders.moveZ = -moveX * sin + moveY * cos
         orders.aimX = aimX * cos + aimY * sin
         orders.aimZ = -aimX * sin + aimY * cos
         orders.dash = dash
@@ -744,49 +686,85 @@ export default class LevelScene
         return orders
     }
 
+    /**
+     * Returns what keyboard and mouse tell a hero to do: to go where the keys point on the screen, and to look at the floor
+     * under the pointer
+     */
+    private keyOrders({ moveX, moveY, dash, attack, block, pointerX, pointerY }: KeyInput, { meeple }: ShownHero): HeroOrders
+    {
+        this.moveOrders(moveX, moveY)
+        orders.aimX = 0
+        orders.aimZ = 0
+        if (pointerX !== null && pointerY !== null)
+        {
+            const rect = this.element.getBoundingClientRect()
+            this.pointer.set(
+                (pointerX - rect.left) / rect.width * 2 - 1,
+                -(pointerY - rect.top) / rect.height * 2 + 1
+            )
+            this.raycaster.setFromCamera(this.pointer, this.camera)
+            if (this.raycaster.ray.intersectPlane(FLOOR, hit))
+            {
+                const dx = hit.x - meeple.position.x
+                const dz = hit.z - meeple.position.z
+                if (Math.hypot(dx, dz) > POINTER_AIM_REACH)
+                {
+                    orders.aimX = dx
+                    orders.aimZ = dz
+                }
+            }
+        }
+        orders.dash = dash
+        orders.attack = attack
+        orders.block = block
+        return orders
+    }
+
+    /**
+     * Sets where the orders tell to go, from a direction on the screen
+     */
+    private moveOrders(moveX: number, moveY: number): void
+    {
+        const heading = this.controls.getAzimuthalAngle()
+        const cos = Math.cos(heading), sin = Math.sin(heading)
+        orders.moveX = moveX * cos + moveY * sin
+        orders.moveZ = -moveX * sin + moveY * cos
+    }
+
     private updateHeroes(time: number, delta: number): void
     {
         const { steering } = this
         this.steering = null
-        if (!steering)
+        const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (steering)
+        {
+            this.look(FIXED_VIEW ? 0 : this.viewTurn.update(steering.aimX, steering.aimY, delta), 0, 1)
+        }
+        else
         {
             this.viewTurn.reset()
         }
+        // a controller always shows where the hero looks, the mouse only while it tells them
+        let aiming = !!steering
         for (const [id, hero] of this.shown)
         {
-            const steered = id === this.focus ? steering : null
-            this.steerHero(id, hero, steered, time, delta)
-
-            const { meeple, walk, faces } = hero
-            if (!walk)
+            let given: HeroOrders | null = null
+            if (hero === focused)
             {
-                continue
+                given = steering ? this.ordersOf(steering) : this.keyOrders(this.keys.input(), hero)
+                aiming ||= given.aimX !== 0 || given.aimZ !== 0
             }
-            walk.advance(WALK_SPEED * walkSpeedMultiplier(meeple) * delta / SCALE, 1)
-            walk.position(walkPosition)
-            meeple.position.set(walkPosition[0] * SCALE, 0, walkPosition[1] * SCALE)
-            turnToward(meeple, Math.atan2(walkPosition[2], walkPosition[3]), TURN_RATE * delta)
-            meeple.walking = true
-
-            if (walk.isAt(1))
-            {
-                const face = faces[faces.length - 1]
-                hero.walk = null
-                hero.faces = [face]
-                meeple.walking = false
-                this.onMoved(id, face)
-            }
+            this.steerHero(id, hero, given, time, delta)
         }
         this.updateExploration()
         this.updateMonsters(time, delta)
         this.updateTreasure(time)
         this.crowd?.update(this.camera, time)
 
-        const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
         if (focused)
         {
             const { position, facing } = focused.meeple
-            this.marks.update(position.x, position.z, facing, !!steering, time)
+            this.marks.update(position.x, position.z, facing, aiming, time)
         }
         const atExit = this.focus !== null && this.nearExit(this.focus)
         if (atExit !== this.atExit)
@@ -804,7 +782,7 @@ export default class LevelScene
         let changed = false
         for (const hero of this.shown.values())
         {
-            const face = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+            const { face } = hero
             if (face !== hero.visitedFrom)
             {
                 hero.visitedFrom = face
@@ -884,7 +862,7 @@ export default class LevelScene
      */
     private jumpTargets(hero: ShownHero): LevelMapState["rooms"]
     {
-        const at = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+        const at = hero.face
         return jumpTargets(this.meshes!.world, this.level!.rooms, this.exploration!, at)
     }
 
@@ -901,8 +879,7 @@ export default class LevelScene
             return false
         }
         const [x, z] = faceCenter(this.meshes.world, face)
-        hero.walk = null
-        hero.faces = [face]
+        hero.face = face
         hero.steered = false
         hero.meeple.position.set(x, 0, z)
         hero.meeple.walking = false
@@ -1016,7 +993,7 @@ export default class LevelScene
         if (FIXED_VIEW)
         {
             // only the space the hero is in: a space next to it has the wall the hero looks at as its near wall
-            const space = meshes!.near.spaceOf.get(hero.faces[0])
+            const space = meshes!.near.spaceOf.get(hero.face)
             updateWallCut(meshes!.cut, space ? [space] : [], delta)
         }
         if (hero.lightOn)
@@ -1033,52 +1010,27 @@ export default class LevelScene
         }
     }
 
+    /**
+     * Feeds the mouse to what steers the hero. The buttons only count when they go down on the level itself, and wherever
+     * they come up again.
+     */
     private listen(canvas: HTMLCanvasElement): void
     {
-        let downX = 0, downY = 0
+        const { keys } = this
         canvas.addEventListener("pointerdown", ev => {
-            downX = ev.clientX
-            downY = ev.clientY
+            keys.point(ev.clientX, ev.clientY)
+            keys.button(ev.button, true)
         })
-        canvas.addEventListener("pointerup", ev => {
-            const dx = ev.clientX - downX
-            const dy = ev.clientY - downY
-            if (ev.button === 0 && dx * dx + dy * dy <= CLICK_DISTANCE * CLICK_DISTANCE)
-            {
-                this.walkToPointer(ev)
-            }
-        })
+        // the right button blocks
+        canvas.addEventListener("contextmenu", ev => ev.preventDefault())
+
+        const { signal } = this.listening
+        window.addEventListener("pointermove", ev => keys.point(ev.clientX, ev.clientY), { signal })
+        window.addEventListener("pointerup", ev => keys.button(ev.button, false), { signal })
+        window.addEventListener("pointercancel", () => keys.release(), { signal })
+        window.addEventListener("blur", () => keys.release(), { signal })
     }
 
-    /**
-     * Sends the hero the view is with to the floor under the pointer
-     */
-    private walkToPointer(ev: PointerEvent): void
-    {
-        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero)
-        {
-            return
-        }
-        const rect = this.element.getBoundingClientRect()
-        this.pointer.set(
-            (ev.clientX - rect.left) / rect.width * 2 - 1,
-            -(ev.clientY - rect.top) / rect.height * 2 + 1
-        )
-        this.raycaster.setFromCamera(this.pointer, this.camera)
-        if (this.raycaster.ray.intersectPlane(FLOOR, hit))
-        {
-            const face = this.floorAt(hit.x, hit.z)
-            if (face !== null)
-            {
-                this.walkTo(hero, face)
-            }
-        }
-    }
-
-    /**
-     * Returns the floor face with its center closest to the given point in world units, null with none close by
-     */
     /**
      * Has the hero the view is with listen, with left and right as on screen
      */
@@ -1092,26 +1044,8 @@ export default class LevelScene
         const { position } = hero.meeple
         this.camera.getWorldDirection(forward)
         const length = Math.hypot(forward.x, forward.z) || 1
-        const face = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+        const face = hero.face
         this.sound.listen(face, position.x, position.z, forward.x / length, forward.z / length)
-    }
-
-    private floorAt(x: number, z: number): number | null
-    {
-        let closest: number | null = null
-        // faces are about one world unit across
-        let shortest = 1
-        for (const face of this.floor)
-        {
-            const [fx, fz] = faceCenter(this.meshes!.world, face)
-            const distance = Math.hypot(fx - x, fz - z)
-            if (distance < shortest)
-            {
-                closest = face
-                shortest = distance
-            }
-        }
-        return closest
     }
 
     private resize(): void
@@ -1154,6 +1088,10 @@ export default class LevelScene
             return
         }
         this.running = running
+        if (!running)
+        {
+            this.keys.release()
+        }
         this.sound?.setRunning(running)
         this.lastFrame = performance.now() / 1000
         this.renderer.setAnimationLoop(running ? () => {
@@ -1183,6 +1121,7 @@ export default class LevelScene
         this.setRunning(false)
         this.sound?.dispose()
         this.controls.dispose()
+        this.listening.abort()
         this.client.terminate()
         this.renderer.dispose()
         this.renderer.forceContextLoss()

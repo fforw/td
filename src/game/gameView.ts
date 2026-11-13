@@ -18,6 +18,7 @@ import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
+import { keyAction } from "./keySteer"
 import LevelScene, { type LevelHero } from "./levelScene"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
@@ -246,6 +247,17 @@ export default class GameView implements PadTarget
             {
                 this.follow(null)
             }
+            else
+            {
+                this.steerKey(ev)
+            }
+        })
+        window.addEventListener("keyup", ev => {
+            // also keeps the space bar from pressing a button that still has the focus
+            if (this.level?.keys.keyUp(ev.code))
+            {
+                ev.preventDefault()
+            }
         })
 
         this.render()
@@ -445,6 +457,38 @@ export default class GameView implements PadTarget
         else
         {
             this.level?.act(action)
+        }
+    }
+
+    /**
+     * Has a key that went down steer the hero in the level, or do what a button of a controller does there
+     */
+    private steerKey(ev: KeyboardEvent): void
+    {
+        const { level } = this
+        const { target, code } = ev
+        if (!level || ev.ctrlKey || ev.metaKey || ev.altKey || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+        {
+            return
+        }
+        const action = keyAction(code)
+        if (!this.canSteer())
+        {
+            // the key for the map of the level also puts it away again
+            if (action === "endDay" && !ev.repeat && !this.levelMapPopup.hidden)
+            {
+                this.closeLevelMap()
+            }
+            return
+        }
+        if (level.keys.keyDown(code))
+        {
+            ev.preventDefault()
+        }
+        else if (action && !ev.repeat)
+        {
+            ev.preventDefault()
+            this.steerAct(action)
         }
     }
 
