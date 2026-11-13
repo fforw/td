@@ -682,6 +682,20 @@
     font-style: italic;
 }
 
+.pad-prompts kbd
+{
+    padding: 0.1rem 0.4rem;
+    border: 1px solid rgba(232, 224, 212, 0.5);
+    border-radius: 0.2rem;
+    font: inherit;
+    font-size: 0.8rem;
+}
+
+#game.key-steered .info
+{
+    bottom: 3.75rem;
+}
+
 /* keeps what's along the bottom out from under the prompts */
 body.gamepad #title
 {

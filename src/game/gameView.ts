@@ -18,7 +18,7 @@ import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
-import { keyAction } from "./keySteer"
+import { KEY_HINTS, keyAction } from "./keySteer"
 import LevelScene, { type LevelHero } from "./levelScene"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
@@ -206,6 +206,8 @@ export default class GameView implements PadTarget
 
     /** a controller is in charge */
     private padMode = false
+    /** what the keys and the mouse do in a level, shown while they steer */
+    private readonly keyHints = el("div", { className: "pad-prompts key-hints", hidden: true })
 
     constructor(root: HTMLElement, campaign: Campaign, store: SaveStore)
     {
@@ -493,6 +495,33 @@ export default class GameView implements PadTarget
     }
 
     /**
+     * Shows what the keys and the mouse do while they steer a hero in a level
+     */
+    private updateKeyHints(): void
+    {
+        const { keyHints, campaign, following } = this
+        const shown = !this.padMode && this.canSteer()
+        keyHints.hidden = !shown
+        this.root.classList.toggle("key-steered", shown)
+        if (!shown)
+        {
+            return
+        }
+        const { item, leftItem } = heldItems(campaign.heroes.find(hero => hero.id === following)!.character)
+        const hints: [string, string][] = [
+            [KEY_HINTS.move, "Move"],
+            [KEY_HINTS.aim, "Aim"],
+            [KEY_HINTS.dash, "Dash"],
+            ...(item ? [[KEY_HINTS.attack, "Attack"] as [string, string]] : []),
+            ...(leftItem ? [[KEY_HINTS.block, "Block"] as [string, string]] : []),
+            [KEY_HINTS.confirm, "Open / Leave"],
+            [KEY_HINTS.light, "Light"],
+            [KEY_HINTS.map, "Map"]
+        ]
+        keyHints.replaceChildren(...hints.map(([key, label]) => el("span", {}, el("kbd", {}, key), label)))
+    }
+
+    /**
      * Returns the job of the hero the view is with inside a level, if any
      */
     private viewedLevelJob(): Job | undefined
@@ -514,6 +543,7 @@ export default class GameView implements PadTarget
     {
         this.padMode = active
         this.sheet.showAllArrows(active)
+        this.updateKeyHints()
     }
 
     private createCastle(): CastleScene | null
@@ -533,6 +563,7 @@ export default class GameView implements PadTarget
             this.hud,
             this.info,
             this.notices,
+            this.keyHints,
             this.popup,
             this.levelMapPopup,
             this.dialog,
@@ -574,6 +605,7 @@ export default class GameView implements PadTarget
             return
         }
         levelMapPopup.hidden = false
+        this.updateKeyHints()
         levelMapPopup.replaceChildren(levelMap.element)
         levelMap.extras.replaceChildren(
             el("span", { className: "map-north", title: "North is up, like the view when it starts" }, "N ↑"),
@@ -1037,6 +1069,7 @@ export default class GameView implements PadTarget
         {
             this.optionsPopup.replaceChildren(this.renderOptions())
         }
+        this.updateKeyHints()
         document.title = campaign.castleName + ", day " + campaign.day + " - Treasure & Dread"
     }
 
