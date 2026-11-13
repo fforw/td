@@ -30,6 +30,7 @@ import EyePack, { placeEyes } from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
+import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
@@ -48,6 +49,7 @@ import Exploration, { jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
 
 const TAU = Math.PI * 2
+const DEG2RAD_FACTOR = TAU / 360;
 
 /**
  * How far around them in world units a hero gets to know the floor they can see
@@ -116,6 +118,21 @@ const COIN_SEED = 0x7c3a
  * Camera offset from the hero, in world units
  */
 const CAMERA_OFFSET = new Vector3(0, 3.2, 3.2)
+
+/**
+ * Whether the view keeps looking from the same side, with the walls in front of the hero see-through, instead of turning
+ * with the aim. A prototype: "?turn" in the address gets the turning view back to compare.
+ */
+const FIXED_VIEW = !new URLSearchParams(location.search).has("turn")
+
+const CAMERA_ANGLE = 56 * DEG2RAD_FACTOR
+const CAMERA_DISTANCE = 4.5
+
+/**
+ * Camera offset from the hero with the fixed view, at 52 degrees above the ground: a bit steeper than the turning view
+ * so that walls hide less. It looks along VIEW_AWAY.
+ */
+const FIXED_CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_ANGLE) * CAMERA_DISTANCE,Math.sin(CAMERA_ANGLE) * CAMERA_DISTANCE)
 
 const MIN_DISTANCE = 1.5
 const MAX_DISTANCE = 10
@@ -332,6 +349,7 @@ export default class LevelScene
         controls.maxPolarAngle = Math.PI * 0.45
         controls.minDistance = MIN_DISTANCE
         controls.maxDistance = MAX_DISTANCE
+        controls.enableRotate = !FIXED_VIEW
         this.controls = controls
 
         this.listen(canvas)
@@ -676,7 +694,7 @@ export default class LevelScene
         }
         if (input)
         {
-            this.look(this.viewTurn.update(input.aimX, input.aimY, delta), 0, 1)
+            this.look(FIXED_VIEW ? 0 : this.viewTurn.update(input.aimX, input.aimY, delta), 0, 1)
         }
         meeple.leftReady = control.blocking
         if (control.turnTo !== null)
@@ -987,7 +1005,7 @@ export default class LevelScene
         {
             this.unplaced = false
             controls.target.copy(position)
-            camera.position.copy(position).add(CAMERA_OFFSET)
+            camera.position.copy(position).add(FIXED_VIEW ? FIXED_CAMERA_OFFSET : CAMERA_OFFSET)
         }
         else
         {
@@ -995,6 +1013,12 @@ export default class LevelScene
             controls.target.add(hit)
         }
         focusAt.copy(position)
+        if (FIXED_VIEW)
+        {
+            // only the space the hero is in: a space next to it has the wall the hero looks at as its near wall
+            const space = meshes!.near.spaceOf.get(hero.faces[0])
+            updateWallCut(meshes!.cut, space ? [space] : [], delta)
+        }
         if (hero.lightOn)
         {
             hero.lightBurnt += delta
@@ -1110,8 +1134,11 @@ export default class LevelScene
     {
         const { camera, controls, lookAngles } = this
         lookAngles.setFromVector3(hit.copy(camera.position).sub(controls.target))
-        lookAngles.theta += yaw
-        lookAngles.phi += pitch
+        if (!FIXED_VIEW)
+        {
+            lookAngles.theta += yaw
+            lookAngles.phi += pitch
+        }
         lookAngles.radius *= zoom
         lookAngles.makeSafe()
         camera.position.setFromSpherical(lookAngles).add(controls.target)
