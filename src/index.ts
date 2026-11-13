@@ -6,6 +6,7 @@ import { type Campaign, createCampaign } from "./game/campaign"
 import GameView from "./game/gameView"
 import GamepadControl from "./game/gamepadControl"
 import { LocalSaveStore } from "./game/storage"
+import { mixer } from "./sound/mixer"
 
 const store = new LocalSaveStore()
 
@@ -58,8 +59,15 @@ title.querySelector(".reroll")!.addEventListener("click", () => showPreview(rand
 
 const music = document.querySelector<HTMLAudioElement>("audio")!
 
-music.addEventListener("play", () => soundButton.textContent = "🔊")
-music.addEventListener("pause", () => soundButton.textContent = "🔇")
+// the sound button stands for all sounds, not just the music
+music.addEventListener("play", () => {
+    soundButton.textContent = "🔊"
+    mixer().mute(false)
+})
+music.addEventListener("pause", () => {
+    soundButton.textContent = "🔇"
+    mixer().mute(true)
+})
 
 soundButton.addEventListener("click", () => {
     if (music.paused)
@@ -106,6 +114,7 @@ if (__DISABLE_MUSIC)
 }
 else
 {
+    mixer().attach(music, "music")
     music.play().catch(() => {
         window.addEventListener("pointerdown", startOnGesture)
         window.addEventListener("keydown", startOnGesture)
