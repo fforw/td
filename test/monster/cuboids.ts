@@ -351,6 +351,16 @@ describe("Acid cuboids", () => {
             }
         })
 
+        it("smites big ones whole, without small ones", () => {
+
+            const cuboids = pack()
+            cuboids.add(BIG_CUBOID, 0, 0, 0.3)
+            cuboids.add(SMALL_CUBOID, 1, 2, 0)
+            cuboids.smite(({ face }) => face === 0)
+            assert.deepEqual(cuboids.members.map(({ kind }) => kind), [SMALL_CUBOID])
+            assert.deepEqual(cuboids.deaths.map(({ kind, share }) => [kind, share]), [[BIG_CUBOID, 1]])
+        })
+
         it("breaks big ones up into 2 to 7 small ones", () => {
 
             const counts = new Set<number>()

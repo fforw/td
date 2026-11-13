@@ -597,7 +597,7 @@ export default class LevelScene
         const room = hero && this.level?.rooms.find(faces => faces.includes(hero.face))
         if (room)
         {
-            this.monsters?.killOn(new Set(room))
+            this.monsters?.smiteOn(new Set(room))
         }
     }
 

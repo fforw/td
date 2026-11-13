@@ -302,9 +302,9 @@ export default class CuboidPack extends MonsterPack<Cuboid>
      *
      * @return share of the volume of a big one that doesn't go into the small ones
      */
-    protected kill(cuboid: Cuboid, away: number): number
+    protected kill(cuboid: Cuboid, away: number, smite: boolean): number
     {
-        if (cuboid.kind.splits)
+        if (cuboid.kind.splits && !smite)
         {
             const { face, x, z, chase, goalX, goalZ } = cuboid
             const count = rng.nextInt(MIN_SPLIT, MAX_SPLIT)

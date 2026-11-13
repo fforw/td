@@ -1,4 +1,5 @@
 import type { FloorSpot } from "../map/dungeonWays"
+import { rng } from "../math/random"
 import type { BurstSphere, Death } from "./bursts"
 
 /**
@@ -141,10 +142,11 @@ export abstract class MonsterPack<M extends Monster = Monster>
      * Has a monster that died go its way, the default bursts all of it
      *
      * @param away  direction of the blow as a meeple facing
+     * @param smite whether it goes at once and all of it, without anything coming out of it
      *
      * @return share of its volume that bursts
      */
-    protected kill(_monster: M, _away: number): number
+    protected kill(_monster: M, _away: number, _smite: boolean): number
     {
         return 1
     }
@@ -152,10 +154,10 @@ export abstract class MonsterPack<M extends Monster = Monster>
     /**
      * Takes out a monster that died and has it burst, as far as it does
      */
-    private die(monster: M, away: number): void
+    private die(monster: M, away: number, smite: boolean): void
     {
         this.members.splice(this.members.indexOf(monster), 1)
-        const share = this.kill(monster, away)
+        const share = this.kill(monster, away, smite)
         if (share > 0)
         {
             this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away, share })
@@ -192,7 +194,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
                 if (monster.hp <= 0)
                 {
                     // right on top of the hero, they go where the blow goes
-                    this.die(monster, distance > 1e-6 ? Math.atan2(dx, dz) : facing)
+                    this.die(monster, distance > 1e-6 ? Math.atan2(dx, dz) : facing, false)
                 }
                 else
                 {
@@ -208,16 +210,15 @@ export abstract class MonsterPack<M extends Monster = Monster>
     }
 
     /**
-     * TEMP god mode: kills the given monsters on the spot, as a blow from a random direction would
+     * Annihilates the given monsters: they burst whole, as from a blow from a random direction, and nothing comes out of
+     * them, not even the small cuboids of a big one
      */
-    killAll(doomed: (monster: M) => boolean): number
+    smite(doomed: (monster: M) => boolean): void
     {
-        const killed = this.members.filter(doomed)
-        for (const monster of killed)
+        for (const monster of this.members.filter(doomed))
         {
-            this.die(monster, Math.random() * Math.PI * 2)
+            this.die(monster, rng.next(0, Math.PI * 2), true)
         }
-        return killed.length
     }
 
     /**
@@ -303,12 +304,13 @@ export default class Monsters
     }
 
     /**
-     * TEMP god mode: kills all monsters on the given faces, and whatever they break up into
+     * Annihilates all monsters on the given faces, see MonsterPack.smite()
      */
-    killOn(faces: ReadonlySet<number>): void
+    smiteOn(faces: ReadonlySet<number>): void
     {
-        while (this.packs.reduce((killed, pack) => killed + pack.killAll(({ face }) => faces.has(face)), 0) > 0)
+        for (const pack of this.packs)
         {
+            pack.smite(({ face }) => faces.has(face))
         }
     }
 
