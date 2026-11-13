@@ -1,3 +1,4 @@
+import { Matrix4, Quaternion, Vector3 } from "three"
 import { assert, describe, it } from "vitest"
 
 import { MEEPLE_SCALE } from "../../src/meeple/Meeple3D"
@@ -5,7 +6,7 @@ import { BRUTE } from "../../src/monster/brutes"
 import Bursts, { DENSITY, FEWEST, particleCount, sphereVolume } from "../../src/monster/bursts"
 import { BIG_CUBOID, SMALL_CUBOID } from "../../src/monster/cuboids"
 import { FLYING_EYE } from "../../src/monster/eyes"
-import type { MonsterKind } from "../../src/monster/monsters"
+import type { Monster, MonsterKind } from "../../src/monster/monsters"
 
 const FRAME = 1 / 60
 
@@ -13,8 +14,19 @@ const FRAME = 1 / 60
 function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1): Bursts
 {
     const bursts = new Bursts()
-    bursts.add({ kind, x: 1, z: 2, yaw, away, share })
+    const monster = { kind, face: 0, x: 1, z: 2, yaw } as Monster
+    bursts.add({ monster, kind, x: 1, z: 2, yaw, away, share, smite: false })
     return bursts
+}
+
+/**
+ * Returns the world matrix of the club bone of a brute at 1, 2 in its rest pose
+ */
+function clubMatrix(yaw: number): Matrix4
+{
+    const factor = BRUTE.scale * MEEPLE_SCALE
+    const root = new Matrix4().compose(new Vector3(1, 0, 2), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw), new Vector3(factor, factor, factor))
+    return root.multiply(new Matrix4().makeTranslation(-0.405, 0.561, 0.007))
 }
 
 function average(values: number[]): number
@@ -29,7 +41,10 @@ describe("Bursts", () => {
 
         const [body, club] = BRUTE.burst
         assert(particleCount(body, 1) === Math.round(sphereVolume(body, 1) * DENSITY))
-        assert(burst(BRUTE).particles.length === particleCount(body, 1) + particleCount(club, 1))
+        assert(burst(BRUTE).particles.length === particleCount(body, 1))
+        const bursts = new Bursts()
+        bursts.burst(club, clubMatrix(0), 0)
+        assert(bursts.particles.length === particleCount(club, 1))
         // a smaller monster of the same shape gets fewer, but never too few
         assert(particleCount(SMALL_CUBOID.burst[0], 0.5) < particleCount(SMALL_CUBOID.burst[0], 1))
         assert(particleCount({ ...body, rx: 0.01 }, 1) === FEWEST)
@@ -52,12 +67,18 @@ describe("Bursts", () => {
         // the club is held on the left of the model, which is where it looks with no turn
         for (const [yaw, side] of [[0, -1], [Math.PI, 1]])
         {
-            const particles = burst(BRUTE, yaw).particles.filter(({ color }) => color === clubColor)
+            const bursts = new Bursts()
+            bursts.burst(club, clubMatrix(yaw), 0)
+            const { particles } = bursts
+            assert(particles.every(({ color }) => color === clubColor))
             const x = average(particles.map(({ x }) => x)) - 1
             assert(Math.sign(x) === side)
-            assert(Math.abs(Math.abs(x) - Math.abs(club.x) * factor) < 0.03)
-            assert(particles.every(({ y }) => y >= (club.y - club.ry) * factor && y <= (club.y + club.ry) * factor))
+            assert(Math.abs(Math.abs(x) - 0.405 * factor) < 0.03)
+            // measured from the bone at its lower end
+            const bottom = (0.561 + club.y - club.ry) * factor, top = (0.561 + club.y + club.ry) * factor
+            assert(particles.every(({ y }) => y >= bottom - 1e-9 && y <= top + 1e-9))
         }
+        assert(club.bone === "Club" && !BRUTE.burst[0].bone)
 
         // eyes burst where they hover
         const eye = burst(FLYING_EYE).particles

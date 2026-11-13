@@ -160,7 +160,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
         const share = this.kill(monster, away, smite)
         if (share > 0)
         {
-            this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away, share })
+            this.deaths.push({ monster, kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away, share, smite })
         }
     }
 

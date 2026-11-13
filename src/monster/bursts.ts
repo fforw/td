@@ -1,6 +1,7 @@
+import { Matrix4, Quaternion, Vector3 } from "three"
 import { MEEPLE_SCALE } from "../meeple/Meeple3D"
 import { rng } from "../math/random"
-import type { MonsterKind } from "./monsters"
+import type { Monster, MonsterKind } from "./monsters"
 
 /**
  * Particles per cubic world unit of a burst sphere, and the fewest a sphere gets however small it is
@@ -39,6 +40,14 @@ const SHRINK = 0.4
  */
 const SPIN = 12
 
+const UP = new Vector3(0, 1, 0)
+const rootMatrix = new Matrix4()
+const position = new Vector3()
+const rotation = new Quaternion()
+const scale = new Vector3()
+const point = new Vector3()
+const outward = new Vector3()
+
 
 /**
  * Rough part of the volume of a monster, a sphere scaled along its axes, in units of the model and turned with it. The
@@ -46,6 +55,8 @@ const SPIN = 12
  */
 export interface BurstSphere
 {
+    /** bone it goes with, measured from it, for a part that is still shown moving on after the monster died */
+    bone?: string
     x: number
     y: number
     z: number
@@ -62,6 +73,7 @@ export interface BurstSphere
  */
 export interface Death
 {
+    monster: Monster
     kind: MonsterKind
     x: number
     z: number
@@ -70,6 +82,8 @@ export interface Death
     away: number
     /** share of its volume that bursts, the rest went on in some other way */
     share: number
+    /** annihilated, it bursts whole at once */
+    smite: boolean
 }
 
 export interface Particle
@@ -129,54 +143,69 @@ export default class Bursts
     readonly particles: Particle[] = []
 
     /**
-     * Fills the burst spheres of a monster that died with particles
+     * Fills the burst spheres of a monster that died with particles, those of its body only. Spheres that go with a bone
+     * are left to the view that poses it, see burst().
      */
     add({ kind, x, z, yaw, away, share }: Death): void
     {
-        const factor = kind.scale * MEEPLE_SCALE
-        const sin = Math.sin(yaw), cos = Math.cos(yaw)
-        const blowX = Math.sin(away) * BLOW_SPEED, blowZ = Math.cos(away) * BLOW_SPEED
+        rootMatrix.compose(position.set(x, 0, z), rotation.setFromAxisAngle(UP, yaw), scale.setScalar(kind.scale * MEEPLE_SCALE))
         for (const sphere of kind.burst)
         {
-            const count = particleCount(sphere, kind.scale, share)
-            for (let i = 0; i < count; i++)
+            if (!sphere.bone)
             {
-                // evenly within the unit sphere, then scaled along the axes of the model and turned with it
-                let ux: number, uy: number, uz: number
-                do
-                {
-                    ux = rng.next(-1, 1)
-                    uy = rng.next(-1, 1)
-                    uz = rng.next(-1, 1)
-                } while (ux * ux + uy * uy + uz * uz > 1)
-                const lx = (sphere.x + ux * sphere.rx) * factor
-                const ly = (sphere.y + uy * sphere.ry) * factor
-                const lz = (sphere.z + uz * sphere.rz) * factor
-                // the outward push turns with the model as well
-                const ox = ux * BURST_SPEED, oz = uz * BURST_SPEED
-                let ax = rng.next(-1, 1), ay = rng.next(-1, 1), az = rng.next(-1, 1)
-                const length = Math.hypot(ax, ay, az) || 1
-                ax /= length
-                ay /= length
-                az /= length
-                this.particles.push({
-                    x: x + lx * cos + lz * sin,
-                    y: ly,
-                    z: z - lx * sin + lz * cos,
-                    vx: ox * cos + oz * sin + blowX,
-                    vy: uy * BURST_SPEED + rng.next(0, BURST_SPEED),
-                    vz: -ox * sin + oz * cos + blowZ,
-                    ax,
-                    ay,
-                    az,
-                    spin: rng.next(-SPIN, SPIN),
-                    turn: rng.next(0, Math.PI * 2),
-                    size: PARTICLE_SIZE * rng.next(0.6, 1.3),
-                    life: rng.next(SHORTEST, LONGEST),
-                    age: 0,
-                    color: sphere.colors[rng.nextInt(0, sphere.colors.length - 1)]
-                })
+                this.burst(sphere, rootMatrix, away, share)
             }
+        }
+    }
+
+    /**
+     * Fills a burst sphere with particles
+     *
+     * @param sphere    sphere to fill
+     * @param matrix    world matrix of what the sphere is measured from, the model or a bone of it
+     * @param away      direction of the blow as a meeple facing
+     * @param share     share of the volume that bursts
+     */
+    burst(sphere: BurstSphere, matrix: Matrix4, away: number, share = 1): void
+    {
+        const scale = Math.cbrt(Math.abs(matrix.determinant())) / MEEPLE_SCALE
+        const blowX = Math.sin(away) * BLOW_SPEED, blowZ = Math.cos(away) * BLOW_SPEED
+        const count = particleCount(sphere, scale, share)
+        for (let i = 0; i < count; i++)
+        {
+            // evenly within the unit sphere, then scaled along its axes and placed with the matrix
+            let ux: number, uy: number, uz: number
+            do
+            {
+                ux = rng.next(-1, 1)
+                uy = rng.next(-1, 1)
+                uz = rng.next(-1, 1)
+            } while (ux * ux + uy * uy + uz * uz > 1)
+            point.set(sphere.x + ux * sphere.rx, sphere.y + uy * sphere.ry, sphere.z + uz * sphere.rz).applyMatrix4(matrix)
+            // the outward push turns with it as well
+            outward.set(ux, uy, uz).transformDirection(matrix).multiplyScalar(Math.hypot(ux, uy, uz) * BURST_SPEED)
+            let ax = rng.next(-1, 1), ay = rng.next(-1, 1), az = rng.next(-1, 1)
+            const length = Math.hypot(ax, ay, az) || 1
+            ax /= length
+            ay /= length
+            az /= length
+            this.particles.push({
+                x: point.x,
+                y: point.y,
+                z: point.z,
+                vx: outward.x + blowX,
+                vy: outward.y + rng.next(0, BURST_SPEED),
+                vz: outward.z + blowZ,
+                ax,
+                ay,
+                az,
+                spin: rng.next(-SPIN, SPIN),
+                turn: rng.next(0, Math.PI * 2),
+                size: PARTICLE_SIZE * rng.next(0.6, 1.3),
+                life: rng.next(SHORTEST, LONGEST),
+                age: 0,
+                color: sphere.colors[rng.nextInt(0, sphere.colors.length - 1)]
+            })
         }
     }
 
