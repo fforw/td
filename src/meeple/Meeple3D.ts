@@ -146,6 +146,11 @@ const NARROW_GAIT = { roll: 0.9, bounce: 1.9, speed: 0.85, swing: 0.35 }
 const ATTENTION_SPEED = 3
 
 /**
+ * Seconds a meeple takes to fall over, and to get up again
+ */
+const FALL_TIME = 0.4
+
+/**
  * Maximum angle in radians a meeple looking at the camera tilts its head up
  */
 const MAX_LOOK_UP = 1.0
@@ -214,6 +219,10 @@ export interface Meeple
      * Turns the meeple toward the camera with its face up to the viewer, e.g. while the player interacts with it
      */
     lookAtCamera?: boolean
+    /**
+     * Lies on its back with the eyes shut. It falls over when this turns on, and gets up when it turns off.
+     */
+    fallen?: boolean
     /**
      * Color of the shape showing where something hides the meeple, none without. See showSilhouettes() and setSilhouette().
      */
@@ -583,6 +592,10 @@ export default class MeepleCrowd
      */
     private readonly attention: number[] = []
     /**
+     * How far each meeple has fallen over, from 0 standing to 1 lying
+     */
+    private readonly lying: number[] = []
+    /**
      * Animation states of the right and the left hand
      */
     private readonly itemStates: [ItemState, ItemState][] = []
@@ -809,6 +822,8 @@ export default class MeepleCrowd
         const i = this.meeples.length
         this.meeples.push(meeple)
         this.attention.push(0)
+        // one that already lies when it comes doesn't fall again
+        this.lying.push(meeple.fallen ? 1 : 0)
         this.itemStates.push([newItemState(), newItemState()])
         // start somewhere into the first pause, so the crowd doesn't wait and then all start blinking together
         this.nextBlink.push(this.lastTime + rng.next() * blinkPause(meeple.gait))
@@ -829,7 +844,7 @@ export default class MeepleCrowd
         {
             return
         }
-        for (const list of [this.meeples, this.attention, this.itemStates, this.nextBlink, this.blinkDuration])
+        for (const list of [this.meeples, this.attention, this.lying, this.itemStates, this.nextBlink, this.blinkDuration])
         {
             list.splice(i, 1)
         }
@@ -937,8 +952,13 @@ export default class MeepleCrowd
         this.meeples.forEach((meeple, i) => {
             const { position, look, phase, gait } = meeple
 
+            // falling speeds up like dropping, getting up slows down toward standing
+            const fallStep = step / ATTENTION_SPEED / FALL_TIME
+            const lying = this.lying[i] += Math.max(-fallStep, Math.min(fallStep, (meeple.fallen ? 1 : 0) - this.lying[i]))
+            const fall = lying * lying * Math.PI / 2
+
             let bounce = 0, stretch = 1, roll = 0, swing = 0
-            if (meeple.walking ?? this.walking)
+            if ((meeple.walking ?? this.walking) && lying === 0)
             {
                 // the body is highest and rocked furthest over the foot it stands on
                 const speed = WALK_SPEED * walkSpeedMultiplier(meeple)
@@ -975,11 +995,14 @@ export default class MeepleCrowd
             // lean back, away from the camera, around the feet
             toCamera.set(cam.x - position.x, 0, cam.z - position.z).normalize()
             axis.crossVectors(UP, toCamera)
-            leanRotation.setFromAxisAngle(axis, -this.lean)
+            leanRotation.setFromAxisAngle(axis, -this.lean * Math.cos(fall))
             facingRotation.setFromAxisAngle(UP, facing)
             rotation.multiplyQuaternions(leanRotation, facingRotation)
+            // over backwards around the feet, raised so the head rests on the floor rather than in it
+            rotation.multiply(fallRotation.setFromAxisAngle(SIDEWAYS, -fall))
+            const rise = bounce + Math.sin(fall) * HEAD_RADIUS
 
-            figure.compose(tmpPos.set(position.x, position.y + bounce * MEEPLE_SCALE, position.z), rotation, tmpScale.setScalar(MEEPLE_SCALE))
+            figure.compose(tmpPos.set(position.x, position.y + rise * MEEPLE_SCALE, position.z), rotation, tmpScale.setScalar(MEEPLE_SCALE))
             if (roll !== 0)
             {
                 // rock around the facing direction at belly height
@@ -998,7 +1021,8 @@ export default class MeepleCrowd
             this.head.setMatrixAt(i, part)
             this.eyes.setMatrixAt(i, part)
 
-            this.blink.setX(i, this.blinkAt(i, time))
+            const blink = this.blinkAt(i, time)
+            this.blink.setX(i, lying > 0.5 ? 1 : blink)
 
             const hair = this.hair.get(look.hairStyle)
             if (hair)
@@ -1094,6 +1118,8 @@ export default class MeepleCrowd
 }
 
 const UP = new Vector3(0, 1, 0)
+const SIDEWAYS = new Vector3(1, 0, 0)
+const fallRotation = new Quaternion()
 const toCamera = new Vector3()
 const axis = new Vector3()
 const leanRotation = new Quaternion()

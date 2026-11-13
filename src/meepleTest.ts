@@ -191,6 +191,8 @@ function checkbox(label: string, get: () => boolean, set: (v: boolean) => void):
 slider("lean", 0, 0.8, () => crowd.lean, v => crowd.lean = v)
 slider("head tilt", -0.3, 1, () => crowd.headTilt, v => crowd.headTilt = v)
 checkbox("outlines", () => crowd.outlinesVisible, v => crowd.outlinesVisible = v)
+// every other one, to see them fall next to those standing
+checkbox("fallen", () => !!crowd.meeples[0]?.fallen, v => crowd.meeples.forEach((m, i) => m.fallen = v && i % 2 === 0))
 
 const FACING_MODES = ["camera", "random", "spin"]
 
