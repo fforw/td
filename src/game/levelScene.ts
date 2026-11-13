@@ -816,6 +816,16 @@ export default class LevelScene
     }
 
     /**
+     * Returns whether there is nothing left to find in the level: heroes have been everywhere, which also means no monsters
+     * come back, and all the treasure is gone. False until the level is there.
+     */
+    spent(): boolean
+    {
+        const { exploration, chests } = this
+        return !!exploration && !!chests && chests.empty && exploration.hasAll(this.floorSet)
+    }
+
+    /**
      * Returns what the map of the level shows, null until the level is there
      */
     mapState(): LevelMapState | null

@@ -41,6 +41,23 @@ describe("Exploration", () => {
         assert(loaded.encode() === exploration.encode())
     })
 
+    it("knows when all of some faces are visited", () => {
+
+        const { level, world, slots } = build()
+        const exploration = new Exploration(world, slots)
+        const [room] = level.rooms
+        assert(exploration.hasAll([]))
+        assert(!exploration.hasAll(room))
+        for (const face of room.slice(1))
+        {
+            exploration.visit(face)
+        }
+        assert(!exploration.hasAll(room))
+        exploration.visit(room[0])
+        assert(exploration.hasAll(room))
+        assert(!exploration.hasAll(level.rooms.flat()))
+    })
+
     it("leaves monsters only where nobody has been", () => {
 
         const { level, world, slots } = build()

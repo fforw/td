@@ -264,6 +264,14 @@ export default class ChestHoard
     }
 
     /**
+     * Returns whether there is nothing left to get, with all chests open and all coins picked up
+     */
+    get empty(): boolean
+    {
+        return this.chests.every(({ openedAt, coins }) => openedAt !== null && coins.every(({ takenAt }) => takenAt !== null))
+    }
+
+    /**
      * Pops a chest open, which spills its coins
      */
     open(chest: Chest, time: number): void

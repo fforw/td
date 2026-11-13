@@ -247,6 +247,11 @@
     font-size: 1.1rem;
 }
 
+#game .notice .spent
+{
+    color: #ffcf6b;
+}
+
 #game .notice .enter
 {
     background: #c0244e;

@@ -1007,6 +1007,11 @@ export default class GameView implements PadTarget
                 explored => {
                     this.campaign.explored[target] = explored
                     this.store.save(this.campaign)
+                    // happens once at most, as there is nothing more to explore after
+                    if (this.level?.spent())
+                    {
+                        this.render()
+                    }
                 }
             )
             this.levelTarget = job.target
@@ -1410,8 +1415,13 @@ export default class GameView implements PadTarget
         const { name } = campaign.heroes.find(h => h.id === job.heroId)!
         const { kind } = overworld(campaign).patches[job.target]
         const place = KIND_ICONS[kind] + " " + KIND_NAMES[kind]
+        const spent = job.inside && this.levelTarget === job.target && this.level?.spent()
         return hasArrived(campaign, job)
-            ? el("div", { className: "notice followed" }, "🛡️ " + name + (job.inside ? " is in " : " is at ") + place, ...this.renderOrders(job))
+            ? el("div", { className: "notice followed" },
+                "🛡️ " + name + (job.inside ? " is in " : " is at ") + place,
+                ...spent ? [el("span", { className: "spent" }, "⚠️ All explored, no treasure left")] : [],
+                ...this.renderOrders(job)
+            )
             : el("div", { className: "notice followed" },
                 "🛡️ " + name + " → " + (job.returning ? "🏰 " + campaign.castleName : place) + ", " + this.jobStatus(job)
             )

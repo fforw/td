@@ -739,7 +739,8 @@ Glyphs are built from the stroke data of a source kanji per concept
   seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in
   the unexplored parts, and whatever lived on known floor is gone for good,
-  killed or not. A hero's
+  killed or not. Once all floor is known and the chests and coins are gone, the
+  notice of the hero in there says so (`LevelScene.spent()`). A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
   decided. The level then starts anew, with its chests full and its cuboids

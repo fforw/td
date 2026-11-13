@@ -161,4 +161,26 @@ describe("ChestHoard", () => {
         assert.equal(again.coins.length, left)
         assert.isNull(hoard(opened).closedNear(0, 0))
     })
+
+    it("is empty once every coin of every chest is taken", () => {
+
+        const opened: OpenedChests = {}
+        const chests = hoard(opened)
+        assert(!chests.empty, "closed")
+        for (const chest of chests.chests)
+        {
+            chests.open(chest, 0)
+        }
+        assert(!chests.empty, "coins around")
+        for (const { coins } of chests.chests)
+        {
+            for (const { x, z } of coins)
+            {
+                chests.collect(x, z, LONG_AFTER)
+            }
+        }
+        assert(chests.empty)
+        assert(hoard(opened).empty, "after a reload")
+        assert(!hoard({}).empty, "after the level started anew")
+    })
 })

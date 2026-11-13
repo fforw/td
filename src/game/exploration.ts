@@ -79,6 +79,21 @@ export default class Exploration
         return true
     }
 
+    /**
+     * Returns whether all of the given faces have been visited
+     */
+    hasAll(faces: Iterable<number>): boolean
+    {
+        for (const face of faces)
+        {
+            if (!this.has(face))
+            {
+                return false
+            }
+        }
+        return true
+    }
+
     encode(): string
     {
         let end = this.bits.length
