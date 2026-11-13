@@ -2,6 +2,7 @@ import {
     BoxGeometry,
     BufferGeometry,
     Float32BufferAttribute,
+    InstancedBufferAttribute,
     InstancedMesh,
     Matrix4,
     Mesh,
@@ -11,6 +12,7 @@ import {
 } from "three"
 import { wallGround } from "../map/dungeonWalls"
 import { EdgeType } from "../map/geometry"
+import { type NearSpaces, type NearWalls, thickWallSpaces, thinWallEndSpaces, thinWallSpace } from "../map/nearWalls"
 import type PatchWorld from "../map/PatchWorld"
 import { SLOT_SHIFT } from "../map/PatchWorld"
 import { next, prev } from "../map/QuadPatch"
@@ -71,32 +73,48 @@ const wallMaterial = new MeshStandardMaterial({ color: "#6e6c72", roughness: 1 }
 const singleWallMaterial = new MeshStandardMaterial({ color: "#423935", roughness: 0.3 })
 const thinWallGeometry = new BoxGeometry(1, 1, 1)
 
+const NO_SPACES: NearSpaces = [0, 0]
+
 
 /**
  * Creates the thick walls of the packed patch in the given slot of the world: the wall ground raised to wall height, with
  * sides along its outline. The sides between patches are inside of the wall and never get seen.
+ *
+ * @param world     world with all patches of the level
+ * @param slot      slot of the patch
+ * @param near      tells the near walls, which gives each corner the spaces to get cut for, see applyWallCut()
  */
-export function createThickWalls(world: PatchWorld, slot: number): Mesh
+export function createThickWalls(world: PatchWorld, slot: number, near?: NearWalls): Mesh
 {
     const positions: number[] = []
+    const nearSpace: number[] = []
     const { triangles, outline } = wallGround(world, slot)
+    const spaces = near ? thickWallSpaces(triangles, outline, near) : new Map<string, NearSpaces>()
+    const spacesAt = (x: number, z: number): NearSpaces => spaces.get(x + "," + z) ?? NO_SPACES
 
     for (let i = 0; i < triangles.length; i += 2)
     {
         positions.push(triangles[i] * SCALE, THICK_WALL_HEIGHT, triangles[i + 1] * SCALE)
+        nearSpace.push(...spacesAt(triangles[i], triangles[i + 1]))
     }
 
     for (const [x0, z0, x1, z1] of outline)
     {
         const ax = x0 * SCALE, az = z0 * SCALE, bx = x1 * SCALE, bz = z1 * SCALE
+        const a = spacesAt(x0, z0), b = spacesAt(x1, z1)
         positions.push(
             ax, 0, az, bx, 0, bz, bx, THICK_WALL_HEIGHT, bz,
             ax, 0, az, bx, THICK_WALL_HEIGHT, bz, ax, THICK_WALL_HEIGHT, az
         )
+        nearSpace.push(...a, ...b, ...b, ...a, ...b, ...a)
     }
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    if (near)
+    {
+        geometry.setAttribute("nearSpace", new Float32BufferAttribute(nearSpace, 2))
+    }
     // flat sides would each look like a column bulging out under the light, which changes direction along them
     geometry.setAttribute("normal", new Float32BufferAttribute(smoothNormals(positions, SMOOTH_ANGLE), 3))
     geometry.computeBoundingSphere()
@@ -308,13 +326,15 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
  * @param world     world with all patches of the level
  * @param slots     slots of the patches of the level
  * @param single    whether to create the single walls or all others
+ * @param near      tells the near walls, which gives each wall the space to get cut for, see applyWallCut()
  */
-export function createThinWalls(world: PatchWorld, slots: readonly number[], single: boolean): InstancedMesh
+export function createThinWalls(world: PatchWorld, slots: readonly number[], single: boolean, near?: NearWalls): InstancedMesh
 {
     const singles = findSingleThinWalls(world, slots)
     const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
 
     const matrices: Matrix4[] = []
+    const nearSpace: number[] = []
     const position = new Vector3()
     const rotation = new Quaternion()
     const scale = new Vector3()
@@ -352,10 +372,17 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[], sin
                 rotation.setFromAxisAngle(up, Math.atan2(z0 - z1, x1 - x0)),
                 scale.set(length + reach0 + reach1, THIN_WALL_HEIGHT, THIN_WALL_THICKNESS)
             ))
+            nearSpace.push(near ? thinWallSpace(world, base | h, near) : 0, 0)
         }
     }
 
-    const mesh = new InstancedMesh(thinWallGeometry, single ? singleWallMaterial : wallMaterial, matrices.length)
+    let geometry = thinWallGeometry
+    if (near)
+    {
+        geometry = thinWallGeometry.clone()
+        geometry.setAttribute("nearSpace", new InstancedBufferAttribute(new Float32Array(nearSpace), 2))
+    }
+    const mesh = new InstancedMesh(geometry, single ? singleWallMaterial : wallMaterial, matrices.length)
     matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix))
     return mesh
 }
@@ -367,11 +394,14 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[], sin
  *
  * @param world     world with all patches of the level
  * @param slots     slots of the patches of the level
+ * @param near      tells the near walls. A corner gets cut along with the near walls that end at it.
  */
-export function createThinWallCorners(world: PatchWorld, slots: readonly number[]): Mesh
+export function createThinWallCorners(world: PatchWorld, slots: readonly number[], near?: NearWalls): Mesh
 {
     const triangles: number[] = []
     const normals: number[] = []
+    const nearSpace: number[] = []
+    const spaces = near ? thinWallEndSpaces(world, slots, near) : new Map<string, NearSpaces>()
     for (const { x, z, ax, az, bx, bz, tight } of findThinWallCorners(world, slots))
     {
         addRoundedCorner(triangles, normals, x, z, ax, az, bx, bz)
@@ -379,10 +409,19 @@ export function createThinWallCorners(world: PatchWorld, slots: readonly number[
         {
             addFlatCorner(triangles, normals, x, z, ax, az, bx, bz)
         }
+        const at = spaces.get(x + "," + z) ?? NO_SPACES
+        while (nearSpace.length < triangles.length / 3 * 2)
+        {
+            nearSpace.push(...at)
+        }
     }
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(triangles, 3))
+    if (near)
+    {
+        geometry.setAttribute("nearSpace", new Float32BufferAttribute(nearSpace, 2))
+    }
     geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3))
     geometry.computeBoundingSphere()
     return new Mesh(geometry, wallMaterial)
