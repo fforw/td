@@ -282,6 +282,8 @@ export default class LevelScene
     private unplaced = true
     /** what a controller does in the current frame, if it is in charge of the hero the view is with */
     private steering: PadInput | null = null
+    /** TEMP god mode: up on the cross was down in the last frame */
+    private godHeld = false
     /** what keyboard and mouse tell the hero the view is with, which they do in frames without a controller steering */
     readonly keys = new KeySteer()
 
@@ -573,6 +575,25 @@ export default class LevelScene
     steer(input: PadInput): void
     {
         this.steering = input
+        // TEMP god mode, once per press
+        if (input.godKill && !this.godHeld)
+        {
+            this.godKill()
+        }
+        this.godHeld = input.godKill
+    }
+
+    /**
+     * TEMP god mode: kills all monsters in the room of the hero the view is with
+     */
+    private godKill(): void
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        const room = hero && this.level?.rooms.find(faces => faces.includes(hero.face))
+        if (room)
+        {
+            this.monsters?.killOn(new Set(room))
+        }
     }
 
     /**

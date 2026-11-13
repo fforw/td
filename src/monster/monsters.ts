@@ -191,6 +191,22 @@ export abstract class MonsterPack<M extends Monster = Monster>
     }
 
     /**
+     * TEMP god mode: kills the given monsters on the spot, as a blow from a random direction would
+     */
+    killAll(doomed: (monster: M) => boolean): number
+    {
+        const killed = this.members.filter(doomed)
+        for (const monster of killed)
+        {
+            this.members.splice(this.members.indexOf(monster), 1)
+            const away = Math.random() * Math.PI * 2
+            this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away })
+            this.kill(monster, away)
+        }
+        return killed.length
+    }
+
+    /**
      * Returns whether any monster can see a hero right now, whether it has got around to noticing them or not
      */
     sees(hero: Prey): boolean
@@ -270,6 +286,16 @@ export default class Monsters
     strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): number
     {
         return this.packs.reduce((hits, pack) => hits + pack.strike(x, z, facing, reach, width, damage), 0)
+    }
+
+    /**
+     * TEMP god mode: kills all monsters on the given faces, and whatever they break up into
+     */
+    killOn(faces: ReadonlySet<number>): void
+    {
+        while (this.packs.reduce((killed, pack) => killed + pack.killAll(({ face }) => faces.has(face)), 0) > 0)
+        {
+        }
     }
 
     /**

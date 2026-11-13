@@ -47,6 +47,8 @@ export interface PadInput
     attack: boolean
     /** left trigger */
     block: boolean
+    /** TEMP god mode: up on the cross kills all monsters in the room of the hero */
+    godKill: boolean
 }
 
 /**
@@ -325,7 +327,8 @@ export function readPad(pad: PadState): PadInput
         aimY,
         dash,
         attack,
-        block
+        block,
+        godKill: isPressed(pad, DPAD_UP)
     }
 }
 
