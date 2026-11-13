@@ -332,6 +332,10 @@ describe("Acid cuboids", () => {
             cuboids.add(SMALL_CUBOID, 0, 0, 0.3)
             cuboids.strike(0, 0, 0, REACH, WIDTH, SMALL_CUBOID.hp)
             assert(cuboids.members.length === 0)
+            // to burst, carried off in the direction of the blow
+            assert(cuboids.deaths.length === 1)
+            const [{ kind, x, z, away }] = cuboids.deaths
+            assert(kind === SMALL_CUBOID && x === 0 && z === 0.3 && away === 0)
         })
 
         it("breaks big ones up into 2 to 7 small ones", () => {

@@ -1,4 +1,5 @@
 import type { FloorSpot } from "../map/dungeonWays"
+import type { BurstSphere, Death } from "./bursts"
 
 /**
  * Seconds after a monster did damage to someone in which no monster can do so again
@@ -35,6 +36,8 @@ export interface MonsterKind
     big: boolean
     /** hovers over the floor instead of walking on it */
     flying: boolean
+    /** rough volume it bursts into particles from when it dies, none for one that goes another way */
+    burst: readonly BurstSphere[]
 }
 
 export interface Monster extends FloorSpot
@@ -102,6 +105,9 @@ export abstract class MonsterPack<M extends Monster = Monster>
 {
     readonly members: M[] = []
 
+    /** monsters that died since the scene last took them, to burst */
+    readonly deaths: Death[] = []
+
     constructor(protected readonly floor: MonsterFloor)
     {
     }
@@ -167,7 +173,9 @@ export abstract class MonsterPack<M extends Monster = Monster>
                 {
                     this.members.splice(this.members.indexOf(monster), 1)
                     // right on top of the hero, they go where the blow goes
-                    this.kill(monster, distance > 1e-6 ? Math.atan2(dx, dz) : facing)
+                    const away = distance > 1e-6 ? Math.atan2(dx, dz) : facing
+                    this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away })
+                    this.kill(monster, away)
                 }
                 else
                 {

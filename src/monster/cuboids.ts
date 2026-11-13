@@ -87,6 +87,8 @@ export const BIG_CUBOID: CuboidKind = {
     hp: 8,
     big: true,
     flying: false,
+    // comes down as small ones
+    burst: [],
     damage: 3,
     hopLength: 0.38,
     hopTime: 0.5,
@@ -102,6 +104,7 @@ export const SMALL_CUBOID: CuboidKind = {
     hp: 2,
     big: false,
     flying: false,
+    burst: [{ x: 0, y: 0.48, z: 0, rx: 0.48, ry: 0.48, rz: 0.48, colors: ["#24c550"] }],
     damage: 1,
     hopLength: 0.3,
     hopTime: 0.32,

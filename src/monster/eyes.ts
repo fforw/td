@@ -99,6 +99,8 @@ export const FLYING_EYE: EyeKind = {
     hp: 4,
     big: false,
     flying: true,
+    // at the height it hovers at
+    burst: [{ x: 0, y: 1, z: 0, rx: 0.25, ry: 0.25, rz: 0.25, colors: ["#4760e5"] }],
     damage: 1,
     speed: 0.9
 }
