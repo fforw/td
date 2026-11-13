@@ -108,14 +108,15 @@ const HURT_FLASH_TIME = 250
  */
 const COIN_SEED = 0x7c3a
 
-const CAMERA_ANGLE = 56 * DEG2RAD_FACTOR
+const CAMERA_ANGLE = 34
 const CAMERA_DISTANCE = 4.5
 
+const CAMERA_RAD = (90 - CAMERA_ANGLE) * DEG2RAD_FACTOR
 /**
  * Camera offset from the hero in world units. The view keeps looking from the same side, along VIEW_AWAY, with the walls
  * in front of the hero see-through, so that a direction on the screen always is the same one in the level.
  */
-const CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_ANGLE) * CAMERA_DISTANCE,Math.sin(CAMERA_ANGLE) * CAMERA_DISTANCE)
+const CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_RAD) * CAMERA_DISTANCE,Math.sin(CAMERA_RAD) * CAMERA_DISTANCE)
 
 const MIN_DISTANCE = 1.5
 const MAX_DISTANCE = 10
