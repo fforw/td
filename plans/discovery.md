@@ -716,6 +716,13 @@ Glyphs are built from the stroke data of a source kanji per concept
   Monsters are big or small and walk or fly. Those on the same ground keep
   apart, a flying one only from big ones on the ground and from heroes, who
   count as big.
+- A monster that dies bursts into small cubes (`monster/bursts.ts`), as a
+  fallback until monsters get ways of dying of their own. Each kind gives its
+  rough volume as a few spheres scaled along the axes of the model, with the
+  colors of that part, e.g. the brute one for its body and one for its club.
+  The cubes fill them by volume, fly out and away from the blow, fall, bounce
+  on the floor and shrink away within 1 to 1.6 seconds. A big cuboid has none,
+  as it breaks up instead.
 - The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
   from heroes: it picks a spot that sees them, as far off as it can without a
   long way there, at least 1 away. While it sees someone it fires a fast bolt

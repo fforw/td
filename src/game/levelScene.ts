@@ -22,6 +22,8 @@ import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import BruteCrowd from "../monster/BruteCrowd"
+import BurstCrowd from "../monster/BurstCrowd"
+import Bursts from "../monster/bursts"
 import BrutePack, { placeBrutes } from "../monster/brutes"
 import CuboidCrowd from "../monster/CuboidCrowd"
 import EyeCrowd from "../monster/EyeCrowd"
@@ -258,6 +260,8 @@ export default class LevelScene
     private eyeCrowd: EyeCrowd | null = null
     private brutes: BrutePack | null = null
     private bruteCrowd: BruteCrowd | null = null
+    private readonly bursts = new Bursts()
+    private burstCrowd: BurstCrowd | null = null
     private readonly marks = new HeroMarks()
     private slots: number[] = []
     private entrance = 0
@@ -479,6 +483,9 @@ export default class LevelScene
         this.bruteCrowd = bruteCrowd
 
         this.monsters = new Monsters([cuboids, eyes, brutes], floor)
+        const burstCrowd = new BurstCrowd(field)
+        this.scene.add(burstCrowd.mesh)
+        this.burstCrowd = burstCrowd
     }
 
     /**
@@ -923,6 +930,17 @@ export default class LevelScene
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
         this.bruteCrowd!.update(this.brutes!.members, delta)
+
+        const { bursts } = this
+        for (const pack of monsters.packs)
+        {
+            for (const death of pack.deaths.splice(0))
+            {
+                bursts.add(death)
+            }
+        }
+        bursts.update(delta)
+        this.burstCrowd!.update(bursts.particles)
     }
 
     /**
