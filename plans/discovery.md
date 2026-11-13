@@ -950,8 +950,10 @@ travels along the room graph instead.
   that doorway moves it onto its real position.
 - Changes of gain, cutoff and position ramp over a fraction of a second,
   so a hero walking through a door fades sound in instead of switching.
-- Room ambience (dripping, fire, wind) are loops placed per space, which
-  makes them fade in at the doorway.
+- Room ambience (dripping, fire, wind) is a loop at the middle of each
+  room, which makes it fade in at the doorway. Corridors have none. For
+  now the loops are generated: brown noise with drips, a few variants
+  with different playback rates.
 - Later: per-face walking distance instead of hops, baked in the map
   worker next to the lighting, once single mobiles make noise. Mobiles
   could hear heroes over the same distance.

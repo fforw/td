@@ -30,6 +30,9 @@ import EyePack, { placeEyes } from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
+import LevelSound from "../sound/LevelSound"
+import { mixer } from "../sound/mixer"
+import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio, SCALE } from "../render/scene3d"
@@ -131,6 +134,7 @@ const FLOOR = new Plane(new Vector3(0, 1, 0), 0)
 
 const walkPosition: number[] = []
 const hit = new Vector3()
+const forward = new Vector3()
 
 /**
  * What heroes can carry into a level
@@ -241,6 +245,7 @@ export default class LevelScene
     private chests: ChestHoard | null = null
     private treasure: TreasureView | null = null
     private exits: LevelExit[] = []
+    private sound: LevelSound | null = null
     /** the hero the view is with was close enough to take an exit in the last frame */
     private atExit = false
     private crowd: MeepleCrowd | null = null
@@ -361,9 +366,27 @@ export default class LevelScene
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
         this.addMonsters(level, meshes, seed, chests)
+        this.addSound(level, meshes, seed)
 
         this.setHeroes(this.heroes)
         this.client.terminate()
+    }
+
+    private addSound({ rooms, corridors }: DungeonLevel, { world }: LevelMeshes, seed: number): void
+    {
+        const center = (face: number): [number, number] => faceCenter(world, face)
+        const middles = rooms.map(faces => {
+            let x = 0, z = 0
+            for (const face of faces)
+            {
+                const [fx, fz] = center(face)
+                x += fx
+                z += fz
+            }
+            return [x / faces.length, z / faces.length] as const
+        })
+        this.sound = new LevelSound(mixer(), new SoundSpaces(rooms, corridors, center), middles, seed)
+        this.sound.setRunning(this.running)
     }
 
     /**
@@ -1032,6 +1055,23 @@ export default class LevelScene
     /**
      * Returns the floor face with its center closest to the given point in world units, null with none close by
      */
+    /**
+     * Has the hero the view is with listen, with left and right as on screen
+     */
+    private updateSound(): void
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (!hero || !this.sound)
+        {
+            return
+        }
+        const { position } = hero.meeple
+        this.camera.getWorldDirection(forward)
+        const length = Math.hypot(forward.x, forward.z) || 1
+        const face = hero.walk ? this.closestOnWay(hero) : hero.faces[0]
+        this.sound.listen(face, position.x, position.z, forward.x / length, forward.z / length)
+    }
+
     private floorAt(x: number, z: number): number | null
     {
         let closest: number | null = null
@@ -1087,6 +1127,7 @@ export default class LevelScene
             return
         }
         this.running = running
+        this.sound?.setRunning(running)
         this.lastFrame = performance.now() / 1000
         this.renderer.setAnimationLoop(running ? () => {
             const time = performance.now() / 1000
@@ -1098,6 +1139,7 @@ export default class LevelScene
             {
                 this.updateHeroes(time, delta)
                 this.updateView(time, delta)
+                this.updateSound()
                 flickerLights(meshes.field, level.lighting!.lights, time)
                 updateLightField(this.renderer, meshes.field)
             }
@@ -1112,6 +1154,7 @@ export default class LevelScene
     dispose(): void
     {
         this.setRunning(false)
+        this.sound?.dispose()
         this.controls.dispose()
         this.client.terminate()
         this.renderer.dispose()
