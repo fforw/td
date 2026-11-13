@@ -10,10 +10,10 @@ import type { MonsterKind } from "../../src/monster/monsters"
 const FRAME = 1 / 60
 
 
-function burst(kind: MonsterKind, yaw = 0, away = 0): Bursts
+function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1): Bursts
 {
     const bursts = new Bursts()
-    bursts.add({ kind, x: 1, z: 2, yaw, away })
+    bursts.add({ kind, x: 1, z: 2, yaw, away, share })
     return bursts
 }
 
@@ -35,9 +35,13 @@ describe("Bursts", () => {
         assert(particleCount({ ...body, rx: 0.01 }, 1) === FEWEST)
     })
 
-    it("leaves out monsters without spheres", () => {
+    it("fills only the share of the volume that bursts", () => {
 
-        assert(burst(BIG_CUBOID).particles.length === 0)
+        const sphere = BIG_CUBOID.burst[0]
+        assert(burst(BIG_CUBOID).particles.length === particleCount(sphere, 1))
+        assert(burst(BIG_CUBOID, 0, 0, 0.25).particles.length === Math.round(sphereVolume(sphere, 1) * 0.25 * DENSITY))
+        // a big cuboid is eight small ones
+        assert(Math.abs(particleCount(sphere, 1, 1 / 8) - particleCount(SMALL_CUBOID.burst[0], SMALL_CUBOID.scale)) <= 1)
     })
 
     it("starts the particles within the spheres, turned with the monster", () => {

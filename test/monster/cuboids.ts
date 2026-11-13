@@ -12,7 +12,8 @@ import CuboidPack, {
     MIN_SPLIT,
     mostCuboids,
     placeCuboids,
-    SMALL_CUBOID
+    SMALL_CUBOID,
+    splitShare
 } from "../../src/monster/cuboids"
 import Monsters, { CHASE_TIME, HERO_RADIUS, HURT_WAIT, type MonsterFloor, NOTICE_DISTANCE, type Prey } from "../../src/monster/monsters"
 
@@ -336,6 +337,18 @@ describe("Acid cuboids", () => {
             assert(cuboids.deaths.length === 1)
             const [{ kind, x, z, away }] = cuboids.deaths
             assert(kind === SMALL_CUBOID && x === 0 && z === 0.3 && away === 0)
+        })
+
+        it("bursts what of a big one doesn't go into the small ones", () => {
+
+            for (let i = 0; i < 50; i++)
+            {
+                const cuboids = pack()
+                cuboids.add(BIG_CUBOID, 0, 0, 0.3)
+                cuboids.strike(0, 0, 0, REACH, WIDTH, BIG_CUBOID.hp)
+                assert(splitShare(BIG_CUBOID) === 1 / 8)
+                assert.deepEqual(cuboids.deaths.map(({ share }) => share), [1 - cuboids.members.length / 8])
+            }
         })
 
         it("breaks big ones up into 2 to 7 small ones", () => {

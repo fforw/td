@@ -1,5 +1,6 @@
 import type Prando from "prando"
 import { rng } from "../math/random"
+import type { BurstSphere } from "./bursts"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
 
 const TAU = Math.PI * 2
@@ -81,14 +82,19 @@ export interface CuboidKind extends MonsterKind
     lunges: boolean
 }
 
+/**
+ * Volume of a cuboid of any size
+ */
+const CUBOID_BURST: readonly BurstSphere[] = [{ x: 0, y: 0.48, z: 0, rx: 0.48, ry: 0.48, rz: 0.48, colors: ["#24c550"] }]
+
 export const BIG_CUBOID: CuboidKind = {
     scale: 1,
     radius: 0.144,
     hp: 8,
     big: true,
     flying: false,
-    // comes down as small ones
-    burst: [],
+    // all of it only when smitten, as it breaks up into small ones otherwise
+    burst: CUBOID_BURST,
     damage: 3,
     hopLength: 0.38,
     hopTime: 0.5,
@@ -104,7 +110,7 @@ export const SMALL_CUBOID: CuboidKind = {
     hp: 2,
     big: false,
     flying: false,
-    burst: [{ x: 0, y: 0.48, z: 0, rx: 0.48, ry: 0.48, rz: 0.48, colors: ["#24c550"] }],
+    burst: CUBOID_BURST,
     damage: 1,
     hopLength: 0.3,
     hopTime: 0.32,
@@ -112,6 +118,15 @@ export const SMALL_CUBOID: CuboidKind = {
     blockable: true,
     splits: false,
     lunges: false
+}
+
+
+/**
+ * Returns the share of the volume of a cuboid each small one it breaks up into takes along, an eighth for a big one
+ */
+export function splitShare(kind: CuboidKind): number
+{
+    return (SMALL_CUBOID.scale / kind.scale) ** 3
 }
 
 
@@ -284,8 +299,10 @@ export default class CuboidPack extends MonsterPack<Cuboid>
 
     /**
      * @param away  direction of the blow as a meeple facing, which the cuboids coming out of a big one carry on in
+     *
+     * @return share of the volume of a big one that doesn't go into the small ones
      */
-    protected kill(cuboid: Cuboid, away: number): void
+    protected kill(cuboid: Cuboid, away: number): number
     {
         if (cuboid.kind.splits)
         {
@@ -302,7 +319,9 @@ export default class CuboidPack extends MonsterPack<Cuboid>
                 small.goalX = goalX
                 small.goalZ = goalZ
             }
+            return 1 - count * splitShare(cuboid.kind)
         }
+        return 1
     }
 
     /**

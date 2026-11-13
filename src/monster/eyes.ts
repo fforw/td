@@ -294,9 +294,10 @@ export default class EyePack extends MonsterPack<Eye>
         }
     }
 
-    protected kill(eye: Eye): void
+    protected kill(eye: Eye): number
     {
         this.sparks.push({ x: eye.x, z: eye.z, age: 0 })
+        return 1
     }
 
     private remember(x: number, z: number): void

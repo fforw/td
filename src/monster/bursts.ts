@@ -68,6 +68,8 @@ export interface Death
     yaw: number
     /** direction of the blow as a meeple facing */
     away: number
+    /** share of its volume that bursts, the rest went on in some other way */
+    share: number
 }
 
 export interface Particle
@@ -102,11 +104,11 @@ export function sphereVolume({ rx, ry, rz }: BurstSphere, scale: number): number
 }
 
 /**
- * Returns how many particles fill a burst sphere
+ * Returns how many particles fill a burst sphere, or the given share of it
  */
-export function particleCount(sphere: BurstSphere, scale: number): number
+export function particleCount(sphere: BurstSphere, scale: number, share = 1): number
 {
-    return Math.max(FEWEST, Math.round(sphereVolume(sphere, scale) * DENSITY))
+    return Math.max(FEWEST, Math.round(sphereVolume(sphere, scale) * share * DENSITY))
 }
 
 /**
@@ -129,14 +131,14 @@ export default class Bursts
     /**
      * Fills the burst spheres of a monster that died with particles
      */
-    add({ kind, x, z, yaw, away }: Death): void
+    add({ kind, x, z, yaw, away, share }: Death): void
     {
         const factor = kind.scale * MEEPLE_SCALE
         const sin = Math.sin(yaw), cos = Math.cos(yaw)
         const blowX = Math.sin(away) * BLOW_SPEED, blowZ = Math.cos(away) * BLOW_SPEED
         for (const sphere of kind.burst)
         {
-            const count = particleCount(sphere, kind.scale)
+            const count = particleCount(sphere, kind.scale, share)
             for (let i = 0; i < count; i++)
             {
                 // evenly within the unit sphere, then scaled along the axes of the model and turned with it

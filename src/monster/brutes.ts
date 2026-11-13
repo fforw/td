@@ -201,10 +201,6 @@ export default class BrutePack extends MonsterPack<Brute>
     {
     }
 
-    protected kill(): void
-    {
-    }
-
     /**
      * Returns whether the club of a brute reaches a hero
      */

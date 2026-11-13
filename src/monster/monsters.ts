@@ -138,9 +138,29 @@ export abstract class MonsterPack<M extends Monster = Monster>
     protected abstract struck(monster: M, dx: number, dz: number, distance: number): void
 
     /**
+     * Has a monster that died go its way, the default bursts all of it
+     *
      * @param away  direction of the blow as a meeple facing
+     *
+     * @return share of its volume that bursts
      */
-    protected abstract kill(monster: M, away: number): void
+    protected kill(_monster: M, _away: number): number
+    {
+        return 1
+    }
+
+    /**
+     * Takes out a monster that died and has it burst, as far as it does
+     */
+    private die(monster: M, away: number): void
+    {
+        this.members.splice(this.members.indexOf(monster), 1)
+        const share = this.kill(monster, away)
+        if (share > 0)
+        {
+            this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away, share })
+        }
+    }
 
     /**
      * Has a sword go through all monsters within its arc
@@ -171,11 +191,8 @@ export abstract class MonsterPack<M extends Monster = Monster>
                 monster.hp -= damage
                 if (monster.hp <= 0)
                 {
-                    this.members.splice(this.members.indexOf(monster), 1)
                     // right on top of the hero, they go where the blow goes
-                    const away = distance > 1e-6 ? Math.atan2(dx, dz) : facing
-                    this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away })
-                    this.kill(monster, away)
+                    this.die(monster, distance > 1e-6 ? Math.atan2(dx, dz) : facing)
                 }
                 else
                 {
@@ -198,10 +215,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
         const killed = this.members.filter(doomed)
         for (const monster of killed)
         {
-            this.members.splice(this.members.indexOf(monster), 1)
-            const away = Math.random() * Math.PI * 2
-            this.deaths.push({ kind: monster.kind, x: monster.x, z: monster.z, yaw: monster.yaw, away })
-            this.kill(monster, away)
+            this.die(monster, Math.random() * Math.PI * 2)
         }
         return killed.length
     }
