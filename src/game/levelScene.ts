@@ -42,7 +42,7 @@ import TreasureView from "../treasure/TreasureView"
 import type PatchWorld from "../map/PatchWorld"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
-import HeroControl, { type HeroOrders, NO_ORDERS, ViewTurn } from "./heroControl"
+import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
 import KeySteer, { type KeyInput } from "./keySteer"
 import Exploration, { jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
@@ -108,25 +108,14 @@ const HURT_FLASH_TIME = 250
  */
 const COIN_SEED = 0x7c3a
 
-/**
- * Camera offset from the hero, in world units
- */
-const CAMERA_OFFSET = new Vector3(0, 3.2, 3.2)
-
-/**
- * Whether the view keeps looking from the same side, with the walls in front of the hero see-through, instead of turning
- * with the aim. A prototype: "?turn" in the address gets the turning view back to compare.
- */
-const FIXED_VIEW = !new URLSearchParams(location.search).has("turn")
-
 const CAMERA_ANGLE = 56 * DEG2RAD_FACTOR
 const CAMERA_DISTANCE = 4.5
 
 /**
- * Camera offset from the hero with the fixed view, at 52 degrees above the ground: a bit steeper than the turning view
- * so that walls hide less. It looks along VIEW_AWAY.
+ * Camera offset from the hero in world units. The view keeps looking from the same side, along VIEW_AWAY, with the walls
+ * in front of the hero see-through, so that a direction on the screen always is the same one in the level.
  */
-const FIXED_CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_ANGLE) * CAMERA_DISTANCE,Math.sin(CAMERA_ANGLE) * CAMERA_DISTANCE)
+const CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_ANGLE) * CAMERA_DISTANCE,Math.sin(CAMERA_ANGLE) * CAMERA_DISTANCE)
 
 const MIN_DISTANCE = 1.5
 const MAX_DISTANCE = 10
@@ -290,8 +279,6 @@ export default class LevelScene
     private steering: PadInput | null = null
     /** what keyboard and mouse tell the hero the view is with, which they do in frames without a controller steering */
     readonly keys = new KeySteer()
-    /** how the right stick turns the view */
-    private readonly viewTurn = new ViewTurn()
 
     private running = false
     private lastFrame = 0
@@ -342,10 +329,9 @@ export default class LevelScene
         const controls = new OrbitControls(this.camera, canvas)
         controls.enableDamping = true
         controls.enablePan = false
-        controls.maxPolarAngle = Math.PI * 0.45
         controls.minDistance = MIN_DISTANCE
         controls.maxDistance = MAX_DISTANCE
-        controls.enableRotate = !FIXED_VIEW
+        controls.enableRotate = false
         this.controls = controls
 
         this.listen(canvas)
@@ -736,14 +722,6 @@ export default class LevelScene
         const { steering } = this
         this.steering = null
         const focused = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (steering)
-        {
-            this.look(FIXED_VIEW ? 0 : this.viewTurn.update(steering.aimX, steering.aimY, delta), 0, 1)
-        }
-        else
-        {
-            this.viewTurn.reset()
-        }
         // a controller always shows where the hero looks, the mouse only while it tells them
         let aiming = !!steering
         for (const [id, hero] of this.shown)
@@ -982,7 +960,7 @@ export default class LevelScene
         {
             this.unplaced = false
             controls.target.copy(position)
-            camera.position.copy(position).add(FIXED_VIEW ? FIXED_CAMERA_OFFSET : CAMERA_OFFSET)
+            camera.position.copy(position).add(CAMERA_OFFSET)
         }
         else
         {
@@ -990,12 +968,9 @@ export default class LevelScene
             controls.target.add(hit)
         }
         focusAt.copy(position)
-        if (FIXED_VIEW)
-        {
-            // only the space the hero is in: a space next to it has the wall the hero looks at as its near wall
-            const space = meshes!.near.spaceOf.get(hero.face)
-            updateWallCut(meshes!.cut, space ? [space] : [], delta)
-        }
+        // only the space the hero is in: a space next to it has the wall the hero looks at as its near wall
+        const space = meshes!.near.spaceOf.get(hero.face)
+        updateWallCut(meshes!.cut, space ? [space] : [], delta)
         if (hero.lightOn)
         {
             hero.lightBurnt += delta
@@ -1062,17 +1037,13 @@ export default class LevelScene
     }
 
     /**
-     * Moves the camera around what it looks at, the same as dragging with the mouse, see CastleScene.look()
+     * Moves the camera closer to what it looks at or further away, by the factor that CastleScene.look() takes. The
+     * side it looks from stays.
      */
-    look(yaw: number, pitch: number, zoom: number): void
+    zoom(zoom: number): void
     {
         const { camera, controls, lookAngles } = this
         lookAngles.setFromVector3(hit.copy(camera.position).sub(controls.target))
-        if (!FIXED_VIEW)
-        {
-            lookAngles.theta += yaw
-            lookAngles.phi += pitch
-        }
         lookAngles.radius *= zoom
         lookAngles.makeSafe()
         camera.position.setFromSpherical(lookAngles).add(controls.target)

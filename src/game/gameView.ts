@@ -430,7 +430,7 @@ export default class GameView implements PadTarget
         {
             if (this.viewedLevelJob())
             {
-                this.level?.look(yaw, pitch, zoom)
+                this.level?.zoom(zoom)
             }
             else
             {

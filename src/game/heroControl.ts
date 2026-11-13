@@ -1,5 +1,3 @@
-import { clamp } from "../util"
-
 /**
  * Fastest a hero moves on orders, as a multiple of walking on their own
  */
@@ -25,35 +23,6 @@ export const DODGE_TIME = 0.2
 export const BLOCK_SPEED = 0.45
 
 /**
- * Radians per second the view turns at with the stick pushed all the way to a side, before it speeds up from turning on
- */
-export const VIEW_TURN_RATE = 2.5
-
-/**
- * How much faster the view gets turning on and on, the seconds of turning at full tilt before it starts to, about a quarter
- * turn, and the seconds it then takes to get there
- */
-export const VIEW_TURN_BOOST = 1.6
-export const VIEW_BOOST_DELAY = 0.6
-export const VIEW_BOOST_TIME = 0.6
-
-/**
- * Seconds the turning of the view takes to follow the stick, the inertia that smooths out its small movements
- */
-export const VIEW_TURN_LAG = 0.15
-
-/**
- * Angle off straight ahead the stick can point without turning the view, and the angle where it turns at full speed
- */
-export const AHEAD_ANGLE = 0.2
-export const FULL_TURN_ANGLE = Math.PI / 2
-
-/**
- * Angle off straight ahead from which the stick points back, where the view keeps turning the way it does
- */
-const BACK_ANGLE = Math.PI * 0.75
-
-/**
  * What a hero is told to do at one moment, with the directions in world units
  */
 export interface HeroOrders
@@ -70,70 +39,6 @@ export interface HeroOrders
 }
 
 export const NO_ORDERS: HeroOrders = { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, dash: false, attack: false, block: false }
-
-
-function smoothstep(v: number): number
-{
-    const t = clamp(v)
-    return t * t * (3 - 2 * t)
-}
-
-
-/**
- * Turns the view while the hero aims off to the side. The stick sets how fast it turns rather than where to, so the view
- * goes on turning as long as the stick is held, and comes to rest when it is let go of or points ahead. The turning
- * follows the stick with some inertia and speeds up when it goes on at full tilt.
- */
-export class ViewTurn
-{
-    /** radians per second the view turns at, to the right is positive */
-    rate = 0
-    /** seconds of turning at full tilt, which it loses faster than it gets */
-    private held = 0
-
-    /**
-     * Moves on by a frame
-     *
-     * @param aimX      where the stick points on the screen, to the right, its length is how far it is pushed
-     * @param aimY      where the stick points on the screen, down
-     * @param delta     seconds since the last frame
-     *
-     * @return the yaw to turn the view by, which is the other way to the rate as in Spherical.theta
-     */
-    update(aimX: number, aimY: number, delta: number): number
-    {
-        const length = Math.min(1, Math.hypot(aimX, aimY))
-        let target = 0
-        if (length > 0)
-        {
-            const angle = Math.atan2(aimX, -aimY)
-            const off = Math.abs(angle)
-            // pointing back doesn't say which way round, so it goes on the way it turns
-            const side = off > BACK_ANGLE && this.rate !== 0 ? Math.sign(this.rate) : Math.sign(angle)
-            target = side * length * smoothstep((off - AHEAD_ANGLE) / (FULL_TURN_ANGLE - AHEAD_ANGLE))
-        }
-
-        const full = Math.abs(target) > 0.9
-        this.held = full ? Math.min(VIEW_BOOST_DELAY + VIEW_BOOST_TIME, this.held + delta) : Math.max(0, this.held - 3 * delta)
-        target *= VIEW_TURN_RATE * (1 + (VIEW_TURN_BOOST - 1) * smoothstep((this.held - VIEW_BOOST_DELAY) / VIEW_BOOST_TIME))
-
-        this.rate += (target - this.rate) * (1 - Math.exp(-delta / VIEW_TURN_LAG))
-        if (target === 0 && Math.abs(this.rate) < 0.01)
-        {
-            this.rate = 0
-        }
-        return -this.rate * delta
-    }
-
-    /**
-     * Stops turning at once, for when nobody steers
-     */
-    reset(): void
-    {
-        this.rate = 0
-        this.held = 0
-    }
-}
 
 
 /**
