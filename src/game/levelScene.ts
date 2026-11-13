@@ -33,6 +33,7 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
+import { loadEffect, playEffect } from "../sound/effects"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
@@ -56,6 +57,7 @@ const DEG2RAD_FACTOR = TAU / 360;
  * TEMP god mode: with 1, up on the cross kills all monsters in the room of the hero, 0 turns it off
  */
 const GOD_MODE = 1
+const SMITE_SOUND = "hallelujah-mono.mp3"
 
 /**
  * How far around them in world units a hero gets to know the floor they can see
@@ -324,6 +326,12 @@ export default class LevelScene
         private readonly onExplored: (explored: string) => void
     )
     {
+        if (GOD_MODE)
+        {
+            // TEMP, for it to play right away
+            void loadEffect(SMITE_SOUND)
+        }
+
         const canvas = document.createElement("canvas")
         canvas.className = "level-scene"
         this.element = canvas
@@ -594,7 +602,13 @@ export default class LevelScene
     private godKill(): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        const room = hero && this.level?.rooms.find(faces => faces.includes(hero.face))
+        if (!hero)
+        {
+            return
+        }
+        // the hero smites, whether there is anything to smite or not
+        playEffect(SMITE_SOUND)
+        const room = this.level?.rooms.find(faces => faces.includes(hero.face))
         if (room)
         {
             this.monsters?.smiteOn(new Set(room))
