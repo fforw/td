@@ -920,6 +920,42 @@ Still to be designed: who needs what and who produces what.
 - Consumers: explorers (1.3), new buildings, heroes, defenses, paying
   off threats (4.5).
 
+## Phase 6 - Sound
+
+### 6.1 Mixer
+
+- One shared `AudioContext` with gain groups for music, effects and
+  ambience, each with its own volume and mute. The title music
+  `<audio>` element is routed into the music group, which gives fades
+  and ducking.
+- The context starts with the first user gesture, like the music does
+  now.
+
+### 6.2 Room propagation
+
+The browser panner only knows straight-line distance, so a sound behind
+a wall would be as loud as one in the same room. Inside a level, sound
+travels along the room graph instead.
+
+- Spaces are the rooms and the corridors of a `DungeonLevel`; a
+  corridor joins the two rooms at its ends. Rooms and corridors form a
+  tree, so there is one way between any two spaces.
+- The listener is the focused hero of the level scene, not the camera,
+  so panning the map does not change what is heard.
+- Hops between the space of a sound and the listener's space set its
+  gain and a lowpass cutoff: the same space plays clear and full,
+  each hop is quieter and more muffled, beyond a few hops it is silent.
+- A sound from another space is panned from the doorway it enters the
+  listener's space through, not from where it is. Stepping through
+  that doorway moves it onto its real position.
+- Changes of gain, cutoff and position ramp over a fraction of a second,
+  so a hero walking through a door fades sound in instead of switching.
+- Room ambience (dripping, fire, wind) are loops placed per space, which
+  makes them fade in at the doorway.
+- Later: per-face walking distance instead of hops, baked in the map
+  worker next to the lighting, once single mobiles make noise. Mobiles
+  could hear heroes over the same distance.
+
 ## Open questions
 
 - The economy (phase 5) beyond gold: resources, facilities, and what
