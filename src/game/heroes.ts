@@ -164,8 +164,11 @@ export function leaveLevel(campaign: Campaign, heroId: number): boolean
     {
         return false
     }
-    // the chests fill up again, and whatever lives there is back as it was
+    // the next attempt is at another level, with full chests and nothing known about it
     delete campaign.chests[target]
+    delete campaign.explored[target]
+    const attempts = campaign.attempts ??= {}
+    attempts[target] = (attempts[target] ?? 0) + 1
     campaign.resets = resets.filter(key => key !== target)
     if (!campaign.resets.length)
     {

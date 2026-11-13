@@ -178,10 +178,15 @@ export interface Campaign
     /** what's left of the chests that got opened, by the key of the patch of their level */
     chests: Record<string, OpenedChests>
     /**
-     * Faces of levels that heroes have been to, by the key of the patch of their level, see Exploration.encode(). It stays
-     * when a level starts anew, the heroes still know their way around.
+     * Faces of levels that heroes have been to, by the key of the patch of their level, see Exploration.encode(). Gone
+     * when a level starts anew, as it is another level then.
      */
     explored: Record<string, string>
+    /**
+     * How often levels started anew, by the key of their patch, missing for those that never did. Each attempt has a seed
+     * of its own, see attemptSeed().
+     */
+    attempts?: Record<string, number>
     /** keys of the patches whose levels start anew once nobody is inside, after a hero got carried out, missing without */
     resets?: string[]
     /** id for the next explorer or hero */

@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
+import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH, attemptSeed, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import { FaceType } from "../../src/map/geometry"
 import { PATCH_SIZE } from "../../src/map/HexagonPatch"
 import { LEVEL_PRIORITY, marchingSquaresPatch } from "../../src/map/marchingSquares"
@@ -240,5 +240,21 @@ describe("FaceType.NONE", () => {
 
         assert(before > 0)
         assert(groundTriangles(world, slots[1]).length > 0)
+    })
+})
+
+
+describe("attemptSeed", () => {
+
+    it("keeps the seed of the level for the first attempt", () => {
+        assert(attemptSeed(levelSeed(4711, -1, 0), 0) === levelSeed(4711, -1, 0))
+    })
+
+    it("gives every attempt a level of its own, the same every time", () => {
+        const seed = levelSeed(4711, -1, 0)
+        const seeds = [0, 1, 2, 3, 4, 5].map(attempt => attemptSeed(seed, attempt))
+        assert(new Set(seeds).size === seeds.length)
+        assert(attemptSeed(seed, 3) === seeds[3])
+        assert(attemptSeed(levelSeed(4711, 1, 0), 1) !== seeds[1])
     })
 })

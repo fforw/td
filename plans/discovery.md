@@ -743,9 +743,12 @@ Glyphs are built from the stroke data of a source kanji per concept
   notice of the hero in there says so (`LevelScene.spent()`). A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
-  decided. The level then starts anew, with its chests full and its cuboids
-  back, once nobody else is inside (`carryOut()`, `Campaign.resets`). So it
-  has to be beaten in one go: on with 1 hit point, or home to heal first.
+  decided. The level then starts anew, once nobody else is inside
+  (`carryOut()`, `Campaign.resets`): the chests are full, the map is
+  forgotten, and `Campaign.attempts` counts up for the level, which gives it
+  another seed (`attemptSeed()`). So every attempt is at another level with
+  its own layout, chests and monsters, and it has to be beaten in one go: on
+  with 1 hit point, or home to heal first.
 - A fight only runs while the view is in its level, so the player can go to the
   castle and send others to help. Everything in the level freezes meanwhile.
   The day can't end while a monster can see a hero in the level kept

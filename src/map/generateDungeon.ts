@@ -47,6 +47,7 @@ export const DEFAULT_DUNGEON_STYLE: DungeonStyle = {
 
 const LEVEL_SALT = 0x1e7e
 const ROOM_SALT = 0x4004
+const ATTEMPT_SALT = 0xa77e
 
 
 /**
@@ -61,6 +62,19 @@ const ROOM_SALT = 0x4004
 export function levelSeed(parentSeed: number, q: number, r: number, index = 0): number
 {
     return patchSeed(parentSeed ^ LEVEL_SALT ^ index, q, r)
+}
+
+
+/**
+ * Returns the seed of a level for the given attempt at it, which makes it another level every time it starts anew. The
+ * first attempt has the seed of the level itself.
+ *
+ * @param seed      seed of the level, see levelSeed()
+ * @param attempt   how often the level started anew
+ */
+export function attemptSeed(seed: number, attempt: number): number
+{
+    return attempt ? patchSeed(seed ^ ATTEMPT_SALT, attempt, 0) : seed
 }
 
 

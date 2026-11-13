@@ -436,14 +436,19 @@ describe("Heroes", () => {
         enterLevel(campaign, first.id)
         enterLevel(campaign, second.id)
         campaign.chests["1/0"] = { 3: [1, 2] }
+        campaign.explored["1/0"] = "AQ=="
 
         assert.deepEqual(carryOut(campaign, first.id), [0, false])
         assert.deepEqual(campaign.resets, ["1/0"])
         assert.deepEqual(parseSave(serializeSave(campaign)).resets, ["1/0"])
         assert(campaign.chests["1/0"] !== undefined, "not under the feet of the other one")
+        assert(campaign.explored["1/0"] !== undefined && campaign.attempts === undefined)
 
         assert(leaveLevel(campaign, second.id))
         assert(campaign.chests["1/0"] === undefined && campaign.resets === undefined)
+        assert(campaign.explored["1/0"] === undefined, "the map is forgotten")
+        assert.deepEqual(campaign.attempts, { "1/0": 1 })
+        assert.deepEqual(parseSave(serializeSave(campaign)).attempts, { "1/0": 1 })
 
         // without anyone carried out, it stays as it is
         enterLevel(campaign, second.id)

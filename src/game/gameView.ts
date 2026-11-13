@@ -10,7 +10,7 @@ import {
     type PatchKind,
     type PatchNode
 } from "./campaign"
-import { levelSeed } from "../map/generateDungeon"
+import { attemptSeed, levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
 import { carryGold, carryOut, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
@@ -967,7 +967,7 @@ export default class GameView implements PadTarget
             this.level?.dispose()
             const { q, r } = overworld(campaign).patches[job.target]
             const { target } = job
-            const seed = levelSeed(campaign.seed, q, r)
+            const seed = attemptSeed(levelSeed(campaign.seed, q, r), campaign.attempts?.[target] ?? 0)
             this.levelMap = new LevelMap(seed)
             this.levelMap.onJump = face => {
                 if (this.level?.jumpTo(face))
@@ -1005,6 +1005,11 @@ export default class GameView implements PadTarget
                 () => this.render(),
                 campaign.explored[target],
                 explored => {
+                    if (this.levelTarget !== target)
+                    {
+                        // the level started anew, and this one is only around until the next one is shown
+                        return
+                    }
                     this.campaign.explored[target] = explored
                     this.store.save(this.campaign)
                     // happens once at most, as there is nothing more to explore after
