@@ -606,18 +606,47 @@ Glyphs are built from the stroke data of a source kanji per concept
   edges of their faces, `moveOnFloor()`), right stick
   aims, L1 dashes, R1 attacks, L2 blocks. R2 is kept for a secondary
   attack. The face buttons keep their jobs (leave, map, options). The hero
-  looks where the right stick points on the screen, and pointing it off to
-  the side also turns the view, for as long as the stick is held
-  (`ViewTurn`). How far it is pushed and how far off ahead it points sets how
-  fast, with some room around straight ahead to look without turning. The
-  turning follows the stick with a little inertia, which smooths out its small
-  movements, and speeds up after about a quarter turn at full tilt. Pointing
-  back keeps it going the way it turns. A first take turned the view toward a
-  fixed aim and stopped there after a quarter turn, which felt abrupt. A dash goes where
+  looks where the right stick points on the screen. A dash goes where
   the hero moves, or else looks, and nothing can hurt them from its start
   until a little after it ends (`DODGE_TIME`), and a tapped attack waits for what's in its
   way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
+- The view of a level looks from one side at a fixed angle, 52 degrees
+  above the ground (`FIXED_VIEW`), so that a stick direction always means
+  the same direction in the world. Only the distance changes. This is a
+  prototype on `test/fixed-angle`, and `?turn` in the address brings back
+  what came before it: pointing the aim stick off to the side also turned
+  the view for as long as it was held (`ViewTurn`), with some room around
+  straight ahead, a little inertia and a speed-up after a quarter turn.
+  That made a held stick mean another direction from frame to frame, and
+  fights felt sluggish. A take before that turned the view toward a fixed
+  aim and stopped after a quarter turn, which felt abrupt.
+- A fixed view can't look behind a wall, so the walls in front of the
+  hero give way. The levels have no direction of their own that would
+  suit one side better than another, rooms come from a relaxed mesh and
+  corridors wind any way. What's in the way only depends on the level
+  (`map/nearWalls.ts`): rooms and corridors are spaces, and a wall is
+  near for a space if floor of it lies right behind the wall as the view
+  has it, and the wall faces the view enough. Walls running along the
+  view stay. Walls are 0.6 high and hide less than a face of floor at
+  that angle, so looking at what is next to a wall is all it takes, also
+  for rooms that aren't convex. A wall between two rooms is near for the
+  one behind it and the back wall of the one in front, so walls only give
+  way for the space the hero is in. Opening the spaces close to the hero
+  as well made the wall they walk up to give way. Thick walls are cut
+  about a face deep from the floor, their corners take after the outline
+  segments they end.
+- Near walls of the open space turn see-through at 30% and stay where
+  they are (`render/wallCut.ts`). Walls are drawn twice from the same
+  geometry, one mesh without what is cut and one with only that, which
+  writes no depth. A single see-through mesh would leave holes in the
+  solid walls behind it. Each space fades over 0.3 seconds on its own, so
+  walls don't blink on the way through small spaces. Lowering the walls to
+  a curb was tried first and looked wrong in motion. A wireframe with
+  hidden lines is kept in mind as an outline on top. The ground under
+  thick walls shows through them and is near black in levels. Still open:
+  several small spaces within a few steps keep the walls changing, which
+  could take a delay or merging small spaces with their neighbors.
 - Walls don't fill their faces, so they also have to meet at vertices that
   keep floors apart or the floor from the void (`splitsAtVertex()`). The
   gaps left otherwise would be real ways around them, for heroes and light.
