@@ -53,6 +53,11 @@ const TAU = Math.PI * 2
 const DEG2RAD_FACTOR = TAU / 360;
 
 /**
+ * TEMP god mode: with 1, up on the cross kills all monsters in the room of the hero, 0 turns it off
+ */
+const GOD_MODE = 1
+
+/**
  * How far around them in world units a hero gets to know the floor they can see
  */
 const VISIT_REACH = 2.5
@@ -576,7 +581,7 @@ export default class LevelScene
     {
         this.steering = input
         // TEMP god mode, once per press
-        if (input.godKill && !this.godHeld)
+        if (GOD_MODE && input.godKill && !this.godHeld)
         {
             this.godKill()
         }
