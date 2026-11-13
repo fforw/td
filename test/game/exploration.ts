@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import Exploration, { BLOCKED_REGION, jumpTargets, OPEN_REGION, VISITED_REGION, visitedRegions } from "../../src/game/exploration"
+import Exploration, { BLOCKED_REGION, inUnexplored, jumpTargets, OPEN_REGION, VISITED_REGION, visitedRegions } from "../../src/game/exploration"
 import { faceCenter } from "../../src/map/dungeonLights"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, generateDungeon, levelSeed } from "../../src/map/generateDungeon"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
@@ -39,6 +39,23 @@ describe("Exploration", () => {
         assert(!loaded.has(1))
         assert(!loaded.has((1 << (SLOT_SHIFT - 2)) | 2))
         assert(loaded.encode() === exploration.encode())
+    })
+
+    it("leaves monsters only where nobody has been", () => {
+
+        const { level, world, slots } = build()
+        const exploration = new Exploration(world, slots)
+        const [first, second] = level.rooms
+        const placed = [{ face: first[0], name: "a" }, { face: first[1], name: "b" }, { face: second[0], name: "c" }]
+        assert.deepEqual(inUnexplored(placed, exploration), placed)
+
+        exploration.visit(first[0])
+        exploration.visit(second[0])
+        assert.deepEqual(inUnexplored(placed, exploration).map(({ name }) => name), ["b"])
+
+        // and stay gone after a reload
+        const loaded = new Exploration(world, slots, exploration.encode())
+        assert.deepEqual(inUnexplored(placed, loaded).map(({ name }) => name), ["b"])
     })
 
     it("records nothing for nothing visited", () => {

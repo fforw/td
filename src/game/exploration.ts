@@ -92,6 +92,19 @@ export default class Exploration
 
 
 /**
+ * Returns those of the monsters placed in a level that are where no hero has been yet. Whatever lived on floor the heroes
+ * know is gone for good, so a level only has monsters left where there is something left to find out.
+ *
+ * @param placed        who goes where, by the face they start on
+ * @param exploration   faces the heroes visited
+ */
+export function inUnexplored<T extends { face: number }>(placed: readonly T[], exploration: Exploration): T[]
+{
+    return placed.filter(({ face }) => !exploration.has(face))
+}
+
+
+/**
  * Returns the region at a point of the map of a level for createManuscriptMap(), the one of the face with the closest center,
  * which is close enough to the shape of the faces once the map wobbles.
  *

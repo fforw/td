@@ -44,7 +44,7 @@ import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
 import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
 import KeySteer, { type KeyInput } from "./keySteer"
-import Exploration, { jumpTargets } from "./exploration"
+import Exploration, { inUnexplored, jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
 
 const TAU = Math.PI * 2
@@ -441,7 +441,9 @@ export default class LevelScene
         const random = new Prando(seed)
 
         const cuboids = new CuboidPack(floor)
-        const placed = placeCuboids(rooms, entrance, random)
+        // all get placed and those on known floor left out, which keeps the places of the others for the same seed
+        const exploration = this.exploration!
+        const placed = inUnexplored(placeCuboids(rooms, entrance, random), exploration)
         for (const { face, kind } of placed)
         {
             const [x, z] = faceCenter(world, face)
@@ -453,7 +455,7 @@ export default class LevelScene
         this.cuboidCrowd = cuboidCrowd
 
         const eyes = new EyePack(floor)
-        const eyesPlaced = placeEyes(rooms, entrance, random)
+        const eyesPlaced = inUnexplored(placeEyes(rooms, entrance, random), exploration)
         for (const { face, kind } of eyesPlaced)
         {
             const [x, z] = faceCenter(world, face)
@@ -466,7 +468,7 @@ export default class LevelScene
 
         // after the others, which keeps their places for the same seed
         const brutes = new BrutePack(floor)
-        for (const { face, kind } of placeBrutes(rooms, entrance, random))
+        for (const { face, kind } of inUnexplored(placeBrutes(rooms, entrance, random), exploration))
         {
             const [x, z] = faceCenter(world, face)
             brutes.add(kind, face, x, z)

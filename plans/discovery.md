@@ -736,7 +736,10 @@ Glyphs are built from the stroke data of a source kanji per concept
   (`BruteCrowd`), the walk following the ground covered and the attack the
   time into the swing, so they are for few at a time.
 - For now cuboids, eyes and brutes are placed in some rooms at random from the level
-  seed, not by a premise, and aren't saved: a reload brings all of them back. A hero's
+  seed, not by a premise, and aren't saved. Only those on floor no hero has
+  been to get created (`inUnexplored()`), so a reload brings back the ones in
+  the unexplored parts, and whatever lived on known floor is gone for good,
+  killed or not. A hero's
   hit points are kept on the job. Without any left they get carried out with 1,
   and are only back at full strength with the next job. Dying is still to be
   decided. The level then starts anew, with its chests full and its cuboids
