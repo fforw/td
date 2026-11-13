@@ -39,12 +39,6 @@ const CLUB_MATERIAL = "Wood"
  */
 const CLUB_DELAY = 0.4
 
-/**
- * Length in seconds of the stand-in for a die clip the model doesn't have yet, in which the club goes back to how it
- * was modelled
- */
-const STAND_IN_DIE = 0.6
-
 
 interface Figure
 {
@@ -259,7 +253,8 @@ export default class BruteCrowd
         const mixer = new AnimationMixer(root)
         const walk = mixer.clipAction(AnimationClip.findByName(clips, "walk")!)
         const attack = mixer.clipAction(AnimationClip.findByName(clips, "attack")!)
-        const die = mixer.clipAction(AnimationClip.findByName(clips, "die") ?? new AnimationClip("die", STAND_IN_DIE, []))
+        // the club falls to the floor, from a rigid body simulation
+        const die = mixer.clipAction(AnimationClip.findByName(clips, "die")!)
         die.setLoop(LoopOnce, 1)
         die.clampWhenFinished = true
         // both are posed by hand, by the ground covered and the time into the swing
