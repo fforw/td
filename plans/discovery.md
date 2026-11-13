@@ -599,7 +599,15 @@ Glyphs are built from the stroke data of a source kanji per concept
   has a canvas of its own and only runs while it is shown. One level is
   kept at a time, the worker only builds it again for another one. Days
   are still ended at the castle, with heroes in levels just waiting there.
-- Clicking on the floor walks the hero there (`map/dungeonWays.ts`).
+- Without a controller, keyboard and mouse steer the same hero at the same
+  speed (`game/keySteer.ts`): WASD moves, as fast in any direction as a stick
+  pushed all the way, and the hero looks at the floor under the pointer. The
+  left button attacks, the right one blocks, space or left shift dashes. E
+  does what the confirm button does, F toggles the light, M opens and closes
+  the map of the level. A bar along the bottom names the keys while they
+  steer. They do in every frame a controller doesn't, so whichever was used
+  last has the hero. Clicking on the floor used to walk the hero there along
+  a route, at walking speed and with no way to fight, which is gone.
 - With a controller, a level plays as a twin-stick action game in real
   time, on the shoulders as the thumbs are busy with the sticks:
   left stick moves (sliding along the walls as they got built, not the
@@ -611,16 +619,16 @@ Glyphs are built from the stroke data of a source kanji per concept
   until a little after it ends (`DODGE_TIME`), and a tapped attack waits for what's in its
   way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
-- The view of a level looks from one side at a fixed angle, 52 degrees
-  above the ground (`FIXED_VIEW`), so that a stick direction always means
-  the same direction in the world. Only the distance changes. This is a
-  prototype on `test/fixed-angle`, and `?turn` in the address brings back
-  what came before it: pointing the aim stick off to the side also turned
-  the view for as long as it was held (`ViewTurn`), with some room around
-  straight ahead, a little inertia and a speed-up after a quarter turn.
-  That made a held stick mean another direction from frame to frame, and
-  fights felt sluggish. A take before that turned the view toward a fixed
-  aim and stopped after a quarter turn, which felt abrupt.
+- The view of a level looks from one side at a fixed angle, 34 degrees
+  above the ground, so that a direction of a stick or the keys always
+  means the same direction in the world. Only the distance changes. Two
+  play testers settled it against what came before: pointing the aim
+  stick off to the side also turned the view for as long as it was held,
+  with some room around straight ahead, a little inertia and a speed-up
+  after a quarter turn. That made a held stick mean another direction
+  from frame to frame, and fights felt sluggish, most of all for players
+  new to that kind of game. A take before that turned the view toward a
+  fixed aim and stopped after a quarter turn, which felt abrupt.
 - A fixed view can't look behind a wall, so the walls in front of the
   hero give way. The levels have no direction of their own that would
   suit one side better than another, rooms come from a relaxed mesh and
