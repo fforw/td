@@ -741,10 +741,14 @@ Glyphs are built from the stroke data of a source kanji per concept
   the unexplored parts, and whatever lived on known floor is gone for good,
   killed or not. Once all floor is known and the chests and coins are gone, the
   notice of the hero in there says so (`LevelScene.spent()`). A hero's
-  hit points are kept on the job. Without any left they get carried out with 1,
-  and are only back at full strength with the next job. Dying is still to be
-  decided. The level then starts anew, once nobody else is inside
-  (`carryOut()`, `Campaign.resets`): the chests are full, the map is
+  hit points are kept on the job. Without any left they fall and lie where they
+  are (`fall()`, `Job.hp` of 0), out of the fight and unable to do anything,
+  as long as someone else still stands in the level. Once the last one standing
+  walks out or falls as well, everyone who fell gets carried out with 1
+  (`fallenToCarry()`), and is only back at full strength with the next job.
+  So heroes only ever get thrown out of a level nobody is in anymore, which
+  lets it start anew. Dying is still to be decided. The level then starts
+  anew (`carryOut()`, `Campaign.resets`): the chests are full, the map is
   forgotten, and `Campaign.attempts` counts up for the level, which gives it
   another seed (`attemptSeed()`). So every attempt is at another level with
   its own layout, chests and monsters, and it has to be beaten in one go: on

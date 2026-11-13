@@ -12,7 +12,10 @@ import {
 } from "./campaign"
 import { attemptSeed, levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
-import { carryGold, carryOut, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "./heroes"
+import {
+    carryGold, carryOut, enterJob, enterLevel, fall, fallenToCarry, hasArrived, hasFallen, isAway, jobDays, leaveLevel, returnHome,
+    startJob
+} from "./heroes"
 import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
@@ -782,7 +785,6 @@ export default class GameView implements PadTarget
         const { campaign } = this
         const job = campaign.jobs.find(j => j.heroId === heroId)!
         const hero = campaign.heroes.find(h => h.id === heroId)!
-        const { kind } = overworld(campaign).patches[job.target]
         const [robbed, reset] = carried ? carryOut(campaign, heroId) : [0, leaveLevel(campaign, heroId)]
         if (reset && this.levelTarget === job.target)
         {
@@ -790,15 +792,54 @@ export default class GameView implements PadTarget
             this.levelTarget = null
         }
         this.report(
-            hero.name + (carried ? " got carried out of " : " came out of ") + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " +
-            job.target + (robbed ? " and robbed of 🪙 " + robbed : "")
+            hero.name + (carried ? " got carried out of " : " came out of ") + this.levelPlace(job.target) +
+            (robbed ? " and robbed of 🪙 " + robbed : "")
         )
         if (this.following === heroId && !job.way)
         {
             // nobody gets to see those without a way outside, they are left to the notices
             this.follow(null)
         }
+        if (!carried)
+        {
+            this.carryFallen(job.target)
+        }
         this.changed()
+    }
+
+    /**
+     * Has a hero fall in a level. They lie there while someone else still stands in it, or else get carried out with
+     * everyone else who fell in there.
+     */
+    private fell(heroId: number): void
+    {
+        const { campaign } = this
+        const { target } = campaign.jobs.find(j => j.heroId === heroId)!
+        fall(campaign, heroId)
+        if (!fallenToCarry(campaign, target).length)
+        {
+            this.report(campaign.heroes.find(h => h.id === heroId)!.name + " fell in " + this.levelPlace(target))
+        }
+        this.carryFallen(target)
+        this.changed()
+    }
+
+    /**
+     * Carries those who fell out of the level at the given patch, once nobody stands in it anymore
+     */
+    private carryFallen(target: string): void
+    {
+        for (const id of fallenToCarry(this.campaign, target))
+        {
+            this.campaign.jobs.find(j => j.heroId === id)!.hp = HP_CARRIED_OUT
+            this.leftLevel(id, true)
+        }
+    }
+
+    private levelPlace(target: string): string
+    {
+        const { kind } = overworld(this.campaign).patches[target]
+        return KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + target
     }
 
     private report(line: string): void
@@ -990,10 +1031,7 @@ export default class GameView implements PadTarget
                     this.campaign.jobs.find(j => j.heroId === id)!.hp = hp
                     this.changed()
                 },
-                id => {
-                    this.campaign.jobs.find(j => j.heroId === id)!.hp = HP_CARRIED_OUT
-                    this.leftLevel(id, true)
-                },
+                id => this.fell(id),
                 campaign.chests[job.target] ??= {},
                 (id, gold) => {
                     if (gold > 0)
@@ -1321,7 +1359,7 @@ export default class GameView implements PadTarget
         const carried = job.gold ? ", carries 🪙 " + job.gold : ""
         if (job.inside)
         {
-            return "is inside" + carried
+            return (hasFallen(job) ? "lies fallen inside" : "is inside") + carried
         }
         return (hasArrived(this.campaign, job) ? "waits to enter" : (job.returning ? "home in " : "gets there in ") + days + "d") + carried
     }
@@ -1331,6 +1369,10 @@ export default class GameView implements PadTarget
      */
     private renderOrders(job: Job): HTMLElement[]
     {
+        if (hasFallen(job))
+        {
+            return []
+        }
         if (job.inside)
         {
             // without a 3D view there is no walking to an exit
@@ -1423,7 +1465,7 @@ export default class GameView implements PadTarget
         const spent = job.inside && this.levelTarget === job.target && this.level?.spent()
         return hasArrived(campaign, job)
             ? el("div", { className: "notice followed" },
-                "🛡️ " + name + (job.inside ? " is in " : " is at ") + place,
+                "🛡️ " + name + (hasFallen(job) ? " lies fallen in " : job.inside ? " is in " : " is at ") + place,
                 ...spent ? [el("span", { className: "spent" }, "⚠️ All explored, no treasure left")] : [],
                 ...this.renderOrders(job)
             )
@@ -1443,7 +1485,8 @@ export default class GameView implements PadTarget
             .map(job => {
                 const { kind } = overworld(campaign).patches[job.target]
                 const { name } = campaign.heroes.find(h => h.id === job.heroId)!
-                const where = job.inside ? this.level?.inFight(job.heroId) ? " is fighting in " : " is in " : " is at "
+                const where = hasFallen(job) ? " lies fallen in "
+                    : job.inside ? this.level?.inFight(job.heroId) ? " is fighting in " : " is in " : " is at "
                 const text = "🛡️ " + name + where + KIND_ICONS[kind] + " " + KIND_NAMES[kind]
                 return el("div", { className: "notice" },
                     text,

@@ -1,7 +1,10 @@
 import { assert, describe, it } from "vitest"
 
 import { createCampaign, overworld, type PassedPatch, START_GOLD, START_HEROES } from "../../src/game/campaign"
-import { carryGold, carryOut, enterJob, enterLevel, hasArrived, isAway, jobDays, leaveLevel, returnHome, startJob } from "../../src/game/heroes"
+import {
+    carryGold, carryOut, enterJob, enterLevel, fall, fallenToCarry, hasArrived, hasFallen, isAway, jobDays, leaveLevel, returnHome,
+    startJob
+} from "../../src/game/heroes"
 import { advanceDay, frontier, missionDays, type MissionRoute, startMission } from "../../src/game/missions"
 import { naturalKind, NEIGHBORS, startEdits, startPatches, unsentEdits, wantedKind } from "../../src/game/patchKinds"
 import { parseSave, serializeSave } from "../../src/game/storage"
@@ -455,6 +458,58 @@ describe("Heroes", () => {
         campaign.chests["1/0"] = { 3: [1] }
         assert(!leaveLevel(campaign, second.id))
         assert(campaign.chests["1/0"] !== undefined)
+    })
+
+    it("leaves the fallen lying while someone stands, and carries them out once nobody does", () => {
+
+        const campaign = createCampaign(21)
+        const [first, second, third] = campaign.heroes
+        for (const hero of [first, second, third])
+        {
+            startJob(campaign, hero.id, "1/0")
+        }
+        while (!hasArrived(campaign, campaign.jobs[0]))
+        {
+            advanceDay(campaign)
+        }
+        for (const hero of [first, second, third])
+        {
+            enterLevel(campaign, hero.id)
+        }
+        const [firstJob, secondJob, thirdJob] = campaign.jobs
+
+        fall(campaign, first.id)
+        assert(hasFallen(firstJob) && !hasFallen(secondJob))
+        assert(parseSave(serializeSave(campaign)).jobs[0].hp === 0, "still lies there after loading")
+        assert.deepEqual(fallenToCarry(campaign, "1/0"), [])
+
+        // the one walking out leaves the other one standing
+        leaveLevel(campaign, second.id)
+        assert.deepEqual(fallenToCarry(campaign, "1/0"), [])
+
+        fall(campaign, third.id)
+        assert.deepEqual(fallenToCarry(campaign, "1/0"), [first.id, third.id])
+        assert.deepEqual(carryOut(campaign, first.id), [0, false])
+        assert.deepEqual(carryOut(campaign, third.id), [0, true])
+        assert(!firstJob.inside && !thirdJob.inside && !hasFallen(firstJob))
+        assert.throws(() => fall(campaign, first.id))
+    })
+
+    it("carries the fallen out after the last one standing walks out", () => {
+
+        const campaign = createCampaign(21)
+        const [first, second] = campaign.heroes
+        startJob(campaign, first.id, "1/0")
+        startJob(campaign, second.id, "1/0")
+        while (!hasArrived(campaign, campaign.jobs[0]))
+        {
+            advanceDay(campaign)
+        }
+        enterLevel(campaign, first.id)
+        enterLevel(campaign, second.id)
+        fall(campaign, first.id)
+        assert(!leaveLevel(campaign, second.id))
+        assert.deepEqual(fallenToCarry(campaign, "1/0"), [first.id])
     })
 
     it("can't enter before getting there", () => {

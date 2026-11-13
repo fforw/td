@@ -159,7 +159,7 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
     dex: number
     /** global id of the face to stand on, the entrance without it */
     face?: number
-    /** hit points left */
+    /** hit points left, none for a hero who lies fallen */
     hp: number
 }
 
@@ -515,9 +515,10 @@ export default class LevelScene
                     dex,
                     walking: false,
                     // the shield only comes up to block
-                    ready: !!held.item,
+                    ready: !!held.item && hp > 0,
                     leftReady: false,
                     silhouette: HERO_SILHOUETTE,
+                    fallen: hp === 0,
                     ...held
                 }
                 crowd.add(meeple)
@@ -555,7 +556,7 @@ export default class LevelScene
     inFight(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && !!this.monsters?.sees(hero.prey)
+        return !!hero && hero.hp > 0 && !!this.monsters?.sees(hero.prey)
     }
 
     /**
@@ -574,7 +575,7 @@ export default class LevelScene
     act(action: PadAction): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero)
+        if (!hero || hero.hp === 0)
         {
             return
         }
@@ -605,7 +606,7 @@ export default class LevelScene
     nearExit(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && this.exits.some(({ x, z }) => Math.hypot(x - hero.meeple.position.x, z - hero.meeple.position.z) <= EXIT_REACH)
+        return !!hero && hero.hp > 0 && this.exits.some(({ x, z }) => Math.hypot(x - hero.meeple.position.x, z - hero.meeple.position.z) <= EXIT_REACH)
     }
 
     /**
@@ -614,7 +615,7 @@ export default class LevelScene
     nearChest(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && !!this.chests?.closedNear(hero.meeple.position.x, hero.meeple.position.z)
+        return !!hero && hero.hp > 0 && !!this.chests?.closedNear(hero.meeple.position.x, hero.meeple.position.z)
     }
 
     /**
@@ -729,6 +730,10 @@ export default class LevelScene
         let aiming = !!steering
         for (const [id, hero] of this.shown)
         {
+            if (hero.hp === 0)
+            {
+                continue
+            }
             let given: HeroOrders | null = null
             if (hero === focused)
             {
@@ -865,7 +870,7 @@ export default class LevelScene
     jumpTo(face: number): boolean
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || !this.meshes || this.monsters?.sees(hero.prey) || !this.jumpTargets(hero).some(target => target.face === face))
+        if (!hero || hero.hp === 0 || !this.meshes || this.monsters?.sees(hero.prey) || !this.jumpTargets(hero).some(target => target.face === face))
         {
             return false
         }
@@ -888,7 +893,8 @@ export default class LevelScene
         {
             return
         }
-        const heroes = [...shown.entries()]
+        // the fallen are no prey anymore
+        const heroes = [...shown.entries()].filter(([, hero]) => hero.hp > 0)
         for (const [, { meeple, control, prey }] of heroes)
         {
             prey.x = meeple.position.x
@@ -929,8 +935,12 @@ export default class LevelScene
         {
             return
         }
-        for (const [id, { meeple: { position } }] of this.shown)
+        for (const [id, { meeple: { position }, hp }] of this.shown)
         {
+            if (hp === 0)
+            {
+                continue
+            }
             const taken = chests.collect(position.x, position.z, time)
             if (taken > 0)
             {
@@ -949,6 +959,11 @@ export default class LevelScene
         }
         if (hero.hp === 0)
         {
+            const { meeple } = hero
+            meeple.fallen = true
+            meeple.walking = false
+            meeple.ready = meeple.leftReady = false
+            hero.strikeAt = null
             this.onFallen(id)
         }
         else

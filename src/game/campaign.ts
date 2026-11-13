@@ -147,7 +147,10 @@ export interface Job extends Journey
     inside?: boolean
     /** global id of the face the hero last got to inside the level, missing before they moved */
     face?: number
-    /** hit points left after getting hurt in the level, missing while unhurt */
+    /**
+     * hit points left after getting hurt in the level, missing while unhurt. With none left, the hero lies fallen in the
+     * level until nobody stands in there anymore.
+     */
     hp?: number
     /** went into the level at some point of the job */
     entered?: boolean

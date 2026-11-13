@@ -203,6 +203,41 @@ export function carryOut(campaign: Campaign, heroId: number): [number, boolean]
 
 
 /**
+ * Has a hero fall in a level. They lie there as long as someone else still stands in it, and get carried out with the
+ * others who fell once nobody does, see fallenToCarry().
+ */
+export function fall(campaign: Campaign, heroId: number): void
+{
+    const job = campaign.jobs.find(j => j.heroId === heroId)
+    if (!job?.inside)
+    {
+        throw new Error("Hero " + heroId + " isn't inside")
+    }
+    job.hp = 0
+}
+
+
+/**
+ * Returns whether a hero lies fallen in a level
+ */
+export function hasFallen(job: Job): boolean
+{
+    return !!job.inside && job.hp === 0
+}
+
+
+/**
+ * Returns the ids of the heroes who lie fallen in the level at the given patch once nobody stands in it anymore, who get
+ * carried out then. None while someone still stands in there.
+ */
+export function fallenToCarry(campaign: Campaign, target: string): number[]
+{
+    const inside = campaign.jobs.filter(j => j.inside && j.target === target)
+    return inside.some(j => !hasFallen(j)) ? [] : inside.map(j => j.heroId)
+}
+
+
+/**
  * Has a hero pick up gold in a level, which they carry until they are back at the castle
  */
 export function carryGold(campaign: Campaign, heroId: number, gold: number): void
