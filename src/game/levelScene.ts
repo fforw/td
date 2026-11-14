@@ -1396,7 +1396,7 @@ export default class LevelScene
     }
 
     /**
-     * Has the heroes pick up the coins they walk over, each for themselves
+     * Has the heroes pick up the coins they come close to, each for themselves
      */
     private updateTreasure(time: number): void
     {
@@ -1411,13 +1411,14 @@ export default class LevelScene
             {
                 continue
             }
-            const taken = chests.collect(position.x, position.z, time)
+            // counts at once, so a hero who leaves right away has it
+            const taken = chests.collect(position.x, position.z, time, id)
             if (taken > 0)
             {
                 this.onLoot(id, taken * COIN_VALUE)
             }
         }
-        treasure!.update(time)
+        treasure!.update(time, id => this.shown.get(id)?.meeple.position)
     }
 
     private hurtHero(id: number, hero: ShownHero, damage: number): void

@@ -1,7 +1,7 @@
-import { DynamicDrawUsage, Group, InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, Object3D } from "three"
-import { applyLightField, type LightField } from "../render/dungeonLighting"
+import { DynamicDrawUsage, Group, InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, Object3D, SphereGeometry } from "three"
+import { applyLightField, createBubbleMaterial, type LightField } from "../render/dungeonLighting"
 import { template } from "../render/scene3d"
-import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME, TAKE_TIME } from "./chests"
+import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME } from "./chests"
 
 /**
  * Half the width of the chest model
@@ -14,8 +14,12 @@ const CHEST_SCALE = CHEST_HALF_WIDTH / CHEST_MODEL_HALF_WIDTH
  * Size of a coin against its model, and half the thickness and the diameter of the model
  */
 const COIN_SCALE = 0.3
-const COIN_HALF_THICKNESS = 0.0833
 const COIN_MODEL_SIZE = 0.4167
+
+/**
+ * Radius of the bubble an item floats in, in world units
+ */
+const BUBBLE_RADIUS = 0.1
 
 /**
  * Rotation of an open lid. Further than the model's own animation, for what comes out to be seen, and short of the wall behind.
@@ -29,7 +33,7 @@ const LID_OVERSHOOT = 2.5
 
 const dummy = new Object3D()
 const matrix = new Matrix4()
-const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, size: 0 }
+const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, spin: 0, size: 0 }
 
 
 /**
@@ -46,7 +50,7 @@ function firstMesh(root: Object3D): Mesh
 
 
 /**
- * Chests and instanced coins of a level. The models must be loaded first.
+ * Chests and instanced coins of a level, each coin in a bubble. The models must be loaded first.
  */
 export default class TreasureView
 {
@@ -54,6 +58,7 @@ export default class TreasureView
 
     private readonly lids: Object3D[] = []
     private readonly coins: InstancedMesh
+    private readonly bubbles: InstancedMesh
 
     /**
      * @param chests    chests of the level
@@ -91,17 +96,26 @@ export default class TreasureView
         applyLightField(coinMaterial, field)
         // around its middle, to turn in the air
         const geometry = source.geometry.clone().translate(0, -COIN_MODEL_SIZE / 2, 0)
-        const coins = new InstancedMesh(geometry, coinMaterial, chests.reduce((sum, { coins }) => sum + coins.length, 0))
-        coins.instanceMatrix.setUsage(DynamicDrawUsage)
-        coins.frustumCulled = false
-        coins.count = 0
-        this.group.add(coins)
+        const most = chests.reduce((sum, { coins }) => sum + coins.length, 0)
+        const coins = new InstancedMesh(geometry, coinMaterial, most)
+        const bubbles = new InstancedMesh(new SphereGeometry(BUBBLE_RADIUS, 24, 16), createBubbleMaterial(field), most)
+        for (const mesh of [coins, bubbles])
+        {
+            mesh.instanceMatrix.setUsage(DynamicDrawUsage)
+            mesh.frustumCulled = false
+            mesh.count = 0
+            this.group.add(mesh)
+        }
         this.coins = coins
+        this.bubbles = bubbles
     }
 
-    update(time: number): void
+    /**
+     * @param heroAt    returns where the hero with the given id is, for coins on the way to them
+     */
+    update(time: number, heroAt: (id: number) => { x: number, z: number } | undefined): void
     {
-        const { chests, lids, coins } = this
+        const { chests, lids, coins, bubbles } = this
         let count = 0
         chests.forEach((chest, index) => {
             const { openedAt } = chest
@@ -115,22 +129,27 @@ export default class TreasureView
 
             for (const coin of chest.coins)
             {
-                if (coin.takenAt !== null && time >= coin.takenAt + TAKE_TIME)
+                if (coin.arrived)
                 {
                     continue
                 }
-                coinPose(coin, chest, time, pose)
+                coinPose(coin, chest, time, pose, coin.takenBy !== null ? heroAt(coin.takenBy) : undefined)
                 if (pose.size > 0)
                 {
-                    dummy.position.set(pose.x, pose.y + COIN_HALF_THICKNESS * COIN_SCALE, pose.z)
-                    dummy.rotation.set(Math.PI / 2 + pose.tumble, coin.yaw, 0, "YXZ")
+                    dummy.position.set(pose.x, pose.y, pose.z)
+                    dummy.rotation.set(pose.tumble, pose.spin, 0, "YXZ")
                     dummy.scale.setScalar(COIN_SCALE * pose.size)
                     dummy.updateMatrix()
-                    coins.setMatrixAt(count++, matrix.copy(dummy.matrix))
+                    coins.setMatrixAt(count, matrix.copy(dummy.matrix))
+                    dummy.rotation.set(0, 0, 0)
+                    dummy.scale.setScalar(pose.size)
+                    dummy.updateMatrix()
+                    bubbles.setMatrixAt(count++, matrix.copy(dummy.matrix))
                 }
             }
         })
-        coins.count = count
-        coins.instanceMatrix.needsUpdate = true
+        coins.count = bubbles.count = count
+        coins.instanceMatrix.needsUpdate = bubbles.instanceMatrix.needsUpdate = true
     }
 }
+

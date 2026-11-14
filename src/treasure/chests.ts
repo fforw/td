@@ -16,9 +16,9 @@ export const CHEST_HALF_DEPTH = 0.16
 export const CHEST_REACH = 0.5
 
 /**
- * How close to a coin in world units a hero has to get to pick it up
+ * How close to a coin in world units a hero has to get for it to come to them
  */
-export const COIN_REACH = 0.15
+export const COIN_REACH = 0.3
 
 /**
  * Gold a coin is worth
@@ -37,9 +37,35 @@ export const MAX_COINS = 14
 export const LID_TIME = 0.3
 
 /**
- * Seconds a picked up coin takes to be gone
+ * Seconds a picked up coin takes to get to the hero
  */
-export const TAKE_TIME = 0.25
+export const TAKE_TIME = 0.3
+
+/**
+ * Height in world units of the middle of the bubble a coin floats in, once it is out of the chest
+ */
+export const HOVER_HEIGHT = 0.17
+
+/**
+ * Height in world units a coin goes to on a hero, about their middle
+ */
+const TAKEN_HEIGHT = 0.2
+
+/**
+ * How far in world units a floating coin bobs up and down, and how fast, in radians per second
+ */
+const BOB = 0.012
+const BOB_RATE = 2.2
+
+/**
+ * How fast a floating coin turns around, in radians per second
+ */
+const SPIN_RATE = 0.8
+
+/**
+ * Share of the way to the hero at which a coin starts to shrink away
+ */
+const SHRINK_FROM = 0.7
 
 /**
  * Share of the rooms other than the first with a chest. There is at least one in any level with a room to spare.
@@ -51,12 +77,6 @@ const ROOMS_TAKEN = 0.15
  */
 const SPILL_HEIGHT = 0.1
 const FLIGHT_HEIGHT = 0.3
-
-/**
- * Share of the flight a coin spends on the way to the floor, the rest being the bounce, and how high it bounces
- */
-const FIRST_ARC = 0.75
-const BOUNCE_HEIGHT = 0.05
 
 /**
  * Seconds until the first coin comes out and between coins
@@ -94,6 +114,9 @@ export type OpenedChests = Record<number, number[]>
  */
 export type ChestSpot = FixtureSpot
 
+/**
+ * A coin in a chest, which flies out when it opens, floats in a bubble and goes to whoever picks it up
+ */
 export interface Coin
 {
     id: number
@@ -103,11 +126,15 @@ export interface Coin
     /** seconds after the opening of the chest it starts to fly, and how long for */
     delay: number
     flight: number
-    /** direction it lies in, and how many half turns it does in the air */
+    /** direction it faces, and how many half turns it does in the air */
     yaw: number
     turns: number
     /** when it got picked up, null if not yet */
     takenAt: number | null
+    /** id of the hero who picked it up, null if nobody did */
+    takenBy: number | null
+    /** got to the hero who picked it up */
+    arrived: boolean
 }
 
 export interface Chest extends ChestSpot
@@ -127,9 +154,11 @@ export interface CoinPose
     /** height above the floor */
     y: number
     z: number
-    /** radians it turned, from lying flat */
+    /** radians it turned forward, from standing up */
     tumble: number
-    /** size, as a share of its own */
+    /** radians it turned around the up axis */
+    spin: number
+    /** size, as a share of its own, for it and its bubble */
     size: number
 }
 
@@ -166,31 +195,42 @@ export function placeChests(
 
 
 /**
- * Sets a pose to where a coin is at the given time. Coins of chests not opened yet are still at the chest.
+ * Sets a pose to where a coin is at the given time: it flies out of the chest in its bubble, floats where it landed, and
+ * once picked up goes to the hero. Coins of chests not opened yet are still at the chest.
+ *
+ * @param hero  where the hero who picked it up is, it stays where it was without
  */
-export function coinPose({ x: landX, z: landZ, delay, flight, turns, takenAt }: Coin, { x, z, openedAt }: Chest, time: number, pose: CoinPose): void
+export function coinPose(coin: Coin, chest: Chest, time: number, pose: CoinPose, hero?: { x: number, z: number }): void
 {
-    const share = Math.max(0, Math.min(1, (time - (openedAt ?? time) - delay) / flight))
+    const { takenAt } = coin
+    floatingPose(coin, chest, takenAt === null ? time : Math.min(time, takenAt), pose)
+    if (takenAt !== null && hero)
+    {
+        const share = Math.min(1, Math.max(0, time - takenAt) / TAKE_TIME)
+        // speeds up toward the hero
+        const pull = share * share
+        pose.x += (hero.x - pose.x) * pull
+        pose.z += (hero.z - pose.z) * pull
+        pose.y += (TAKEN_HEIGHT - pose.y) * pull
+        pose.spin += share * Math.PI
+        pose.size *= share < SHRINK_FROM ? 1 : 1 - (share - SHRINK_FROM) / (1 - SHRINK_FROM)
+    }
+}
+
+
+function floatingPose({ id, x: landX, z: landZ, delay, flight, yaw, turns }: Coin, { x, z, openedAt }: Chest, time: number, pose: CoinPose): void
+{
+    const since = time - (openedAt ?? time) - delay
+    const share = Math.max(0, Math.min(1, since / flight))
     pose.x = x + (landX - x) * share
     pose.z = z + (landZ - z) * share
     pose.tumble = (1 - share) * turns * Math.PI
-    pose.size = share > 0 ? 1 : 0
-    if (share < FIRST_ARC)
-    {
-        const arc = share / FIRST_ARC
-        pose.y = SPILL_HEIGHT * (1 - arc) + FLIGHT_HEIGHT * 4 * arc * (1 - arc)
-    }
-    else
-    {
-        const arc = (share - FIRST_ARC) / (1 - FIRST_ARC)
-        pose.y = BOUNCE_HEIGHT * 4 * arc * (1 - arc)
-    }
-    if (takenAt !== null)
-    {
-        const taken = Math.min(1, (time - takenAt) / TAKE_TIME)
-        pose.y += taken * 0.2
-        pose.size = 1 - taken
-    }
+    // grows as it comes out of the chest
+    pose.size = Math.min(1, share * 4)
+    pose.spin = yaw + Math.max(0, since) * SPIN_RATE
+    // eases in at the end, so the bob goes on from the flight without a jump
+    const bob = BOB * Math.sin(Math.max(0, since - flight) * BOB_RATE + id) * share
+    pose.y = SPILL_HEIGHT * (1 - share) + HOVER_HEIGHT * share + FLIGHT_HEIGHT * 4 * share * (1 - share) + bob
 }
 
 
@@ -233,7 +273,9 @@ export default class ChestHoard
                     flight: random.next(MIN_FLIGHT, MAX_FLIGHT),
                     yaw: random.next(0, TAU),
                     turns: random.nextInt(2, 4) * 2,
-                    takenAt: null
+                    takenAt: null,
+                    takenBy: null,
+                    arrived: false
                 }
                 if (!left || left.includes(id))
                 {
@@ -281,11 +323,12 @@ export default class ChestHoard
     }
 
     /**
-     * Picks up what has landed around a point
+     * Picks up what has landed around a hero, which then goes to them
      *
+     * @param hero  id of the hero
      * @returns the number of coins picked up
      */
-    collect(x: number, z: number, time: number): number
+    collect(x: number, z: number, time: number, hero = 0): number
     {
         let taken = 0
         for (const chest of this.chests)
@@ -304,6 +347,7 @@ export default class ChestHoard
                 )
                 {
                     coin.takenAt = time
+                    coin.takenBy = hero
                     taken++
                     changed = true
                 }
@@ -315,4 +359,25 @@ export default class ChestHoard
         }
         return taken
     }
+
+    /**
+     * Returns the coins that got to the heroes who picked them up since the last time
+     */
+    arrive(time: number): Coin[]
+    {
+        const arrived: Coin[] = []
+        for (const { coins } of this.chests)
+        {
+            for (const coin of coins)
+            {
+                if (!coin.arrived && coin.takenAt !== null && time >= coin.takenAt + TAKE_TIME)
+                {
+                    coin.arrived = true
+                    arrived.push(coin)
+                }
+            }
+        }
+        return arrived
+    }
 }
+

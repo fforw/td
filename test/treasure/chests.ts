@@ -7,10 +7,12 @@ import ChestHoard, {
     COIN_REACH,
     coinPose,
     type CoinPose,
+    HOVER_HEIGHT,
     MAX_COINS,
     MIN_COINS,
     type OpenedChests,
-    placeChests
+    placeChests,
+    TAKE_TIME
 } from "../../src/treasure/chests"
 
 const SPOT: ChestSpot = { face: 0, x: 0, z: 0, facing: 0 }
@@ -107,21 +109,45 @@ describe("ChestHoard", () => {
         const [chest] = chests.chests
         const [coin] = chest.coins
         chests.open(chest, 10)
-        const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, size: 0 }
+        const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, spin: 0, size: 0 }
 
         coinPose(coin, chest, 10, pose)
         assert.equal(pose.size, 0)
 
         coinPose(coin, chest, 10 + coin.delay + coin.flight / 3, pose)
-        assert.equal(pose.size, 1)
+        assert.equal(pose.size, 1, "its bubble has grown")
         assert(pose.y > 0)
         assert(Math.hypot(pose.x, pose.z) < Math.hypot(coin.x, coin.z))
 
         coinPose(coin, chest, 10 + LONG_AFTER, pose)
         assert.closeTo(pose.x, coin.x, 1e-9)
         assert.closeTo(pose.z, coin.z, 1e-9)
-        assert.closeTo(pose.y, 0, 1e-9)
+        assert.closeTo(pose.y, HOVER_HEIGHT, 0.02, "floats, bobbing a little")
         assert.closeTo(pose.tumble, 0, 1e-9)
+    })
+
+    it("goes to the hero who picked it up and gets there", () => {
+
+        const chests = hoard()
+        const [chest] = chests.chests
+        const [coin] = chest.coins
+        chests.open(chest, 0)
+        const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, spin: 0, size: 0 }
+        const hero = { x: coin.x + COIN_REACH * 0.9, z: coin.z }
+        assert.isAtLeast(chests.collect(hero.x, hero.z, LONG_AFTER, 7), 1)
+        assert.equal(coin.takenBy, 7)
+
+        coinPose(coin, chest, LONG_AFTER, pose, hero)
+        const start = Math.hypot(pose.x - hero.x, pose.z - hero.z)
+        coinPose(coin, chest, LONG_AFTER + TAKE_TIME / 2, pose, hero)
+        assert.isBelow(Math.hypot(pose.x - hero.x, pose.z - hero.z), start)
+        assert.deepEqual(chests.arrive(LONG_AFTER + TAKE_TIME / 2), [])
+
+        coinPose(coin, chest, LONG_AFTER + TAKE_TIME, pose, hero)
+        assert.closeTo(pose.x, hero.x, 1e-9)
+        assert.closeTo(pose.size, 0, 1e-9)
+        assert.include(chests.arrive(LONG_AFTER + TAKE_TIME), coin)
+        assert.notInclude(chests.arrive(LONG_AFTER + TAKE_TIME * 2), coin, "only once")
     })
 
     it("picks up coins only once they have landed, and only once", () => {
