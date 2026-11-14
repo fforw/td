@@ -37,6 +37,7 @@ headless Chrome mean nothing, as it renders in software.
 - `src/map`: patch and dungeon generation, routes
 - `src/render`: meshes, lighting and the manuscript map
 - `src/meeple`, `src/castle`, `src/items`: characters, castle, item sprites
+- `src/scene`: scenes in levels, with scripts, the trader and the scene camera
 - `src/worker`: the map worker, which generates patches off the main thread
 - `test/` mirrors `src/`
 - `plans/discovery.md`: the implementation plan, update it when the design changes
