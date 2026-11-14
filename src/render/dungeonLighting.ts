@@ -1,4 +1,5 @@
 import {
+    AdditiveBlending,
     ClampToEdgeWrapping,
     Color,
     DataTexture,
@@ -20,6 +21,7 @@ import {
     RepeatWrapping,
     RGBAFormat,
     Scene,
+    ShaderMaterial,
     type Texture,
     Vector2,
     type WebGLRenderer,
@@ -802,4 +804,100 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
     }
     material.customProgramCacheKey = () => "rim-light"
     material.needsUpdate = true
+}
+
+
+/**
+ * How much the edge of a bubble shows by itself, without a light behind it
+ */
+const BUBBLE_FRESNEL = 0.22
+
+/**
+ * Color of the edge of a bubble by itself
+ */
+const BUBBLE_TINT = "vec3(0.8, 0.9, 1.0)"
+
+/**
+ * Brightness of the rim of a bubble from the light field, against that of the meeples
+ */
+const BUBBLE_RIM = 0.9
+
+/**
+ * Direction of the highlight dot of a bubble in view space, up and to the left, toward the camera
+ */
+const BUBBLE_SPOT = "normalize(vec3(-0.45, 0.55, 0.7))"
+
+
+/**
+ * Creates the material of the bubbles that items float in: a slight fresnel edge, a rim on the side the strongest light
+ * comes from like the meeples have, and a highlight dot. It adds light, so the middle is clear and the item shows. For
+ * instanced spheres.
+ *
+ * @param field     light field
+ */
+export function createBubbleMaterial({ uniforms }: LightField): ShaderMaterial
+{
+    return new ShaderMaterial({
+        uniforms: { ...uniforms },
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+        toneMapped: false,
+        vertexShader: /* glsl */`
+            ${PARS}
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            varying vec2 vWorldNormal;
+            varying vec2 vRimDirection;
+            varying float vRim;
+            varying vec3 vRimColor;
+
+            void main()
+            {
+                mat4 world = modelMatrix;
+                #ifdef USE_INSTANCING
+                world = world * instanceMatrix;
+                #endif
+                // the light where the bubble is, the same all around it, for one rim
+                vec2 center = (world * vec4(0.0, 0.0, 0.0, 1.0)).xz;
+                vec4 field;
+                vec2 fieldDirection;
+                vec2 rimDirection;
+                vec3 rimHue;
+                float rimStrength;
+                readLights(center, field, fieldDirection);
+                readRim(center, rimDirection, rimHue, rimStrength);
+                float rimOwn = length(rimDirection);
+                vRimDirection = rimDirection / max(rimOwn, 1e-4);
+                vRim = rimStrength * smoothstep(${RIM_FADE_START.toFixed(3)}, ${RIM_FADE_END.toFixed(3)}, rimOwn)
+                    * (1.0 - smoothstep(${RIM_GATE_START.toFixed(3)}, ${RIM_GATE_END.toFixed(3)}, field.a));
+                vRimColor = mix(rimHue, vec3(1.0), ${RIM_PALE.toFixed(3)}) * ${BUBBLE_RIM.toFixed(3)};
+
+                vWorldNormal = (world * vec4(normal, 0.0)).xz;
+                vec4 viewPosition = viewMatrix * world * vec4(position, 1.0);
+                vViewPosition = viewPosition.xyz;
+                vNormal = normalize((viewMatrix * world * vec4(normal, 0.0)).xyz);
+                gl_Position = projectionMatrix * viewPosition;
+            }
+        `,
+        fragmentShader: /* glsl */`
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            varying vec2 vWorldNormal;
+            varying vec2 vRimDirection;
+            varying float vRim;
+            varying vec3 vRimColor;
+
+            void main()
+            {
+                vec3 normal = normalize(vNormal);
+                float edge = 1.0 - abs(dot(normal, normalize(-vViewPosition)));
+                float fresnel = edge * edge * edge * ${BUBBLE_FRESNEL.toFixed(3)};
+                float side = smoothstep(0.0, 0.7, dot(normalize(vWorldNormal + 1e-5), vRimDirection));
+                float rim = vRim * side * smoothstep(0.5, 0.95, edge);
+                float spot = smoothstep(0.975, 0.99, dot(normal, ${BUBBLE_SPOT}));
+                gl_FragColor = vec4(${BUBBLE_TINT} * fresnel + vRimColor * rim + vec3(spot), 1.0);
+            }
+        `
+    })
 }
