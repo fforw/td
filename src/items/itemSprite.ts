@@ -133,8 +133,9 @@ function growSolid(data: Uint8ClampedArray, width: number, height: number, steps
  *
  * @param image     sprite from solidifySprite()
  * @param thickness thickness in units
+ * @param columns   front and back as one quad per pixel column instead of a single one, for bending the object
  */
-export function extrudeSprite(image: SpriteImage, thickness: number): BufferGeometry
+export function extrudeSprite(image: SpriteImage, thickness: number, columns = false): BufferGeometry
 {
     const { width: w, height: h, data } = image
     const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && data[(y * w + x) * 4 + 3] >= 128
@@ -160,9 +161,15 @@ export function extrudeSprite(image: SpriteImage, thickness: number): BufferGeom
         indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
     }
 
-    const left = X(0), right = X(w), bottom = Y(h), top = Y(0)
-    quad([[left, bottom, t], [right, bottom, t], [right, top, t], [left, top, t]], [[0, 1], [1, 1], [1, 0], [0, 0]])
-    quad([[right, bottom, -t], [left, bottom, -t], [left, top, -t], [right, top, -t]], [[1, 1], [0, 1], [0, 0], [1, 0]])
+    const bottom = Y(h), top = Y(0)
+    const strips = columns ? w : 1
+    for (let i = 0; i < strips; i++)
+    {
+        const u0 = i / strips, u1 = (i + 1) / strips
+        const left = X(u0 * w), right = X(u1 * w)
+        quad([[left, bottom, t], [right, bottom, t], [right, top, t], [left, top, t]], [[u0, 1], [u1, 1], [u1, 0], [u0, 0]])
+        quad([[right, bottom, -t], [left, bottom, -t], [left, top, -t], [right, top, -t]], [[u1, 1], [u0, 1], [u0, 0], [u1, 0]])
+    }
 
     for (let y = 0; y < h; y++)
     {
@@ -238,6 +245,14 @@ export interface ItemSpriteOptions
      * Outline color as RGB
      */
     outlineColor?: readonly number[]
+    /**
+     * Pixels to scale the longer side of the image down to before anything else, for drawings larger than a sprite
+     */
+    size?: number
+    /**
+     * Front and back as one quad per pixel column, see extrudeSprite()
+     */
+    columns?: boolean
 }
 
 
@@ -250,18 +265,20 @@ export interface ItemSpriteOptions
  */
 export async function loadItemSprite(url: string, thickness: number, options: ItemSpriteOptions = {}): Promise<ItemSprite>
 {
-    const { grow = 0, outline = 1, outlineColor = OUTLINE_COLOR } = options
+    const { grow = 0, outline = 1, outlineColor = OUTLINE_COLOR, size, columns = false } = options
 
     const response = await fetch(url)
     // the canvas stores premultiplied colors, so the faintest edge pixels come back a few levels off. Not worth
     // decoding the PNG ourselves.
     const bitmap = await createImageBitmap(await response.blob(), { colorSpaceConversion: "none" })
 
+    const factor = size ? Math.min(1, size / Math.max(bitmap.width, bitmap.height)) : 1
     const canvas = document.createElement("canvas")
-    canvas.width = bitmap.width
-    canvas.height = bitmap.height
+    canvas.width = Math.round(bitmap.width * factor)
+    canvas.height = Math.round(bitmap.height * factor)
     const ctx = canvas.getContext("2d")!
-    ctx.drawImage(bitmap, 0, 0)
+    ctx.imageSmoothingQuality = "high"
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     bitmap.close()
 
     let image = solidifySprite(ctx.getImageData(0, 0, canvas.width, canvas.height), SOLID_ALPHA, grow)
@@ -271,7 +288,7 @@ export async function loadItemSprite(url: string, thickness: number, options: It
     }
     const pixels = Math.max(image.width, image.height)
     return {
-        geometry: extrudeSprite(image, thickness / pixels),
+        geometry: extrudeSprite(image, thickness / pixels, columns),
         texture: createSpriteTexture(image),
         pixels,
         scale: 1
