@@ -33,7 +33,7 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
-import { loadEffect, playEffect } from "../sound/effects"
+import { loadEffect, playEffect, playPlop } from "../sound/effects"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
@@ -1396,7 +1396,7 @@ export default class LevelScene
     }
 
     /**
-     * Has the heroes pick up the coins they come close to, each for themselves
+     * Has the heroes pick up the coins they come close to, each for themselves, and plays a plop when one gets to them
      */
     private updateTreasure(time: number): void
     {
@@ -1416,6 +1416,14 @@ export default class LevelScene
             if (taken > 0)
             {
                 this.onLoot(id, taken * COIN_VALUE)
+            }
+        }
+        // only the hero the view is with is close enough to be heard
+        for (const { takenBy } of chests.arrive(time))
+        {
+            if (takenBy === this.focus)
+            {
+                playPlop()
             }
         }
         treasure!.update(time, id => this.shown.get(id)?.meeple.position)
