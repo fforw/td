@@ -805,9 +805,10 @@ person: a trader, a stranger with a message, a prisoner who begs.
   `pnpm export-models` with one instanced mesh per part; the glass is plain
   alpha for now, to be faked better. A hero who
   comes within reach of a landed one (0.3 world units) picks it up: it
-  moves to them and disappears with a plop, made up on the spot with Web
-  Audio (`playPlop`). Each coin is worth 10 gold, which the hero carries
-  (`Job.gold`) and only adds to the campaign once back at the castle. A hero
+  moves to them and disappears with `media/sounds/pick-up.mp3`, pitched to
+  a random step of the major pentatonic scale around its own pitch. Each
+  coin is worth 10 gold, which the hero carries (`Job.gold`) and only adds
+  to the campaign once back at the castle. A hero
   carried out of a level gets robbed of all they carry, and it goes back into
   the level, see below.
   `Campaign.chests` keeps which coins of each opened chest are still lying

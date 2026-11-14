@@ -33,7 +33,7 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
-import { loadEffect, playEffect, playPlop } from "../sound/effects"
+import { loadEffect, playEffect } from "../sound/effects"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
@@ -64,6 +64,18 @@ const DEG2RAD_FACTOR = TAU / 360;
  */
 export const GOD_MODE = 1
 const SMITE_SOUND = "hallelujah-mono.mp3"
+
+/**
+ * Sound of a coin getting to the hero, and the gain it plays at
+ */
+const PICK_UP_SOUND = "pick-up.mp3"
+const PICK_UP_VOLUME = 0.85
+
+/**
+ * Playback rates a pick-up sound picks from, so many in a row don't sound the same: the steps of the major pentatonic
+ * scale around the sound's own pitch, from a fourth below to a major third above, which sound well in any order
+ */
+const PICK_UP_RATES = [-5, -3, 0, 2, 4].map(semitones => 2 ** (semitones / 12))
 
 /**
  * How far around them in world units a hero gets to know the floor they can see
@@ -449,6 +461,7 @@ export default class LevelScene
             // TEMP, for it to play right away
             void loadEffect(SMITE_SOUND)
         }
+        void loadEffect(PICK_UP_SOUND)
 
         const canvas = document.createElement("canvas")
         canvas.className = "level-scene"
@@ -1396,7 +1409,7 @@ export default class LevelScene
     }
 
     /**
-     * Has the heroes pick up the coins they come close to, each for themselves, and plays a plop when one gets to them
+     * Has the heroes pick up the coins they come close to, each for themselves, and plays a sound when one gets to them
      */
     private updateTreasure(time: number): void
     {
@@ -1434,7 +1447,7 @@ export default class LevelScene
         {
             if (takenBy === this.focus)
             {
-                playPlop()
+                playEffect(PICK_UP_SOUND, PICK_UP_RATES[Math.floor(Math.random() * PICK_UP_RATES.length)], PICK_UP_VOLUME)
             }
         }
         treasure!.update(time, id => this.shown.get(id)?.meeple.position)
