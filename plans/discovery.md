@@ -638,11 +638,17 @@ person: a trader, a stranger with a message, a prisoner who begs.
   (chests, exits, later special rooms) marked only by a "?" until a
   hero has been there. So the player still has to find out which "?"
   is an exit. The
-  trader offers one at a time, holding it up with its price in coins
-  (10 gold each), and the hero agrees or not ("Yes?", "No, I guess?").
-  Paying takes from the gold the hero carries, so spending it in the
-  level is a trade-off against bringing it home. A hero without enough
-  gets a shake of the head.
+  talk is short: the trader offers to trade, and the hero agrees or not
+  ("Yes?", "No, I guess?"). No ends the scene, and talking again starts
+  it over. Yes opens a trade (a `trade` beat): every ware with what it
+  looks like, its glyph and its price in coins (10 gold each), the ones
+  the hero can't pay for disabled, the map gone once bought. Buying
+  uses the ware at once, and the player learns its glyph, which then
+  shows as its emoji, in every later trade (`Campaign.concepts`). Back
+  (circle, Escape, the ✕) leaves the trade and ends the scene. Paying
+  takes from the gold the hero carries, so spending it in the level is
+  a trade-off against bringing it home. Until there are sprites and
+  glyphs, the potions are a colored 🧪 and the unknown glyphs runes.
 - Later scenes: a messenger who tells a few glyphs, some known, some
   not, and the hero takes it in or turns away.
 - Walls between a low camera and the actors: the near walls of 3.1 only
@@ -660,8 +666,17 @@ person: a trader, a stranger with a message, a prisoner who begs.
 - The stranger stands in the middle of a big room of the level, not the
   entrance room (`scene/stranger.ts`), and no monsters are placed in
   that room. Potions last 2 minutes of level time, which stands still
-  in scenes, and are not saved yet. The trader doesn't offer the map
-  yet: it needs the map of the level to draw the "?" first.
+  in scenes, and are not saved yet. What scenes found out or decided
+  is saved with the campaign as facts by level (`Campaign.facts`, gone
+  when the level starts anew like `explored`): a bought map
+  (`charted`), which the trader doesn't offer twice, and a talk with
+  the stranger played to the end (`metStranger`), after which the map
+  of the level shows the stranger as 🥸. The "?" is an
+  Inkscape drawing in `media-src/icons`, which `pnpm build-icons` turns
+  into a plain SVG in `src/icons` (text to paths, then svgo). TEMP: in
+  god mode the map of a level has a button that shows all of it with
+  what is where, the stranger included, and makes every room a jump
+  target.
 
 ## Phase 3 - Levels and contents
 
@@ -774,8 +789,21 @@ person: a trader, a stranger with a message, a prisoner who begs.
   from the level seed for now, not by a premise. It can't be walked through,
   but can be seen past. A hero close enough opens it, without walking to an
   anchor yet.
-  Its coins spill to where a hero can get to, and whoever walks over one that
-  has landed picks it up. Each coin is worth 10 gold, which the hero carries
+  Its coins spill to where a hero can get to, each in a bubble that floats
+  over the floor, with the coin turning slowly inside. The bubble is a
+  sphere with a shader (`createBubbleMaterial` in `render/dungeonLighting.ts`):
+  a slight fresnel edge, the rim of the light field like the meeples get,
+  and one highlight dot; it adds light, so the coin shows through. Every
+  item to pick up is meant to float like that. One chest in five also has a
+  potion of healing, speed or strength, which comes out after the coins,
+  from random numbers of its own so the coins stay the same. A hero drinks
+  it on picking it up, like a bought one, and the player learns its glyph.
+  The potions are Blender models (`media-src/potions.blend`), exported by
+  `pnpm export-models` with one instanced mesh per part; the glass is plain
+  alpha for now, to be faked better. A hero who
+  comes within reach of a landed one (0.3 world units) picks it up: it
+  moves to them and disappears with a plop, made up on the spot with Web
+  Audio (`playPlop`). Each coin is worth 10 gold, which the hero carries
   (`Job.gold`) and only adds to the campaign once back at the castle. A hero
   carried out of a level gets robbed of all they carry, and it goes back into
   the level, see below.
