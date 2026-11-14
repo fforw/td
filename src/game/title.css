@@ -6,7 +6,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2vh;
+    background: #16161d;
 }
 
 #title[hidden]
@@ -14,12 +14,12 @@
     display: none;
 }
 
-/* keeps the logo's aspect ratio at 80% of the screen height, or narrower on portrait screens */
+/* fills the screen at the logo's aspect ratio, the menu and subtitle scale along with it */
 #title .logo
 {
     position: relative;
-    aspect-ratio: 1200 / 1043;
-    height: min(80vh, 95vw * 1043 / 1200);
+    aspect-ratio: 2339 / 1654;
+    width: min(100vw, 100vh * 2339 / 1654);
     container-type: size;
 }
 
@@ -30,22 +30,23 @@
     height: 100%;
 }
 
-/* sits on the paper below the drips of "Dread" */
+/* sits on the lit floor near the bottom of the picture */
 #title .subtitle
 {
     position: absolute;
     left: 10%;
     right: 10%;
-    top: 85.5%;
+    top: 84.5%;
     margin: 0;
     text-align: center;
     font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
     font-style: italic;
     font-weight: normal;
-    font-size: 6cqh;
+    font-size: 9cqh;
     line-height: 1;
     white-space: nowrap;
-    color: #2a1d14;
+    color: #e8d9b8;
+    text-shadow: 0 0 0.3em #000, 0 0 0.6em #000;
 }
 
 #sound
@@ -62,20 +63,28 @@
     z-index: 1;
 }
 
+/* stacked in the dark wall on the right, below the drips of "Dread" */
 #title .menu
 {
+    position: absolute;
+    left: 62%;
+    right: 4%;
+    top: 45%;
+    bottom: 12%;
     display: flex;
-    gap: 1rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3cqh;
 }
 
 #title .menu button
 {
-    padding: 0.5rem 1.25rem;
+    padding: 0.5em 1em;
     border: none;
     border-radius: 0.25rem;
     background: #e8e0d4;
     color: #2a1d14;
-    font: italic 1.25rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    font: italic 3.4cqh "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
     cursor: pointer;
 }
 
