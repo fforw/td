@@ -32,15 +32,26 @@ export function loadEffect(name: string): Promise<AudioBuffer | null>
  * Plays a sound effect from the sounds directory once through the effects of the mixer, from nowhere in particular, as
  * soon as it is loaded. It plays to its end, whatever happens meanwhile.
  *
- * @param name  file name
+ * @param name    file name
+ * @param rate    playback rate, which shifts pitch and length together
+ * @param volume  gain the sound plays at
  */
-export function playEffect(name: string): void
+export function playEffect(name: string, rate = 1, volume = 1): void
 {
     void loadEffect(name).then(buffer => {
         if (buffer)
         {
-            const source = new AudioBufferSourceNode(mixer().context, { buffer })
-            source.connect(mixer().input("effects"))
+            const { context } = mixer()
+            const source = new AudioBufferSourceNode(context, { buffer, playbackRate: rate })
+            const output = mixer().input("effects")
+            if (volume === 1)
+            {
+                source.connect(output)
+            }
+            else
+            {
+                source.connect(new GainNode(context, { gain: volume })).connect(output)
+            }
             source.start()
         }
     })
