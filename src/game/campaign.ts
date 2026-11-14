@@ -185,6 +185,11 @@ export interface Campaign
      * when a level starts anew, as it is another level then.
      */
     explored: Record<string, string>
+    /**
+     * What scenes in levels found out or decided, by the key of the patch of their level, missing without any. Gone when
+     * a level starts anew, like explored.
+     */
+    facts?: Record<string, string[]>
     /** concepts of the glyph language the player learned, see plans/discovery.md 2.5, missing before the first */
     concepts?: string[]
     /**

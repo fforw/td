@@ -167,6 +167,7 @@ export function leaveLevel(campaign: Campaign, heroId: number): boolean
     // the next attempt is at another level, with full chests and nothing known about it
     delete campaign.chests[target]
     delete campaign.explored[target]
+    delete campaign.facts?.[target]
     const attempts = campaign.attempts ??= {}
     attempts[target] = (attempts[target] ?? 0) + 1
     campaign.resets = resets.filter(key => key !== target)

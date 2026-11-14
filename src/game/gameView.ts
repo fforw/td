@@ -1135,6 +1135,11 @@ export default class GameView implements PadTarget
                     this.render()
                 }
             )
+            this.level.setFacts(campaign.facts?.[target] ?? [])
+            this.level.onFacts = facts => {
+                (this.campaign.facts ??= {})[target] = facts
+                this.store.save(this.campaign)
+            }
             this.levelTarget = job.target
             root.prepend(this.level.element)
         }

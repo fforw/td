@@ -362,8 +362,10 @@ export default class LevelScene
     private stranger: Meeple | null = null
     /** the scene going on, null without one */
     private playing: Playing | null = null
-    /** what scenes found out or decided, which is forgotten with the level for now */
+    /** what scenes found out or decided, see setFacts() */
     private readonly facts = new Set<string>()
+    /** called with all facts when there are new ones */
+    onFacts: ((facts: string[]) => void) | null = null
     private readonly sceneTarget = new Vector3()
     /** the shot of the scene, pulled in where walls are in the way */
     private readonly pulledShot: Shot = { ...SHOTS.two }
@@ -831,7 +833,7 @@ export default class LevelScene
             learn: concept => this.outside.learn(concept),
             use: ware => this.use(id, hero, ware),
             fact: name => this.facts.has(name),
-            setFact: name => this.facts.add(name)
+            setFact: name => this.addFact(name)
         }
         const stage = new SceneStage(new ScenePlayer(script, world), () => this.sceneChanged())
         this.playing = { stage, left: script.left, heroId: id, hero, other: stranger, otherFacing: stranger.facing }
@@ -904,6 +906,27 @@ export default class LevelScene
             }
         }
         this.camera.lookAt(this.sceneTarget)
+    }
+
+    /**
+     * Sets what scenes found out or decided before, see Campaign.facts
+     */
+    setFacts(facts: readonly string[]): void
+    {
+        this.facts.clear()
+        for (const fact of facts)
+        {
+            this.facts.add(fact)
+        }
+    }
+
+    private addFact(fact: string): void
+    {
+        if (!this.facts.has(fact))
+        {
+            this.facts.add(fact)
+            this.onFacts?.([...this.facts])
+        }
     }
 
     private sceneChanged(): void
