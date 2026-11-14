@@ -48,9 +48,12 @@ export function traderScript(wares: readonly Ware[], left: "a" | "b" = "a"): Scr
         }
         beats["check" + i] = { kind: "check", condition: { gold: price }, then: "pay" + i, else: "short" + i }
         beats["pay" + i] = { kind: "pay", gold: price, next: "use" + i }
-        beats["use" + i] = { kind: "use", ware, next: "thanks" + i }
+        beats["use" + i] = { kind: "use", ware, next: "glad" + i }
+        // back to the face of the trader for how they take it
+        beats["glad" + i] = { kind: "shot", shot: "overA", next: "thanks" + i }
         beats["thanks" + i] = { kind: "say", actor: "b", words: ["coin", "thanks"], emotion: "joy", next: after }
-        beats["short" + i] = { kind: "act", actor: "b", clip: "shakeHead", next: after }
+        beats["short" + i] = { kind: "shot", shot: "overA", next: "shake" + i }
+        beats["shake" + i] = { kind: "act", actor: "b", clip: "shakeHead", next: after }
     })
     return { left, start: "start", beats }
 }
