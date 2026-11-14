@@ -594,7 +594,10 @@ person: a trader, a stranger with a message, a prisoner who begs.
   Only the actors of the scene move. Room ambience keeps playing.
 - Actors are the focused hero and the meeples the scene names. Before it
   starts they step to marks a few faces apart on open floor of the
-  room, so there is room around them for the camera.
+  room, so there is room around them for the camera. For now the hero
+  goes to a mark at talking distance from the stranger, toward where
+  they came from, turned around the stranger until every shot sees both
+  of them from inside the room.
 - The 180-degree rule: the two main actors A and B
   span the line of action, and the camera stays on one side of it. A
   shot is an angle around the middle between them, from the direction
@@ -642,11 +645,23 @@ person: a trader, a stranger with a message, a prisoner who begs.
   gets a shake of the head.
 - Later scenes: a messenger who tells a few glyphs, some known, some
   not, and the hero takes it in or turns away.
-- Still open: walls between a low camera and the actors. The near walls
-  of 3.1 only give way toward the level view, so a shot across the room
-  can have a wall in front. Candidates: keep the camera inside the room
-  (pull it in toward the actors along the wall outline), and fade any
-  wall the camera ray to an actor crosses.
+- Walls between a low camera and the actors: the near walls of 3.1 only
+  give way toward the level view, so a shot across the room could have
+  a wall in front. The marks are chosen for all shots to see the actors
+  from inside the room, and where that doesn't work out, a shot is
+  pulled in toward the actors until no wall is in the way. Fading the
+  walls in the way is left for when that isn't enough.
+- The stage (`scene/stage.ts`) plays a script in time: it cuts to the
+  first shot, blends to the others, waits for acts by time and for the
+  player to go on after something said or shown. `scene/SceneBox.ts`
+  shows the bubbles above the heads and the buttons to go on or choose,
+  which the mouse, the keyboard and a controller all work. Until the
+  glyph language is there, words show as plain emoji.
+- The stranger stands in the middle of a big room of the level, not the
+  entrance room (`scene/stranger.ts`), and no monsters are placed in
+  that room. Potions last 2 minutes of level time, which stands still
+  in scenes, and are not saved yet. The trader doesn't offer the map
+  yet: it needs the map of the level to draw the "?" first.
 
 ## Phase 3 - Levels and contents
 
