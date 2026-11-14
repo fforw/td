@@ -734,8 +734,9 @@ Glyphs are built from the stroke data of a source kanji per concept
   bursts right away and its figure stays with only the club shown
   (`monster/BruteCrowd.ts`): the club plays the die clip of the model, in
   which it drops from the hand, lands on its end, tips over and comes to rest,
-  baked from a rigid body simulation in `media-src/brute2.blend`. It lies
-  still for 0.4 seconds after that, then bursts as well.
+  baked from a rigid body simulation in `media-src/brute2.blend`. It bursts
+  where it is at a random frame from 10, where it first hits the floor, to
+  the end of the clip, so not every club takes the whole fall.
 - The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
   from heroes: it picks a spot that sees them, as far off as it can without a
   long way there, at least 1 away. While it sees someone it fires a fast bolt

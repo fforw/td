@@ -35,9 +35,15 @@ const FADE_TIME = 0.25
 const CLUB_MATERIAL = "Wood"
 
 /**
- * Seconds the club lies still after the die clip before it bursts as well
+ * Frames per second of the clips in the model
  */
-const CLUB_DELAY = 0.4
+const FPS = 24
+
+/**
+ * Frame of the die clip in which the club first hits the floor. It bursts in a random frame from this one to the end of
+ * the clip.
+ */
+const CLUB_LANDED = 10
 
 
 interface Figure
@@ -57,6 +63,8 @@ interface Figure
     death: Death | null
     /** seconds since it died */
     dead: number
+    /** seconds after its death at which the club bursts */
+    burst: number
 }
 
 
@@ -80,7 +88,7 @@ export default class BruteCrowd
 
     /**
      * Shows the given brutes, and what is left of those that died: their bodies burst right away, see Bursts.add(), and
-     * the club plays the die clip and bursts after it. Smitten ones burst whole at once.
+     * the club plays the die clip and bursts somewhere along it, once on the floor. Smitten ones burst whole at once.
      *
      * @param brutes    brutes to show
      * @param deaths    monsters that died in this frame
@@ -108,7 +116,7 @@ export default class BruteCrowd
             }
             figure.dead += delta
             figure.mixer.update(delta)
-            if (figure.dead >= figure.die.getClip().duration + CLUB_DELAY)
+            if (figure.dead >= figure.burst)
             {
                 this.remove(brute, figure, figure.death, bursts)
             }
@@ -133,6 +141,8 @@ export default class BruteCrowd
     private startDying(figure: Figure, death: Death): void
     {
         figure.death = death
+        const landed = CLUB_LANDED / FPS
+        figure.burst = landed + Math.random() * (figure.die.getClip().duration - landed)
         for (const { material, mesh } of figure.bodies)
         {
             mesh.visible = material.name === CLUB_MATERIAL
@@ -262,6 +272,9 @@ export default class BruteCrowd
         attack.timeScale = 0
         attack.setLoop(LoopOnce, 1)
         attack.clampWhenFinished = true
-        return { root, mixer, walk, attack, die, bodies, rim, fill, walking: false, attacking: false, death: null, dead: 0 }
+        return {
+            root, mixer, walk, attack, die, bodies, rim, fill,
+            walking: false, attacking: false, death: null, dead: 0, burst: 0
+        }
     }
 }
