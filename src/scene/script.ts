@@ -40,7 +40,29 @@ export interface Choice<K extends string>
 {
     /** what the player sees, which gets less doubtful as they understand more */
     label: string
-    next: K
+    /** missing for an option that ends the scene */
+    next?: K
+}
+
+/**
+ * Something said along with a choice, which stays while the player chooses
+ */
+export interface Saying
+{
+    actor: ActorRole
+    words: Word[]
+    emotion?: Emotion
+}
+
+/**
+ * A ware on offer in a trade
+ */
+export interface Offer
+{
+    ware: Ware
+    price: number
+    /** sold only once in a trade, like a map nobody needs twice */
+    once?: boolean
 }
 
 /**
@@ -52,7 +74,8 @@ export type Beat<K extends string> =
     | { kind: "say", actor: ActorRole, words: Word[], emotion?: Emotion, next?: K }
     | { kind: "act", actor: ActorRole, clip: string, next?: K }
     | { kind: "show", actor: ActorRole, ware: Ware, price: number, next?: K }
-    | { kind: "choice", options: Choice<K>[] }
+    | { kind: "choice", say?: Saying, options: Choice<K>[] }
+    | { kind: "trade", offers: Offer[], next?: K }
     | { kind: "check", condition: Condition, then: K, else: K }
     | { kind: "pay", gold: number, next?: K }
     | { kind: "use", ware: Ware, next?: K }
@@ -63,7 +86,7 @@ export type BeatKind = Beat<string>["kind"]
 /**
  * Beats that wait for the stage before the scene goes on
  */
-const TIMED: ReadonlySet<BeatKind> = new Set(["shot", "say", "act", "show", "choice"])
+const TIMED: ReadonlySet<BeatKind> = new Set(["shot", "say", "act", "show", "choice", "trade"])
 
 export interface Script<K extends string = string>
 {
@@ -86,6 +109,9 @@ export interface SceneWorld
     use(ware: Ware): void
     fact(name: string): boolean
     setFact(name: string): void
+    /** whether the player knows a concept of the glyph language, see plans/discovery.md 2.5 */
+    knows(concept: Word): boolean
+    learn(concept: Word): void
 }
 
 /**
@@ -100,6 +126,8 @@ const MOST_INSTANT = 1000
 export default class ScenePlayer<K extends string = string>
 {
     private current: K | null
+    /** offers of the current trade that were sold once and for all */
+    private readonly soldOut = new Set<Offer>()
 
     constructor(private readonly script: Script<K>, private readonly world: SceneWorld)
     {
@@ -121,7 +149,7 @@ export default class ScenePlayer<K extends string = string>
     }
 
     /**
-     * The stage is done with the beat it was showing
+     * The stage is done with the beat it was showing, or the player left the trade
      */
     done(): void
     {
@@ -131,6 +159,75 @@ export default class ScenePlayer<K extends string = string>
             throw new Error("Nothing to be done with: " + (beat?.kind ?? "the scene ended"))
         }
         this.go(beat.next)
+    }
+
+    /**
+     * Returns whether the hero can pay for an offer of the current trade
+     */
+    affords(index: number): boolean
+    {
+        const offer = this.offer(index)
+        return this.world.gold() >= offer.price
+    }
+
+    /**
+     * Returns whether an offer of the current trade is gone
+     */
+    sold(index: number): boolean
+    {
+        return this.soldOut.has(this.offer(index))
+    }
+
+    /**
+     * The hero buys an offer of the current trade, uses it at once, and the player learns what it is. The trade goes on.
+     *
+     * @returns false if the hero can't pay for it
+     */
+    buy(index: number): boolean
+    {
+        const offer = this.offer(index)
+        const { ware, price } = offer
+        const { world } = this
+        if (world.gold() < price || this.soldOut.has(offer))
+        {
+            return false
+        }
+        if (offer.once)
+        {
+            this.soldOut.add(offer)
+        }
+        world.pay(price)
+        world.use(ware)
+        world.learn(ware)
+        return true
+    }
+
+    /**
+     * Whether the player knows a concept, see SceneWorld
+     */
+    knows(concept: Word): boolean
+    {
+        return this.world.knows(concept)
+    }
+
+    gold(): number
+    {
+        return this.world.gold()
+    }
+
+    private offer(index: number): Offer
+    {
+        const beat = this.beat
+        if (beat?.kind !== "trade")
+        {
+            throw new Error("No trade going on")
+        }
+        const offer = beat.offers[index]
+        if (!offer)
+        {
+            throw new Error("No offer " + index)
+        }
+        return offer
     }
 
     /**
@@ -240,7 +337,7 @@ function links(beat: Beat<string>): string[]
     switch (beat.kind)
     {
         case "choice":
-            return beat.options.map(option => option.next)
+            return beat.options.flatMap(option => option.next === undefined ? [] : [option.next])
         case "check":
             return [beat.then, beat.else]
         default:

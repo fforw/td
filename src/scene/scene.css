@@ -90,3 +90,108 @@
     outline: none;
     background: rgba(90, 64, 42, 0.95);
 }
+
+/* what a trader has, on the right, where the over-the-shoulder shot leaves room */
+.scene-trade
+{
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 12rem;
+    padding: 0.8rem;
+    border: 2px solid #8a6a48;
+    border-radius: 0.6rem;
+    background: rgba(42, 29, 20, 0.92);
+    color: #e8e0d4;
+    pointer-events: auto;
+}
+
+.scene-trade[hidden]
+{
+    display: none;
+}
+
+.scene-trade .scene-purse
+{
+    align-self: flex-end;
+    font-size: 1rem;
+}
+
+:is(#game, body) .scene-trade button
+{
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.4rem 0.8rem;
+    border: 2px solid #8a6a48;
+    border-radius: 0.4rem;
+    background: rgba(70, 50, 34, 0.95);
+    color: #e8e0d4;
+    font: 1rem system-ui, sans-serif;
+    cursor: pointer;
+}
+
+:is(#game, body) .scene-trade button:hover:not(:disabled),
+:is(#game, body) .scene-trade button:focus-visible
+{
+    border-color: #f4ecdc;
+    outline: none;
+    background: rgba(110, 80, 54, 0.95);
+}
+
+:is(#game, body) .scene-trade button:disabled
+{
+    opacity: 0.4;
+    cursor: default;
+}
+
+:is(#game, body) .scene-trade .scene-leave
+{
+    align-self: center;
+    justify-content: center;
+    min-width: 3rem;
+}
+
+.scene-trade .scene-item
+{
+    font-size: 1.8rem;
+}
+
+/* red, blue and orange potions, from the green of the emoji, which differs between platforms */
+.scene-trade .scene-healing
+{
+    filter: hue-rotate(185deg) saturate(1.5);
+}
+
+.scene-trade .scene-speed
+{
+    filter: hue-rotate(40deg) saturate(1.5);
+}
+
+.scene-trade .scene-strength
+{
+    filter: hue-rotate(220deg) saturate(1.5);
+}
+
+/* an unknown glyph is just an ink mark, a known one shows its meaning in color */
+.scene-trade .scene-symbol
+{
+    min-width: 2rem;
+    font: bold 1.6rem serif;
+    text-align: center;
+    color: #c8b89c;
+}
+
+.scene-trade .scene-symbol.scene-known
+{
+    font: 1.6rem system-ui, sans-serif;
+}
+
+.scene-trade .scene-price
+{
+    margin-left: auto;
+}

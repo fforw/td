@@ -222,13 +222,16 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
 }
 
 /**
- * What a level needs to know about the gold the heroes carry
+ * What a level needs to know beyond itself, for its scenes: the gold the heroes carry, and what the player knows of the
+ * glyph language
  */
-export interface LevelWallet
+export interface LevelOutside
 {
     gold(id: number): number
     /** takes gold from a hero */
     pay(id: number, gold: number): void
+    knows(concept: string): boolean
+    learn(concept: string): void
 }
 
 interface ShownHero
@@ -402,7 +405,7 @@ export default class LevelScene
      * @param onExitNear called when the hero the view is with got close enough to an exit to take it, or isn't anymore
      * @param explored  where heroes have been before, see Exploration.encode()
      * @param onExplored called with the new Exploration.encode() when heroes got to see more of the level
-     * @param wallet    the gold the heroes carry
+     * @param outside   the gold the heroes carry and what the player knows
      * @param onScene   called when a scene started, ended or waits on something else
      */
     constructor(
@@ -416,7 +419,7 @@ export default class LevelScene
         private readonly onExitNear: () => void,
         private readonly explored: string | undefined,
         private readonly onExplored: (explored: string) => void,
-        private readonly wallet: LevelWallet,
+        private readonly outside: LevelOutside,
         private readonly onScene: () => void
     )
     {
@@ -822,8 +825,10 @@ export default class LevelScene
         this.onMoved(id, hero.face)
 
         const world: SceneWorld = {
-            gold: () => this.wallet.gold(id),
-            pay: gold => this.wallet.pay(id, gold),
+            gold: () => this.outside.gold(id),
+            pay: gold => this.outside.pay(id, gold),
+            knows: concept => this.outside.knows(concept),
+            learn: concept => this.outside.learn(concept),
             use: ware => this.use(id, hero, ware),
             fact: name => this.facts.has(name),
             setFact: name => this.facts.add(name)

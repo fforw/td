@@ -28,7 +28,7 @@ export default class SceneStage
     /**
      * @param onBeat    called when the scene waits on another beat, or ended, not for the one it starts with
      */
-    constructor(private readonly player: ScenePlayer, private readonly onBeat: () => void)
+    constructor(readonly player: ScenePlayer, private readonly onBeat: () => void)
     {
         const first = player.beat
         // the first shot is a cut
@@ -55,12 +55,13 @@ export default class SceneStage
     }
 
     /**
-     * Returns whether the player can go on with the current beat, which they have to for things said or shown
+     * Returns whether the player can go on with the current beat, which they have to for things said or shown, and to
+     * leave a trade
      */
     get waitsOnPlayer(): boolean
     {
         const kind = this.beat?.kind
-        return kind === "say" || kind === "show"
+        return kind === "say" || kind === "show" || kind === "trade"
     }
 
     /**
@@ -107,6 +108,19 @@ export default class SceneStage
         }
         this.advance()
         return true
+    }
+
+    /**
+     * The hero buys an offer of the current trade, see ScenePlayer.buy()
+     */
+    buy(index: number): boolean
+    {
+        const bought = this.player.buy(index)
+        if (bought)
+        {
+            this.onBeat()
+        }
+        return bought
     }
 
     /**

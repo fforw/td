@@ -16,6 +16,7 @@ const info = document.getElementById("info")!
 
 let shownHp = maxHp
 let gold = Number(params.get("gold") ?? 0)
+const concepts = new Set<string>()
 
 function showHp(hp: number): void
 {
@@ -46,6 +47,8 @@ const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), s
     gold += found
     showHp(shownHp)
 }, () => {}, undefined, () => {}, {
+    knows: concept => concepts.has(concept),
+    learn: concept => concepts.add(concept),
     gold: () => gold,
     pay: (_, paid) => {
         gold -= paid
@@ -79,7 +82,7 @@ function steer(time: number): void
                 {
                     box.confirm()
                 }
-                else if (action === "back")
+                else if (action === "back" && !box.leave())
                 {
                     buttons[buttons.length - 1]?.click()
                 }

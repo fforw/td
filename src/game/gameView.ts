@@ -251,7 +251,11 @@ export default class GameView implements PadTarget
         })
         window.addEventListener("keydown", ev => {
             // leaving a hero alone takes a key or the mouse, which is a risk in the middle of a fight, on purpose
-            if (ev.key === "Escape" && !this.closePopup() && this.following !== null && !this.inScene())
+            if (ev.key === "Escape" && this.inScene() && this.dialog.hidden && this.optionsPopup.hidden)
+            {
+                this.sceneBox.leave()
+            }
+            else if (ev.key === "Escape" && !this.closePopup() && this.following !== null && !this.inScene())
             {
                 this.follow(null)
             }
@@ -335,10 +339,11 @@ export default class GameView implements PadTarget
         {
             const kind = this.level!.playingScene!.beat?.kind
             return [
-                ...(kind === "choice" ? [{ glyph: "move", label: "Choose" } as const] : []),
+                ...(kind === "choice" || kind === "trade" ? [{ glyph: "move", label: "Choose" } as const] : []),
                 ...(kind === "choice" || kind === "say" || kind === "show"
                     ? [{ glyph: "confirm", label: kind === "choice" ? "Select" : "Go on" } as const]
                     : []),
+                ...(kind === "trade" ? [{ glyph: "confirm", label: "Buy" } as const, { glyph: "back", label: "Leave" } as const] : []),
                 { glyph: "menu", label: "Options" }
             ]
         }
@@ -421,8 +426,12 @@ export default class GameView implements PadTarget
         }
         else if (action === "back")
         {
-            // a scene has to be played through
-            if (!this.closePopup() && following !== null && !this.inScene())
+            // a scene has to be played through, but a trade can be left
+            if (this.inScene() && dialog.hidden && optionsPopup.hidden)
+            {
+                this.sceneBox.leave()
+            }
+            else if (!this.closePopup() && following !== null && !this.inScene())
             {
                 this.follow(null)
             }
@@ -1105,6 +1114,15 @@ export default class GameView implements PadTarget
                     }
                 },
                 {
+                    knows: concept => !!this.campaign.concepts?.includes(concept),
+                    learn: concept => {
+                        const concepts = this.campaign.concepts ??= []
+                        if (!concepts.includes(concept))
+                        {
+                            concepts.push(concept)
+                            this.store.save(this.campaign)
+                        }
+                    },
                     gold: id => this.campaign.jobs.find(j => j.heroId === id)?.gold ?? 0,
                     pay: (id, gold) => {
                         const paying = this.campaign.jobs.find(j => j.heroId === id)!

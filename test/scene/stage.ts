@@ -4,7 +4,15 @@ import { SHOTS } from "../../src/scene/sceneCamera"
 import ScenePlayer, { type SceneWorld, type Script } from "../../src/scene/script"
 import SceneStage, { ACT_TIME, BLEND_TIME } from "../../src/scene/stage"
 
-const WORLD: SceneWorld = { gold: () => 0, pay: () => {}, use: () => {}, fact: () => false, setFact: () => {} }
+const WORLD: SceneWorld = {
+    gold: () => 0,
+    pay: () => {},
+    use: () => {},
+    fact: () => false,
+    setFact: () => {},
+    knows: () => false,
+    learn: () => {}
+}
 
 const SCRIPT: Script = {
     left: "a",

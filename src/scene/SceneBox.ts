@@ -1,7 +1,7 @@
 import "./scene.css"
 
 import { COIN_VALUE } from "../treasure/chests"
-import type { ActorRole, Emotion, Ware, Word } from "./script"
+import type { ActorRole, Emotion, Offer, Saying, Ware, Word } from "./script"
 import type SceneStage from "./stage"
 
 /**
@@ -13,6 +13,43 @@ const WORD_EMOJI: Record<Word, string> = {
     trade: "⚖️",
     coin: "🪙",
     thanks: "🙏"
+}
+
+/**
+ * What a ware looks like, until there are sprites of them
+ */
+const WARE_ITEM: Record<Ware, string> = {
+    healing: "🧪",
+    speed: "🧪",
+    strength: "🧪",
+    map: "📜"
+}
+
+/**
+ * Glyphs of the wares while the player doesn't know them, placeholders until the glyph language of 2.5 makes them
+ */
+const WARE_GLYPH: Record<Ware, string> = {
+    healing: "ᛉ",
+    speed: "ᚱ",
+    strength: "ᛏ",
+    map: "ᛞ"
+}
+
+/**
+ * Glyphs of the wares once the player knows them
+ */
+const WARE_MEANING: Record<Ware, string> = {
+    healing: "❤️",
+    speed: "💨",
+    strength: "💪",
+    map: "🗺️"
+}
+
+const WARE_NAME: Record<Ware, string> = {
+    healing: "Healing potion",
+    speed: "Speed potion",
+    strength: "Strength potion",
+    map: "Map of the level"
 }
 
 const WARE_EMOJI: Record<Ware, string> = {
@@ -46,17 +83,21 @@ export default class SceneBox
     readonly element = document.createElement("div")
     private readonly bubble = document.createElement("div")
     private readonly buttons = document.createElement("div")
+    private readonly trade = document.createElement("div")
+    /** the scene shown, null without one */
+    private stage: SceneStage | null = null
 
     /**
      * @param onScreen  returns where the head of an actor is on the screen, from 0 to 1 from the top left
      */
     constructor(private readonly onScreen: (actor: ActorRole) => [number, number] | null)
     {
-        const { element, bubble, buttons } = this
+        const { element, bubble, buttons, trade } = this
         element.className = "scene-box"
         bubble.className = "scene-bubble"
         buttons.className = "scene-buttons"
-        element.append(bubble, buttons)
+        trade.className = "scene-trade"
+        element.append(bubble, buttons, trade)
         element.hidden = true
     }
 
@@ -65,11 +106,16 @@ export default class SceneBox
      */
     show(stage: SceneStage | null): void
     {
-        const { element, bubble, buttons } = this
+        const { element, bubble, buttons, trade } = this
         const beat = stage?.beat
+        // a trade shown again after buying keeps the focus on the same offer
+        const focused = this.stage === stage && beat?.kind === "trade" ? trade.querySelector<HTMLElement>("button:focus")?.dataset.index : undefined
+        this.stage = stage
         element.hidden = !beat
         bubble.hidden = true
+        trade.hidden = true
         buttons.replaceChildren()
+        trade.replaceChildren()
         if (!stage || !beat)
         {
             return
@@ -82,9 +128,77 @@ export default class SceneBox
         }
         else if (beat.kind === "choice")
         {
+            if (beat.say)
+            {
+                this.say(beat.say)
+            }
             buttons.append(...beat.options.map(({ label }, index) => this.button(label, label, () => stage.choose(index))))
         }
+        else if (beat.kind === "trade")
+        {
+            this.showTrade(stage, beat.offers, focused)
+            return
+        }
         buttons.firstElementChild?.classList.add("pad-start")
+    }
+
+    /**
+     * Leaves a trade, which is what the back button does in one
+     *
+     * @returns false without a trade to leave
+     */
+    leave(): boolean
+    {
+        const { stage } = this
+        if (stage?.beat?.kind !== "trade")
+        {
+            return false
+        }
+        stage.next()
+        return true
+    }
+
+    private say({ actor, words, emotion }: Saying): void
+    {
+        this.bubble.replaceChildren(...this.saying(words, emotion))
+        this.place(actor)
+    }
+
+    /**
+     * Shows what the trader has, each with what it looks like, its glyph and its price, and what the hero carries
+     */
+    private showTrade(stage: SceneStage, offers: readonly Offer[], focused: string | undefined): void
+    {
+        const { trade } = this
+        const { player } = stage
+        trade.hidden = false
+        const rows = offers.map(({ ware, price }, index) => {
+            const known = player.knows(ware)
+            const row = this.button("", known ? WARE_NAME[ware] : "Something", () => {
+                stage.buy(index)
+            })
+            row.dataset.index = String(index)
+            row.disabled = !player.affords(index) || player.sold(index)
+            row.append(
+                span("scene-item scene-" + ware, WARE_ITEM[ware]),
+                span(known ? "scene-symbol scene-known" : "scene-symbol", known ? WARE_MEANING[ware] : WARE_GLYPH[ware]),
+                span("scene-price", "🪙 ×" + Math.ceil(price / COIN_VALUE))
+            )
+            return row
+        })
+        const leave = this.button("✕", "Back to the dungeon", () => this.leave())
+        leave.classList.add("scene-leave")
+        trade.append(
+            span("scene-purse", "🪙 ×" + Math.floor(player.gold() / COIN_VALUE)),
+            ...rows,
+            leave
+        )
+        const start = rows.find(row => row.dataset.index === focused && !row.disabled) ?? rows.find(row => !row.disabled) ?? leave
+        start.classList.add("pad-start")
+        if (focused !== undefined)
+        {
+            start.focus()
+        }
     }
 
     /**
@@ -92,8 +206,8 @@ export default class SceneBox
      */
     confirm(): void
     {
-        const { buttons } = this
-        const focused = buttons.querySelector<HTMLButtonElement>("button:focus") ?? buttons.querySelector("button")
+        const { element } = this
+        const focused = element.querySelector<HTMLButtonElement>("button:focus") ?? element.querySelector(".pad-start")
         focused?.click()
     }
 
