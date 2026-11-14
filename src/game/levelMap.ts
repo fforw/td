@@ -85,12 +85,12 @@ export default class LevelMap
      */
     update(state: LevelMapState, maxWidth: number, maxHeight: number): void
     {
-        const { world, slots, floor, exploration, chests, exits, rooms, hero, charted } = state
+        const { world, slots, floor, exploration, chests, exits, rooms, hero, charted, revealed } = state
         // a bought map shows all the floor as if visited
-        const whole = charted
+        const whole = charted || revealed
         const knows = (face: number) => exploration.has(face) || whole && floor.has(face)
         // what's at a place is only known once a hero has been there
-        const seen = (face: number) => exploration.has(face)
+        const seen = (face: number) => exploration.has(face) || revealed
 
         // all faces go into the regions, the walls keep the floor from reaching into them
         const centers: number[] = []

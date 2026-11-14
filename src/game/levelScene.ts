@@ -62,7 +62,7 @@ const DEG2RAD_FACTOR = TAU / 360;
 /**
  * TEMP god mode: with 1, up on the cross kills all monsters in the room of the hero, 0 turns it off
  */
-const GOD_MODE = 1
+export const GOD_MODE = 1
 const SMITE_SOUND = "hallelujah-mono.mp3"
 
 /**
@@ -205,6 +205,11 @@ const spot: FloorSpot = { face: 0, x: 0, z: 0 }
  */
 const CHARTED = "charted"
 
+/**
+ * Counts every face as visited
+ */
+const EVERYWHERE = { has: () => true }
+
 const orders: HeroOrders = { ...NO_ORDERS }
 
 /**
@@ -302,6 +307,8 @@ export interface LevelMapState
     hero: { x: number, z: number, facing: number } | null
     /** a hero bought the map, which shows all the floor, and where there is something to find */
     charted: boolean
+    /** TEMP god mode: everything is shown, with what it is */
+    revealed: boolean
 }
 
 
@@ -373,6 +380,8 @@ export default class LevelScene
     private readonly facts = new Set<string>()
     /** called with all facts when there are new ones */
     onFacts: ((facts: string[]) => void) | null = null
+    /** TEMP god mode: the map shows everything, see LevelMapState */
+    revealed = false
     private readonly sceneTarget = new Vector3()
     /** the shot of the scene, pulled in where walls are in the way */
     private readonly pulledShot: Shot = { ...SHOTS.two }
@@ -1291,17 +1300,20 @@ export default class LevelScene
             exits: this.exits,
             rooms: hero ? this.jumpTargets(hero) : [],
             hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null,
-            charted: this.facts.has(CHARTED)
+            charted: this.facts.has(CHARTED),
+            revealed: this.revealed
         }
     }
 
     /**
-     * Returns where in the rooms with visited floor the given hero can jump to, leaving out the room they are in
+     * Returns where in the rooms with visited floor the given hero can jump to, in every room once the map is revealed,
+     * leaving out the room they are in
      */
     private jumpTargets(hero: ShownHero): LevelMapState["rooms"]
     {
         const at = hero.face
-        return jumpTargets(this.meshes!.world, this.level!.rooms, this.exploration!, at)
+        // TEMP god mode: every room once the map is revealed
+        return jumpTargets(this.meshes!.world, this.level!.rooms, this.revealed ? EVERYWHERE : this.exploration!, at)
     }
 
     /**

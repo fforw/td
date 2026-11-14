@@ -378,6 +378,18 @@
     filter: drop-shadow(0 1px 1px #0008);
 }
 
+/* TEMP god mode: shows the whole map of a level */
+#game .reveal
+{
+    position: absolute;
+    top: 1.5rem;
+    right: 4.5rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(236, 220, 182, 0.9);
+    color: #3f2a14;
+    font-size: 0.9rem;
+}
+
 /* known rooms on the map of a level, to jump to */
 #game .marker.level-marker.room
 {

@@ -22,7 +22,7 @@ import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
 import { KEY_HINTS, keyAction } from "./keySteer"
-import LevelScene, { type LevelHero } from "./levelScene"
+import LevelScene, { GOD_MODE, type LevelHero } from "./levelScene"
 import SceneBox from "../scene/SceneBox"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
@@ -667,6 +667,16 @@ export default class GameView implements PadTarget
         levelMapPopup.replaceChildren(levelMap.element)
         levelMap.extras.replaceChildren(
             el("span", { className: "map-north", title: "North is up, like the view when it starts" }, "N ↑"),
+            // TEMP god mode
+            ...(GOD_MODE && !this.level!.revealed ? [el("button", {
+                type: "button",
+                className: "reveal",
+                title: "God mode: show the whole level and what is where",
+                onclick: () => {
+                    this.level!.revealed = true
+                    this.openLevelMap()
+                }
+            }, "👁 Reveal")] : []),
             el("button", {
                 type: "button",
                 className: "close",
