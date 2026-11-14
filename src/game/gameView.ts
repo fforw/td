@@ -23,6 +23,7 @@ import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
 import { KEY_HINTS, keyAction } from "./keySteer"
 import LevelScene, { type LevelHero } from "./levelScene"
+import SceneBox from "../scene/SceneBox"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
 import MapSheet from "./mapSheet"
 import { loadOptions, saveOptions } from "./options"
@@ -211,6 +212,8 @@ export default class GameView implements PadTarget
     private padMode = false
     /** what the keys and the mouse do in a level, shown while they steer */
     private readonly keyHints = el("div", { className: "pad-prompts key-hints", hidden: true })
+    /** what goes on in a scene in the level */
+    private readonly sceneBox = new SceneBox(actor => this.level?.actorOnScreen(actor) ?? null)
 
     constructor(root: HTMLElement, campaign: Campaign, store: SaveStore)
     {
@@ -248,7 +251,7 @@ export default class GameView implements PadTarget
         })
         window.addEventListener("keydown", ev => {
             // leaving a hero alone takes a key or the mouse, which is a risk in the middle of a fight, on purpose
-            if (ev.key === "Escape" && !this.closePopup() && this.following !== null)
+            if (ev.key === "Escape" && !this.closePopup() && this.following !== null && !this.inScene())
             {
                 this.follow(null)
             }
@@ -313,6 +316,10 @@ export default class GameView implements PadTarget
         {
             return [this.levelMapPopup, hud]
         }
+        if (this.inScene())
+        {
+            return [this.sceneBox.element]
+        }
         const around = [hud, info, notices, document.getElementById("sound")!]
         return popup.hidden ? around : [popup, ...around]
     }
@@ -323,6 +330,17 @@ export default class GameView implements PadTarget
         if (this.canSteer())
         {
             return [...this.steerPrompts(), { glyph: "menu", label: "Options" }]
+        }
+        if (this.inScene() && dialog.hidden && optionsPopup.hidden)
+        {
+            const kind = this.level!.playingScene!.beat?.kind
+            return [
+                ...(kind === "choice" ? [{ glyph: "move", label: "Choose" } as const] : []),
+                ...(kind === "choice" || kind === "say" || kind === "show"
+                    ? [{ glyph: "confirm", label: kind === "choice" ? "Select" : "Go on" } as const]
+                    : []),
+                { glyph: "menu", label: "Options" }
+            ]
         }
         const prompts: Prompt[] = [{ glyph: "move", label: "Move" }, { glyph: "confirm", label: "Select" }]
         if (!dialog.hidden || !optionsPopup.hidden)
@@ -380,6 +398,7 @@ export default class GameView implements PadTarget
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
+            ...(this.level?.nearStranger(following!) ? [{ glyph: "confirm", label: "Talk" } as const] : []),
             ...(this.level?.nearExit(following!) ? [{ glyph: "confirm", label: "Leave" } as const] : []),
             { glyph: "map", label: "Light" },
             ...(!this.inFight() ? [{ glyph: "endDay", label: "Map" } as const] : [])
@@ -402,7 +421,8 @@ export default class GameView implements PadTarget
         }
         else if (action === "back")
         {
-            if (!this.closePopup() && following !== null)
+            // a scene has to be played through
+            if (!this.closePopup() && following !== null && !this.inScene())
             {
                 this.follow(null)
             }
@@ -477,6 +497,15 @@ export default class GameView implements PadTarget
             return
         }
         const action = keyAction(code)
+        if (this.inScene() && this.dialog.hidden && this.optionsPopup.hidden)
+        {
+            if (action === "confirm" && !ev.repeat)
+            {
+                ev.preventDefault()
+                this.sceneBox.confirm()
+            }
+            return
+        }
         if (!this.canSteer())
         {
             // the key for the map of the level also puts it away again
@@ -517,7 +546,7 @@ export default class GameView implements PadTarget
             [KEY_HINTS.dash, "Dash"],
             ...(item ? [[KEY_HINTS.attack, "Attack"] as [string, string]] : []),
             ...(leftItem ? [[KEY_HINTS.block, "Block"] as [string, string]] : []),
-            [KEY_HINTS.confirm, "Open / Leave"],
+            [KEY_HINTS.confirm, "Open / Leave / Talk"],
             [KEY_HINTS.light, "Light"],
             [KEY_HINTS.map, "Map"]
         ]
@@ -539,7 +568,23 @@ export default class GameView implements PadTarget
     private canSteer(): boolean
     {
         const { popup, dialog, optionsPopup, levelMapPopup } = this
-        return popup.hidden && dialog.hidden && optionsPopup.hidden && levelMapPopup.hidden && !!this.viewedLevelJob()
+        return popup.hidden && dialog.hidden && optionsPopup.hidden && levelMapPopup.hidden && !!this.viewedLevelJob() && !this.inScene()
+    }
+
+    /**
+     * Returns whether the view is with a hero in a scene
+     */
+    private inScene(): boolean
+    {
+        return !!this.level?.playingScene && !!this.viewedLevelJob()
+    }
+
+    /**
+     * Shows what goes on in the scene of the level, if the view is with it
+     */
+    private showScene(): void
+    {
+        this.sceneBox.show(this.inScene() ? this.level!.playingScene : null)
     }
 
     setPadMode(active: boolean): void
@@ -566,6 +611,7 @@ export default class GameView implements PadTarget
             this.hud,
             this.info,
             this.notices,
+            this.sceneBox.element,
             this.keyHints,
             this.popup,
             this.levelMapPopup,
@@ -685,6 +731,7 @@ export default class GameView implements PadTarget
         this.finished = null
         this.castle?.follow(id)
         this.render()
+        this.showScene()
     }
 
     /**
@@ -989,6 +1036,7 @@ export default class GameView implements PadTarget
                 gait: gaitOf(heroId),
                 dex: character.stats.dex,
                 hp: hp ?? character.stats.hp,
+                maxHp: character.stats.hp,
                 ...heldItems(character),
                 ...(face !== undefined ? { face } : {})
             }
@@ -1055,6 +1103,18 @@ export default class GameView implements PadTarget
                     {
                         this.render()
                     }
+                },
+                {
+                    gold: id => this.campaign.jobs.find(j => j.heroId === id)?.gold ?? 0,
+                    pay: (id, gold) => {
+                        const paying = this.campaign.jobs.find(j => j.heroId === id)!
+                        paying.gold = (paying.gold ?? 0) - gold
+                        this.changed()
+                    }
+                },
+                () => {
+                    this.showScene()
+                    this.render()
                 }
             )
             this.levelTarget = job.target

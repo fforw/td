@@ -1,9 +1,11 @@
 import LevelScene, { type LevelHero } from "./game/levelScene"
 import { PadTracker, readPad } from "./game/gamepad"
 import { randomLook } from "./meeple/look"
+import SceneBox from "./scene/SceneBox"
 
 /*
- * Test page for fighting and looting in a level with a controller, e.g. fight.html?seed=1&hp=20
+ * Test page for fighting, looting and talking to the stranger in a level with a controller, e.g.
+ * fight.html?seed=1&hp=20&gold=100
  */
 
 const params = new URLSearchParams(location.search)
@@ -13,7 +15,7 @@ const maxHp = Number(params.get("hp") ?? 20)
 const info = document.getElementById("info")!
 
 let shownHp = maxHp
-let gold = 0
+let gold = Number(params.get("gold") ?? 0)
 
 function showHp(hp: number): void
 {
@@ -27,6 +29,7 @@ const hero: LevelHero = {
     gait: 0.5,
     dex: 5,
     hp: maxHp,
+    maxHp,
     item: "sword_silver",
     leftItem: "shield_silver"
 }
@@ -42,8 +45,16 @@ function startOver(): void
 const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), startOver, {}, (_, found) => {
     gold += found
     showHp(shownHp)
-}, () => {}, undefined, () => {})
+}, () => {}, undefined, () => {}, {
+    gold: () => gold,
+    pay: (_, paid) => {
+        gold -= paid
+        showHp(shownHp)
+    }
+}, () => box.show(level.playingScene))
+const box = new SceneBox(actor => level.actorOnScreen(actor))
 document.body.prepend(level.element)
+document.body.append(box.element)
 level.setHeroes([hero])
 level.setFocus(hero.id)
 level.setRunning(true)
@@ -60,7 +71,23 @@ function steer(time: number): void
         level.steer(input)
         for (const action of tracker.update(input, time).pressed)
         {
-            level.act(action)
+            // in a scene, confirm goes on or takes the first choice and back the last one
+            if (level.playingScene)
+            {
+                const buttons = box.element.querySelectorAll("button")
+                if (action === "confirm")
+                {
+                    box.confirm()
+                }
+                else if (action === "back")
+                {
+                    buttons[buttons.length - 1]?.click()
+                }
+            }
+            else
+            {
+                level.act(action)
+            }
         }
     }
     requestAnimationFrame(steer)

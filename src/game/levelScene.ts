@@ -49,6 +49,12 @@ import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
 import KeySteer, { type KeyInput } from "./keySteer"
 import Exploration, { inUnexplored, jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
+import { randomLook } from "../meeple/look"
+import { placeShot, type Shot, SHOTS } from "../scene/sceneCamera"
+import ScenePlayer, { type ActorRole, type SceneWorld, type Ware } from "../scene/script"
+import SceneStage, { ACT_TIME } from "../scene/stage"
+import { placeStranger, STRANGER_REACH, type StrangerSpot, TALK_DISTANCE } from "../scene/stranger"
+import { POTION_TIME, traderScript } from "../scene/trader"
 
 const TAU = Math.PI * 2
 const DEG2RAD_FACTOR = TAU / 360;
@@ -100,6 +106,47 @@ const ROOM_AROUND = HERO_RADIUS
  * Hit points a sword takes
  */
 const SWORD_DAMAGE = 2
+
+/**
+ * Hit points a sword takes with a strength potion
+ */
+const STRONG_SWORD_DAMAGE = 4
+
+/**
+ * Factor on the walking speed with a speed potion
+ */
+const SPEED_POTION = 1.5
+
+/**
+ * What the trader of a level offers. The map comes once the map of the level can show it.
+ */
+const TRADER_WARES: readonly Ware[] = ["healing", "speed", "strength"]
+
+/**
+ * Height in world units of the tail of a speech bubble, a little above the heads
+ */
+const BUBBLE_HEIGHT = 0.36
+
+/**
+ * Directions tried around the stranger for the mark of the hero in a scene, for all shots to see both from inside the
+ * room
+ */
+const MARK_TRIES = 16
+
+/**
+ * Shares of its distance a shot gets pulled in to, for the camera to stay on the near side of the walls
+ */
+const SHOT_PULLS = [1, 0.75, 0.5, 0.25, 0]
+
+/**
+ * Radians the head of a meeple who shakes it turns to each side
+ */
+const SHAKE_ANGLE = 0.5
+
+/**
+ * Times a meeple who shakes their head turns it to each side
+ */
+const SHAKES = 3
 
 /**
  * Room the biggest monsters on the floor take up, in world units, which keeps them out of narrow places
@@ -170,6 +217,18 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
     face?: number
     /** hit points left, none for a hero who lies fallen */
     hp: number
+    /** hit points when unhurt */
+    maxHp: number
+}
+
+/**
+ * What a level needs to know about the gold the heroes carry
+ */
+export interface LevelWallet
+{
+    gold(id: number): number
+    /** takes gold from a hero */
+    pay(id: number, gold: number): void
 }
 
 interface ShownHero
@@ -192,6 +251,27 @@ interface ShownHero
     lightBurnt: number
     /** face the floor around got visited from last, -1 before */
     visitedFrom: number
+    maxHp: number
+    /** seconds of level time left on a speed potion */
+    speedLeft: number
+    /** seconds of level time left on a strength potion */
+    strengthLeft: number
+}
+
+/**
+ * A scene going on in the level
+ */
+interface Playing
+{
+    stage: SceneStage
+    /** which side of the line the camera is on */
+    left: ActorRole
+    heroId: number
+    hero: ShownHero
+    /** the meeple the hero talks to */
+    other: Meeple
+    /** where the other one faces when they stand still */
+    otherFacing: number
 }
 
 
@@ -274,6 +354,16 @@ export default class LevelScene
     private entrance = 0
     /** null until the level is there */
     private exploration: Exploration | null = null
+    /** null for a level without one */
+    private strangerSpot: StrangerSpot | null = null
+    private stranger: Meeple | null = null
+    /** the scene going on, null without one */
+    private playing: Playing | null = null
+    /** what scenes found out or decided, which is forgotten with the level for now */
+    private readonly facts = new Set<string>()
+    private readonly sceneTarget = new Vector3()
+    /** the shot of the scene, pulled in where walls are in the way */
+    private readonly pulledShot: Shot = { ...SHOTS.two }
 
     /** every face that can be walked on */
     private floorSet: ReadonlySet<number> = new Set()
@@ -305,13 +395,15 @@ export default class LevelScene
      * @param seed      seed of the level
      * @param onMoved   called when a hero got to a face
      * @param onLeft    called when a hero took an exit
-     * @param onHurt    called with the hit points left when a hero got hurt
+     * @param onHurt    called with the hit points left when a hero got hurt or healed
      * @param onFallen  called when a hero has no hit points left
      * @param opened    what happened to the chests of the level before, gets changed along with them
      * @param onLoot    called when that changed, with the hero and the gold they picked up
      * @param onExitNear called when the hero the view is with got close enough to an exit to take it, or isn't anymore
      * @param explored  where heroes have been before, see Exploration.encode()
      * @param onExplored called with the new Exploration.encode() when heroes got to see more of the level
+     * @param wallet    the gold the heroes carry
+     * @param onScene   called when a scene started, ended or waits on something else
      */
     constructor(
         seed: number,
@@ -323,7 +415,9 @@ export default class LevelScene
         private readonly onLoot: (id: number, gold: number) => void,
         private readonly onExitNear: () => void,
         private readonly explored: string | undefined,
-        private readonly onExplored: (explored: string) => void
+        private readonly onExplored: (explored: string) => void,
+        private readonly wallet: LevelWallet,
+        private readonly onScene: () => void
     )
     {
         if (GOD_MODE)
@@ -379,11 +473,13 @@ export default class LevelScene
         this.exploration = new Exploration(meshes.world, this.slots, this.explored)
         const chests = this.addChests(level, meshes, seed)
 
-        const crowd = new MeepleCrowd(MAX_HEROES)
+        // the stranger takes one more
+        const crowd = new MeepleCrowd(MAX_HEROES + 1)
         crowd.showSilhouettes()
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
+        this.addStranger(level, meshes, seed)
         this.addMonsters(level, meshes, seed, chests)
         this.addSound(level, meshes, seed)
 
@@ -446,6 +542,39 @@ export default class LevelScene
         return [spot.x, spot.z]
     }
 
+    /**
+     * Puts the stranger of the level in the middle of a room
+     */
+    private addStranger({ rooms, corridors }: DungeonLevel, { world }: LevelMeshes, seed: number): void
+    {
+        const spot = placeStranger(rooms, entranceRoom(rooms, corridors), face => faceCenter(world, face), seed)
+        this.strangerSpot = spot
+        if (!spot)
+        {
+            return
+        }
+        const [x, z] = faceCenter(world, spot.face)
+        const stranger: Meeple = {
+            position: new Vector3(x, 0, z),
+            facing: 0,
+            look: { ...randomLook(), moustache: true },
+            phase: seed,
+            name: "",
+            gait: 0.5,
+            walking: false
+        }
+        this.crowd!.add(stranger)
+        this.stranger = stranger
+    }
+
+    /**
+     * Returns whether a monster is placed somewhere else than the room of the stranger, who gets to talk in peace
+     */
+    private readonly awayFromStranger = ({ face }: { face: number }): boolean => {
+        const spot = this.strangerSpot
+        return !spot || !this.level!.rooms[spot.room].includes(face)
+    }
+
     private addMonsters({ rooms, corridors }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
     {
         const entrance = entranceRoom(rooms, corridors)
@@ -462,7 +591,7 @@ export default class LevelScene
         const cuboids = new CuboidPack(floor)
         // all get placed and those on known floor left out, which keeps the places of the others for the same seed
         const exploration = this.exploration!
-        const placed = inUnexplored(placeCuboids(rooms, entrance, random), exploration)
+        const placed = inUnexplored(placeCuboids(rooms, entrance, random), exploration).filter(this.awayFromStranger)
         for (const { face, kind } of placed)
         {
             const [x, z] = faceCenter(world, face)
@@ -474,7 +603,7 @@ export default class LevelScene
         this.cuboidCrowd = cuboidCrowd
 
         const eyes = new EyePack(floor)
-        const eyesPlaced = inUnexplored(placeEyes(rooms, entrance, random), exploration)
+        const eyesPlaced = inUnexplored(placeEyes(rooms, entrance, random), exploration).filter(this.awayFromStranger)
         for (const { face, kind } of eyesPlaced)
         {
             const [x, z] = faceCenter(world, face)
@@ -487,7 +616,7 @@ export default class LevelScene
 
         // after the others, which keeps their places for the same seed
         const brutes = new BrutePack(floor)
-        for (const { face, kind } of inUnexplored(placeBrutes(rooms, entrance, random), exploration))
+        for (const { face, kind } of inUnexplored(placeBrutes(rooms, entrance, random), exploration).filter(this.awayFromStranger))
         {
             const [x, z] = faceCenter(world, face)
             brutes.add(kind, face, x, z)
@@ -522,7 +651,7 @@ export default class LevelScene
                 shown.delete(id)
             }
         }
-        for (const { id, look, gait, dex, face = this.entrance, hp, ...held } of heroes)
+        for (const { id, look, gait, dex, face = this.entrance, hp, maxHp, ...held } of heroes)
         {
             if (!shown.has(id))
             {
@@ -554,7 +683,10 @@ export default class LevelScene
                     strikeAt: null,
                     lightOn: true,
                     lightBurnt: 0,
-                    visitedFrom: -1
+                    visitedFrom: -1,
+                    maxHp,
+                    speedLeft: 0,
+                    strengthLeft: 0
                 })
             }
         }
@@ -589,7 +721,7 @@ export default class LevelScene
     {
         this.steering = input
         // TEMP god mode, once per press
-        if (GOD_MODE && input.godKill && !this.godHeld)
+        if (GOD_MODE && input.godKill && !this.godHeld && !this.playing)
         {
             this.godKill()
         }
@@ -622,7 +754,7 @@ export default class LevelScene
     act(action: PadAction): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || hero.hp === 0)
+        if (!hero || hero.hp === 0 || this.playing)
         {
             return
         }
@@ -640,11 +772,231 @@ export default class LevelScene
                 this.chests!.open(chest, performance.now() / 1000)
                 this.onLoot(this.focus!, 0)
             }
+            else if (this.nearStranger(this.focus!))
+            {
+                this.startScene(this.focus!, hero)
+            }
             else if (this.nearExit(this.focus!))
             {
                 this.onLeft(this.focus!)
             }
         }
+    }
+
+    /**
+     * Returns whether the hero with the given id is close enough to the stranger to talk to them, and not in a fight
+     */
+    nearStranger(id: number): boolean
+    {
+        const hero = this.shown.get(id)
+        const { stranger } = this
+        return !!hero && !!stranger && hero.hp > 0 && !this.playing && !this.inFight(id) &&
+            Math.hypot(stranger.position.x - hero.meeple.position.x, stranger.position.z - hero.meeple.position.z) <= STRANGER_REACH
+    }
+
+    /**
+     * The scene going on, null without one
+     */
+    get playingScene(): SceneStage | null
+    {
+        return this.playing?.stage ?? null
+    }
+
+    /**
+     * Starts the scene of the stranger with a hero: the two step to their marks, facing each other, and the level stops
+     */
+    private startScene(id: number, hero: ShownHero): void
+    {
+        const stranger = this.stranger!
+        const { meeple } = hero
+        const script = traderScript(TRADER_WARES)
+        this.findMark(meeple.position, script.left)
+        hero.face = spot.face
+        meeple.position.set(spot.x, 0, spot.z)
+        meeple.walking = false
+        meeple.leftReady = false
+        hero.steered = false
+        hero.strikeAt = null
+        meeple.facing = Math.atan2(stranger.position.x - spot.x, stranger.position.z - spot.z)
+        stranger.facing = Math.atan2(spot.x - stranger.position.x, spot.z - stranger.position.z)
+        this.onMoved(id, hero.face)
+
+        const world: SceneWorld = {
+            gold: () => this.wallet.gold(id),
+            pay: gold => this.wallet.pay(id, gold),
+            use: ware => this.use(id, hero, ware),
+            fact: name => this.facts.has(name),
+            setFact: name => this.facts.add(name)
+        }
+        const stage = new SceneStage(new ScenePlayer(script, world), () => this.sceneChanged())
+        this.playing = { stage, left: script.left, heroId: id, hero, other: stranger, otherFacing: stranger.facing }
+        this.controls.enabled = false
+        // for the first bubble to be in the right place
+        this.placeSceneCamera(meeple.position, stranger.position, script.left, stage.shot)
+        this.onScene()
+    }
+
+    /**
+     * Finds the mark of the hero in the scene with the stranger, at the talking distance from them, as close to the way
+     * the hero came from as it can be with all shots seeing both from inside the room, and puts it into spot
+     */
+    private findMark(from: Vector3, left: ActorRole): void
+    {
+        const { position } = this.stranger!
+        const start = Math.atan2(from.x - position.x, from.z - position.z) || 0
+        const mark = new Vector3()
+        let fallback: FloorSpot | null = null
+        for (let i = 0; i < MARK_TRIES; i++)
+        {
+            // 0, 1, -1, 2, -2, ...
+            const step = (i + 1 >> 1) * (i % 2 ? 1 : -1)
+            const angle = start + step * TAU / MARK_TRIES
+            spot.face = this.strangerSpot!.face
+            spot.x = position.x
+            spot.z = position.z
+            moveOnFloor(this.meshes!.world, this.solidWalls!, spot, Math.sin(angle) * TALK_DISTANCE, Math.cos(angle) * TALK_DISTANCE)
+            if (Math.hypot(spot.x - position.x, spot.z - position.z) < TALK_DISTANCE * 0.9)
+            {
+                continue
+            }
+            fallback ??= { ...spot }
+            mark.set(spot.x, 0, spot.z)
+            if (Object.values(SHOTS).every(shot => this.shotSees(mark, position, left, shot)))
+            {
+                return
+            }
+        }
+        if (fallback)
+        {
+            Object.assign(spot, fallback)
+        }
+    }
+
+    /**
+     * Returns whether the camera of a shot sees both actors without a wall in the way, and places it
+     */
+    private shotSees(a: Vector3, b: Vector3, left: ActorRole, shot: Shot): boolean
+    {
+        const { camera, sceneTarget } = this
+        const walls = this.floorWalls!
+        placeShot(a, b, left, shot, camera.position, sceneTarget)
+        const { x, z } = camera.position
+        return seesAcross(walls, a.x, a.z, x, z) && seesAcross(walls, b.x, b.z, x, z)
+    }
+
+    /**
+     * Places the camera for a shot, pulled in toward the actors as far as it takes for no wall to be in the way
+     */
+    private placeSceneCamera(a: Vector3, b: Vector3, left: ActorRole, shot: Shot): void
+    {
+        const pulled = Object.assign(this.pulledShot, shot)
+        for (const pull of SHOT_PULLS)
+        {
+            pulled.back = shot.back * pull
+            if (this.shotSees(a, b, left, pulled))
+            {
+                break
+            }
+        }
+        this.camera.lookAt(this.sceneTarget)
+    }
+
+    private sceneChanged(): void
+    {
+        const { playing } = this
+        if (playing?.stage.ended)
+        {
+            playing.other.facing = playing.otherFacing
+            this.playing = null
+            this.controls.enabled = true
+            this.unplaced = true
+        }
+        this.onScene()
+    }
+
+    /**
+     * Returns where above the head of an actor of the scene a bubble goes on the screen, from 0 to 1 from the top left,
+     * null without a scene
+     */
+    actorOnScreen(actor: ActorRole): [number, number] | null
+    {
+        const { playing } = this
+        if (!playing)
+        {
+            return null
+        }
+        const meeple = actor === "a" ? playing.hero.meeple : playing.other
+        // the camera might have moved since the last frame
+        this.camera.updateMatrixWorld()
+        hit.copy(meeple.position).setY(BUBBLE_HEIGHT).project(this.camera)
+        return [(hit.x + 1) / 2, (1 - hit.y) / 2]
+    }
+
+    /**
+     * The player goes on after something said or shown in the scene
+     */
+    sceneNext(): void
+    {
+        this.playing?.stage.next()
+    }
+
+    /**
+     * The player picks an option of the choice in the scene
+     */
+    sceneChoose(index: number): void
+    {
+        this.playing?.stage.choose(index)
+    }
+
+    /**
+     * Has a hero drink or use what they bought
+     */
+    private use(id: number, hero: ShownHero, ware: Ware): void
+    {
+        if (ware === "healing")
+        {
+            hero.hp = hero.maxHp
+            this.onHurt(id, hero.hp)
+        }
+        else if (ware === "speed")
+        {
+            hero.speedLeft = POTION_TIME
+        }
+        else if (ware === "strength")
+        {
+            hero.strengthLeft = POTION_TIME
+        }
+    }
+
+    /**
+     * Moves the actors of the scene and the camera, while the rest of the level stands still
+     */
+    private updateScene(time: number, delta: number): void
+    {
+        const { stage, left, hero, other, otherFacing } = this.playing!
+        stage.update(delta)
+        const { beat } = stage
+        if (beat?.kind === "act" && beat.clip === "shakeHead")
+        {
+            const actor = beat.actor === "a" ? hero.meeple : other
+            const t = Math.min(1, stage.beatTime / ACT_TIME)
+            const base = actor === other ? otherFacing : actor.facing
+            actor.facing = base + Math.sin(t * SHAKES * Math.PI * 2) * SHAKE_ANGLE * Math.sin(t * Math.PI)
+        }
+        // the scene might have ended with the update
+        if (this.playing)
+        {
+            const { meshes } = this
+            this.placeSceneCamera(hero.meeple.position, other.position, left, stage.shot)
+            const space = meshes!.near.spaceOf.get(hero.face)
+            updateWallCut(meshes!.cut, space ? [space] : [], delta)
+            if (hero.lightOn)
+            {
+                moveHeroLight(meshes!.field, meshes!.segments, hero.meeple.position.x, hero.meeple.position.z)
+                flickerHeroLight(meshes!.field, time, heroBurn(hero.lightBurnt))
+            }
+        }
+        this.crowd?.update(this.camera, time)
     }
 
     /**
@@ -689,7 +1041,7 @@ export default class LevelScene
 
         if (control.moving)
         {
-            const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * delta
+            const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * (hero.speedLeft > 0 ? SPEED_POTION : 1) * delta
             spot.face = hero.face
             spot.x = meeple.position.x
             spot.z = meeple.position.z
@@ -781,6 +1133,8 @@ export default class LevelScene
             {
                 continue
             }
+            hero.speedLeft = Math.max(0, hero.speedLeft - delta)
+            hero.strengthLeft = Math.max(0, hero.strengthLeft - delta)
             let given: HeroOrders | null = null
             if (hero === focused)
             {
@@ -958,7 +1312,7 @@ export default class LevelScene
             if (strikeAt !== null && time >= strikeAt)
             {
                 hero.strikeAt = null
-                monsters.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, SWORD_DAMAGE)
+                monsters.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, hero.strengthLeft > 0 ? STRONG_SWORD_DAMAGE : SWORD_DAMAGE)
             }
             const damage = monsters.hurt(prey, delta)
             if (damage > 0)
@@ -1158,13 +1512,23 @@ export default class LevelScene
             const { level, meshes } = this
             if (level && meshes)
             {
-                this.updateHeroes(time, delta)
-                this.updateView(time, delta)
+                if (this.playing)
+                {
+                    this.updateScene(time, delta)
+                }
+                else
+                {
+                    this.updateHeroes(time, delta)
+                    this.updateView(time, delta)
+                }
                 this.updateSound()
                 flickerLights(meshes.field, level.lighting!.lights, time)
                 updateLightField(this.renderer, meshes.field)
             }
-            this.controls.update()
+            if (!this.playing)
+            {
+                this.controls.update()
+            }
             this.renderer.render(this.scene, this.camera)
         } : null)
     }
