@@ -577,6 +577,77 @@ Glyphs are built from the stroke data of a source kanji per concept
   it gives the meaning away to players who read Japanese, so it stays
   out of anything meant to be decoded.
 
+### 2.7 Scenes
+
+Meeples talk to the heroes in scenes: the level stops, the camera moves
+in close to the meeples involved, and a script plays, straight through
+or with choices for the player. This is how a stereotype shows up in
+person: a trader, a stranger with a message, a prisoner who begs.
+
+- Triggers: interacting with a meeple (cross near them, like a chest,
+  with a prompt for it), reaching a place (entering a room, coming
+  close to a mark), or a scene that follows another. Only outside of
+  fights, like the map of the level; a trigger that fires during one
+  waits for it to end.
+- The level freezes while a scene plays: monsters, coins and bursts
+  stop, the carried light doesn't burn down, nothing can hurt anyone.
+  Only the actors of the scene move. Room ambience keeps playing.
+- Actors are the focused hero and the meeples the scene names. Before it
+  starts they step to marks a few faces apart on open floor of the
+  room, so there is room around them for the camera.
+- The 180-degree rule: the two main actors A and B
+  span the line of action, and the camera stays on one side of it. A
+  shot is an angle around the middle between them, from the direction
+  of A (0) to that of B (180), plus distance and height: the two-shot
+  is near 90, over the shoulder of A near 20, over that of B near 160
+  (`scene/sceneCamera.ts`).
+  Camera moves go along that arc, so they never cross the line, and
+  whoever is left on the screen stays left.
+- The script, or the generator that made it, says which side of the
+  line the camera is on, i.e. who of A and B is left on the screen. The
+  marks are chosen to suit it.
+- A third actor stands back on the far side of the line, and the line
+  stays with A and B for the whole scene.
+- A script is a graph of beats (`scene/script.ts`), typed data in TS, so stereotypes can
+  make scenes as well as hold written ones. Beats: shot, move to a mark,
+  act (a clip or gesture), say (a bubble of glyphs plus an emotion, see
+  2.5), give and take (gold, items), choice, check a fact, set a fact,
+  end. A scene plays as a whole and is never saved halfway; what it
+  changed (gold, items, facts, concepts shown) is saved when it ends.
+  Scenes may outgrow plain data later and need some scripting or a
+  node editor; the beat graph should leave room for that.
+- Bubbles speak the glyph language: known concepts show as readable
+  emoji, the rest stay cryptic. A clear enough showing in a scene
+  counts as an exposure toward learning a concept, so a message the
+  player can't read yet is still worth hearing.
+- Choices grow with the language. Early on the player half understands
+  at best, so the choices are just agreeing or not, full of doubt:
+  "Yes?", "No, I guess?". Later they get more complex, as emoji or whole
+  sentences in meeplish, the glyph language of 2.5.
+- First scene: a trader (`scene/trader.ts`), a stranger in a room of a dungeon (not the
+  entrance room), met by interacting. A stranger wears a dashing
+  moustache (`MeepleLook.moustache`, `media/meeple/moustache.png`). Heroes carry nothing but their
+  weapons and the gold they found (`Job.gold`), so the first wares are
+  drunk or used at once. Three potions: healing, speed (faster walking
+  for 2 minutes) and strength (the sword takes 4 hit points instead of 2
+  for 2 minutes). Plus the map of the level, which is expensive: it
+  draws the whole level as if visited, with every special feature
+  (chests, exits, later special rooms) marked only by a "?" until a
+  hero has been there. So the player still has to find out which "?"
+  is an exit. The
+  trader offers one at a time, holding it up with its price in coins
+  (10 gold each), and the hero agrees or not ("Yes?", "No, I guess?").
+  Paying takes from the gold the hero carries, so spending it in the
+  level is a trade-off against bringing it home. A hero without enough
+  gets a shake of the head.
+- Later scenes: a messenger who tells a few glyphs, some known, some
+  not, and the hero takes it in or turns away.
+- Still open: walls between a low camera and the actors. The near walls
+  of 3.1 only give way toward the level view, so a shot across the room
+  can have a wall in front. Candidates: keep the camera inside the room
+  (pull it in toward the actors along the wall outline), and fade any
+  wall the camera ray to an actor crosses.
+
 ## Phase 3 - Levels and contents
 
 ### 3.1 Doors and portals
