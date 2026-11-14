@@ -33,7 +33,7 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
-import { loadEffect, playEffect } from "../sound/effects"
+import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
@@ -70,6 +70,13 @@ const SMITE_SOUND = "hallelujah-mono.mp3"
  */
 const PICK_UP_SOUND = "pick-up.mp3"
 const PICK_UP_VOLUME = 0.85
+
+/**
+ * How many pick-up sounds play at once at most, and seconds at least between their starts, so a hero sweeping up a pile
+ * hears a quick run of notes instead of one loud chord
+ */
+const PICK_UP_VOICES = 3
+const PICK_UP_GAP = 0.08
 
 /**
  * Playback rates a pick-up sound picks from, so many in a row don't sound the same: the steps of the major pentatonic
@@ -358,6 +365,7 @@ export default class LevelScene
     private readonly lookAngles = new Spherical()
     /** ends the listening to the window */
     private readonly listening = new AbortController()
+    private readonly pickUpSound = new EffectVoices(PICK_UP_SOUND, PICK_UP_VOICES, PICK_UP_GAP)
 
     /** null until the level is there */
     private level: DungeonLevel | null = null
@@ -1447,7 +1455,7 @@ export default class LevelScene
         {
             if (takenBy === this.focus)
             {
-                playEffect(PICK_UP_SOUND, PICK_UP_RATES[Math.floor(Math.random() * PICK_UP_RATES.length)], PICK_UP_VOLUME)
+                this.pickUpSound.play(PICK_UP_RATES[Math.floor(Math.random() * PICK_UP_RATES.length)], PICK_UP_VOLUME)
             }
         }
         treasure!.update(time, id => this.shown.get(id)?.meeple.position)
