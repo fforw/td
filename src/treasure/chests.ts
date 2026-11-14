@@ -32,6 +32,29 @@ export const MIN_COINS = 6
 export const MAX_COINS = 14
 
 /**
+ * Potions that can be in a chest
+ */
+export type Potion = "healing" | "speed" | "strength"
+
+export const POTIONS: readonly Potion[] = ["healing", "speed", "strength"]
+
+/**
+ * Share of the chests with a potion in them, along with the coins
+ */
+export const POTION_CHANCE = 0.2
+
+/**
+ * Seed of the potions of the chests against the one of the coins. They have numbers of their own, so the coins stay the
+ * same with or without them.
+ */
+const POTION_SEED = 0x9a71
+
+/**
+ * Seconds a potion comes out after the last coin
+ */
+const POTION_DELAY = 0.15
+
+/**
  * Seconds a lid takes to pop open
  */
 export const LID_TIME = 0.3
@@ -115,11 +138,13 @@ export type OpenedChests = Record<number, number[]>
 export type ChestSpot = FixtureSpot
 
 /**
- * A coin in a chest, which flies out when it opens, floats in a bubble and goes to whoever picks it up
+ * Something in a chest, a coin or a potion, which flies out when it opens, floats in a bubble and goes to whoever picks it up
  */
 export interface Coin
 {
     id: number
+    /** what it is, a coin without */
+    potion?: Potion
     /** where it lands */
     x: number
     z: number
@@ -250,6 +275,7 @@ export default class ChestHoard
     constructor(spots: readonly ChestSpot[], seed: number, land: CoinLanding, private readonly opened: OpenedChests)
     {
         const random = new Prando(seed)
+        const potionRandom = new Prando(seed + POTION_SEED)
         this.chests = spots.map((spot, index) => {
             const left = opened[index]
             const chest: Chest = {
@@ -259,28 +285,24 @@ export default class ChestHoard
                 openedAt: left ? -Infinity : null,
                 coins: []
             }
-            const count = random.nextInt(MIN_COINS, MAX_COINS)
-            for (let id = 0; id < count; id++)
-            {
-                const angle = spot.facing + random.next(-SPILL_ANGLE, SPILL_ANGLE)
-                const reach = random.next(MIN_SPILL, MAX_SPILL)
-                const [x, z] = land(spot, Math.sin(angle) * reach, Math.cos(angle) * reach)
-                const coin: Coin = {
-                    id,
-                    x,
-                    z,
-                    delay: SPILL_START + id * SPILL_INTERVAL,
-                    flight: random.next(MIN_FLIGHT, MAX_FLIGHT),
-                    yaw: random.next(0, TAU),
-                    turns: random.nextInt(2, 4) * 2,
-                    takenAt: null,
-                    takenBy: null,
-                    arrived: false
-                }
-                if (!left || left.includes(id))
+            const keep = (coin: Coin) => {
+                if (!left || left.includes(coin.id))
                 {
                     chest.coins.push(coin)
                 }
+            }
+            const count = random.nextInt(MIN_COINS, MAX_COINS)
+            for (let id = 0; id < count; id++)
+            {
+                keep(spilled(spot, id, SPILL_START + id * SPILL_INTERVAL, land, random))
+            }
+            // drawn for every chest, for each to have the same potion whatever the others have
+            const hasPotion = potionRandom.next() < POTION_CHANCE
+            const potion = POTIONS[potionRandom.nextInt(0, POTIONS.length - 1)]
+            const last = spilled(spot, count, SPILL_START + (count - 1) * SPILL_INTERVAL + POTION_DELAY, land, potionRandom)
+            if (hasPotion)
+            {
+                keep({ ...last, potion })
             }
             return chest
         })
@@ -326,11 +348,11 @@ export default class ChestHoard
      * Picks up what has landed around a hero, which then goes to them
      *
      * @param hero  id of the hero
-     * @returns the number of coins picked up
+     * @returns the coins and potions picked up
      */
-    collect(x: number, z: number, time: number, hero = 0): number
+    collect(x: number, z: number, time: number, hero = 0): Coin[]
     {
-        let taken = 0
+        const taken: Coin[] = []
         for (const chest of this.chests)
         {
             if (chest.openedAt === null)
@@ -348,7 +370,7 @@ export default class ChestHoard
                 {
                     coin.takenAt = time
                     coin.takenBy = hero
-                    taken++
+                    taken.push(coin)
                     changed = true
                 }
             }
@@ -381,3 +403,27 @@ export default class ChestHoard
     }
 }
 
+
+/**
+ * Returns where something that comes out of a chest lands and how it gets there
+ *
+ * @param delay     seconds after the opening of the chest it comes out
+ */
+function spilled(spot: ChestSpot, id: number, delay: number, land: CoinLanding, random: Prando): Coin
+{
+    const angle = spot.facing + random.next(-SPILL_ANGLE, SPILL_ANGLE)
+    const reach = random.next(MIN_SPILL, MAX_SPILL)
+    const [x, z] = land(spot, Math.sin(angle) * reach, Math.cos(angle) * reach)
+    return {
+        id,
+        x,
+        z,
+        delay,
+        flight: random.next(MIN_FLIGHT, MAX_FLIGHT),
+        yaw: random.next(0, TAU),
+        turns: random.nextInt(2, 4) * 2,
+        takenAt: null,
+        takenBy: null,
+        arrived: false
+    }
+}

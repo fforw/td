@@ -1,3 +1,5 @@
+import type { Potion } from "../treasure/chests"
+
 /**
  * Scripts of scenes, see plans/discovery.md 2.7. A script is a graph of beats. The player walks it, and whatever shows
  * the scene tells it when a beat that takes time is over, or what the player chose.
@@ -12,7 +14,7 @@ export type ActorRole = "a" | "b"
 /**
  * Things a hero can buy and drink or use at once
  */
-export type Ware = "healing" | "speed" | "strength" | "map"
+export type Ware = Potion | "map"
 
 /**
  * How an actor feels, shown in their bubble along with what they say

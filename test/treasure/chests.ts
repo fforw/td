@@ -12,6 +12,8 @@ import ChestHoard, {
     MIN_COINS,
     type OpenedChests,
     placeChests,
+    POTION_CHANCE,
+    POTIONS,
     TAKE_TIME
 } from "../../src/treasure/chests"
 
@@ -92,7 +94,8 @@ describe("ChestHoard", () => {
     it("has a fitting number of coins, the same every time", () => {
 
         const { coins } = hoard().chests[0]
-        assert(coins.length >= MIN_COINS && coins.length <= MAX_COINS)
+        const count = coins.filter(({ potion }) => !potion).length
+        assert(count >= MIN_COINS && count <= MAX_COINS)
         assert.deepEqual(coins, hoard().chests[0].coins)
     })
 
@@ -100,7 +103,33 @@ describe("ChestHoard", () => {
 
         const spots = Array.from({ length: 20 }, () => SPOT)
         const { chests } = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
-        assert(new Set(chests.map(({ coins }) => coins.length)).size > 2)
+        assert(new Set(chests.map(({ coins }) => coins.filter(({ potion }) => !potion).length)).size > 2)
+    })
+
+    it("has a potion in some chests, which comes out after the coins", () => {
+
+        const spots = Array.from({ length: 400 }, () => SPOT)
+        const { chests } = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
+        const withPotion = chests.filter(({ coins }) => coins.some(({ potion }) => potion))
+        assert.closeTo(withPotion.length / chests.length, POTION_CHANCE, 0.06)
+        assert.sameMembers([...new Set(withPotion.map(({ coins }) => coins.at(-1)!.potion))], [...POTIONS])
+        for (const { coins } of withPotion)
+        {
+            const potion = coins.at(-1)!
+            assert.equal(coins.filter(({ potion }) => potion).length, 1)
+            assert.equal(potion.id, coins.length - 1)
+            assert(coins.slice(0, -1).every(({ delay }) => delay < potion.delay))
+        }
+    })
+
+    it("gets picked up like a coin, as a potion", () => {
+
+        const spots = Array.from({ length: 40 }, () => SPOT)
+        const chests = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
+        const chest = chests.chests.find(({ coins }) => coins.at(-1)!.potion)!
+        const potion = chest.coins.at(-1)!
+        chests.open(chest, 0)
+        assert.include(chests.collect(potion.x, potion.z, LONG_AFTER), potion)
     })
 
     it("lets coins fly out of the chest and land where they are meant to", () => {
@@ -134,7 +163,7 @@ describe("ChestHoard", () => {
         chests.open(chest, 0)
         const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, spin: 0, size: 0 }
         const hero = { x: coin.x + COIN_REACH * 0.9, z: coin.z }
-        assert.isAtLeast(chests.collect(hero.x, hero.z, LONG_AFTER, 7), 1)
+        assert.isAtLeast(chests.collect(hero.x, hero.z, LONG_AFTER, 7).length, 1)
         assert.equal(coin.takenBy, 7)
 
         coinPose(coin, chest, LONG_AFTER, pose, hero)
@@ -156,13 +185,13 @@ describe("ChestHoard", () => {
         const [chest] = chests.chests
         const [coin] = chest.coins
 
-        assert.equal(chests.collect(coin.x, coin.z, LONG_AFTER), 0, "closed")
+        assert.isEmpty(chests.collect(coin.x, coin.z, LONG_AFTER), "closed")
         chests.open(chest, 0)
-        assert.equal(chests.collect(coin.x, coin.z, coin.delay / 2), 0, "in the air")
-        assert.isAtLeast(chests.collect(coin.x, coin.z, LONG_AFTER), 1)
+        assert.isEmpty(chests.collect(coin.x, coin.z, coin.delay / 2), "in the air")
+        assert.include(chests.collect(coin.x, coin.z, LONG_AFTER), coin)
         assert.isNotNull(coin.takenAt)
-        assert.equal(chests.collect(coin.x, coin.z, LONG_AFTER), 0, "gone")
-        assert.equal(chests.collect(coin.x + COIN_REACH * 100, coin.z, LONG_AFTER), 0, "too far")
+        assert.isEmpty(chests.collect(coin.x, coin.z, LONG_AFTER), "gone")
+        assert.isEmpty(chests.collect(coin.x + COIN_REACH * 100, coin.z, LONG_AFTER), "too far")
     })
 
     it("keeps a record of what is left, to go on from", () => {

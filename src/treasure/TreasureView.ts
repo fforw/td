@@ -1,7 +1,7 @@
-import { DynamicDrawUsage, Group, InstancedMesh, Matrix4, type Mesh, type MeshStandardMaterial, Object3D, SphereGeometry } from "three"
+import { Box3, DynamicDrawUsage, Group, InstancedMesh, type Mesh, type MeshStandardMaterial, Object3D, SphereGeometry, Vector3 } from "three"
 import { applyLightField, createBubbleMaterial, type LightField } from "../render/dungeonLighting"
-import { template } from "../render/scene3d"
-import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME } from "./chests"
+import { type ModelName, template } from "../render/scene3d"
+import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME, type Potion, POTIONS } from "./chests"
 
 /**
  * Half the width of the chest model
@@ -15,6 +15,17 @@ const CHEST_SCALE = CHEST_HALF_WIDTH / CHEST_MODEL_HALF_WIDTH
  */
 const COIN_SCALE = 0.3
 const COIN_MODEL_SIZE = 0.4167
+
+/**
+ * Size of a potion against its model, whose bottles are about three units high
+ */
+const POTION_SCALE = 0.042
+
+const POTION_MODELS: Record<Potion, ModelName> = {
+    healing: "healthPotion",
+    speed: "speedPotion",
+    strength: "strengthPotion"
+}
 
 /**
  * Radius of the bubble an item floats in, in world units
@@ -32,7 +43,6 @@ const LID_OPEN = -Math.PI * 0.55
 const LID_OVERSHOOT = 2.5
 
 const dummy = new Object3D()
-const matrix = new Matrix4()
 const pose: CoinPose = { x: 0, y: 0, z: 0, tumble: 0, spin: 0, size: 0 }
 
 
@@ -50,14 +60,26 @@ function firstMesh(root: Object3D): Mesh
 
 
 /**
- * Chests and instanced coins of a level, each coin in a bubble. The models must be loaded first.
+ * Instanced meshes for all of one kind of thing that comes out of chests, one for each part of its model
+ */
+interface Items
+{
+    parts: InstancedMesh[]
+    scale: number
+    /** instances set so far in an update */
+    count: number
+}
+
+
+/**
+ * Chests and the instanced coins and potions in them, each in a bubble. The models must be loaded first.
  */
 export default class TreasureView
 {
     readonly group = new Group()
 
     private readonly lids: Object3D[] = []
-    private readonly coins: InstancedMesh
+    private readonly items: Record<"coin" | Potion, Items>
     private readonly bubbles: InstancedMesh
 
     /**
@@ -91,22 +113,29 @@ export default class TreasureView
         // after the silhouettes of a level, see MeepleCrowd.showSilhouettes()
         this.group.renderOrder = 1
 
+        const all = chests.flatMap(({ coins }) => coins)
+        const most = (potion?: Potion) => all.filter(coin => coin.potion === potion).length
         const source = firstMesh(template("coin"))
         const coinMaterial = (source.material as MeshStandardMaterial).clone()
         applyLightField(coinMaterial, field)
         // around its middle, to turn in the air
-        const geometry = source.geometry.clone().translate(0, -COIN_MODEL_SIZE / 2, 0)
-        const most = chests.reduce((sum, { coins }) => sum + coins.length, 0)
-        const coins = new InstancedMesh(geometry, coinMaterial, most)
-        const bubbles = new InstancedMesh(new SphereGeometry(BUBBLE_RADIUS, 24, 16), createBubbleMaterial(field), most)
-        for (const mesh of [coins, bubbles])
+        const coins = new InstancedMesh(source.geometry.clone().translate(0, -COIN_MODEL_SIZE / 2, 0), coinMaterial, most())
+        this.items = {
+            coin: { parts: [coins], scale: COIN_SCALE, count: 0 },
+            ...Object.fromEntries(POTIONS.map(potion => [potion, {
+                parts: instancedParts(template(POTION_MODELS[potion]), field, most(potion)),
+                scale: POTION_SCALE,
+                count: 0
+            }])) as Record<Potion, Items>
+        }
+        const bubbles = new InstancedMesh(new SphereGeometry(BUBBLE_RADIUS, 24, 16), createBubbleMaterial(field), all.length)
+        for (const mesh of [...Object.values(this.items).flatMap(({ parts }) => parts), bubbles])
         {
             mesh.instanceMatrix.setUsage(DynamicDrawUsage)
             mesh.frustumCulled = false
             mesh.count = 0
             this.group.add(mesh)
         }
-        this.coins = coins
         this.bubbles = bubbles
     }
 
@@ -115,7 +144,11 @@ export default class TreasureView
      */
     update(time: number, heroAt: (id: number) => { x: number, z: number } | undefined): void
     {
-        const { chests, lids, coins, bubbles } = this
+        const { chests, lids, items, bubbles } = this
+        for (const kind of Object.values(items))
+        {
+            kind.count = 0
+        }
         let count = 0
         chests.forEach((chest, index) => {
             const { openedAt } = chest
@@ -136,20 +169,55 @@ export default class TreasureView
                 coinPose(coin, chest, time, pose, coin.takenBy !== null ? heroAt(coin.takenBy) : undefined)
                 if (pose.size > 0)
                 {
+                    const kind = items[coin.potion ?? "coin"]
                     dummy.position.set(pose.x, pose.y, pose.z)
                     dummy.rotation.set(pose.tumble, pose.spin, 0, "YXZ")
-                    dummy.scale.setScalar(COIN_SCALE * pose.size)
+                    dummy.scale.setScalar(kind.scale * pose.size)
                     dummy.updateMatrix()
-                    coins.setMatrixAt(count, matrix.copy(dummy.matrix))
+                    for (const part of kind.parts)
+                    {
+                        part.setMatrixAt(kind.count, dummy.matrix)
+                    }
+                    kind.count++
                     dummy.rotation.set(0, 0, 0)
                     dummy.scale.setScalar(pose.size)
                     dummy.updateMatrix()
-                    bubbles.setMatrixAt(count++, matrix.copy(dummy.matrix))
+                    bubbles.setMatrixAt(count++, dummy.matrix)
                 }
             }
         })
-        coins.count = bubbles.count = count
-        coins.instanceMatrix.needsUpdate = bubbles.instanceMatrix.needsUpdate = true
+        for (const { parts, count } of Object.values(items))
+        {
+            for (const part of parts)
+            {
+                part.count = count
+                part.instanceMatrix.needsUpdate = true
+            }
+        }
+        bubbles.count = count
+        bubbles.instanceMatrix.needsUpdate = true
     }
 }
 
+
+/**
+ * Returns an instanced mesh for each part of a model, around the middle of the whole model, to turn in the air
+ *
+ * @param most  number of instances there can be
+ */
+function instancedParts(model: Object3D, field: LightField, most: number): InstancedMesh[]
+{
+    const middle = new Box3().setFromObject(model).getCenter(new Vector3())
+    const parts: InstancedMesh[] = []
+    model.traverse(part => {
+        const mesh = part as Mesh
+        if (mesh.isMesh)
+        {
+            const material = (mesh.material as MeshStandardMaterial).clone()
+            applyLightField(material, field)
+            const geometry = mesh.geometry.clone().translate(-middle.x, -middle.y, -middle.z)
+            parts.push(new InstancedMesh(geometry, material, most))
+        }
+    })
+    return parts
+}

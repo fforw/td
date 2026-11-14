@@ -476,7 +476,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "chest", "coin", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -1405,17 +1405,28 @@ export default class LevelScene
         {
             return
         }
-        for (const [id, { meeple: { position }, hp }] of this.shown)
+        for (const [id, hero] of this.shown)
         {
+            const { meeple: { position }, hp } = hero
             if (hp === 0)
             {
                 continue
             }
             // counts at once, so a hero who leaves right away has it
             const taken = chests.collect(position.x, position.z, time, id)
-            if (taken > 0)
+            const coins = taken.filter(({ potion }) => !potion).length
+            if (coins > 0)
             {
-                this.onLoot(id, taken * COIN_VALUE)
+                this.onLoot(id, coins * COIN_VALUE)
+            }
+            // drunk at once like a bought one, which tells what it is
+            for (const { potion } of taken)
+            {
+                if (potion)
+                {
+                    this.use(id, hero, potion)
+                    this.outside.learn(potion)
+                }
             }
         }
         // only the hero the view is with is close enough to be heard

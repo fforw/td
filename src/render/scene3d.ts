@@ -60,6 +60,9 @@ export const MODELS = {
     flyingEye: "monster/flying-eye.glb",
     chest: "treasure/chest.glb",
     coin: "treasure/coin.glb",
+    healthPotion: "treasure/health-potion.glb",
+    speedPotion: "treasure/speed-potion.glb",
+    strengthPotion: "treasure/strength-potion.glb",
     stairs: "dungeon/stairs.glb",
 }
 
