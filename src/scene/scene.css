@@ -1,0 +1,92 @@
+/* over the level, letting clicks through to it except on the bubble and the buttons */
+.scene-box
+{
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    font: 1rem system-ui, sans-serif;
+}
+
+.scene-box[hidden],
+.scene-bubble[hidden]
+{
+    display: none;
+}
+
+/* above the head of who speaks, with its tail on the left, or on the right for someone on the right of the screen */
+.scene-bubble
+{
+    position: absolute;
+    transform: translate(-1.5rem, calc(-100% - 1.2rem));
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 1rem;
+    background: #f4ecdc;
+    color: #2a1d14;
+    font-size: 2rem;
+    line-height: 1;
+    box-shadow: 0 0.2rem 0.6rem rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+}
+
+.scene-bubble::after
+{
+    content: "";
+    position: absolute;
+    left: 1rem;
+    bottom: -0.7rem;
+    border: 0.4rem solid transparent;
+    border-top: 0.6rem solid #f4ecdc;
+    border-bottom: none;
+}
+
+.scene-bubble-right
+{
+    transform: translate(calc(-100% + 1.5rem), calc(-100% - 1.2rem));
+}
+
+.scene-bubble-right::after
+{
+    left: auto;
+    right: 1rem;
+}
+
+.scene-bubble .scene-price
+{
+    font-size: 1.2rem;
+}
+
+.scene-buttons
+{
+    position: absolute;
+    left: 50%;
+    bottom: 3.5rem;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 1rem;
+    pointer-events: auto;
+}
+
+/* :is() with the id outweighs the buttons of the game page */
+:is(#game, body) .scene-buttons button
+{
+    min-width: 6rem;
+    padding: 0.5rem 1rem;
+    border: 2px solid #8a6a48;
+    border-radius: 0.4rem;
+    background: rgba(42, 29, 20, 0.9);
+    color: #e8e0d4;
+    font: 1.1rem system-ui, sans-serif;
+    cursor: pointer;
+}
+
+:is(#game, body) .scene-buttons button:hover,
+:is(#game, body) .scene-buttons button:focus-visible
+{
+    border-color: #f4ecdc;
+    outline: none;
+    background: rgba(90, 64, 42, 0.95);
+}
