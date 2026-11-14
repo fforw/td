@@ -79,22 +79,30 @@
 
 #title .menu button
 {
-    padding: 0.5em 1em;
+    padding: 0.4em 1em;
     border: none;
     border-radius: 0.25rem;
-    background: #e8e0d4;
-    color: #2a1d14;
-    font: italic 3.4cqh "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    background: rgba(232, 224, 212, 0.12);
+    color: #f2e8d5;
+    text-shadow: 0 0 0.3em #000;
+    font: italic 4.5cqh "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
     cursor: pointer;
 }
 
 #title .menu button.play
 {
-    background: #c0244e;
+    background: rgba(192, 36, 78, 0.3);
     color: #fff;
 }
 
-#title .menu button[hidden]
+#title .menu button:hover,
+#title .menu button:focus-visible
 {
-    display: none;
+    background: rgba(232, 224, 212, 0.22);
+}
+
+#title .menu button.play:hover,
+#title .menu button.play:focus-visible
+{
+    background: rgba(192, 36, 78, 0.45);
 }

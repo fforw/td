@@ -13,7 +13,7 @@ const store = new LocalSaveStore()
 const title = document.getElementById("title")!
 const game = document.getElementById("game")!
 const subtitle = title.querySelector(".subtitle")!
-const continueButton = title.querySelector<HTMLButtonElement>(".continue")!
+const startButton = title.querySelector<HTMLButtonElement>(".play")!
 const soundButton = document.getElementById("sound")!
 
 const gamepad = new GamepadControl()
@@ -24,16 +24,20 @@ gamepad.setTarget({
 })
 
 /**
- * Campaign shown on the title screen, created from its seed but not saved before play
+ * Campaign shown on the title screen: the saved one, or a new one that is only saved once it is played
  */
-let preview: Campaign
+let current: Campaign
 
-function showPreview(seed: number): void
+/**
+ * Shows the campaign's name on the title screen. A new campaign keeps its seed in the URL, so a reload shows it again.
+ */
+function show(campaign: Campaign, played: boolean): void
 {
-    preview = createCampaign(seed)
-    subtitle.textContent = preview.subtitle
-    document.title = "Treasure & Dread: " + preview.subtitle
-    history.replaceState(null, "", "?seed=" + seed)
+    current = campaign
+    subtitle.textContent = campaign.subtitle
+    startButton.textContent = played ? "Continue" : "Start"
+    document.title = "Treasure & Dread: " + campaign.subtitle
+    history.replaceState(null, "", played ? location.pathname : "?seed=" + campaign.seed)
 }
 
 function play(campaign: Campaign): void
@@ -45,17 +49,18 @@ function play(campaign: Campaign): void
 }
 
 const seedParam = new URLSearchParams(location.search).get("seed")
-showPreview(randomSeed(seedParam ? +seedParam : null))
-
 const saved = store.load()
-if (saved)
+if (saved && (!seedParam || +seedParam === saved.seed))
 {
-    continueButton.hidden = false
-    continueButton.textContent = "Continue: " + saved.subtitle
-    continueButton.addEventListener("click", () => play(saved))
+    show(saved, true)
 }
-title.querySelector(".play")!.addEventListener("click", () => play(preview))
-title.querySelector(".reroll")!.addEventListener("click", () => showPreview(randomSeed()))
+else
+{
+    show(createCampaign(randomSeed(seedParam ? +seedParam : null)), false)
+}
+
+startButton.addEventListener("click", () => play(current))
+title.querySelector(".new")!.addEventListener("click", () => show(createCampaign(randomSeed()), false))
 
 const music = document.querySelector<HTMLAudioElement>("audio")!
 

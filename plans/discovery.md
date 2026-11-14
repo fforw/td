@@ -218,10 +218,13 @@ subtitle on top of that.
   stored in the campaign record. It colors all speech bubbles and
   glyphs of the world. Each palette has a row per color scheme, used
   by `prefers-color-scheme`: background, main, secondary, accent.
-- Start screen: logo, subtitle and a preview of the generated castle
-  patch behind it, e.g. "Treasure & Dread: The Rise of Blatopia". Reroll
-  draws a new seed; play creates the campaign record and goes straight
-  into the discovery loop. Nothing is saved before play.
+- Start screen: the rendered logo picture with the current campaign's
+  subtitle on its floor, e.g. "The Rise of Blatopia", and the menu in
+  its dark wall. The current campaign is the saved one, or a new one
+  from the seed. The top button reads "Continue" for a saved campaign
+  and "Start" for a new one, which is only saved once it is played.
+  "New game" draws a new seed and stays on the title screen, so the
+  new subtitle can be read.
 - Keep the subtitle generator separate from the castle code, so it can
   later name a key figure instead ("The Oath of Kenrik", via
   `meepleNameGenerator`).
