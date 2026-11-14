@@ -245,6 +245,16 @@ for (const index of (params.get("look") ?? "").split(",").filter(Boolean))
 {
     crowd.meeples[+index].lookAtCamera = true
 }
+/**
+ * Chance of a meeple to wear a moustache, unless the page names those that do
+ */
+const MOUSTACHE_CHANCE = 0.2
+
+// "all" or the indices of the meeples to wear one
+const moustaches = params.get("moustache")
+crowd.meeples.forEach((meeple, index) => meeple.look.moustache = moustaches === null
+    ? rng.next() < MOUSTACHE_CHANCE
+    : moustaches === "all" || moustaches.split(",").includes(String(index)))
 
 const hint = document.createElement("div")
 hint.textContent = "click a meeple to make it look at you"

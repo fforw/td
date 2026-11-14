@@ -26,7 +26,7 @@ import {
 } from "three"
 import { canEquip, type Character, checkClasses, dexWalkFactor } from "./character"
 import { actItem, advanceItem, itemAnimation, itemPose, type ItemPose, type ItemState, newItemState, stopActing } from "../items/itemAnimation"
-import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite } from "../items/itemSprite"
+import { ITEM_PIXELS, type ItemName, ITEMS, type ItemSprite, itemSprite, loadItemSprite } from "../items/itemSprite"
 import { bodySurface, createBodyGeometry, createHeadGeometry, createShortHair, HEAD_RADIUS, HEAD_Y } from "./meepleParts"
 import { applyLightField, applyRimLight, type LightField } from "../render/dungeonLighting"
 import { type ModelName, template } from "../render/scene3d"
@@ -79,6 +79,28 @@ const EYE_RX = 21
 const EYE_RY = 23
 const EYE_RING = 4
 const EYE_OUTLINE = "#1a1a24"
+
+/**
+ * Drawing of the moustache, made into a thin sprite like the items and bent around the head
+ */
+const MOUSTACHE_IMAGE = import.meta.env.BASE_URL + "media/meeple/moustache.png"
+/**
+ * Width of the moustache in pixels, finer than the items, with the outline of the drawing
+ */
+const MOUSTACHE_PIXELS = 80
+/**
+ * Width and thickness of the moustache in meeple units, the thickness about one item pixel
+ */
+const MOUSTACHE_WIDTH = 0.41
+const MOUSTACHE_THICKNESS = 0.016
+/**
+ * Angle in radians from the face center down to the middle of the moustache, below the eyes
+ */
+const MOUSTACHE_DROP = 0.8
+/**
+ * Distance in head radii the moustache stands off the head, so the eyes, which are drawn in front of it, don't cover it
+ */
+const MOUSTACHE_LIFT = 0.25
 
 /**
  * Minimum height of an eye on screen in CSS pixels for the meeple to blink. Smaller eyes are too coarse to show the
@@ -192,6 +214,10 @@ export interface MeepleLook
     shirt: Color
     hair: Color
     hairStyle: HairStyle
+    /**
+     * Wears a moustache under the nose it doesn't have
+     */
+    moustache?: boolean
     /**
      * Height from 0 to 1
      */
@@ -458,6 +484,34 @@ function createEyeMaterial(): ShaderMaterial
 
 
 /**
+ * Bends a sprite facing +z around the front of the head, with its middle at the given angle below the face center and
+ * its back the given distance off the head. The sprite keeps its width along the head.
+ *
+ * @param geometry  sprite geometry from extrudeSprite(), with columns, scaled to its size
+ * @param drop      angle in radians below the face center
+ * @param thickness thickness of the sprite
+ * @param lift      distance of its back from the head
+ */
+export function bendAroundHead(geometry: BufferGeometry, drop: number, thickness: number, lift = 0): BufferGeometry
+{
+    const position = geometry.getAttribute("position")
+    const middle = -HEAD_RADIUS * Math.sin(drop)
+    const radius = HEAD_RADIUS * Math.cos(drop) + lift
+    for (let i = 0; i < position.count; i++)
+    {
+        const x = position.getX(i), y = middle + position.getY(i), z = position.getZ(i)
+        // the circle around the head at the height of the vertex, with the back of the sprite on it
+        const around = Math.sqrt(Math.max(0, HEAD_RADIUS * HEAD_RADIUS - y * y)) + lift + thickness / 2 + z
+        const angle = x / radius
+        position.setXYZ(i, around * Math.sin(angle), y, around * Math.cos(angle))
+    }
+    position.needsUpdate = true
+    geometry.computeVertexNormals()
+    return geometry
+}
+
+
+/**
  * Returns the geometry of a loaded hair model. The objects have their origin at the head center, so the geometry is
  * used as it is and their transforms are ignored.
  */
@@ -605,6 +659,7 @@ export default class MeepleCrowd
     private readonly body: InstancedMesh
     private readonly head: InstancedMesh
     private readonly eyes: InstancedMesh
+    private readonly moustaches: InstancedMesh
     /**
      * How far each meeple's lids are closed, from 0 to 1
      */
@@ -661,6 +716,23 @@ export default class MeepleCrowd
         this.eyes.setColorAt(0, new Color())
         this.eyes.onBeforeRender = renderer => eyeMaterial.uniforms.viewportHeight.value = renderer.getSize(tmpSize).y
         this.group.add(this.eyes)
+
+        // shows once the drawing is loaded and made into a sprite
+        const moustacheMaterial = new MeshToonMaterial({ alphaTest: 0.5, gradientMap })
+        this.moustaches = new InstancedMesh(new BufferGeometry(), moustacheMaterial, capacity)
+        this.moustaches.castShadow = true
+        this.moustaches.frustumCulled = false
+        this.moustaches.count = 0
+        this.moustaches.visible = false
+        this.group.add(this.moustaches)
+        const thickness = MOUSTACHE_THICKNESS / MOUSTACHE_WIDTH * MOUSTACHE_PIXELS
+        loadItemSprite(MOUSTACHE_IMAGE, thickness, { size: MOUSTACHE_PIXELS, outline: 0, columns: true }).then(({ geometry, texture }) => {
+            geometry.scale(MOUSTACHE_WIDTH, MOUSTACHE_WIDTH, MOUSTACHE_WIDTH)
+            this.moustaches.geometry = bendAroundHead(geometry, MOUSTACHE_DROP, MOUSTACHE_THICKNESS, HEAD_RADIUS * MOUSTACHE_LIFT)
+            moustacheMaterial.map = texture
+            moustacheMaterial.needsUpdate = true
+            this.moustaches.visible = true
+        })
 
         this.items = new Map()
         for (const name of ITEMS)
@@ -945,6 +1017,7 @@ export default class MeepleCrowd
     {
         const counts = new Map<HairStyle, number>()
         const itemCounts = new Map<ItemName, number>()
+        let moustaches = 0
         const step = Math.min(0.1, Math.max(0, time - this.lastTime)) * ATTENTION_SPEED
         this.lastTime = time
         const cam = camera.position
@@ -1020,6 +1093,10 @@ export default class MeepleCrowd
             part.multiplyMatrices(figure, local)
             this.head.setMatrixAt(i, part)
             this.eyes.setMatrixAt(i, part)
+            if (look.moustache)
+            {
+                this.moustaches.setMatrixAt(moustaches++, part)
+            }
 
             const blink = this.blinkAt(i, time)
             this.blink.setX(i, lying > 0.5 ? 1 : blink)
@@ -1079,8 +1156,9 @@ export default class MeepleCrowd
         {
             mesh.count = itemCounts.get(name) ?? 0
         }
+        this.moustaches.count = moustaches
 
-        for (const mesh of [this.body, this.head, this.eyes, ...this.hair.values(), ...this.items.values()])
+        for (const mesh of [this.body, this.head, this.eyes, this.moustaches, ...this.hair.values(), ...this.items.values()])
         {
             mesh.instanceMatrix.needsUpdate = true
         }
