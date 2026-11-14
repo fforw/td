@@ -365,6 +365,19 @@
     font-size: 0.9rem;
 }
 
+/* something on a bought map that nobody has been to: just the drawn question mark, without a disc */
+#game .marker.level-marker.unknown
+{
+    border: none;
+    background: none;
+}
+
+#game .marker.level-marker.unknown svg
+{
+    height: 100%;
+    filter: drop-shadow(0 1px 1px #0008);
+}
+
 /* known rooms on the map of a level, to jump to */
 #game .marker.level-marker.room
 {

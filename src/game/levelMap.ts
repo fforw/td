@@ -8,6 +8,7 @@ import { loadMapPaper } from "../render/mapPaper"
 import drawOldMap, { type InkStroke, mapProjection, type MapView } from "../render/manuscriptMap"
 import { areaAround, BLOCKED_REGION, OPEN_REGION, VISITED_REGION, visitedRegions } from "./exploration"
 import type { LevelMapState } from "./levelScene"
+import QUESTION_MARK_SVG from "../icons/question-mark.svg?raw"
 
 /**
  * Map units per plan unit of the level. The wobble of the old map is made for the overworld, at this size it moves the
@@ -84,7 +85,12 @@ export default class LevelMap
      */
     update(state: LevelMapState, maxWidth: number, maxHeight: number): void
     {
-        const { world, slots, floor, exploration, chests, exits, rooms, hero } = state
+        const { world, slots, floor, exploration, chests, exits, rooms, hero, charted } = state
+        // a bought map shows all the floor as if visited
+        const whole = charted
+        const knows = (face: number) => exploration.has(face) || whole && floor.has(face)
+        // what's at a place is only known once a hero has been there
+        const seen = (face: number) => exploration.has(face)
 
         // all faces go into the regions, the walls keep the floor from reaching into them
         const centers: number[] = []
@@ -107,14 +113,14 @@ export default class LevelMap
                     y += positions[vertex[h] * 3 + 1] / 4
                 }
                 const face = (slot << (SLOT_SHIFT - 2)) | local
-                const isVisited = exploration.has(face)
+                const isVisited = knows(face)
                 centers.push(x, y)
                 visited.push(isVisited)
                 isFloor.push(floor.has(face))
                 if (isVisited)
                 {
                     known.push(x * ZOOM, y * ZOOM)
-                    this.addThinWalls(state, slot, local, thinWalls)
+                    this.addThinWalls(world, knows, slot, local, thinWalls)
                 }
             }
         }
@@ -156,6 +162,13 @@ export default class LevelMap
             elem.title = title
             return elem
         }
+        const unknown = () => {
+            const elem = document.createElement("span")
+            elem.className = "marker level-marker unknown"
+            elem.innerHTML = QUESTION_MARK_SVG
+            elem.title = "Something to find"
+            return elem
+        }
         const elements: HTMLElement[] = [
             ...rooms.map(({ face, x, z }) => {
                 const button = document.createElement("button")
@@ -166,10 +179,14 @@ export default class LevelMap
                 button.addEventListener("click", () => this.onJump?.(face))
                 return place(button, x, z)
             }),
-            ...chests.filter(({ face }) => exploration.has(face)).map(({ x, z, opened }) =>
-                place(marker(opened ? "chest opened" : "chest", "🧰", opened ? "Opened chest" : "Chest"), x, z)
-            ),
-            ...exits.filter(({ face }) => exploration.has(face)).map(({ x, z }) => place(marker("exit", "🪜", "Exit"), x, z))
+            ...chests.filter(({ face }) => whole || seen(face)).map(({ face, x, z, opened }) => place(
+                seen(face) ? marker(opened ? "chest opened" : "chest", "🧰", opened ? "Opened chest" : "Chest") : unknown(),
+                x,
+                z
+            )),
+            ...exits.filter(({ face }) => whole || seen(face)).map(({ face, x, z }) =>
+                place(seen(face) ? marker("exit", "🪜", "Exit") : unknown(), x, z)
+            )
         ]
         if (hero)
         {
@@ -231,9 +248,9 @@ export default class LevelMap
     }
 
     /**
-     * Adds the thin walls on the sides of a visited face, each one once, as lines from visited floor to something blocked
+     * Adds the thin walls on the sides of a known face, each one once, as lines from known floor to something blocked
      */
-    private addThinWalls({ world, exploration }: LevelMapState, slot: number, local: number, out: InkEdge[]): void
+    private addThinWalls(world: LevelMapState["world"], knows: (face: number) => boolean, slot: number, local: number, out: InkEdge[]): void
     {
         const { positions, vertex, edgeType } = world.getPatch(slot)
         for (let h = local * 4; h < local * 4 + 4; h++)
@@ -245,7 +262,7 @@ export default class LevelMap
             const global = (slot << SLOT_SHIFT) | h
             const twin = world.twin(global)
             // a wall between two visited faces comes from the one with the lower id
-            if (twin >= 0 && twin < global && exploration.has(twin >> 2))
+            if (twin >= 0 && twin < global && knows(twin >> 2))
             {
                 continue
             }

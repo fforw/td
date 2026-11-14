@@ -118,9 +118,9 @@ const STRONG_SWORD_DAMAGE = 4
 const SPEED_POTION = 1.5
 
 /**
- * What the trader of a level offers. The map comes once the map of the level can show it.
+ * What the trader of a level offers
  */
-const TRADER_WARES: readonly Ware[] = ["healing", "speed", "strength"]
+const TRADER_WARES: readonly Ware[] = ["healing", "speed", "strength", "map"]
 
 /**
  * Height in world units of the tail of a speech bubble, a little above the heads
@@ -199,6 +199,11 @@ const forward = new Vector3()
 const HERO_ITEMS = ["sword_silver", "shield_silver"] as const
 
 const spot: FloorSpot = { face: 0, x: 0, z: 0 }
+
+/**
+ * Facts of a level: a hero bought its map
+ */
+const CHARTED = "charted"
 
 const orders: HeroOrders = { ...NO_ORDERS }
 
@@ -295,6 +300,8 @@ export interface LevelMapState
     rooms: { face: number, x: number, z: number }[]
     /** the hero the view is with, null without one */
     hero: { x: number, z: number, facing: number } | null
+    /** a hero bought the map, which shows all the floor, and where there is something to find */
+    charted: boolean
 }
 
 
@@ -814,7 +821,8 @@ export default class LevelScene
     {
         const stranger = this.stranger!
         const { meeple } = hero
-        const script = traderScript(TRADER_WARES)
+        // nobody buys a map twice
+        const script = traderScript(TRADER_WARES.filter(ware => ware !== "map" || !this.facts.has(CHARTED)))
         this.findMark(meeple.position, script.left)
         hero.face = spot.face
         meeple.position.set(spot.x, 0, spot.z)
@@ -993,6 +1001,10 @@ export default class LevelScene
         else if (ware === "strength")
         {
             hero.strengthLeft = POTION_TIME
+        }
+        else if (ware === "map")
+        {
+            this.addFact(CHARTED)
         }
     }
 
@@ -1278,7 +1290,8 @@ export default class LevelScene
             chests: chests.chests.map(({ face, x, z, openedAt }) => ({ face, x, z, opened: openedAt !== null })),
             exits: this.exits,
             rooms: hero ? this.jumpTargets(hero) : [],
-            hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null
+            hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null,
+            charted: this.facts.has(CHARTED)
         }
     }
 
