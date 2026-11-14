@@ -1016,6 +1016,16 @@ travels along the room graph instead.
   worker next to the lighting, once single mobiles make noise. Mobiles
   could hear heroes over the same distance.
 
+### 6.3 Effects
+
+- One-off effects (`sound/effects.ts`) load once from `media/sounds/`, so
+  `playEffect()` plays them without waiting, and play to their end through
+  the effects group of the mixer, from nowhere in particular. They belong
+  to what someone does, not to the level, so they don't fade out with it.
+- The smite of the hero in god mode sings a hallelujah on every press,
+  whether there is anything in the room to smite or not. It loads with the
+  level while `GOD_MODE` is on.
+
 ## Open questions
 
 - The economy (phase 5) beyond gold: resources, facilities, and what
