@@ -142,7 +142,7 @@ export default class BruteCrowd
     {
         figure.death = death
         const landed = CLUB_LANDED / FPS
-        figure.burst = landed + Math.random() * (figure.die.getClip().duration - landed)
+        figure.burst = landed + Math.pow(Math.random(), 0.6) * (figure.die.getClip().duration - landed)
         for (const { material, mesh } of figure.bodies)
         {
             mesh.visible = material.name === CLUB_MATERIAL

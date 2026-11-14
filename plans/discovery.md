@@ -807,7 +807,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   which it drops from the hand, lands on its end, tips over and comes to rest,
   baked from a rigid body simulation in `media-src/brute2.blend`. It bursts
   where it is at a random frame from 10, where it first hits the floor, to
-  the end of the clip, so not every club takes the whole fall. A smitten
+  the end of the clip, so not every club takes the whole fall. Later frames
+  are a bit more likely. A smitten
   brute goes the same way.
 - The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
   from heroes: it picks a spot that sees them, as far off as it can without a
