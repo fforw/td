@@ -88,7 +88,7 @@ export default class BruteCrowd
 
     /**
      * Shows the given brutes, and what is left of those that died: their bodies burst right away, see Bursts.add(), and
-     * the club plays the die clip and bursts somewhere along it, once on the floor. Smitten ones burst whole at once.
+     * the club plays the die clip and bursts somewhere along it, once on the floor, smitten or not.
      *
      * @param brutes    brutes to show
      * @param deaths    monsters that died in this frame
@@ -107,7 +107,7 @@ export default class BruteCrowd
             if (!figure.death)
             {
                 const death = deaths.find(({ monster }) => monster === brute)
-                if (!death || death.smite)
+                if (!death)
                 {
                     this.remove(brute, figure, death, bursts)
                     continue

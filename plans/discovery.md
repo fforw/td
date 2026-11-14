@@ -800,14 +800,15 @@ person: a trader, a stranger with a message, a prisoner who begs.
 - A part that goes on after the monster died gives its sphere a bone, and is
   measured from it. `Bursts.add()` leaves those spheres out, and the view that
   poses the monster bursts them later with `burst()`, from the world matrix of
-  the bone, wherever it ended up. A death tells which monster it was and
-  whether it was smitten, for the view to find its figure. A brute's body
+  the bone, wherever it ended up. A death tells which monster it was, for
+  the view to find its figure. A brute's body
   bursts right away and its figure stays with only the club shown
   (`monster/BruteCrowd.ts`): the club plays the die clip of the model, in
   which it drops from the hand, lands on its end, tips over and comes to rest,
   baked from a rigid body simulation in `media-src/brute2.blend`. It bursts
   where it is at a random frame from 10, where it first hits the floor, to
-  the end of the clip, so not every club takes the whole fall.
+  the end of the clip, so not every club takes the whole fall. A smitten
+  brute goes the same way.
 - The flying eye (`monster/eyes.ts`) hovers low over the floor and keeps away
   from heroes: it picks a spot that sees them, as far off as it can without a
   long way there, at least 1 away. While it sees someone it fires a fast bolt

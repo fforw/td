@@ -15,7 +15,7 @@ function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1): Bursts
 {
     const bursts = new Bursts()
     const monster = { kind, face: 0, x: 1, z: 2, yaw } as Monster
-    bursts.add({ monster, kind, x: 1, z: 2, yaw, away, share, smite: false })
+    bursts.add({ monster, kind, x: 1, z: 2, yaw, away, share })
     return bursts
 }
 

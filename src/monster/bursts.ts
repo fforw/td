@@ -82,8 +82,6 @@ export interface Death
     away: number
     /** share of its volume that bursts, the rest went on in some other way */
     share: number
-    /** annihilated, it bursts whole at once */
-    smite: boolean
 }
 
 export interface Particle
