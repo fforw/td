@@ -201,9 +201,10 @@ const HERO_ITEMS = ["sword_silver", "shield_silver"] as const
 const spot: FloorSpot = { face: 0, x: 0, z: 0 }
 
 /**
- * Facts of a level: a hero bought its map
+ * Facts of a level: a hero bought its map, a hero talked to its stranger to the end
  */
 const CHARTED = "charted"
+const MET_STRANGER = "metStranger"
 
 /**
  * Counts every face as visited
@@ -309,6 +310,8 @@ export interface LevelMapState
     charted: boolean
     /** TEMP god mode: everything is shown, with what it is */
     revealed: boolean
+    /** where the stranger stands, once a hero talked to them or the map is revealed, null before */
+    stranger: { x: number, z: number } | null
 }
 
 
@@ -951,6 +954,7 @@ export default class LevelScene
         const { playing } = this
         if (playing?.stage.ended)
         {
+            this.addFact(MET_STRANGER)
             playing.other.facing = playing.otherFacing
             this.playing = null
             this.controls.enabled = true
@@ -1291,6 +1295,7 @@ export default class LevelScene
             return null
         }
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        const { stranger } = this
         return {
             world: meshes.world,
             slots: this.slots,
@@ -1301,7 +1306,8 @@ export default class LevelScene
             rooms: hero ? this.jumpTargets(hero) : [],
             hero: hero ? { x: hero.meeple.position.x, z: hero.meeple.position.z, facing: hero.meeple.facing } : null,
             charted: this.facts.has(CHARTED),
-            revealed: this.revealed
+            revealed: this.revealed,
+            stranger: stranger && (this.facts.has(MET_STRANGER) || this.revealed) ? { x: stranger.position.x, z: stranger.position.z } : null
         }
     }
 

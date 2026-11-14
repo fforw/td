@@ -85,7 +85,7 @@ export default class LevelMap
      */
     update(state: LevelMapState, maxWidth: number, maxHeight: number): void
     {
-        const { world, slots, floor, exploration, chests, exits, rooms, hero, charted, revealed } = state
+        const { world, slots, floor, exploration, chests, exits, rooms, hero, charted, revealed, stranger } = state
         // a bought map shows all the floor as if visited
         const whole = charted || revealed
         const knows = (face: number) => exploration.has(face) || whole && floor.has(face)
@@ -186,7 +186,8 @@ export default class LevelMap
             )),
             ...exits.filter(({ face }) => whole || seen(face)).map(({ face, x, z }) =>
                 place(seen(face) ? marker("exit", "🪜", "Exit") : unknown(), x, z)
-            )
+            ),
+            ...(stranger ? [place(marker("stranger", "🥸", "Mysterious stranger"), stranger.x, stranger.z)] : [])
         ]
         if (hero)
         {
