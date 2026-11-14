@@ -39,6 +39,8 @@ headless Chrome mean nothing, as it renders in software.
 - `src/meeple`, `src/castle`, `src/items`: characters, castle, item sprites
 - `src/scene`: scenes in levels, with scripts, the trader and the scene camera
 - `src/icons`: SVG icons made by `pnpm build-icons` from the Inkscape drawings in `media-src/icons`, don't edit them
+- `public/media/treasure/*-potion.glb`: models made by `pnpm export-models` from the Blender files in `media-src`, which
+  needs Blender on the PATH or in `BLENDER`
 - `src/worker`: the map worker, which generates patches off the main thread
 - `test/` mirrors `src/`
 - `plans/discovery.md`: the implementation plan, update it when the design changes

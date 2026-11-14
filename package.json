@@ -29,6 +29,7 @@
         "preview": "vite preview --outDir docs",
         "typecheck": "tsc",
         "export-meeple": "node scripts/exportMeeple.ts",
+        "export-models": "node scripts/exportModels.ts",
         "build-atlas": "node scripts/buildAtlas.ts",
         "build-icons": "node scripts/buildIcons.ts",
         "shot": "node scripts/shot.ts",
