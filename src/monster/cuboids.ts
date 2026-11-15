@@ -1,4 +1,3 @@
-import type Prando from "prando"
 import { rng } from "../math/random"
 import type { BurstSphere } from "./bursts"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
@@ -29,11 +28,6 @@ const LOOK_TIME = 0.25
  */
 const WANDER_CHANCE = 0.1
 const WANDER_LENGTH = 0.5
-
-/**
- * Share of the rooms with cuboids in them, as levels have a lot of rooms
- */
-const ROOMS_TAKEN = 0.3
 
 /**
  * How close a cuboid comes to who it goes after, as a share of the distance where they touch, so that they stay in touch without
@@ -157,24 +151,6 @@ export interface Cuboid extends Monster
     lookWait: number
 }
 
-
-/**
- * Returns who goes where in a level: one big cuboid or a few small ones in some of the rooms, but not the one the heroes come in by
- *
- * @param rooms     faces of each room of the level
- * @param entrance  index of the room the heroes come in by
- * @param random    random numbers, for the same level to always have the same cuboids
- */
-export function placeCuboids(rooms: readonly (readonly number[])[], entrance: number, random: Prando): { face: number, kind: CuboidKind }[]
-{
-    return rooms.filter((_, index) => index !== entrance).filter(() => random.next() < ROOMS_TAKEN).flatMap(room => {
-        const big = random.next() < 0.5
-        return Array.from({ length: big ? 1 : random.nextInt(1, 3) }, () => ({
-            face: room[random.nextInt(0, room.length - 1)],
-            kind: big ? BIG_CUBOID : SMALL_CUBOID
-        }))
-    })
-}
 
 /**
  * Returns how many cuboids can come out of the ones given, for a level to know how many to prepare for

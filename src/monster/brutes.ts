@@ -1,4 +1,3 @@
-import type Prando from "prando"
 import { rng } from "../math/random"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
 
@@ -36,11 +35,6 @@ const LOOK_TIME = 0.25
  */
 const WANDER_CHANCE = 0.03
 const WANDER_LENGTH = 0.6
-
-/**
- * Share of the rooms with a brute in them
- */
-const ROOMS_TAKEN = 0.08
 
 /**
  * How close a brute comes to who it goes after, as a share of its reach
@@ -90,22 +84,6 @@ export interface Brute extends Monster
     moving: boolean
     /** seconds until it looks around again */
     lookWait: number
-}
-
-
-/**
- * Returns who goes where in a level: a brute in a few rooms, but not the one the heroes come in by
- *
- * @param rooms     faces of each room of the level
- * @param entrance  index of the room the heroes come in by
- * @param random    random numbers, for the same level to always have the same brutes
- */
-export function placeBrutes(rooms: readonly (readonly number[])[], entrance: number, random: Prando): { face: number, kind: BruteKind }[]
-{
-    return rooms.filter((_, index) => index !== entrance).filter(() => random.next() < ROOMS_TAKEN).map(room => ({
-        face: room[random.nextInt(0, room.length - 1)],
-        kind: BRUTE
-    }))
 }
 
 

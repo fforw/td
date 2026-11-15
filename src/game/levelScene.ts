@@ -14,7 +14,7 @@ import {
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
-import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, type LevelExit } from "../map/dungeonRoles"
+import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, findRoomRoles, type LevelExit } from "../map/dungeonRoles"
 import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
@@ -24,12 +24,13 @@ import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook,
 import BruteCrowd from "../monster/BruteCrowd"
 import BurstCrowd from "../monster/BurstCrowd"
 import Bursts from "../monster/bursts"
-import BrutePack, { placeBrutes } from "../monster/brutes"
+import BrutePack from "../monster/brutes"
 import CuboidCrowd from "../monster/CuboidCrowd"
 import EyeCrowd from "../monster/EyeCrowd"
-import EyePack, { placeEyes } from "../monster/eyes"
-import CuboidPack, { BIG_CUBOID, mostCuboids, placeCuboids } from "../monster/cuboids"
+import EyePack from "../monster/eyes"
+import CuboidPack, { BIG_CUBOID, mostCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
+import { planSpawns } from "../monster/spawns"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
@@ -612,17 +613,8 @@ export default class LevelScene
         this.stranger = stranger
     }
 
-    /**
-     * Returns whether a monster is placed somewhere else than the room of the stranger, who gets to talk in peace
-     */
-    private readonly awayFromStranger = ({ face }: { face: number }): boolean => {
-        const spot = this.strangerSpot
-        return !spot || !this.level!.rooms[spot.room].includes(face)
-    }
-
     private addMonsters({ rooms, corridors }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
     {
-        const entrance = entranceRoom(rooms, corridors)
         const walls = this.solidWalls!
         const seeing = this.floorWalls!
         const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
@@ -631,43 +623,47 @@ export default class LevelScene
             move: (monster, dx, dz) => moveOnFloor(world, monster.kind.flying ? seeing : monster.kind.big ? bigWalls : walls, monster, dx, dz),
             sees: (x0, z0, x1, z1) => seesAcross(seeing, x0, z0, x1, z1)
         }
-        const random = new Prando(seed)
+        // nothing in the room the heroes come in by, nor in those nobody can get to
+        const { depths, mainPath } = findRoomRoles(rooms, corridors)
+        const closed = new Set(depths.flatMap((depth, room) => depth === Infinity ? [room] : []))
+        closed.add(mainPath[mainPath.length - 1])
+        if (this.strangerSpot)
+        {
+            // the stranger gets to talk in peace
+            closed.add(this.strangerSpot.room)
+        }
+        const plan = planSpawns({ rooms, closed }, new Prando(seed))
+        // the plan is the same for the seed, and those on known floor get left out of it
+        const spawns = inUnexplored(plan.flatMap(({ spawns }) => spawns), this.exploration!)
 
         const cuboids = new CuboidPack(floor)
-        // all get placed and those on known floor left out, which keeps the places of the others for the same seed
-        const exploration = this.exploration!
-        const placed = inUnexplored(placeCuboids(rooms, entrance, random), exploration).filter(this.awayFromStranger)
-        for (const { face, kind } of placed)
+        const eyes = new EyePack(floor)
+        const brutes = new BrutePack(floor)
+        for (const spawn of spawns)
         {
-            const [x, z] = faceCenter(world, face)
-            cuboids.add(kind, face, x, z)
+            const [x, z] = faceCenter(world, spawn.face)
+            switch (spawn.species)
+            {
+                case "cuboid":
+                    cuboids.add(spawn.kind, spawn.face, x, z)
+                    break
+                case "eye":
+                    eyes.add(spawn.kind, spawn.face, x, z)
+                    break
+                case "brute":
+                    brutes.add(spawn.kind, spawn.face, x, z)
+                    break
+            }
         }
-        const cuboidCrowd = new CuboidCrowd(mostCuboids(placed.map(({ kind }) => kind)), field)
-        this.scene.add(cuboidCrowd.group)
+
+        const cuboidCrowd = new CuboidCrowd(mostCuboids(spawns.flatMap(spawn => spawn.species === "cuboid" ? [spawn.kind] : [])), field)
+        const eyeCrowd = new EyeCrowd(spawns.filter(({ species }) => species === "eye").length, field)
+        const bruteCrowd = new BruteCrowd(field)
+        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
-
-        const eyes = new EyePack(floor)
-        const eyesPlaced = inUnexplored(placeEyes(rooms, entrance, random), exploration).filter(this.awayFromStranger)
-        for (const { face, kind } of eyesPlaced)
-        {
-            const [x, z] = faceCenter(world, face)
-            eyes.add(kind, face, x, z)
-        }
-        const eyeCrowd = new EyeCrowd(eyesPlaced.length, field)
-        this.scene.add(eyeCrowd.group)
         this.eyes = eyes
         this.eyeCrowd = eyeCrowd
-
-        // after the others, which keeps their places for the same seed
-        const brutes = new BrutePack(floor)
-        for (const { face, kind } of inUnexplored(placeBrutes(rooms, entrance, random), exploration).filter(this.awayFromStranger))
-        {
-            const [x, z] = faceCenter(world, face)
-            brutes.add(kind, face, x, z)
-        }
-        const bruteCrowd = new BruteCrowd(field)
-        this.scene.add(bruteCrowd.group)
         this.brutes = brutes
         this.bruteCrowd = bruteCrowd
 

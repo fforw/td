@@ -1,4 +1,3 @@
-import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import CuboidPack, { BIG_CUBOID, SMALL_CUBOID } from "../../src/monster/cuboids"
@@ -11,7 +10,6 @@ import EyePack, {
     FLYING_EYE,
     MEMORY_TIME,
     MIN_PERCH,
-    placeEyes,
     WARN_TIME
 } from "../../src/monster/eyes"
 import Monsters, { HERO_RADIUS, HURT_WAIT, type MonsterFloor, type Prey } from "../../src/monster/monsters"
@@ -329,25 +327,6 @@ describe("Flying eyes", () => {
             monsters.strike(0, 0, 0, 0.55, 2.2, FLYING_EYE.hp)
             assert(eyes.members.length === 0)
             assert(!monsters.sees(prey()))
-        })
-    })
-
-    describe("placing", () => {
-
-        const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])
-
-        it("leaves the room the heroes come in by alone", () => {
-
-            for (let seed = 0; seed < 20; seed++)
-            {
-                const placed = placeEyes(rooms, 3, new Prando(seed))
-                assert(placed.every(({ face }) => face < 10 || face > 12))
-            }
-        })
-
-        it("is the same for the same seed", () => {
-
-            assert.deepEqual(placeEyes(rooms, 3, new Prando(7)), placeEyes(rooms, 3, new Prando(7)))
         })
     })
 })

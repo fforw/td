@@ -1,7 +1,6 @@
-import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
-import BrutePack, { AIM_TIME, ATTACK_TIME, BRUTE, type Brute, IMPACT_TIME, placeBrutes } from "../../src/monster/brutes"
+import BrutePack, { AIM_TIME, ATTACK_TIME, BRUTE, type Brute, IMPACT_TIME } from "../../src/monster/brutes"
 import { BIG_CUBOID } from "../../src/monster/cuboids"
 import { FLYING_EYE } from "../../src/monster/eyes"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../../src/monster/monsters"
@@ -179,26 +178,5 @@ describe("Brutes", () => {
         const brute = brutes.add(BRUTE, 0, 1, 0)
         run(brutes, 1, [prey()])
         assert(brute.chase === 0 && brute.attack === null)
-    })
-
-    describe("placing", () => {
-
-        const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])
-
-        it("puts one in a few rooms, not the one the heroes come in by", () => {
-
-            for (let seed = 0; seed < 20; seed++)
-            {
-                const placed = placeBrutes(rooms, 3, new Prando(seed))
-                assert(placed.length < rooms.length / 4)
-                assert(new Set(placed.map(({ face }) => Math.ceil(face / 3))).size === placed.length)
-                assert(placed.every(({ face }) => face < 10 || face > 12))
-            }
-        })
-
-        it("is the same for the same seed", () => {
-
-            assert.deepEqual(placeBrutes(rooms, 3, new Prando(7)), placeBrutes(rooms, 3, new Prando(7)))
-        })
     })
 })

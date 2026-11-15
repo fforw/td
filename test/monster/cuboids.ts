@@ -1,4 +1,3 @@
-import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import CuboidPack, {
@@ -11,7 +10,6 @@ import CuboidPack, {
     MAX_SPLIT,
     MIN_SPLIT,
     mostCuboids,
-    placeCuboids,
     SMALL_CUBOID,
     splitShare
 } from "../../src/monster/cuboids"
@@ -436,25 +434,7 @@ describe("Acid cuboids", () => {
         })
     })
 
-    describe("placing", () => {
-
-        const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])
-
-        it("leaves the room the heroes come in by alone", () => {
-
-            for (let seed = 0; seed < 20; seed++)
-            {
-                const placed = placeCuboids(rooms, 3, new Prando(seed))
-                assert(placed.length > 0)
-                assert(new Set(placed.map(({ face }) => Math.ceil(face / 3))).size < rooms.length / 2)
-                assert(placed.every(({ face }) => face < 10 || face > 12))
-            }
-        })
-
-        it("is the same for the same seed", () => {
-
-            assert.deepEqual(placeCuboids(rooms, 3, new Prando(7)), placeCuboids(rooms, 3, new Prando(7)))
-        })
+    describe("counting", () => {
 
         it("knows how many there can be at most", () => {
 

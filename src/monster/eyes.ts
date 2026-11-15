@@ -1,4 +1,3 @@
-import type Prando from "prando"
 import { rng } from "../math/random"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, NOTICE_DISTANCE, type Prey } from "./monsters"
 
@@ -73,16 +72,6 @@ const TURN_RATE = 6
  * Seconds a spark of a bolt that went out lasts
  */
 export const SPARK_TIME = 0.3
-
-/**
- * Share of the rooms with eyes in them
- */
-const ROOMS_TAKEN = 0.1
-
-/**
- * Share of the rooms with eyes that have two
- */
-const PAIRS = 0.25
 
 
 export interface EyeKind extends MonsterKind
@@ -164,23 +153,6 @@ export interface Spark
     age: number
 }
 
-
-/**
- * Returns who goes where in a level: one eye in a few rooms, sometimes two, but not the one the heroes come in by
- *
- * @param rooms     faces of each room of the level
- * @param entrance  index of the room the heroes come in by
- * @param random    random numbers, for the same level to always have the same eyes
- */
-export function placeEyes(rooms: readonly (readonly number[])[], entrance: number, random: Prando): { face: number, kind: EyeKind }[]
-{
-    return rooms.filter((_, index) => index !== entrance).filter(() => random.next() < ROOMS_TAKEN).flatMap(room =>
-        Array.from({ length: random.next() < PAIRS ? 2 : 1 }, () => ({
-            face: room[random.nextInt(0, room.length - 1)],
-            kind: FLYING_EYE
-        }))
-    )
-}
 
 /**
  * Returns the shortest distance between a point and a line segment
