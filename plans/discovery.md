@@ -876,8 +876,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   Blender: each brute has its own rigged copy with an AnimationMixer
   (`BruteCrowd`), the walk following the ground covered and the attack the
   time into the swing, so they are for few at a time.
-- For now cuboids, eyes and brutes are placed in some rooms at random from the level
-  seed, not by a premise, and aren't saved. Only those on floor no hero has
+- For now cuboids, eyes and brutes are placed in some rooms by the spawn
+  planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in
   the unexplored parts, and whatever lived on known floor is gone for good,
   killed or not. Once all floor is known and the chests and coins are gone, the
@@ -1049,6 +1049,52 @@ person: a trader, a stranger with a message, a prisoner who begs.
   per facility.
 - The first facility kind is the TAVERN. Every castle has one from the
   start; it is where explorers are hired (1.3).
+
+### 3.7 Spawns
+
+- One planner decides what lives where in a level
+  (`monster/spawns.ts`, `planSpawns()`). The packs don't decide anything
+  anymore, they only take what the plan gives them. Before this, each
+  kind rolled its own chance for every room, so rooms got mixes nobody
+  chose, and how many monsters a level got could not be steered.
+- The plan is per room: a room is closed or open, an open room is taken
+  or not, and a taken room gets exactly one group. A group
+  (`SpawnGroup`) is a weight and a list of members, each a kind of monster
+  and how many of it, from min to max. The members go onto random faces
+  of the room. Which pack a monster goes to follows from its species,
+  which keeps the kinds typed for the packs.
+- Closed are the entrance room, the room of the stranger and rooms nobody
+  can get to. The planner gets them and rolls nothing for them, instead of
+  monsters being dropped afterwards.
+- The plan only depends on the level and its seed, from one random
+  stream of its own. Whatever changes between loads, like known floor
+  (`inUnexplored()`), filters the finished plan, so the rest of it stays
+  where it was. Once monsters get saved (3.3), they can be keyed by room
+  and their place in its group.
+- For now the groups are the old kinds on their own, weighted like the
+  shares of rooms they took before (`SPAWN_GROUPS`): a big cuboid, 1 to 3
+  small ones, an eye, a pair of eyes, a brute. 42% of the open rooms are
+  taken, about as many as had any monster before. Mixes are gone until
+  groups bring them back on purpose.
+- Next: groups of mixed kinds, like a brute with an eye watching for it,
+  or small cuboids around a big one. They are just more entries in the
+  table.
+- Escalation: the planner gets a threat level for the level, which grows
+  with how far its patch is from the castle and maybe with the days gone
+  by. Each group gets a cost, the sum of what its members are worth, and
+  a lowest threat level it shows up at. The level gets a budget from its
+  threat level; the planner spends it on rooms, picking from the groups
+  it can afford and that are unlocked, with weights that move toward
+  costlier groups as the threat level grows. The share of rooms taken
+  falls out of the budget, instead of being a fixed chance.
+- Roles (3.4) steer where the budget goes: nothing at the entrance, cheap
+  groups in the rooms near it as foreshadowing, more along the main path,
+  the most expensive affordable group as the guardian of the climax, and
+  branches lighter, as they hold side rewards. `SpawnLevel` is the
+  place for the roles and the threat level when they come.
+- Inhabitants from premises and stereotype slots (3.3) go through the
+  planner too, as rooms it is handed already filled, so it doesn't put a
+  group on top of them.
 
 ## Phase 4 - Threats
 
