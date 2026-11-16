@@ -1017,6 +1017,11 @@ person: a trader, a stranger with a message, a prisoner who begs.
 - Half of the rooms get a pattern over their floor from the
   Kenney Pattern Pack, low in contrast, to vary them a little
   (`render/floorPatterns.ts`). Every face is a tile of the pattern. The
+  floor keeps the edges of the wall faces next to it, so the pattern goes
+  on into them, each continuing the room face that reaches it first. A
+  wall face can lie between two rooms or a room and a corridor, so a room
+  only covers the triangles from the middle of a wall face to its edges
+  with the room. The
   texture coordinates flood out from a face, each face continuing the
   pattern over the edge it was reached by. Around an irregular vertex
   the pattern turns, so where two paths meet the edge doesn't match;
