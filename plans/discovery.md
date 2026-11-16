@@ -759,6 +759,19 @@ person: a trader, a stranger with a message, a prisoner who begs.
   thick walls shows through them and is near black in levels. Still open:
   several small spaces within a few steps keep the walls changing, which
   could take a delay or merging small spaces with their neighbors.
+- Once cut, a near wall and a gap in it both show the floor, and playtests
+  had a hard time telling openings. Each DOOR edge gets a sill, a slab of
+  warm stone 0.02 high and 0.12 deep (`findDoorSills()` in
+  `render/dungeonMeshes.ts`), lit by the field like the floor. It shows
+  through cut walls and marks side openings too. Where a face has doors on
+  two neighboring edges, their sills would meet in an L. They make way for
+  one sill on the one other edge of the face that is open, or diagonally
+  across the face, cutting off the corner of the doors, if both are. That
+  is a room face with two corridors coming in at its corner, a few per
+  level. One open edge didn't show up in generated levels. With neither
+  open, both go: that is a corridor of a single face around the corner
+  between two rooms, about 60 per level, where the end of the wall between
+  the rooms shows the way well enough.
 - Walls don't fill their faces, so they also have to meet at vertices that
   keep floors apart or the floor from the void (`splitsAtVertex()`). The
   gaps left otherwise would be real ways around them, for heroes and light.
