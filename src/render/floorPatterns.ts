@@ -14,6 +14,7 @@ import {
     type Texture,
     TextureLoader
 } from "three"
+import { FaceType } from "../map/geometry"
 import type PatchWorld from "../map/PatchWorld"
 import { SCALE } from "./scene3d"
 
@@ -208,6 +209,61 @@ export function layOutRoom(world: PatchWorld, faces: readonly number[]): RoomUVs
 }
 
 
+/**
+ * Lays out the wall faces next to a room in texture space, each continuing the pattern of the first face of the room that
+ * reaches it, in the order of the flood. The floor of a level keeps the edges of the wall faces, see LEVEL_PRIORITY, so a
+ * strip of floor along each edge to the room lies in the wall face. A wall face can lie between rooms, or between a room
+ * and a corridor, so only the part of it next to the room gets the pattern, see wallTriangles().
+ *
+ * @param world     world with all patches of the level
+ * @param layout    layout of the faces of the room
+ *
+ * @return global face id of the wall faces to their corners, in the order of their half edges
+ */
+export function layOutWalls(world: PatchWorld, layout: RoomUVs): Map<number, Int32Array>
+{
+    const walls = new Map<number, Int32Array>()
+    for (const [face, uv] of layout.uvs)
+    {
+        for (let k = 0; k < 4; k++)
+        {
+            const twin = world.twin((face << 2) | k)
+            const other = twin >> 2
+            if (twin >= 0 && !walls.has(other) && FaceType.byIndex(world.faceType(other)) === FaceType.WALL)
+            {
+                walls.set(other, across(uv, k, twin & 3))
+            }
+        }
+    }
+    return walls
+}
+
+
+/**
+ * Returns the corners of a wall face whose edges lie next to the given faces, as triangles from its middle to those
+ * edges. The diagonals of the face part them, so a wall between two rooms shows the pattern of each room on its side.
+ *
+ * @param world     world with all patches of the level
+ * @param face      global face id of the wall face
+ * @param faces     faces of the room
+ *
+ * @return corners of the triangles, k for corner k of the face and 4 for the middle
+ */
+export function wallTriangles(world: PatchWorld, face: number, faces: ReadonlySet<number>): number[]
+{
+    const corners: number[] = []
+    for (let k = 0; k < 4; k++)
+    {
+        const twin = world.twin((face << 2) | k)
+        if (twin >= 0 && faces.has(twin >> 2))
+        {
+            corners.push(k, (k + 1) & 3, 4)
+        }
+    }
+    return corners
+}
+
+
 const textures = new Map<string, Texture>()
 
 function patternTexture(name: string): Texture
@@ -320,13 +376,37 @@ export function createPatternGeometries(
             {
                 return
             }
-            for (const [face, uv] of layOutRoom(world, faces).uvs)
+            const layout = layOutRoom(world, faces)
+            for (const [face, uv] of layout.uvs)
             {
                 for (const k of [0, 1, 2, 0, 2, 3])
                 {
                     world.position((face << 2) | k, position)
                     positions.push(position[0] * SCALE, 0, position[1] * SCALE)
                     uvs.push(uv[k * 2], uv[k * 2 + 1])
+                }
+            }
+            const own = new Set(faces)
+            for (const [face, uv] of layOutWalls(world, layout))
+            {
+                // corner 4 is the middle of the face, where the corners of the pattern average out as well
+                const x = [0, 0, 0, 0, 0], y = [0, 0, 0, 0, 0], u = [0, 0, 0, 0, 0], v = [0, 0, 0, 0, 0]
+                for (let k = 0; k < 4; k++)
+                {
+                    world.position((face << 2) | k, position)
+                    x[k] = position[0]
+                    y[k] = position[1]
+                    u[k] = uv[k * 2]
+                    v[k] = uv[k * 2 + 1]
+                    x[4] += x[k] / 4
+                    y[4] += y[k] / 4
+                    u[4] += u[k] / 4
+                    v[4] += v[k] / 4
+                }
+                for (const k of wallTriangles(world, face, own))
+                {
+                    positions.push(x[k] * SCALE, 0, y[k] * SCALE)
+                    uvs.push(u[k], v[k])
                 }
             }
         })

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { assert, describe, it } from "vitest"
 import { generateDungeon } from "../../src/map/generateDungeon"
+import { FaceType } from "../../src/map/geometry"
 import PatchWorld from "../../src/map/PatchWorld"
 import { FACE_SIZE } from "../../src/map/scale"
 import {
@@ -9,7 +10,9 @@ import {
     floodRoom,
     FLOOR_PATTERNS,
     layOutRoom,
-    PATTERN_SHARE
+    layOutWalls,
+    PATTERN_SHARE,
+    wallTriangles
 } from "../../src/render/floorPatterns"
 
 
@@ -104,13 +107,75 @@ describe("floor patterns", () => {
         }
     })
 
-    it("creates a geometry per pattern with two triangles per face", () => {
+    it("continues the pattern into the wall faces next to a room", () => {
+        let walls = 0
+        for (const faces of rooms)
+        {
+            const layout = layOutRoom(world, faces)
+            for (const [face, uv] of layOutWalls(world, layout))
+            {
+                walls++
+                assert.equal(FaceType.byIndex(world.faceType(face)), FaceType.WALL)
+                assert.equal(area(uv), 2)
+                let reached = false
+                for (let k = 0; k < 4; k++)
+                {
+                    const twin = world.twin((face << 2) | k)
+                    const own = twin >= 0 && layout.uvs.get(twin >> 2)
+                    if (!own)
+                    {
+                        continue
+                    }
+                    const kt = twin & 3, n = (kt + 1) & 3
+                    const a = k * 2, b = ((k + 1) & 3) * 2
+                    reached ||= uv[a] === own[n * 2] && uv[a + 1] === own[n * 2 + 1] &&
+                        uv[b] === own[kt * 2] && uv[b + 1] === own[kt * 2 + 1]
+                }
+                assert.isTrue(reached)
+            }
+        }
+        assert.isAbove(walls, 0)
+    })
+
+    it("gives each room the part of a wall face on its side", () => {
+        const owners = new Map<number, number>()
+        rooms.forEach((faces, room) => {
+            const own = new Set(faces)
+            for (const face of layOutWalls(world, layOutRoom(world, faces)).keys())
+            {
+                const corners = wallTriangles(world, face, own)
+                assert.isAbove(corners.length, 0)
+                for (let i = 0; i < corners.length; i += 3)
+                {
+                    const k = corners[i]
+                    assert.isTrue(own.has(world.twin((face << 2) | k) >> 2))
+                    // an edge of a face goes to one room only
+                    const edge = (face << 2) | k
+                    assert.isFalse(owners.has(edge))
+                    owners.set(edge, room)
+                }
+            }
+        })
+        // some wall faces lie between two rooms
+        const shared = new Set([...owners.keys()].map(edge => edge >> 2))
+        assert.isBelow(shared.size, owners.size)
+    })
+
+    it("creates a geometry per pattern with two triangles per face and one per wall edge", () => {
         const chosen = choosePatterns(rooms, 17)
         const geometries = createPatternGeometries(world, rooms, 17)
-        const faces = rooms.filter((_, room) => chosen[room] >= 0).reduce((sum, room) => sum + room.length, 0)
+        const faces = rooms.filter((_, room) => chosen[room] >= 0).reduce((sum, room) => {
+            const own = new Set(room)
+            let walls = 0
+            for (const face of layOutWalls(world, layOutRoom(world, room)).keys())
+            {
+                walls += wallTriangles(world, face, own).length
+            }
+            return sum + room.length * 6 + walls
+        }, 0)
         const used = new Set(chosen.filter(pattern => pattern >= 0))
         assert.deepEqual([...geometries.keys()].sort((a, b) => a - b), [...used].sort((a, b) => a - b))
         const counts = [...geometries.values()].map(geometry => geometry.getAttribute("position").count)
-        assert.equal(counts.reduce((sum, count) => sum + count, 0), faces * 6)
+        assert.equal(counts.reduce((sum, count) => sum + count, 0), faces)
     })
 })
