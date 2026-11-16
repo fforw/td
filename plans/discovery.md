@@ -1014,7 +1014,7 @@ person: a trader, a stranger with a message, a prisoner who begs.
   placing and baking 30 of them took about 0.55 s in the worker. A changed wall
   means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
   reach up to twice as far. Not done yet.
-- A share of the rooms (35%) get a pattern over their floor from the
+- Half of the rooms get a pattern over their floor from the
   Kenney Pattern Pack, low in contrast, to vary them a little
   (`render/floorPatterns.ts`). Every face is a tile of the pattern. The
   texture coordinates flood out from a face, each face continuing the

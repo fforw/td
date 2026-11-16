@@ -51,7 +51,7 @@ export const FLOOR_PATTERNS: readonly (readonly [name: string, mean: number])[] 
 /**
  * Share of the rooms that get a pattern
  */
-export const PATTERN_SHARE = 0.35
+export const PATTERN_SHARE = 0.5
 
 /**
  * How much a pattern changes the floor: the light parts multiply it by up to 1 + strength, the dark ones by down to
