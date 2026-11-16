@@ -1014,6 +1014,17 @@ person: a trader, a stranger with a message, a prisoner who begs.
   placing and baking 30 of them took about 0.55 s in the worker. A changed wall
   means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
   reach up to twice as far. Not done yet.
+- A share of the rooms (35%) get a pattern over their floor from the
+  Kenney Pattern Pack, low in contrast, to vary them a little
+  (`render/floorPatterns.ts`). Every face is a tile of the pattern. The
+  texture coordinates flood out from a face, each face continuing the
+  pattern over the edge it was reached by. Around an irregular vertex
+  the pattern turns, so where two paths meet the edge doesn't match;
+  that is accepted. Of 12 starts the one with the most matching edges
+  wins, which is about 94% of the edges inside rooms. Growing first where
+  the most neighbors agree gains next to nothing. The pattern multiplies
+  the lit floor by 2 x its texel, which lightens and darkens around the
+  mean of the pattern, so the room keeps its brightness.
 - A meeple gets a rim instead of its outline only where it stands in the
   dark and a light still reaches it, so not close to a light. The rim only
   follows the light with the most energy at a point, with its own direction
