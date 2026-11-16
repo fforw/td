@@ -8,11 +8,15 @@ import { FACE_SIZE } from "../../src/map/scale"
 import {
     addFlatCorner,
     addRoundedCorner,
+    createDoorSills,
     createThickWalls,
     createThinWallCorners,
     createThinWalls,
     findSingleThinWalls,
     findThinWallCorners,
+    DOOR_SILL_DEPTH,
+    DOOR_SILL_HEIGHT,
+    findDoorSills,
     smoothNormals,
     THICK_WALL_HEIGHT,
     THIN_WALL_HEIGHT,
@@ -228,6 +232,65 @@ describe("createThinWalls", () => {
         }
         assert(ending > 0)
         assert(reaching > 0)
+    })
+})
+
+
+describe("findDoorSills", () => {
+
+    it("gives every door edge one sill, also on seams", () => {
+        const { world, slots } = level()
+        const ends = findDoorSills(world, slots)
+        const position = [0, 0, 0]
+        const point = (h: number) =>
+        {
+            world.position(h, position)
+            return position[0] * SCALE + "," + position[1] * SCALE
+        }
+        const sills = new Set<string>()
+        for (let i = 0; i < ends.length; i += 4)
+        {
+            sills.add([ends[i] + "," + ends[i + 1], ends[i + 2] + "," + ends[i + 3]].sort().join(" "))
+        }
+
+        let doors = 0
+        for (const slot of slots)
+        {
+            world.getPatch(slot).edgeType.forEach((type, local) => {
+                const h = (slot << SLOT_SHIFT) | local
+                if (type === EdgeType.DOOR.index)
+                {
+                    doors++
+                    assert(sills.has([point(h), point(next(h))].sort().join(" ")))
+                }
+            })
+        }
+        assert(doors > 0)
+        assert(ends.length / 4 === doors / 2)
+    })
+})
+
+
+describe("createDoorSills", () => {
+
+    it("stands the sills on the floor along their ends, as high and deep as they should be", () => {
+        const { world, slots } = level()
+        const ends = findDoorSills(world, slots)
+        const sills = createDoorSills(world, slots)
+        assert(sills.count === ends.length / 4)
+
+        const matrix = new Matrix4()
+        for (let i = 0; i < sills.count; i++)
+        {
+            sills.getMatrixAt(i, matrix)
+            const from = new Vector3(ends[i * 4], 0, ends[i * 4 + 1])
+            const to = new Vector3(ends[i * 4 + 2], 0, ends[i * 4 + 3])
+            assert(new Vector3(-0.5, -0.5, 0).applyMatrix4(matrix).distanceTo(from) < 1e-5)
+            assert(new Vector3(0.5, -0.5, 0).applyMatrix4(matrix).distanceTo(to) < 1e-5)
+            const center = new Vector3(0, 0, 0).applyMatrix4(matrix)
+            assert(Math.abs(center.y - DOOR_SILL_HEIGHT / 2) < 1e-6)
+            assert(Math.abs(new Vector3(0, 0, 0.5).applyMatrix4(matrix).distanceTo(center) - DOOR_SILL_DEPTH / 2) < 1e-6)
+        }
     })
 })
 

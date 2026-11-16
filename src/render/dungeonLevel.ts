@@ -6,7 +6,7 @@ import { LEVEL_PRIORITY } from "../map/marchingSquares"
 import { createNearWalls, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
-import { createThickWalls, createThinWallCorners, createThinWalls } from "./dungeonMeshes"
+import { createDoorSills, createThickWalls, createThinWallCorners, createThinWalls } from "./dungeonMeshes"
 import { createGround } from "./patchMeshes"
 import { GROUND_COLORS } from "./scene3d"
 import { applyWallCut, createWallCut, type WallCut } from "./wallCut"
@@ -73,6 +73,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const slots = patches.map(patch => world.add(patch))
     const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY, LEVEL_GROUND_COLORS))
     const near = createNearWalls(world, slots, level)
+    const sills = createDoorSills(world, slots)
     const walls: Mesh[] = [
         ...slots.map(slot => createThickWalls(world, slot, near)),
         createThinWalls(world, slots, false, near),
@@ -82,6 +83,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     // the see-through side of the cut, see WallCut
     const glass = walls.map(mesh => mesh.clone())
     lightMeshes(ground, field)
+    lightMeshes([sills], field)
     lightMeshes(walls, field, true)
     lightMeshes(glass, field, true)
     for (const [meshes, isGlass] of [[walls, false], [glass, true]] as const)
@@ -94,7 +96,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 
     return {
         world,
-        meshes: [...ground, ...walls, ...glass],
+        meshes: [...ground, sills, ...walls, ...glass],
         field,
         segments: findWallSegments(world, slots),
         cut,

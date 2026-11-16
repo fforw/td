@@ -73,6 +73,22 @@ const wallMaterial = new MeshStandardMaterial({ color: "#6e6c72", roughness: 1 }
 const singleWallMaterial = new MeshStandardMaterial({ color: "#423935", roughness: 0.3 })
 const thinWallGeometry = new BoxGeometry(1, 1, 1)
 
+/**
+ * Size of the door sills in world units: how high they stand off the floor and how deep they reach across their edge.
+ * They are low enough to step over and keep from flickering with the floor.
+ */
+export const DOOR_SILL_HEIGHT = 0.02
+export const DOOR_SILL_DEPTH = 0.12
+
+/**
+ * Material of the door sills, a warm stone that stands out from the gray floor and walls, and a little
+ * glossy to catch the light of a hero
+ */
+const doorSillMaterial = new MeshStandardMaterial({
+    color: "#c2a878",
+    roughness: 0.5
+})
+
 const NO_SPACES: NearSpaces = [0, 0]
 
 
@@ -585,4 +601,68 @@ function addWedge(
         ax, 0, az, bx, 0, bz, bx, 0, bz,
         ax, 0, az, bx, 0, bz, ax, 0, az
     )
+}
+
+
+/**
+ * Finds where the sills of the doors of a level go, one on each door edge
+ *
+ * @param world     world with all patches of the level
+ * @param slots     slots of the patches of the level
+ *
+ * @return start and end of each sill in world units, as x0, z0, x1, z1
+ */
+export function findDoorSills(world: PatchWorld, slots: readonly number[]): number[]
+{
+    const ends: number[] = []
+    const position = [0, 0, 0]
+    for (const slot of slots)
+    {
+        const { edgeType } = world.getPatch(slot)
+        const base = slot << SLOT_SHIFT
+        for (let h = 0; h < edgeType.length; h++)
+        {
+            // both half edges have the type, the lower global id gets the sill, also on a seam
+            if (edgeType[h] !== EdgeType.DOOR.index || (base | h) > world.twin(base | h))
+            {
+                continue
+            }
+            world.position(base | h, position)
+            ends.push(position[0] * SCALE, position[1] * SCALE)
+            world.position(base | next(h), position)
+            ends.push(position[0] * SCALE, position[1] * SCALE)
+        }
+    }
+    return ends
+}
+
+
+/**
+ * Creates the sills of the doors of a level, see findDoorSills(). The walls next to a door look much the same as the gap
+ * between them once they are cut, and the sills show where the gaps are. They are low slabs, whose edges catch the light.
+ *
+ * @param world     world with all patches of the level
+ * @param slots     slots of the patches of the level
+ */
+export function createDoorSills(world: PatchWorld, slots: readonly number[]): InstancedMesh
+{
+    const ends = findDoorSills(world, slots)
+    const position = new Vector3()
+    const rotation = new Quaternion()
+    const scale = new Vector3()
+    const up = new Vector3(0, 1, 0)
+    const matrix = new Matrix4()
+
+    const mesh = new InstancedMesh(thinWallGeometry, doorSillMaterial, ends.length / 4)
+    for (let i = 0; i < ends.length; i += 4)
+    {
+        const [x0, z0, x1, z1] = ends.slice(i, i + 4)
+        mesh.setMatrixAt(i / 4, matrix.compose(
+            position.set((x0 + x1) / 2, DOOR_SILL_HEIGHT / 2, (z0 + z1) / 2),
+            rotation.setFromAxisAngle(up, Math.atan2(z0 - z1, x1 - x0)),
+            scale.set(Math.hypot(x1 - x0, z1 - z0), DOOR_SILL_HEIGHT, DOOR_SILL_DEPTH)
+        ))
+    }
+    mesh.receiveShadow = true
+    return mesh
 }
