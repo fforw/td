@@ -1,9 +1,9 @@
 import { assert, describe, it } from "vitest"
 import { Matrix4, Vector3 } from "three"
 import { generateDungeon } from "../../src/map/generateDungeon"
-import { EdgeType } from "../../src/map/geometry"
+import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
-import { next, prev } from "../../src/map/QuadPatch"
+import { faceOf, next, prev } from "../../src/map/QuadPatch"
 import { FACE_SIZE } from "../../src/map/scale"
 import {
     addFlatCorner,
@@ -238,7 +238,7 @@ describe("createThinWalls", () => {
 
 describe("findDoorSills", () => {
 
-    it("gives every door edge one sill, also on seams", () => {
+    it("gives each door a sill, but two doors meeting on a face one that leads on from it, if any", () => {
         const { world, slots } = level()
         const ends = findDoorSills(world, slots)
         const position = [0, 0, 0]
@@ -252,21 +252,52 @@ describe("findDoorSills", () => {
         {
             sills.add([ends[i] + "," + ends[i + 1], ends[i + 2] + "," + ends[i + 3]].sort().join(" "))
         }
+        const has = (from: number, to: number) => sills.has([point(from), point(to)].sort().join(" "))
+        assert(sills.size === ends.length / 4)
 
-        let doors = 0
+        const isDoor = (h: number) => world.edgeType(h) === EdgeType.DOOR.index
+        const isOpen = (h: number) => world.edgeType(h) === EdgeType.OPEN.index && world.twin(h) >= 0
+            && world.faceType(faceOf(world.twin(h))) === FaceType.PAVED.index
+
+        const cases = [0, 0, 0]
+        const replaced = new Set<number>()
+        for (const slot of slots)
+        {
+            for (let local = 0; local < world.getPatch(slot).faceType.length; local++)
+            {
+                const first = (slot << SLOT_SHIFT) | local * 4
+                const doors = [0, 1, 2, 3].map(i => first + i).filter(isDoor)
+                const d = doors.find(h => doors.includes(next(h)))
+                if (doors.length !== 2 || d === undefined)
+                {
+                    continue
+                }
+                const open = [next(next(d)), prev(d)].filter(isOpen)
+                cases[open.length]++
+                if (open.length === 1)
+                {
+                    assert(has(open[0], next(open[0])))
+                }
+                else if (open.length === 2)
+                {
+                    assert(has(d, next(next(d))))
+                }
+                replaced.add(d).add(world.twin(d)).add(next(d)).add(world.twin(next(d)))
+            }
+        }
+        // a face with doors on two sides also open on just one of the others is rare, this level has none
+        assert(cases[0] > 0 && cases[2] > 0, "cases " + cases)
+
         for (const slot of slots)
         {
             world.getPatch(slot).edgeType.forEach((type, local) => {
                 const h = (slot << SLOT_SHIFT) | local
                 if (type === EdgeType.DOOR.index)
                 {
-                    doors++
-                    assert(sills.has([point(h), point(next(h))].sort().join(" ")))
+                    assert(has(h, next(h)) === !replaced.has(h))
                 }
             })
         }
-        assert(doors > 0)
-        assert(ends.length / 4 === doors / 2)
     })
 })
 

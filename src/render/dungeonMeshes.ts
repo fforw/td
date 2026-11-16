@@ -11,11 +11,11 @@ import {
     Vector3
 } from "three"
 import { wallGround } from "../map/dungeonWalls"
-import { EdgeType } from "../map/geometry"
+import { EdgeType, FaceType } from "../map/geometry"
 import { type NearSpaces, type NearWalls, thickWallSpaces, thinWallEndSpaces, thinWallSpace } from "../map/nearWalls"
 import type PatchWorld from "../map/PatchWorld"
 import { SLOT_SHIFT } from "../map/PatchWorld"
-import { next, prev } from "../map/QuadPatch"
+import { faceOf, next, prev } from "../map/QuadPatch"
 import { SCALE } from "./scene3d"
 
 const TAU = Math.PI * 2
@@ -605,7 +605,11 @@ function addWedge(
 
 
 /**
- * Finds where the sills of the doors of a level go, one on each door edge
+ * Finds where the sills of the doors of a level go. Each door edge gets one, except where a face has doors on two edges
+ * next to each other, as their sills would run into each other at the corner. Those two make way for one sill that leads
+ * on from the face: on the one other edge of it that is open, or diagonally across it if both are, cutting off the corner
+ * of the doors. A face open on neither side is a corridor of one face around the corner between two rooms, which reads as
+ * an opening without any sill.
  *
  * @param world     world with all patches of the level
  * @param slots     slots of the patches of the level
@@ -614,23 +618,79 @@ function addWedge(
  */
 export function findDoorSills(world: PatchWorld, slots: readonly number[]): number[]
 {
-    const ends: number[] = []
-    const position = [0, 0, 0]
+    const isDoor = (h: number) => world.edgeType(h) === EdgeType.DOOR.index
+    const isOpen = (h: number) => {
+        const twin = world.twin(h)
+        return world.edgeType(h) === EdgeType.OPEN.index && twin >= 0 && world.faceType(faceOf(twin)) === FaceType.PAVED.index
+    }
+    // edges by the lower of their half edges, which have the type on both sides
+    const edgeOf = (h: number) => Math.min(h, world.twin(h))
+
+    // faces with doors on two neighboring edges, by the first of those doors and the other edges that are open
+    const corners: { door: number, open: number[] }[] = []
+    for (const slot of slots)
+    {
+        const faces = world.getPatch(slot).faceType.length
+        for (let local = 0; local < faces; local++)
+        {
+            const first = (slot << SLOT_SHIFT) | local * 4
+            const doors = [0, 1, 2, 3].map(i => first + i).filter(isDoor)
+            // the first door ends where the second one starts
+            const door = doors.find(h => doors.includes(next(h)))
+            if (doors.length === 2 && door !== undefined)
+            {
+                corners.push({ door, open: [next(next(door)), prev(door)].filter(isOpen) })
+            }
+        }
+    }
+    // A corridor of one face can share a door with a room face whose sill moves, so those go first. The corridor loses its
+    // other sill as well then.
+    corners.sort((a, b) => b.open.length - a.open.length)
+
+    const replaced = new Set<number>()
+    const sills: [number, number][] = []
+    for (const { door, open } of corners)
+    {
+        const doors = [edgeOf(door), edgeOf(next(door))]
+        if (open.length > 0 && doors.some(h => replaced.has(h)))
+        {
+            continue
+        }
+        doors.forEach(h => replaced.add(h))
+        if (open.length > 0)
+        {
+            sills.push(open.length === 1 ? [open[0], next(open[0])] : [door, next(next(door))])
+        }
+    }
+
     for (const slot of slots)
     {
         const { edgeType } = world.getPatch(slot)
-        const base = slot << SLOT_SHIFT
-        for (let h = 0; h < edgeType.length; h++)
+        for (let local = 0; local < edgeType.length; local++)
         {
-            // both half edges have the type, the lower global id gets the sill, also on a seam
-            if (edgeType[h] !== EdgeType.DOOR.index || (base | h) > world.twin(base | h))
+            const h = (slot << SLOT_SHIFT) | local
+            if (isDoor(h) && h === edgeOf(h) && !replaced.has(h))
             {
-                continue
+                sills.push([h, next(h)])
             }
-            world.position(base | h, position)
-            ends.push(position[0] * SCALE, position[1] * SCALE)
-            world.position(base | next(h), position)
-            ends.push(position[0] * SCALE, position[1] * SCALE)
+        }
+    }
+
+    // the same edge can be where the sills of both of its faces moved to
+    const seen = new Set<string>()
+    const ends: number[] = []
+    const position = [0, 0, 0]
+    for (const [from, to] of sills)
+    {
+        world.position(from, position)
+        const x0 = position[0] * SCALE, z0 = position[1] * SCALE
+        world.position(to, position)
+        const x1 = position[0] * SCALE, z1 = position[1] * SCALE
+        const key = [x0 + "," + z0, x1 + "," + z1].sort().join(" ")
+        if (!seen.has(key))
+        {
+            seen.add(key)
+            ends.push(x0, z0, x1, z1)
         }
     }
     return ends
