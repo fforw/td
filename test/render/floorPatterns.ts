@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { assert, describe, it } from "vitest"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import PatchWorld from "../../src/map/PatchWorld"
@@ -94,6 +95,13 @@ describe("floor patterns", () => {
         const share = chosen.filter(pattern => pattern >= 0).length / rooms.length
         assert.approximately(share, PATTERN_SHARE, 0.15)
         assert.isTrue(chosen.every(pattern => pattern < FLOOR_PATTERNS.length))
+    })
+
+    it("has the files of all patterns", () => {
+        for (const [name] of FLOOR_PATTERNS)
+        {
+            assert.isTrue(existsSync(`public/media/patterns/${name}.png`), name)
+        }
     })
 
     it("creates a geometry per pattern with two triangles per face", () => {

@@ -25,12 +25,20 @@ const PATTERN_DIR = import.meta.env.BASE_URL + "media/patterns/"
 
 /**
  * Patterns from the Kenney Pattern Pack that pass for floors, with the mean of their texels. They are irregular: stones,
- * cobbles, paving, scatter and wood grain. On the bent quads of the mesh, straight lines and grids would show how
+ * cobbles, paving, scatter, wood grain and waves. On the bent quads of the mesh, straight lines and grids would show how
  * bent they are, and the turns of the pattern around irregular vertices, see floodRoom(). The overlay shifts the floor
  * by the difference to the mean, so a room keeps its brightness whatever share of a pattern is dark.
  */
 export const FLOOR_PATTERNS: readonly (readonly [name: string, mean: number])[] = [
     ["pattern_24", 0.315],
+    ["pattern_25", 0.46],
+    ["pattern_26", 0.5],
+    ["pattern_27", 0.46],
+    ["pattern_28", 0.469],
+    ["pattern_29", 0.469],
+    ["pattern_30", 0.312],
+    ["pattern_31", 0.501],
+    ["pattern_32", 0.566],
     ["pattern_37", 0.609],
     ["pattern_38", 0.503],
     ["pattern_39", 0.404],
