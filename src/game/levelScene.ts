@@ -42,7 +42,7 @@ import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
 import { createExitMeshes } from "../render/exitMeshes"
-import ChestHoard, { CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
+import ChestHoard, { type Chest, CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
 import TreasureView from "../treasure/TreasureView"
 import type PatchWorld from "../map/PatchWorld"
 import MapWorkerClient from "../worker/MapWorkerClient"
@@ -807,8 +807,7 @@ export default class LevelScene
         }
         else if (action === "confirm")
         {
-            const { position } = hero.meeple
-            const chest = this.chests?.closedNear(position.x, position.z)
+            const chest = this.chestNear(hero)
             if (chest)
             {
                 this.chests!.open(chest, performance.now() / 1000)
@@ -1085,7 +1084,17 @@ export default class LevelScene
     nearChest(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && hero.hp > 0 && !!this.chests?.closedNear(hero.meeple.position.x, hero.meeple.position.z)
+        return !!hero && hero.hp > 0 && !!this.chestNear(hero)
+    }
+
+    /**
+     * Returns the closed chest a hero can open, in reach and in the same room
+     */
+    private chestNear(hero: ShownHero): Chest | null
+    {
+        const { position } = hero.meeple
+        const room = this.level?.rooms.find(faces => faces.includes(hero.face)) ?? []
+        return this.chests?.closedNear(position.x, position.z, new Set(room)) ?? null
     }
 
     /**

@@ -19,6 +19,8 @@ import ChestHoard, {
 
 const SPOT: ChestSpot = { face: 0, x: 0, z: 0, facing: 0 }
 const LONG_AFTER = 100
+/** faces of the room the chest stands in */
+const ROOM: ReadonlySet<number> = new Set([SPOT.face])
 
 /**
  * Every face at (face, 0), in a row
@@ -83,12 +85,20 @@ describe("ChestHoard", () => {
     it("opens only closed chests within reach", () => {
 
         const chests = hoard()
-        assert.isNull(chests.closedNear(CHEST_REACH * 1.1, 0))
+        assert.isNull(chests.closedNear(CHEST_REACH * 1.1, 0, ROOM))
 
-        const chest = chests.closedNear(CHEST_REACH * 0.9, 0)!
+        const chest = chests.closedNear(CHEST_REACH * 0.9, 0, ROOM)!
         assert.equal(chest, chests.chests[0])
         chests.open(chest, 0)
-        assert.isNull(chests.closedNear(0, 0))
+        assert.isNull(chests.closedNear(0, 0, ROOM))
+    })
+
+    it("opens only chests in the same room", () => {
+
+        const chests = hoard()
+        assert.isNull(chests.closedNear(0, 0, new Set([1, 2])))
+        assert.isNull(chests.closedNear(0, 0, new Set()))
+        assert.equal(chests.closedNear(0, 0, new Set([1, SPOT.face])), chests.chests[0])
     })
 
     it("has a fitting number of coins, the same every time", () => {
@@ -214,7 +224,7 @@ describe("ChestHoard", () => {
         assert.isNotNull(again.openedAt)
         assert.deepEqual(again.coins.map(({ id }) => id), opened[0])
         assert.equal(again.coins.length, left)
-        assert.isNull(hoard(opened).closedNear(0, 0))
+        assert.isNull(hoard(opened).closedNear(0, 0, ROOM))
     })
 
     it("is empty once every coin of every chest is taken", () => {

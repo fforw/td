@@ -310,16 +310,19 @@ export default class ChestHoard
     }
 
     /**
-     * Returns the closed chest closest to a point within reach, if any
+     * Returns the closed chest closest to a point within reach, if any. Only chests in the same room count, for a hero not to
+     * open them through walls.
+     *
+     * @param room  faces of the room the point is in, empty outside of rooms
      */
-    closedNear(x: number, z: number): Chest | null
+    closedNear(x: number, z: number, room: ReadonlySet<number>): Chest | null
     {
         let closest: Chest | null = null
         let shortest = CHEST_REACH
         for (const chest of this.chests)
         {
             const distance = Math.hypot(chest.x - x, chest.z - z)
-            if (chest.openedAt === null && distance <= shortest)
+            if (chest.openedAt === null && distance <= shortest && room.has(chest.face))
             {
                 closest = chest
                 shortest = distance
