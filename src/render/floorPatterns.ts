@@ -24,23 +24,28 @@ import { SCALE } from "./scene3d"
 const PATTERN_DIR = import.meta.env.BASE_URL + "media/patterns/"
 
 /**
- * Patterns from the Kenney Pattern Pack that pass for floors, with the mean of their texels. The overlay shifts the floor
+ * Patterns from the Kenney Pattern Pack that pass for floors, with the mean of their texels. They are irregular: stones,
+ * cobbles, paving, scatter and wood grain. On the bent quads of the mesh, straight lines and grids would show how
+ * bent they are, and the turns of the pattern around irregular vertices, see floodRoom(). The overlay shifts the floor
  * by the difference to the mean, so a room keeps its brightness whatever share of a pattern is dark.
  */
 export const FLOOR_PATTERNS: readonly (readonly [name: string, mean: number])[] = [
-    ["pattern_14", 0.121],
-    ["pattern_15", 0.5],
-    ["pattern_18", 0.82],
-    ["pattern_20", 0.762],
-    ["pattern_22", 0.692],
-    ["pattern_23", 0.463],
     ["pattern_24", 0.315],
     ["pattern_37", 0.609],
-    ["pattern_61", 0.498],
-    ["pattern_72", 0.379],
-    ["pattern_74", 0.134],
+    ["pattern_38", 0.503],
+    ["pattern_39", 0.404],
+    ["pattern_42", 0.609],
+    ["pattern_52", 0.442],
+    ["pattern_53", 0.408],
+    ["pattern_54", 0.224],
+    ["pattern_55", 0.074],
+    ["pattern_57", 0.577],
+    ["pattern_76", 0.216],
     ["pattern_79", 0.287],
-    ["pattern_80", 0.263]
+    ["pattern_80", 0.263],
+    ["pattern_81", 0.267],
+    ["pattern_82", 0.239],
+    ["pattern_83", 0.413]
 ]
 
 /**
