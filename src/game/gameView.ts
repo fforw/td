@@ -405,8 +405,8 @@ export default class GameView implements PadTarget
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
             ...(this.level?.nearStranger(following!) ? [{ glyph: "confirm", label: "Talk" } as const] : []),
             ...(this.level?.nearExit(following!) ? [{ glyph: "confirm", label: "Leave" } as const] : []),
-            { glyph: "map", label: "Light" },
-            ...(!this.inFight() ? [{ glyph: "endDay", label: "Map" } as const] : [])
+            { glyph: "endDay", label: "Light" },
+            ...(!this.inFight() ? [{ glyph: "map", label: "Map" } as const] : [])
         ]
     }
 
@@ -483,8 +483,8 @@ export default class GameView implements PadTarget
 
     steerAct(action: Exclude<PadAction, "menu">): void
     {
-        // the button for the end of the day, which doesn't come in a level
-        if (action === "endDay")
+        // the map button opens the map of the level, the end of the day button toggles the light there
+        if (action === "map")
         {
             this.openLevelMap()
         }
@@ -518,7 +518,7 @@ export default class GameView implements PadTarget
         if (!this.canSteer())
         {
             // the key for the map of the level also puts it away again
-            if (action === "endDay" && !ev.repeat && !this.levelMapPopup.hidden)
+            if (action === "map" && !ev.repeat && !this.levelMapPopup.hidden)
             {
                 this.closeLevelMap()
             }

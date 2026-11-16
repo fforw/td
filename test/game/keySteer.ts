@@ -103,8 +103,8 @@ describe("KeySteer", () => {
     it("has keys for what the buttons of a controller do", () => {
 
         assert.equal(keyAction("KeyE"), "confirm")
-        assert.equal(keyAction("KeyF"), "map")
-        assert.equal(keyAction("KeyM"), "endDay")
+        assert.equal(keyAction("KeyF"), "endDay")
+        assert.equal(keyAction("KeyM"), "map")
         assert.isNull(keyAction("KeyW"))
     })
 })

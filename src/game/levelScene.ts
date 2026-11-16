@@ -800,7 +800,7 @@ export default class LevelScene
         {
             return
         }
-        if (action === "map")
+        if (action === "endDay")
         {
             hero.lightOn = !hero.lightOn
             hero.lightBurnt = 0

@@ -110,8 +110,8 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
     xbox: {
         confirm: "xbox_button_a",
         back: "xbox_button_b",
-        map: "xbox_button_y",
-        endDay: "xbox_button_x",
+        map: "xbox_button_x",
+        endDay: "xbox_button_y",
         menu: "xbox_button_menu",
         move: "xbox_dpad",
         look: "xbox_stick_r",
@@ -125,8 +125,8 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
     playstation: {
         confirm: "playstation_button_cross",
         back: "playstation_button_circle",
-        map: "playstation_button_triangle",
-        endDay: "playstation_button_square",
+        map: "playstation_button_square",
+        endDay: "playstation_button_triangle",
         menu: "playstation5_button_options",
         move: "playstation_dpad",
         look: "playstation_stick_r",
@@ -140,8 +140,8 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
     switch: {
         confirm: "switch_button_a",
         back: "switch_button_b",
-        map: "switch_button_x",
-        endDay: "switch_button_y",
+        map: "switch_button_y",
+        endDay: "switch_button_x",
         menu: "switch_button_plus",
         move: "switch_dpad",
         look: "switch_stick_r",
@@ -155,8 +155,8 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
     steamdeck: {
         confirm: "steamdeck_button_a",
         back: "steamdeck_button_b",
-        map: "steamdeck_button_y",
-        endDay: "steamdeck_button_x",
+        map: "steamdeck_button_x",
+        endDay: "steamdeck_button_y",
         menu: "steamdeck_button_options",
         move: "steamdeck_dpad",
         look: "steamdeck_stick_r",
@@ -294,7 +294,7 @@ export function readPad(pad: PadState): PadInput
     const scheme = schemeOf(pad.id)
     const [confirm, back] = scheme === "switch" ? [EAST, SOUTH] : [SOUTH, EAST]
     const actions: PadAction[] = []
-    for (const [action, index] of [["confirm", confirm], ["back", back], ["map", NORTH], ["endDay", WEST], ["menu", START]] as const)
+    for (const [action, index] of [["confirm", confirm], ["back", back], ["map", WEST], ["endDay", NORTH], ["menu", START]] as const)
     {
         if (isPressed(pad, index))
         {

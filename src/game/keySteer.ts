@@ -33,8 +33,8 @@ const DASH_KEYS: readonly string[] = ["Space", "ShiftLeft"]
  */
 const ACTION_KEYS: Record<string, Exclude<PadAction, "menu">> = {
     KeyE: "confirm",
-    KeyF: "map",
-    KeyM: "endDay"
+    KeyF: "endDay",
+    KeyM: "map"
 }
 
 const ATTACK_BUTTON = 0

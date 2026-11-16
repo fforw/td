@@ -69,8 +69,8 @@ describe("Reading a controller", () => {
 
         assert.deepEqual(readPad(pad([0])).actions, ["confirm"])
         assert.deepEqual(readPad(pad([1])).actions, ["back"])
-        assert.deepEqual(readPad(pad([3])).actions, ["map"])
-        assert.deepEqual(readPad(pad([2])).actions, ["endDay"])
+        assert.deepEqual(readPad(pad([3])).actions, ["endDay"])
+        assert.deepEqual(readPad(pad([2])).actions, ["map"])
         assert.deepEqual(readPad(pad([9])).actions, ["menu"])
     })
 

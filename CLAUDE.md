@@ -28,7 +28,7 @@ node scripts/shot.ts /dungeon3d.html --wait 4000 --shot a.jpg --clip canvas --sc
 ```
 
 The game page takes its campaign from `?seed=`, and starts on clicking `.play`. With `--gamepad`, the first `--press`
-only activates pad mode, so use a second one to trigger the action. Button 2 (west) ends the day. Frame rates in
+only activates pad mode, so use a second one to trigger the action. Button 3 (north) ends the day. Frame rates in
 headless Chrome mean nothing, as it renders in software.
 
 ## Layout
