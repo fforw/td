@@ -10,3 +10,5 @@ Gets copied to "docs/media/"
  * treasure/: Chest and coin from [Mini Dungeon by Kenney](https://www.kenney.nl) (CC0), see treasure/License.txt.
 
  * dungeon/: Stairs from [Mini Dungeon by Kenney](https://www.kenney.nl) (CC0), see dungeon/License.txt.
+
+ * patterns/: Floor patterns from [Pattern Pack by Kenney](https://www.kenney.nl) (CC0), see patterns/License.txt.
