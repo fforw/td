@@ -688,7 +688,11 @@ export default class MeepleCrowd
     private readonly silhouettes = new Map<InstancedMesh, InstancedMesh>()
     private readonly silhouetteMaterials: Material[] = []
 
-    constructor(capacity: number)
+    /**
+     * @param capacity  most meeples
+     * @param scale     from meeple units to world units
+     */
+    constructor(capacity: number, private readonly scale = MEEPLE_SCALE)
     {
         this.capacity = capacity
 
@@ -1061,7 +1065,7 @@ export default class MeepleCrowd
                 const turn = ((Math.atan2(dx, dz) - facing) % TAU + TAU * 1.5) % TAU - Math.PI
                 facing += turn * t
 
-                const lookUp = Math.atan2(cam.y - position.y - headY * MEEPLE_SCALE, Math.hypot(dx, dz))
+                const lookUp = Math.atan2(cam.y - position.y - headY * this.scale, Math.hypot(dx, dz))
                 headTilt += (Math.min(MAX_LOOK_UP, lookUp) - this.lean - headTilt) * t
             }
 
@@ -1075,7 +1079,7 @@ export default class MeepleCrowd
             rotation.multiply(fallRotation.setFromAxisAngle(SIDEWAYS, -fall))
             const rise = bounce + Math.sin(fall) * HEAD_RADIUS
 
-            figure.compose(tmpPos.set(position.x, position.y + rise * MEEPLE_SCALE, position.z), rotation, tmpScale.setScalar(MEEPLE_SCALE))
+            figure.compose(tmpPos.set(position.x, position.y + rise * this.scale, position.z), rotation, tmpScale.setScalar(this.scale))
             if (roll !== 0)
             {
                 // rock around the facing direction at belly height
