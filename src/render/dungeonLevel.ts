@@ -7,6 +7,7 @@ import { createNearWalls, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
 import { createDoorSills, createThickWalls, createThinWallCorners, createThinWalls } from "./dungeonMeshes"
+import { createFloorPatterns } from "./floorPatterns"
 import { createGround } from "./patchMeshes"
 import { GROUND_COLORS } from "./scene3d"
 import { applyWallCut, createWallCut, type WallCut } from "./wallCut"
@@ -65,7 +66,7 @@ function lightMeshes(meshes: Mesh[], field: LightField, flatTops = false): void
  */
 export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 {
-    const { patches, lighting } = level
+    const { patches, lighting, rooms } = level
     const field = createLightField(lighting!)
     const cut = createWallCut()
 
@@ -74,6 +75,9 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY, LEVEL_GROUND_COLORS))
     const near = createNearWalls(world, slots, level)
     const sills = createDoorSills(world, slots)
+    // the rooms are as good a seed as any, they differ from level to level
+    const seed = rooms.reduce((hash, room) => (hash * 31 + room[0]) | 0, rooms.length)
+    const patterns = createFloorPatterns(world, rooms, seed)
     const walls: Mesh[] = [
         ...slots.map(slot => createThickWalls(world, slot, near)),
         createThinWalls(world, slots, false, near),
@@ -96,7 +100,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 
     return {
         world,
-        meshes: [...ground, sills, ...walls, ...glass],
+        meshes: [...ground, ...patterns, sills, ...walls, ...glass],
         field,
         segments: findWallSegments(world, slots),
         cut,
