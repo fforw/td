@@ -1,4 +1,5 @@
 import { rng } from "../math/random"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
 
 const TAU = Math.PI * 2
@@ -34,7 +35,7 @@ const LOOK_TIME = 0.25
  * How likely a brute with nobody to go after walks somewhere when it looks around, and how far in world units
  */
 const WANDER_CHANCE = 0.03
-const WANDER_LENGTH = 0.6
+const WANDER_LENGTH = 0.6 * FIGURE_SCALE
 
 /**
  * How close a brute comes to who it goes after, as a share of its reach
@@ -54,7 +55,7 @@ export interface BruteKind extends MonsterKind
 
 export const BRUTE: BruteKind = {
     scale: 1,
-    radius: 0.11,
+    radius: 0.11 * FIGURE_SCALE,
     hp: 16,
     big: true,
     flying: false,
@@ -64,8 +65,8 @@ export const BRUTE: BruteKind = {
         { bone: "Club", x: 0, y: 0.75, z: 0, rx: 0.18, ry: 0.75, rz: 0.18, colors: ["#4c291f"] }
     ],
     damage: 5,
-    speed: 0.35,
-    reach: 0.32
+    speed: 0.35 * FIGURE_SCALE,
+    reach: 0.32 * FIGURE_SCALE
 }
 
 

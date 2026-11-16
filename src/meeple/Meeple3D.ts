@@ -32,6 +32,7 @@ import { applyLightField, applyRimLight, type LightField } from "../render/dunge
 import { type ModelName, template } from "../render/scene3d"
 import { rng } from "../math/random"
 import { meepleNameGenerator } from "./nameGenerator";
+import { FIGURE_SCALE } from "./figureScale"
 
 const TAU = Math.PI * 2
 
@@ -39,6 +40,11 @@ const TAU = Math.PI * 2
  * Scale from meeple units (a meeple is about 1.15 units tall) to world units, where one face is one unit.
  */
 export const MEEPLE_SCALE = 0.3
+
+/**
+ * Scale from meeple units to world units in a level, see FIGURE_SCALE
+ */
+export const LEVEL_MEEPLE_SCALE = MEEPLE_SCALE * FIGURE_SCALE
 
 /**
  * How far below HEAD_Y the head of the shortest meeple sits, and how much higher the head of the tallest one is, in

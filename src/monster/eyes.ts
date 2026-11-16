@@ -1,4 +1,5 @@
 import { rng } from "../math/random"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, NOTICE_DISTANCE, type Prey } from "./monsters"
 
 const TAU = Math.PI * 2
@@ -12,8 +13,8 @@ const LOOK_TIME = 0.25
  * How far from a hero an eye wants to be, in world units, the closest it settles for, and how much shorter the way there
  * has to be for a spot closer to them
  */
-const PERCH_DISTANCES = [1.3, 1.8, 2.3]
-export const MIN_PERCH = 1
+const PERCH_DISTANCES = [1.3, 1.8, 2.3].map(distance => distance * FIGURE_SCALE)
+export const MIN_PERCH = 1 * FIGURE_SCALE
 const PERCH_ANGLES = 16
 const WAY_COST = 0.6
 
@@ -22,13 +23,13 @@ const WAY_COST = 0.6
  * in world units
  */
 const ACCELERATION = 5
-const SLOW_DOWN = 0.3
+const SLOW_DOWN = 0.3 * FIGURE_SCALE
 
 /**
  * How likely an eye with nobody to go after floats somewhere when it looks around, and how far at most in world units
  */
 const WANDER_CHANCE = 0.05
-const WANDER_LENGTH = 0.6
+const WANDER_LENGTH = 0.6 * FIGURE_SCALE
 
 /**
  * Seconds the eyes of a level remember where one of them last saw a hero
@@ -49,9 +50,9 @@ export const WARN_TIME = 0.5
 /**
  * Speed of a bolt in world units per second, how far it goes, and half its width
  */
-export const BOLT_SPEED = 6
+export const BOLT_SPEED = 6 * FIGURE_SCALE
 export const BOLT_RANGE = NOTICE_DISTANCE + 2
-const BOLT_RADIUS = 0.02
+const BOLT_RADIUS = 0.02 * FIGURE_SCALE
 
 /**
  * Most radians between where a hero looks and where a bolt comes from for the shield to stop it
@@ -61,7 +62,7 @@ export const BLOCK_ANGLE = Math.PI * 0.42
 /**
  * Speed in world units per second an eye gets knocked back with
  */
-const RECOIL_SPEED = 3
+const RECOIL_SPEED = 3 * FIGURE_SCALE
 
 /**
  * How fast an eye turns, in radians per second
@@ -84,14 +85,14 @@ export interface EyeKind extends MonsterKind
 
 export const FLYING_EYE: EyeKind = {
     scale: 1,
-    radius: 0.075,
+    radius: 0.075 * FIGURE_SCALE,
     hp: 4,
     big: false,
     flying: true,
     // at the height it hovers at
     burst: [{ x: 0, y: 1, z: 0, rx: 0.25, ry: 0.25, rz: 0.25, colors: ["#4760e5"] }],
     damage: 1,
-    speed: 0.9
+    speed: 0.9 * FIGURE_SCALE
 }
 
 

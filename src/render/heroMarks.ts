@@ -1,5 +1,7 @@
 import { DoubleSide, Group, Mesh, MeshBasicMaterial, RingGeometry, Shape, ShapeGeometry } from "three"
 
+import { FIGURE_SCALE } from "../meeple/figureScale"
+
 /**
  * Height over the floor in world units
  */
@@ -8,16 +10,16 @@ const HEIGHT = 0.02
 /**
  * Distance of the aim mark from the hero, and its size, in world units
  */
-const AIM_DISTANCE = 0.3
-const AIM_SIZE = 0.07
+const AIM_DISTANCE = 0.3 * FIGURE_SCALE
+const AIM_SIZE = 0.07 * FIGURE_SCALE
 const AIM_OPACITY = 0.6
 
 /**
  * Inner and outer radius of the arc of a slash in world units, its width in radians, how visible it starts, and how many
  * seconds it takes to fade
  */
-const SLASH_INNER = 0.2
-export const SLASH_OUTER = 0.55
+const SLASH_INNER = 0.2 * FIGURE_SCALE
+export const SLASH_OUTER = 0.55 * FIGURE_SCALE
 export const SLASH_WIDTH = 2.2
 const SLASH_OPACITY = 0.85
 const SLASH_FADE = 0.2

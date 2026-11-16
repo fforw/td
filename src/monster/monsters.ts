@@ -1,5 +1,6 @@
 import type { FloorSpot } from "../map/dungeonWays"
 import { rng } from "../math/random"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import type { BurstSphere, Death } from "./bursts"
 
 /**
@@ -10,12 +11,12 @@ export const HURT_WAIT = 1
 /**
  * Room a hero takes up in world units
  */
-export const HERO_RADIUS = 0.09
+export const HERO_RADIUS = 0.09 * FIGURE_SCALE
 
 /**
  * How far a monster notices a hero in world units, and for how many seconds it goes on after losing sight of them
  */
-export const NOTICE_DISTANCE = 3
+export const NOTICE_DISTANCE = 3 * FIGURE_SCALE
 export const CHASE_TIME = 3
 
 /**

@@ -11,7 +11,8 @@ import {
     SphereGeometry,
     Vector3
 } from "three"
-import { MEEPLE_SCALE, NO_SILHOUETTE } from "../meeple/Meeple3D"
+import { LEVEL_MEEPLE_SCALE, NO_SILHOUETTE } from "../meeple/Meeple3D"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import type { LightField } from "../render/dungeonLighting"
 import { type Bolt, type Eye, type Spark, SPARK_TIME } from "./eyes"
 import MonsterCrowd, { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
@@ -19,8 +20,8 @@ import MonsterCrowd, { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
 /**
  * Height in world units eyes and their bolts hover at, and how far and fast eyes bob up and down
  */
-export const HOVER_HEIGHT = 0.3
-const BOB = 0.025
+export const HOVER_HEIGHT = 0.3 * FIGURE_SCALE
+const BOB = 0.025 * FIGURE_SCALE
 const BOB_SPEED = 2.5
 
 /**
@@ -40,15 +41,15 @@ const SPARKS_PER_EYE = 6
  * Size of a bolt in world units, how much longer it is than wide, and how far its glow reaches beyond it as a multiple of
  * its size
  */
-const BOLT_SIZE = 0.03
+const BOLT_SIZE = 0.03 * FIGURE_SCALE
 const BOLT_STRETCH = 2.5
 const GLOW_SIZE = 2.2
 
 /**
  * Size of a spark in world units when it starts and when it is gone
  */
-const SPARK_START = 0.04
-const SPARK_END = 0.14
+const SPARK_START = 0.04 * FIGURE_SCALE
+const SPARK_END = 0.14 * FIGURE_SCALE
 
 const BOLT_COLOR = new Color("#ffe0a0")
 const GLOW_COLOR = new Color("#ff6a1a")
@@ -143,7 +144,7 @@ export default class EyeCrowd
         const { crowd, irisShift } = this
         eyes.forEach((eye, i) => {
             const { kind, x, z, yaw, flash, chase, warning } = eye
-            const size = kind.scale * MEEPLE_SCALE
+            const size = kind.scale * LEVEL_MEEPLE_SCALE
             rotation.setFromAxisAngle(UP, yaw)
             matrix.compose(position.set(x, HOVER_HEIGHT + BOB * Math.sin(time * BOB_SPEED + yaw * 3), z), rotation, scale.setScalar(size))
             crowd.set(i, matrix, flash > 0 ? FLASH : PLAIN, chase > 0 ? SILHOUETTE : NO_SILHOUETTE)

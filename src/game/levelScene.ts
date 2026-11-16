@@ -20,7 +20,8 @@ import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
-import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
+import MeepleCrowd, { LEVEL_MEEPLE_SCALE, type Meeple, MEEPLE_MODELS, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
+import { FIGURE_SCALE, LEVEL_GROWTH } from "../meeple/figureScale"
 import BruteCrowd from "../monster/BruteCrowd"
 import BurstCrowd from "../monster/BurstCrowd"
 import Bursts from "../monster/bursts"
@@ -100,7 +101,7 @@ const MAX_HEROES = 16
 /**
  * Walking speed in world units per second for a meeple with a walk speed multiplier of 1
  */
-const WALK_SPEED = MEEPLE_SCALE * 1.5
+const WALK_SPEED = LEVEL_MEEPLE_SCALE * 1.5
 
 /**
  * Fastest a meeple turns when told where to look, in radians per second
@@ -145,7 +146,7 @@ const TRADER_WARES: readonly Ware[] = ["healing", "speed", "strength", "map"]
 /**
  * Height in world units of the tail of a speech bubble, a little above the heads
  */
-const BUBBLE_HEIGHT = 0.36
+const BUBBLE_HEIGHT = 0.36 * FIGURE_SCALE
 
 /**
  * Directions tried around the stranger for the mark of the hero in a scene, for all shots to see both from inside the
@@ -185,7 +186,7 @@ const HURT_FLASH_TIME = 250
 const COIN_SEED = 0x7c3a
 
 const CAMERA_ANGLE = 34
-const CAMERA_DISTANCE = 4.5
+const CAMERA_DISTANCE = 4.5 / LEVEL_GROWTH
 
 const CAMERA_RAD = (90 - CAMERA_ANGLE) * DEG2RAD_FACTOR
 /**
@@ -194,14 +195,14 @@ const CAMERA_RAD = (90 - CAMERA_ANGLE) * DEG2RAD_FACTOR
  */
 const CAMERA_OFFSET = new Vector3(0, Math.cos(CAMERA_RAD) * CAMERA_DISTANCE,Math.sin(CAMERA_RAD) * CAMERA_DISTANCE)
 
-const MIN_DISTANCE = 1.5
-const MAX_DISTANCE = 10
+const MIN_DISTANCE = 1.5 / LEVEL_GROWTH
+const MAX_DISTANCE = 10 / LEVEL_GROWTH
 
 /**
  * Closest the pointer gets to the hero in world units and still tells them where to look. Any closer, and the smallest
  * movement would spin them around.
  */
-const POINTER_AIM_REACH = 0.15
+const POINTER_AIM_REACH = 0.15 * FIGURE_SCALE
 
 /**
  * Longest time in seconds a single frame moves things for
@@ -520,7 +521,7 @@ export default class LevelScene
         const chests = this.addChests(level, meshes, seed)
 
         // the stranger takes one more
-        const crowd = new MeepleCrowd(MAX_HEROES + 1)
+        const crowd = new MeepleCrowd(MAX_HEROES + 1, LEVEL_MEEPLE_SCALE)
         crowd.showSilhouettes()
         crowd.setLightField(meshes.field)
         this.scene.add(crowd.group, this.marks.group)

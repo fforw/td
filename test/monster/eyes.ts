@@ -12,7 +12,7 @@ import EyePack, {
     MIN_PERCH,
     WARN_TIME
 } from "../../src/monster/eyes"
-import Monsters, { HERO_RADIUS, HURT_WAIT, type MonsterFloor, type Prey } from "../../src/monster/monsters"
+import Monsters, { HERO_RADIUS, HURT_WAIT, type MonsterFloor, NOTICE_DISTANCE, type Prey } from "../../src/monster/monsters"
 
 const FRAME = 1 / 60
 
@@ -98,11 +98,11 @@ describe("Flying eyes", () => {
         it("come closer to a hero far off, but not too close", () => {
 
             const [eyes, monsters] = setup()
-            const eye = eyes.add(FLYING_EYE, 0, 2.9, 0)
+            const eye = eyes.add(FLYING_EYE, 0, NOTICE_DISTANCE - 0.1, 0)
             run(monsters, 4, [prey(0, 0, { dodging: true })])
             assert(eye.chase > 0)
             assert.isAtLeast(Math.hypot(eye.x, eye.z), MIN_PERCH - 0.05)
-            assert.isBelow(Math.hypot(eye.x, eye.z), 2.9)
+            assert.isBelow(Math.hypot(eye.x, eye.z), NOTICE_DISTANCE - 0.1)
         })
 
         it("only pick spots that see the hero", () => {

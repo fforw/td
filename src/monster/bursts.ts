@@ -1,30 +1,31 @@
 import { Matrix4, Quaternion, Vector3 } from "three"
-import { MEEPLE_SCALE } from "../meeple/Meeple3D"
+import { LEVEL_MEEPLE_SCALE } from "../meeple/Meeple3D"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import { rng } from "../math/random"
 import type { Monster, MonsterKind } from "./monsters"
 
 /**
  * Particles per cubic world unit of a burst sphere, and the fewest a sphere gets however small it is
  */
-export const DENSITY = 10000
+export const DENSITY = 10000 / FIGURE_SCALE ** 3
 export const FEWEST = 8
 
 /**
  * Edge length of a particle in world units, before the spread of sizes
  */
-export const PARTICLE_SIZE = 0.03
+export const PARTICLE_SIZE = 0.03 * FIGURE_SCALE
 
 /**
  * How fast particles fly out of the middle of their sphere, and away from the blow, in world units per second
  */
-const BURST_SPEED = 0.45
-const BLOW_SPEED = 0.35
+const BURST_SPEED = 0.45 * FIGURE_SCALE
+const BLOW_SPEED = 0.35 * FIGURE_SCALE
 
 /**
  * How fast particles fall in world units per second squared, how much of their speed they keep when they hit the floor, and
  * how much of it along the floor
  */
-const GRAVITY = 2.5
+const GRAVITY = 2.5 * FIGURE_SCALE
 const BOUNCE = 0.3
 const SLIDE = 0.6
 
@@ -111,7 +112,7 @@ export interface Particle
  */
 export function sphereVolume({ rx, ry, rz }: BurstSphere, scale: number): number
 {
-    const factor = scale * MEEPLE_SCALE
+    const factor = scale * LEVEL_MEEPLE_SCALE
     return 4 / 3 * Math.PI * rx * ry * rz * factor * factor * factor
 }
 
@@ -146,7 +147,7 @@ export default class Bursts
      */
     add({ kind, x, z, yaw, away, share }: Death): void
     {
-        rootMatrix.compose(position.set(x, 0, z), rotation.setFromAxisAngle(UP, yaw), scale.setScalar(kind.scale * MEEPLE_SCALE))
+        rootMatrix.compose(position.set(x, 0, z), rotation.setFromAxisAngle(UP, yaw), scale.setScalar(kind.scale * LEVEL_MEEPLE_SCALE))
         for (const sphere of kind.burst)
         {
             if (!sphere.bone)
@@ -166,7 +167,7 @@ export default class Bursts
      */
     burst(sphere: BurstSphere, matrix: Matrix4, away: number, share = 1): void
     {
-        const scale = Math.cbrt(Math.abs(matrix.determinant())) / MEEPLE_SCALE
+        const scale = Math.cbrt(Math.abs(matrix.determinant())) / LEVEL_MEEPLE_SCALE
         const blowX = Math.sin(away) * BLOW_SPEED, blowZ = Math.cos(away) * BLOW_SPEED
         const count = particleCount(sphere, scale, share)
         for (let i = 0; i < count; i++)

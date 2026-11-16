@@ -11,7 +11,8 @@ import {
     type Object3D,
     SkinnedMesh
 } from "three"
-import { createSilhouetteMaterial, MEEPLE_SCALE, NO_SILHOUETTE, SILHOUETTE_FILL, SILHOUETTE_RIM } from "../meeple/Meeple3D"
+import { createSilhouetteMaterial, LEVEL_MEEPLE_SCALE, NO_SILHOUETTE, SILHOUETTE_FILL, SILHOUETTE_RIM } from "../meeple/Meeple3D"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import { applyLightField, type LightField } from "../render/dungeonLighting"
 import { animations, model } from "../render/scene3d"
 import { type Brute, ATTACK_TIME } from "./brutes"
@@ -22,7 +23,7 @@ import { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
 /**
  * World units walked in one loop of the walk clip, so that the feet keep up with the ground
  */
-const STRIDE = 0.7
+const STRIDE = 0.7 * FIGURE_SCALE
 
 /**
  * Seconds it takes to start and stop walking, and to go from walking to swinging and back
@@ -182,7 +183,7 @@ export default class BruteCrowd
 
         root.position.set(x, 0, z)
         root.rotation.y = yaw
-        root.scale.setScalar(kind.scale * MEEPLE_SCALE)
+        root.scale.setScalar(kind.scale * LEVEL_MEEPLE_SCALE)
 
         // the walk follows the ground covered, not the time
         walk.time = walked / STRIDE % walk.getClip().duration

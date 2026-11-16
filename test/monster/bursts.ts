@@ -1,10 +1,11 @@
 import { Matrix4, Quaternion, Vector3 } from "three"
 import { assert, describe, it } from "vitest"
 
-import { MEEPLE_SCALE } from "../../src/meeple/Meeple3D"
+import { LEVEL_MEEPLE_SCALE } from "../../src/meeple/Meeple3D"
 import { BRUTE } from "../../src/monster/brutes"
 import Bursts, { DENSITY, FEWEST, particleCount, sphereVolume } from "../../src/monster/bursts"
 import { BIG_CUBOID, SMALL_CUBOID } from "../../src/monster/cuboids"
+import { HOVER_HEIGHT } from "../../src/monster/EyeCrowd"
 import { FLYING_EYE } from "../../src/monster/eyes"
 import type { Monster, MonsterKind } from "../../src/monster/monsters"
 
@@ -24,7 +25,7 @@ function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1): Bursts
  */
 function clubMatrix(yaw: number): Matrix4
 {
-    const factor = BRUTE.scale * MEEPLE_SCALE
+    const factor = BRUTE.scale * LEVEL_MEEPLE_SCALE
     const root = new Matrix4().compose(new Vector3(1, 0, 2), new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), yaw), new Vector3(factor, factor, factor))
     return root.multiply(new Matrix4().makeTranslation(-0.405, 0.561, 0.007))
 }
@@ -63,7 +64,7 @@ describe("Bursts", () => {
 
         const club = BRUTE.burst[1]
         const clubColor = club.colors[0]
-        const factor = BRUTE.scale * MEEPLE_SCALE
+        const factor = BRUTE.scale * LEVEL_MEEPLE_SCALE
         // the club is held on the left of the model, which is where it looks with no turn
         for (const [yaw, side] of [[0, -1], [Math.PI, 1]])
         {
@@ -82,7 +83,7 @@ describe("Bursts", () => {
 
         // eyes burst where they hover
         const eye = burst(FLYING_EYE).particles
-        assert(Math.abs(average(eye.map(({ y }) => y)) - 0.3) < 0.03)
+        assert(Math.abs(average(eye.map(({ y }) => y)) - HOVER_HEIGHT) < 0.03)
     })
 
     it("sends them off with the blow", () => {

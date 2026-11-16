@@ -1,5 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from "three"
-import { MEEPLE_SCALE, NO_SILHOUETTE } from "../meeple/Meeple3D"
+import { LEVEL_MEEPLE_SCALE, NO_SILHOUETTE } from "../meeple/Meeple3D"
 import type { LightField } from "../render/dungeonLighting"
 import { type Cuboid, hopShare, LUNGE_WINDUP } from "./cuboids"
 import MonsterCrowd, { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
@@ -60,10 +60,10 @@ export default class CuboidCrowd
                 + arc * HOP_STRETCH
                 - (windup > 0 ? (1 - windup / LUNGE_WINDUP) * WINDUP_SQUASH : 0)
             // keeps about the volume it has
-            const width = kind.scale * MEEPLE_SCALE / Math.sqrt(stretch)
+            const width = kind.scale * LEVEL_MEEPLE_SCALE / Math.sqrt(stretch)
 
             rotation.setFromAxisAngle(UP, yaw)
-            matrix.compose(position.set(x, arc * hopHeight, z), rotation, scale.set(width, stretch * kind.scale * MEEPLE_SCALE, width))
+            matrix.compose(position.set(x, arc * hopHeight, z), rotation, scale.set(width, stretch * kind.scale * LEVEL_MEEPLE_SCALE, width))
             crowd.set(i, matrix, flash > 0 ? FLASH : PLAIN, chase > 0 ? SILHOUETTE : NO_SILHOUETTE)
         })
         crowd.show(cuboids.length)

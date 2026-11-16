@@ -1,4 +1,5 @@
 import { rng } from "../math/random"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import type { BurstSphere } from "./bursts"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
 
@@ -15,7 +16,7 @@ export const LUNGE_WINDUP = 0.25
  */
 export const LUNGE_LENGTH = 1.5
 const LUNGE_TIME = 0.6
-const LUNGE_HEIGHT = 0.22
+const LUNGE_HEIGHT = 0.22 * FIGURE_SCALE
 export const LUNGE_WAIT = 3
 
 /**
@@ -38,13 +39,13 @@ const CLOSE_IN = 0.9
 /**
  * How far and how long a cuboid hops away when hit or blocked, in world units and seconds
  */
-const RECOIL_LENGTH = 0.3
+const RECOIL_LENGTH = 0.3 * FIGURE_SCALE
 const RECOIL_TIME = 0.25
 
 /**
  * How far cuboids coming out of a big one get, in world units, and how many there are at most and at least
  */
-const SPLIT_LENGTH = 0.4
+const SPLIT_LENGTH = 0.4 * FIGURE_SCALE
 const SPLIT_TIME = 0.3
 export const MIN_SPLIT = 2
 export const MAX_SPLIT = 7
@@ -83,16 +84,16 @@ const CUBOID_BURST: readonly BurstSphere[] = [{ x: 0, y: 0.48, z: 0, rx: 0.48, r
 
 export const BIG_CUBOID: CuboidKind = {
     scale: 1,
-    radius: 0.144,
+    radius: 0.144 * FIGURE_SCALE,
     hp: 8,
     big: true,
     flying: false,
     // all of it only when smitten, as it breaks up into small ones otherwise
     burst: CUBOID_BURST,
     damage: 3,
-    hopLength: 0.38,
+    hopLength: 0.38 * FIGURE_SCALE,
     hopTime: 0.5,
-    hopHeight: 0.1,
+    hopHeight: 0.1 * FIGURE_SCALE,
     blockable: false,
     splits: true,
     lunges: true
@@ -100,15 +101,15 @@ export const BIG_CUBOID: CuboidKind = {
 
 export const SMALL_CUBOID: CuboidKind = {
     scale: 0.5,
-    radius: 0.072,
+    radius: 0.072 * FIGURE_SCALE,
     hp: 2,
     big: false,
     flying: false,
     burst: CUBOID_BURST,
     damage: 1,
-    hopLength: 0.3,
+    hopLength: 0.3 * FIGURE_SCALE,
     hopTime: 0.32,
-    hopHeight: 0.06,
+    hopHeight: 0.06 * FIGURE_SCALE,
     blockable: true,
     splits: false,
     lunges: false
