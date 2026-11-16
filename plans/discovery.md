@@ -1024,7 +1024,11 @@ person: a trader, a stranger with a message, a prisoner who begs.
   wins, which is about 94% of the edges inside rooms. Growing first where
   the most neighbors agree gains next to nothing. The pattern multiplies
   the lit floor by 2 x its texel, which lightens and darkens around the
-  mean of the pattern, so the room keeps its brightness.
+  mean of the pattern, so the room keeps its brightness. Only irregular
+  patterns are used, stones, cobbles, paving, scatter and wood grain.
+  Grids, bricks and checkers show how bent the quads are, and make the
+  turns obvious. The wavy, blobby ones (25 to 32) look alien, they could
+  suit other kinds of levels.
 - A meeple gets a rim instead of its outline only where it stands in the
   dark and a light still reaches it, so not close to a light. The rim only
   follows the light with the most energy at a point, with its own direction
