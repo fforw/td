@@ -1,6 +1,7 @@
 import Prando from "prando"
 
 import { type FixtureSpot, outerSpot } from "../map/fixtures"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 
 const TAU = Math.PI * 2
 
@@ -18,7 +19,7 @@ export const CHEST_REACH = 0.5
 /**
  * How close to a coin in world units a hero has to get for it to come to them
  */
-export const COIN_REACH = 0.3
+export const COIN_REACH = 0.4
 
 /**
  * Gold a coin is worth
@@ -67,17 +68,17 @@ export const TAKE_TIME = 0.3
 /**
  * Height in world units of the middle of the bubble a coin floats in, once it is out of the chest
  */
-export const HOVER_HEIGHT = 0.17
+export const HOVER_HEIGHT = 0.17 * FIGURE_SCALE
 
 /**
  * Height in world units a coin goes to on a hero, about their middle
  */
-const TAKEN_HEIGHT = 0.2
+const TAKEN_HEIGHT = 0.2 * FIGURE_SCALE
 
 /**
  * How far in world units a floating coin bobs up and down, and how fast, in radians per second
  */
-const BOB = 0.012
+const BOB = 0.012 * FIGURE_SCALE
 const BOB_RATE = 2.2
 
 /**
@@ -99,7 +100,7 @@ const ROOMS_TAKEN = 0.15
  * How high the chest lets go of the coins and how high they fly, in world units
  */
 const SPILL_HEIGHT = 0.1
-const FLIGHT_HEIGHT = 0.3
+const FLIGHT_HEIGHT = 0.3 * FIGURE_SCALE
 
 /**
  * Seconds until the first coin comes out and between coins

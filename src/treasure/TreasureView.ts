@@ -1,4 +1,5 @@
 import { Box3, DynamicDrawUsage, Group, InstancedMesh, type Mesh, type MeshStandardMaterial, Object3D, SphereGeometry, Vector3 } from "three"
+import { FIGURE_SCALE } from "../meeple/figureScale"
 import { applyLightField, createBubbleMaterial, type LightField } from "../render/dungeonLighting"
 import { type ModelName, template } from "../render/scene3d"
 import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME, type Potion, POTIONS } from "./chests"
@@ -13,13 +14,13 @@ const CHEST_SCALE = CHEST_HALF_WIDTH / CHEST_MODEL_HALF_WIDTH
 /**
  * Size of a coin against its model, and half the thickness and the diameter of the model
  */
-const COIN_SCALE = 0.3
+const COIN_SCALE = 0.3 * FIGURE_SCALE
 const COIN_MODEL_SIZE = 0.4167
 
 /**
  * Size of a potion against its model, whose bottles are about three units high
  */
-const POTION_SCALE = 0.042
+const POTION_SCALE = 0.042 * FIGURE_SCALE
 
 const POTION_MODELS: Record<Potion, ModelName> = {
     healing: "healthPotion",
@@ -30,7 +31,7 @@ const POTION_MODELS: Record<Potion, ModelName> = {
 /**
  * Radius of the bubble an item floats in, in world units
  */
-const BUBBLE_RADIUS = 0.1
+const BUBBLE_RADIUS = 0.1 * FIGURE_SCALE
 
 /**
  * Rotation of an open lid. Further than the model's own animation, for what comes out to be seen, and short of the wall behind.
