@@ -922,7 +922,7 @@ person: a trader, a stranger with a message, a prisoner who begs.
 - While steering a hero, the four buttons on the face of the controller only
   do things in the level, so the overworld map and the way back to the castle
   are for the mouse for now. Cross (the confirm button) opens a chest or takes
-  an exit, triangle toggles the light the hero carries, and square opens the
+  an exit. Chests open only from inside their room, not through walls. Triangle toggles the light the hero carries, and square opens the
   map of the level, outside of fights. Circle closes it. In the castle
   square opens the overworld map as well, and triangle ends the day.
 - The light the hero carries burns down in a minute while it is on, losing
