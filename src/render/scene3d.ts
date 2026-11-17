@@ -2,6 +2,7 @@ import { type AnimationClip, InstancedMesh, Matrix4, type Mesh, type MeshStandar
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js"
 import { clone } from "three/addons/utils/SkeletonUtils.js"
 import { FaceType } from "../map/geometry"
+import { dungeonEnvironment } from "./dungeonEnvironment"
 
 /*
  * Map scale, models and ground colors shared by the 3D views
@@ -69,6 +70,16 @@ export const MODELS = {
 export type ModelName = keyof typeof MODELS
 
 /**
+ * Paths of the models from Kenney kits, whose metalness is not to be trusted
+ */
+const KIT = /^(castle|town|nature)\/|^treasure\/(chest|coin)\.glb$|^dungeon\/stairs\.glb$/
+
+/**
+ * Strength of the reflection of the dungeon environment in metal
+ */
+const METAL_REFLECTION = 1
+
+/**
  * Ground colors for the face types. The 2D colors are made for a black background and are too dark for a lit scene.
  */
 export const GROUND_COLORS = new Map<FaceType, string>([
@@ -117,11 +128,19 @@ export function loadModels(names = Object.keys(MODELS) as ModelName[]): Promise<
                         mesh.castShadow = !materials.some(m => m.transparent)
                         mesh.receiveShadow = true
 
-                        // the Fantasy Town and Nature kits export fully metallic materials which render black
-                        // without an environment map
-                        for (const material of materials)
+                        for (const material of materials as MeshStandardMaterial[])
                         {
-                            (material as MeshStandardMaterial).metalness = 0
+                            // the Kenney kits export metallic materials for things that are not metal
+                            if (KIT.test(MODELS[name]))
+                            {
+                                material.metalness = 0
+                            }
+                            // our own metal is in the dungeons and reflects them
+                            else if (material.metalness > 0)
+                            {
+                                material.envMap = dungeonEnvironment()
+                                material.envMapIntensity = METAL_REFLECTION
+                            }
                         }
                     }
                 })
