@@ -37,9 +37,25 @@ const WALL = "#08080b"
 const WALL_EDGE = "rgba(150, 230, 200, 0.35)"
 
 /**
- * Number of wall segments around the horizon
+ * Share of wall segments that are fat ones
  */
-const SEGMENTS = 9
+const FAT_SHARE = 0.35
+
+/**
+ * Widths of thin and fat wall segments, as shares of the full circle
+ */
+const THIN_WIDTH: [number, number] = [0.012, 0.035]
+const FAT_WIDTH: [number, number] = [0.06, 0.13]
+
+/**
+ * Widest gap between wall segments, as a share of the full circle, where they are sparsest
+ */
+const MAX_GAP = 0.28
+
+/**
+ * Where the wall segments are densest, as a share of the full circle
+ */
+const CROWD = 0.3
 
 /**
  * Seed of the generator placing the wall segments, so that the map is the same each time
@@ -99,25 +115,53 @@ function drawEnvironment(): HTMLCanvasElement
         }
     }
 
-    // wall segments rise from the floor through the glow, some of them above the top of it
-    const slot = WIDTH / SEGMENTS
-    for (let i = 0; i < SEGMENTS; i++)
+    // wall segments rise from the floor through the glow, some of them above the top of it. They crowd together on one
+    // side and leave wide gaps on the other.
+    let x = random() * WIDTH * MAX_GAP
+    while (x < WIDTH)
     {
-        const width = slot * (0.25 + random() * 0.45)
-        const x = i * slot + random() * (slot - width)
-        const top = horizon - HEIGHT * (0.04 + random() * 0.22)
+        const fat = random() < FAT_SHARE
+        const [narrowest, widest] = fat ? FAT_WIDTH : THIN_WIDTH
+        const width = Math.round(WIDTH * (narrowest + random() * (widest - narrowest)))
+        const top = Math.round(horizon - HEIGHT * (0.03 + random() * random() * 0.3))
+        // fat ones may step down on one side
+        const step = fat && random() < 0.5 ? Math.round(width * (0.3 + random() * 0.4)) : 0
+        const stepTop = top + Math.round(HEIGHT * (0.03 + random() * 0.06))
         // the glow catches the top and one side
-        const side = random() < 0.5 ? 0 : width - 1
+        const left = random() < 0.5
         for (const offset of [-WIDTH, 0, WIDTH])
         {
-            ctx.fillStyle = WALL
-            ctx.fillRect(x + offset, top, width, HEIGHT - top)
-            ctx.fillStyle = WALL_EDGE
-            ctx.fillRect(x + offset, top, width, 1)
-            ctx.fillRect(x + offset + side, top, 1, horizon + HEIGHT * 0.06 - top)
+            const start = x + offset
+            drawSegment(ctx, start, top, width, left, horizon)
+            if (step)
+            {
+                drawSegment(ctx, left ? start - step + 1 : start + width - 1, stepTop, step, left, horizon)
+            }
         }
+
+        const crowding = density(x / WIDTH)
+        const gap = WIDTH * MAX_GAP * (1 - crowding) * random()
+        x += (width + step) * (0.3 + random() * 0.7) + gap
     }
     return canvas
+}
+
+function drawSegment(ctx: CanvasRenderingContext2D, x: number, top: number, width: number, left: boolean, horizon: number): void
+{
+    ctx.fillStyle = WALL
+    ctx.fillRect(x, top, width, HEIGHT - top)
+    ctx.fillStyle = WALL_EDGE
+    ctx.fillRect(x, top, width, 1)
+    ctx.fillRect(left ? x : x + width - 1, top, 1, horizon + HEIGHT * 0.06 - top)
+}
+
+/**
+ * Returns how crowded the wall segments are at the given share of the full circle, from 0 to 1
+ */
+function density(at: number): number
+{
+    const closeness = 0.5 + 0.5 * Math.cos(2 * Math.PI * (at - CROWD))
+    return closeness * closeness
 }
 
 /**
