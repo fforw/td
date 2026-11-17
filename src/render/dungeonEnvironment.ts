@@ -32,6 +32,12 @@ const DARK = "#040406"
 const WALL = "#08080b"
 
 /**
+ * Heights between which the wall segments fade into the background, as shares of the map from the top. They are gone
+ * in the bottom third.
+ */
+const WALL_FADE: [number, number] = [0.52, 0.7]
+
+/**
  * Color of the edges of the wall segments the glow catches
  */
 const WALL_EDGE = "rgba(150, 230, 200, 0.35)"
@@ -117,6 +123,11 @@ function drawEnvironment(): HTMLCanvasElement
 
     // wall segments rise from the floor through the glow, some of them above the top of it. They crowd together on one
     // side and leave wide gaps on the other.
+    // they go on a layer of their own, which fades as a whole, so that overlapping ones don't add up
+    const walls = document.createElement("canvas")
+    walls.width = WIDTH
+    walls.height = HEIGHT
+    const layer = walls.getContext("2d")!
     let x = random() * WIDTH * MAX_GAP
     while (x < WIDTH)
     {
@@ -132,10 +143,10 @@ function drawEnvironment(): HTMLCanvasElement
         for (const offset of [-WIDTH, 0, WIDTH])
         {
             const start = x + offset
-            drawSegment(ctx, start, top, width, left, horizon)
+            drawSegment(layer, start, top, width, left, horizon)
             if (step)
             {
-                drawSegment(ctx, left ? start - step + 1 : start + width - 1, stepTop, step, left, horizon)
+                drawSegment(layer, left ? start - step + 1 : start + width - 1, stepTop, step, left, horizon)
             }
         }
 
@@ -143,6 +154,16 @@ function drawEnvironment(): HTMLCanvasElement
         const gap = WIDTH * MAX_GAP * (1 - crowding) * random()
         x += (width + step) * (0.3 + random() * 0.7) + gap
     }
+
+    const fade = layer.createLinearGradient(0, 0, 0, HEIGHT)
+    fade.addColorStop(0, "#000")
+    fade.addColorStop(WALL_FADE[0], "#000")
+    fade.addColorStop(WALL_FADE[1], "rgba(0, 0, 0, 0)")
+    fade.addColorStop(1, "rgba(0, 0, 0, 0)")
+    layer.globalCompositeOperation = "destination-in"
+    layer.fillStyle = fade
+    layer.fillRect(0, 0, WIDTH, HEIGHT)
+    ctx.drawImage(walls, 0, 0)
     return canvas
 }
 
