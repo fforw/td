@@ -27,6 +27,11 @@ const GLOW_HIGH = "#2a3a6a"
 const DARK = "#040406"
 
 /**
+ * Color straight up, where the glow has faded to a few percent luminance
+ */
+const GLOW_TOP = "#262c40"
+
+/**
  * Color of the wall segments cutting through the glow
  */
 const WALL = "#08080b"
@@ -95,8 +100,7 @@ function drawEnvironment(): HTMLCanvasElement
     // the top row is straight up, the middle one the horizon
     const horizon = HEIGHT / 2
     const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
-    sky.addColorStop(0, DARK)
-    sky.addColorStop(0.22, DARK)
+    sky.addColorStop(0, GLOW_TOP)
     sky.addColorStop(0.34, GLOW_HIGH)
     sky.addColorStop(0.46, GLOW)
     sky.addColorStop(0.54, "#1c3a34")
