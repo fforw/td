@@ -1015,6 +1015,12 @@ person: a trader, a stranger with a message, a prisoner who begs.
   placing and baking 30 of them took about 0.55 s in the worker. A changed wall
   means rebaking the lights within `MAX_INFLUENCE` of it, and their shadows
   reach up to twice as far. Not done yet.
+- Metal reflects a drawn environment instead of the level: a spooky green
+  glow around the horizon, cut by dark wall segments
+  (`render/dungeonEnvironment.ts`). It goes on the metallic materials of our
+  own models as they load, not on the whole scene, which would light the
+  dark up. The Kenney kits mark things as metal that are not, so their
+  metalness is set to 0.
 - Half of the rooms get a pattern over their floor from the
   Kenney Pattern Pack, low in contrast, to vary them a little
   (`render/floorPatterns.ts`). Every face is a tile of the pattern. The
