@@ -27,9 +27,19 @@ const GLOW_HIGH = "#2a3a6a"
 const DARK = "#040406"
 
 /**
- * Color straight up, where the glow has faded to a few percent luminance
+ * Color of the mist between the glow and the dark straight up, a gray tinted by the glow
  */
-const GLOW_TOP = "#262c40"
+const MIST = "#1a2624"
+
+/**
+ * Color of the wisps in the mist, without the opacity
+ */
+const WISP = "120, 160, 150"
+
+/**
+ * Number of wisps in the mist
+ */
+const WISPS = 40
 
 /**
  * Color of the wall segments cutting through the glow
@@ -100,14 +110,40 @@ function drawEnvironment(): HTMLCanvasElement
     // the top row is straight up, the middle one the horizon
     const horizon = HEIGHT / 2
     const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
-    sky.addColorStop(0, GLOW_TOP)
-    sky.addColorStop(0.34, GLOW_HIGH)
+    sky.addColorStop(0, DARK)
+    sky.addColorStop(0.06, DARK)
+    sky.addColorStop(0.24, MIST)
+    sky.addColorStop(0.36, GLOW_HIGH)
     sky.addColorStop(0.46, GLOW)
     sky.addColorStop(0.54, "#1c3a34")
     sky.addColorStop(0.62, DARK)
     sky.addColorStop(1, DARK)
     ctx.fillStyle = sky
     ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+    // wisps make the mist above the glow uneven, thicker near the glow and thinning out towards the top. They have a
+    // generator of their own, so they leave the wall segments where they are.
+    const mist = generator(SEED + 1)
+    for (let i = 0; i < WISPS; i++)
+    {
+        const x = mist() * WIDTH
+        const height = HEIGHT * (0.06 + 0.32 * Math.sqrt(mist()))
+        const radius = WIDTH * (0.02 + mist() * 0.06)
+        const opacity = (0.04 + mist() * 0.1) * (height / HEIGHT / 0.38)
+        for (const offset of [-WIDTH, 0, WIDTH])
+        {
+            ctx.save()
+            ctx.translate(x + offset, height)
+            // stretched sideways, as the map is around the circle what it is up and down
+            ctx.scale(2 + mist() * 2, 1)
+            const wisp = ctx.createRadialGradient(0, 0, 0, 0, 0, radius)
+            wisp.addColorStop(0, `rgba(${WISP}, ${opacity.toFixed(3)})`)
+            wisp.addColorStop(1, `rgba(${WISP}, 0)`)
+            ctx.fillStyle = wisp
+            ctx.fillRect(-radius, -radius, radius * 2, radius * 2)
+            ctx.restore()
+        }
+    }
 
     // the glow swells and ebbs around the horizon
     const random = generator(SEED)
