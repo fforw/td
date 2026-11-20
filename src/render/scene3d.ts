@@ -60,6 +60,7 @@ export const MODELS = {
     brute: "monster/brute.glb",
     flyingEye: "monster/flying-eye.glb",
     soldier: "monster/soldier.glb",
+    wizard: "monster/wizard.glb",
     chest: "treasure/chest.glb",
     coin: "treasure/coin.glb",
     healthPotion: "treasure/health-potion.glb",
