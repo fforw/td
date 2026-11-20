@@ -163,6 +163,17 @@ export abstract class MonsterPack<M extends Monster = Monster>
     protected abstract struck(monster: M, dx: number, dz: number, distance: number): void
 
     /**
+     * Returns whether a monster stops a blow, e.g. with a shield, which leaves it unhurt. By default none does.
+     *
+     * @param dx        direction of the blow in world units, from the one with the sword to the monster
+     * @param dz        direction of the blow in world units
+     */
+    protected stops(_monster: M, _dx: number, _dz: number): boolean
+    {
+        return false
+    }
+
+    /**
      * Has a monster that died go its way, the default bursts all of it
      *
      * @param away  direction of the blow as a meeple facing
@@ -214,6 +225,13 @@ export abstract class MonsterPack<M extends Monster = Monster>
             if (within && this.floor.sees(x, z, monster.x, monster.z))
             {
                 hits++
+                if (this.stops(monster, dx, dz))
+                {
+                    monster.chase = CHASE_TIME
+                    monster.goalX = x
+                    monster.goalZ = z
+                    continue
+                }
                 monster.hp -= damage
                 if (monster.hp <= 0)
                 {
