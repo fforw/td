@@ -906,7 +906,15 @@ person: a trader, a stranger with a message, a prisoner who begs.
   guard, while the arms give way to swinging and guarding. Each clip of the
   model has only the bones its action moves, as the export leaves out the
   rest, or a guard would hold the body still.
-- For now cuboids, eyes, brutes and soldiers are placed in some rooms by the spawn
+- The wizard (`monster/wizards.ts`) is a placeholder so far: it wanders, walks
+  up to heroes it sees but stops 1.5 figure sizes away, and does no harm. Its
+  model has only the soldier's walk, with the staff swaying against the hips
+  like the sword. Wizards differ by the color of their robe: the robe of the
+  model is a gradient from white at the head to middle grey at the hem, which
+  `WizardCrowd` tints with one of `ROBE_COLORS` per wizard, through the colors
+  by material name that `skinnedFigure()` takes. The face in the hood is dark
+  with glowing eyes from an emissive map, which the light field leaves alone.
+- For now cuboids, eyes, brutes, soldiers and wizards are placed in some rooms by the spawn
   planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in
   the unexplored parts, and whatever lived on known floor is gone for good,
@@ -1129,8 +1137,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   and their place in its group.
 - For now the groups are the old kinds on their own, weighted like the
   shares of rooms they took before (`SPAWN_GROUPS`): a big cuboid, 1 to 3
-  small ones, an eye, a pair of eyes, a brute, and 1 or 2 soldiers, as
-  often as a brute. 42% of the open rooms are
+  small ones, an eye, a pair of eyes, a brute, 1 or 2 soldiers, as
+  often as a brute, and a wizard, a bit less often. 42% of the open rooms are
   taken, about as many as had any monster before. Mixes are gone until
   groups bring them back on purpose.
 - Next: groups of mixed kinds, like a brute with an eye watching for it,
