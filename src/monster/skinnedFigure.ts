@@ -20,8 +20,13 @@ export interface SkinnedFigure
 /**
  * Returns a copy of a rigged model, drawn with the silhouettes of a MeepleCrowd which shows them. The model must be loaded
  * first.
+ *
+ * @param name      model
+ * @param field     light field
+ * @param colors    colors for materials of the model by their names, in place of the colors they have there, as in
+ *                  { Robe: blue }. A texture on such a material is tinted with the color, so it should be light.
  */
-export function skinnedFigure(name: ModelName, field: LightField): SkinnedFigure
+export function skinnedFigure(name: ModelName, field: LightField, colors: Readonly<Record<string, Color>> = {}): SkinnedFigure
 {
     const root = model(name)
     const rim = createSilhouetteMaterial(1, SILHOUETTE_RIM)
@@ -35,6 +40,11 @@ export function skinnedFigure(name: ModelName, field: LightField): SkinnedFigure
     {
         // the flash and the light field belong to this figure
         const material = (mesh.material as MeshStandardMaterial).clone()
+        const color = colors[material.name]
+        if (color)
+        {
+            material.color.copy(color)
+        }
         applyLightField(material, field)
         bodies.push({ material, color: material.color.clone(), mesh })
         mesh.material = material
