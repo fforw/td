@@ -1,24 +1,12 @@
-import {
-    type AnimationAction,
-    AnimationClip,
-    type Bone,
-    AnimationMixer,
-    type Color,
-    Group,
-    LoopOnce,
-    type MeshBasicMaterial,
-    type MeshStandardMaterial,
-    type Object3D,
-    SkinnedMesh
-} from "three"
-import { createSilhouetteMaterial, LEVEL_MEEPLE_SCALE, NO_SILHOUETTE, SILHOUETTE_FILL, SILHOUETTE_RIM } from "../meeple/Meeple3D"
+import { type AnimationAction, AnimationClip, type Bone, AnimationMixer, Group, LoopOnce } from "three"
+import { LEVEL_MEEPLE_SCALE, NO_SILHOUETTE } from "../meeple/Meeple3D"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { applyLightField, type LightField } from "../render/dungeonLighting"
-import { animations, model } from "../render/scene3d"
+import type { LightField } from "../render/dungeonLighting"
+import { animations } from "../render/scene3d"
 import { type Brute, ATTACK_TIME } from "./brutes"
 import type Bursts from "./bursts"
 import type { Death } from "./bursts"
-import { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
+import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
 
 /**
  * World units walked in one loop of the walk clip, so that the feet keep up with the ground
@@ -47,17 +35,12 @@ const FPS = 24
 const CLUB_LANDED = 10
 
 
-interface Figure
+interface Figure extends SkinnedFigure
 {
-    root: Object3D
     mixer: AnimationMixer
     walk: AnimationAction
     attack: AnimationAction
     die: AnimationAction
-    /** lit materials with their own colors, and their meshes */
-    bodies: { material: MeshStandardMaterial, color: Color, mesh: SkinnedMesh }[]
-    rim: MeshBasicMaterial
-    fill: MeshBasicMaterial
     walking: boolean
     attacking: boolean
     /** how it died, null while it lives */
@@ -179,7 +162,7 @@ export default class BruteCrowd
     private pose(brute: Brute, figure: Figure, delta: number): void
     {
         const { kind, x, z, yaw, walked, moving, attack, flash, chase } = brute
-        const { root, mixer, walk, bodies, rim, fill } = figure
+        const { root, mixer, walk } = figure
 
         root.position.set(x, 0, z)
         root.rotation.y = yaw
@@ -219,46 +202,13 @@ export default class BruteCrowd
             figure.attack.time = Math.min(attack, ATTACK_TIME)
         }
         mixer.update(delta)
-
-        const color = flash > 0 ? FLASH : PLAIN
-        for (const body of bodies)
-        {
-            body.material.color.copy(body.color).multiply(color)
-        }
-        const silhouette = chase > 0 ? SILHOUETTE : NO_SILHOUETTE
-        rim.color.copy(silhouette)
-        fill.color.copy(silhouette).multiplyScalar(SILHOUETTE_FILL)
+        tintFigure(figure, flash, chase)
     }
 
     private createFigure(): Figure
     {
-        const root = model("brute")
-        const rim = createSilhouetteMaterial(1, SILHOUETTE_RIM)
-        const fill = createSilhouetteMaterial(SILHOUETTE_FILL, 0)
-        const bodies: Figure["bodies"] = []
-
-        // glTF makes one mesh per material
-        const meshes: SkinnedMesh[] = []
-        root.traverse(obj => (obj as SkinnedMesh).isSkinnedMesh && meshes.push(obj as SkinnedMesh))
-        for (const mesh of meshes)
-        {
-            // the flash and the light field belong to this brute
-            const material = (mesh.material as MeshStandardMaterial).clone()
-            applyLightField(material, this.field)
-            bodies.push({ material, color: material.color.clone(), mesh })
-            mesh.material = material
-            mesh.frustumCulled = false
-
-            // all rims before all fills, see MeepleCrowd.showSilhouettes()
-            for (const [shape, order] of [[rim, -2], [fill, -1]] as const)
-            {
-                const silhouette = new SkinnedMesh(mesh.geometry, shape)
-                silhouette.bind(mesh.skeleton, mesh.bindMatrix)
-                silhouette.renderOrder = order
-                silhouette.frustumCulled = false
-                mesh.add(silhouette)
-            }
-        }
+        const figure = skinnedFigure("brute", this.field)
+        const { root } = figure
 
         const clips = [...animations("brute")]
         const mixer = new AnimationMixer(root)
@@ -274,7 +224,7 @@ export default class BruteCrowd
         attack.setLoop(LoopOnce, 1)
         attack.clampWhenFinished = true
         return {
-            root, mixer, walk, attack, die, bodies, rim, fill,
+            ...figure, mixer, walk, attack, die,
             walking: false, attacking: false, death: null, dead: 0, burst: 0
         }
     }

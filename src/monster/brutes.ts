@@ -1,6 +1,6 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey } from "./monsters"
+import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, turnBetween, turnTo } from "./monsters"
 
 const TAU = Math.PI * 2
 
@@ -85,16 +85,6 @@ export interface Brute extends Monster
     moving: boolean
     /** seconds until it looks around again */
     lookWait: number
-}
-
-
-/**
- * Returns the angle in (-PI, PI] to turn by from one facing to another
- */
-function turnBetween(from: number, to: number): number
-{
-    const turn = to - from
-    return Math.atan2(Math.sin(turn), Math.cos(turn))
 }
 
 
@@ -201,7 +191,7 @@ export default class BrutePack extends MonsterPack<Brute>
         const now = before + delta
         if (before < AIM_TIME && brute.chase > 0)
         {
-            this.turnTo(brute, brute.goalX, brute.goalZ, delta)
+            turnTo(brute, brute.goalX, brute.goalZ, TURN_RATE * delta)
         }
         brute.impact = before < IMPACT_TIME && now >= IMPACT_TIME
         brute.attack = now < ATTACK_TIME ? now : null
@@ -246,7 +236,7 @@ export default class BrutePack extends MonsterPack<Brute>
             brute.wandering = false
             return
         }
-        this.turnTo(brute, brute.goalX, brute.goalZ, delta)
+        turnTo(brute, brute.goalX, brute.goalZ, TURN_RATE * delta)
 
         const step = Math.min(kind.speed * delta, distance - stop)
         const { x, z } = brute
@@ -259,17 +249,5 @@ export default class BrutePack extends MonsterPack<Brute>
         {
             brute.wandering = false
         }
-    }
-
-    private turnTo(brute: Brute, x: number, z: number, delta: number): void
-    {
-        const dx = x - brute.x, dz = z - brute.z
-        if (dx === 0 && dz === 0)
-        {
-            return
-        }
-        const turn = turnBetween(brute.yaw, Math.atan2(dx, dz))
-        const most = TURN_RATE * delta
-        brute.yaw += Math.max(-most, Math.min(most, turn))
     }
 }

@@ -99,6 +99,29 @@ export function inTheWay(a: MonsterKind, b: MonsterKind): boolean
     return a.flying === b.flying || (a.flying ? b.big : a.big)
 }
 
+/**
+ * Returns the angle in (-PI, PI] to turn by from one facing to another
+ */
+export function turnBetween(from: number, to: number): number
+{
+    const turn = to - from
+    return Math.atan2(Math.sin(turn), Math.cos(turn))
+}
+
+/**
+ * Turns a monster towards a point, by at most the given angle
+ */
+export function turnTo(monster: Monster, x: number, z: number, most: number): void
+{
+    const dx = x - monster.x, dz = z - monster.z
+    if (dx === 0 && dz === 0)
+    {
+        return
+    }
+    const turn = turnBetween(monster.yaw, Math.atan2(dx, dz))
+    monster.yaw += Math.max(-most, Math.min(most, turn))
+}
+
 
 /**
  * Monsters of one sort in a level. Plain state without the scene, which shows them and tells what the walls allow.
