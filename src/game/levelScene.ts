@@ -31,6 +31,8 @@ import EyeCrowd from "../monster/EyeCrowd"
 import EyePack from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
+import SoldierCrowd from "../monster/SoldierCrowd"
+import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
@@ -389,6 +391,8 @@ export default class LevelScene
     private eyeCrowd: EyeCrowd | null = null
     private brutes: BrutePack | null = null
     private bruteCrowd: BruteCrowd | null = null
+    private soldiers: SoldierPack | null = null
+    private soldierCrowd: SoldierCrowd | null = null
     private readonly bursts = new Bursts()
     private burstCrowd: BurstCrowd | null = null
     private readonly marks = new HeroMarks()
@@ -499,7 +503,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "soldier", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -640,6 +644,7 @@ export default class LevelScene
         const cuboids = new CuboidPack(floor)
         const eyes = new EyePack(floor)
         const brutes = new BrutePack(floor)
+        const soldiers = new SoldierPack(floor)
         for (const spawn of spawns)
         {
             const [x, z] = faceCenter(world, spawn.face)
@@ -654,21 +659,27 @@ export default class LevelScene
                 case "brute":
                     brutes.add(spawn.kind, spawn.face, x, z)
                     break
+                case "soldier":
+                    soldiers.add(spawn.kind, spawn.face, x, z)
+                    break
             }
         }
 
         const cuboidCrowd = new CuboidCrowd(mostCuboids(spawns.flatMap(spawn => spawn.species === "cuboid" ? [spawn.kind] : [])), field)
         const eyeCrowd = new EyeCrowd(spawns.filter(({ species }) => species === "eye").length, field)
         const bruteCrowd = new BruteCrowd(field)
-        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group)
+        const soldierCrowd = new SoldierCrowd(field)
+        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
         this.eyes = eyes
         this.eyeCrowd = eyeCrowd
         this.brutes = brutes
         this.bruteCrowd = bruteCrowd
+        this.soldiers = soldiers
+        this.soldierCrowd = soldierCrowd
 
-        this.monsters = new Monsters([cuboids, eyes, brutes], floor)
+        this.monsters = new Monsters([cuboids, eyes, brutes, soldiers], floor)
         const burstCrowd = new BurstCrowd(field)
         this.scene.add(burstCrowd.mesh)
         this.burstCrowd = burstCrowd
@@ -1418,6 +1429,7 @@ export default class LevelScene
         }
         // brutes keep their club a while
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)
+        this.soldierCrowd!.update(this.soldiers!.members, delta)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }

@@ -2,6 +2,7 @@ import type Prando from "prando"
 import { BRUTE, type BruteKind } from "./brutes"
 import { BIG_CUBOID, type CuboidKind, SMALL_CUBOID } from "./cuboids"
 import { type EyeKind, FLYING_EYE } from "./eyes"
+import { SOLDIER, type SoldierKind } from "./soldiers"
 
 /**
  * Kinds of monster each pack of a level takes, by the name of the species
@@ -11,6 +12,7 @@ export interface SpeciesKinds
     cuboid: CuboidKind
     eye: EyeKind
     brute: BruteKind
+    soldier: SoldierKind
 }
 
 export type Species = keyof SpeciesKinds
@@ -70,7 +72,8 @@ export const SPAWN_GROUPS: readonly SpawnGroup[] = [
     { name: "small cuboids", weight: 15, members: [{ species: "cuboid", kind: SMALL_CUBOID, min: 1, max: 3 }] },
     { name: "eye", weight: 7.5, members: [{ species: "eye", kind: FLYING_EYE, min: 1, max: 1 }] },
     { name: "eye pair", weight: 2.5, members: [{ species: "eye", kind: FLYING_EYE, min: 2, max: 2 }] },
-    { name: "brute", weight: 8, members: [{ species: "brute", kind: BRUTE, min: 1, max: 1 }] }
+    { name: "brute", weight: 8, members: [{ species: "brute", kind: BRUTE, min: 1, max: 1 }] },
+    { name: "soldiers", weight: 8, members: [{ species: "soldier", kind: SOLDIER, min: 1, max: 2 }] }
 ]
 
 

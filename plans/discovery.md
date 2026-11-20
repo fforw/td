@@ -889,7 +889,24 @@ person: a trader, a stranger with a message, a prisoner who begs.
   Blender: each brute has its own rigged copy with an AnimationMixer
   (`BruteCrowd`), the walk following the ground covered and the attack the
   time into the swing, so they are for few at a time.
-- For now cuboids, eyes and brutes are placed in some rooms by the spawn
+- The soldier (`monster/soldiers.ts`) walks after heroes a bit slower than
+  they run, takes 4 sword blows and swings a sword that hurts for 3 in front,
+  which a shield stops. After each swing, and when struck while not swinging,
+  it holds up its own shield for 1 to 2.5 seconds, turning after the hero and
+  closing in slowly, then lowers it and swings again once it is all the way
+  down. A blow from within 135 degrees in front of it does nothing once the
+  shield is 60% up, so the way in is from the side or behind, or during the
+  swing. Blocking is a mode, not a move: the state keeps how far up the
+  shield is, and `SoldierCrowd` takes the time into the block clip from that,
+  the first half going up and holding at its middle, the second half coming
+  down from as far as it got. Swing and block never overlap and start and end
+  at rest, so neither fades. A monster that stops a blow says so with
+  `MonsterPack.stops()`. The walk follows the ground covered, at the pace it
+  was made for at full speed. It splits by bone: the body walks on beneath a
+  guard, while the arms give way to swinging and guarding. Each clip of the
+  model has only the bones its action moves, as the export leaves out the
+  rest, or a guard would hold the body still.
+- For now cuboids, eyes, brutes and soldiers are placed in some rooms by the spawn
   planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in
   the unexplored parts, and whatever lived on known floor is gone for good,
@@ -1112,7 +1129,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   and their place in its group.
 - For now the groups are the old kinds on their own, weighted like the
   shares of rooms they took before (`SPAWN_GROUPS`): a big cuboid, 1 to 3
-  small ones, an eye, a pair of eyes, a brute. 42% of the open rooms are
+  small ones, an eye, a pair of eyes, a brute, and 1 or 2 soldiers, as
+  often as a brute. 42% of the open rooms are
   taken, about as many as had any monster before. Mixes are gone until
   groups bring them back on purpose.
 - Next: groups of mixed kinds, like a brute with an eye watching for it,
