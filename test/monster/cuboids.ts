@@ -11,7 +11,8 @@ import CuboidPack, {
     MIN_SPLIT,
     mostCuboids,
     SMALL_CUBOID,
-    splitShare
+    splitShare,
+    TOUCH_SLACK
 } from "../../src/monster/cuboids"
 import Monsters, { CHASE_TIME, HERO_RADIUS, HURT_WAIT, type MonsterFloor, NOTICE_DISTANCE, type Prey } from "../../src/monster/monsters"
 
@@ -104,8 +105,9 @@ describe("Acid cuboids", () => {
 
             const cuboids = pack()
             const small = cuboids.add(SMALL_CUBOID, 0, 2, 0)
-            run(cuboids, 4, [prey()])
-            assert(Math.hypot(small.x, small.z) <= SMALL_CUBOID.radius + HERO_RADIUS)
+            const hero = prey()
+            run(cuboids, 4, [hero])
+            assert(Math.hypot(small.x - hero.x, small.z - hero.z) <= (SMALL_CUBOID.radius + HERO_RADIUS) * TOUCH_SLACK)
         })
 
         it("don't notice those too far away", () => {
@@ -241,7 +243,7 @@ describe("Acid cuboids", () => {
         it("does nothing without touching", () => {
 
             const cuboids = pack()
-            cuboids.add(BIG_CUBOID, 0, BIG_CUBOID.radius + HERO_RADIUS + 0.01, 0)
+            cuboids.add(BIG_CUBOID, 0, (BIG_CUBOID.radius + HERO_RADIUS) * TOUCH_SLACK + 0.01, 0)
             assert(hurt(cuboids, prey()) === 0)
         })
 

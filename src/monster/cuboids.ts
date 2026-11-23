@@ -37,6 +37,12 @@ const WANDER_LENGTH = 0.5
 const CLOSE_IN = 0.9
 
 /**
+ * How far off a cuboid still touches a hero, as a multiple of the distance where they meet, as bumping keeps it from getting
+ * any closer
+ */
+export const TOUCH_SLACK = 1.1
+
+/**
  * How far and how long a cuboid hops away when hit or blocked, in world units and seconds
  */
 const RECOIL_LENGTH = 0.3 * FIGURE_SCALE
@@ -249,7 +255,7 @@ export default class CuboidPack extends MonsterPack<Cuboid>
             const { kind, x, z } = cuboid
             const dx = x - hero.x, dz = z - hero.z
             const distance = Math.hypot(dx, dz)
-            if (distance >= kind.radius + HERO_RADIUS || !this.floor.sees(hero.x, hero.z, x, z))
+            if (distance >= (kind.radius + HERO_RADIUS) * TOUCH_SLACK || !this.floor.sees(hero.x, hero.z, x, z))
             {
                 continue
             }
