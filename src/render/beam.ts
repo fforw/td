@@ -30,32 +30,32 @@ import { GLOW_LAYER, OVERLAY_LAYER, UNDERLAY_LAYER } from "./glowPass"
 /**
  * Number of segments along the ribbon, for its wobble
  */
-const SEGMENTS = 48
+const SEGMENTS = 12
 
 /**
  * How bright the core and the halo are at full strength. Above 1 they bloom.
  */
-const CORE_INTENSITY = 3
-const HALO_INTENSITY = 2.8
+const CORE_INTENSITY = 2.5
+const HALO_INTENSITY = 2.1
 
 /**
  * How far the core goes towards white
  */
-const CORE_WHITE = 0.6
+const CORE_WHITE = 0.4
 
 /**
  * Size of the flares in units of the beam width, at the staff and where the beam hits
  */
-const TIP_FLARE = 2.2
-const HIT_FLARE = 5
+const TIP_FLARE = 1.2
+const HIT_FLARE = 3
 
 /**
  * Width of the fringe in units of the beam width, and how much its pixels cover what is behind them. It is blended
  * normally in the color of the beam, so the beam keeps its color on bright floors, where adding light only makes them
  * white. Its pixels have hard edges, which the bloom doesn't wash out like a soft fringe.
  */
-const FRINGE_SPREAD = 1.8
-const FRINGE_OPACITY = 0.9
+const FRINGE_SPREAD = 1.6
+const FRINGE_OPACITY = 0.75
 
 /**
  * Size of the colored spot under the flare where the beam hits, in units of the flare
