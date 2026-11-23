@@ -83,6 +83,47 @@ const PIXEL_CORE = 0.1
 const PIXEL_ROWS = [0.5, 0.22]
 
 /**
+ * Shells around the core, hollow tubes with a pattern of spots on them in the colors of the beam, from the inside out:
+ * their diameter in beam widths, how many of them the spots cover, from 0 to 1, how fast they spin in turns per second,
+ * how far the hue of the whole shell turns around the circle from that of the beam, one of them at random each time the
+ * beam fires, and how much of the opacity of the shells they have. They spin against each other.
+ */
+const SHELLS = [
+    { spread: 0.5, cover: 0.45, spin: 0.45, hues: [1 / 3, -1 / 3, 1 / 2], opacity: 0.7 },
+    { spread: 0.7, cover: 0.55, spin: -0.25, hues: [0], opacity: 0.9 }
+]
+
+/**
+ * Size of the spots of the shells in beam widths, and how fast they run from the staff to where it hits in beam widths
+ * per second
+ */
+const SHELL_CELL = 0.5
+const SHELL_FLOW = 4
+
+/**
+ * How fast the spots change their shape, in sizes of a spot per second
+ */
+const SHELL_MORPH = 1.6
+
+/**
+ * How much the spots cover what is behind them where the shell faces the camera, at most where it is seen edge-on, and
+ * how much of that its back keeps
+ */
+const SHELL_OPACITY = 0.7
+const SHELL_OPACITY_EDGE = 0.95
+const SHELL_BACK = 0.6
+
+/**
+ * How far the hue of the spots varies in radians
+ */
+const SHELL_HUE = 0.1
+
+/**
+ * Looks of the beam around its glow: pixels along both sides of its core, or shells around it
+ */
+export type BeamLook = "pixels" | "shell"
+
+/**
  * Number of sparks there can be at once, and how many fly off per second at full strength
  */
 const SPARKS = 96
@@ -115,6 +156,7 @@ varying vec2 vUv;
 varying float vAlong;
 varying float vAcross;
 varying float vHalfWidth;
+varying float vSlant;
 
 void main()
 {
@@ -133,7 +175,16 @@ void main()
 
     vAcross = (uv.x - 0.5) * w;
     vHalfWidth = 0.5 * w;
-    gl_Position = projectionMatrix * viewMatrix * vec4(at + side * vAcross, 1.0);
+    vec3 position = at + side * vAcross;
+    gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+
+    // how far along the beam a point moves for each step towards the camera, seen through this one, as the camera looks at
+    // the beam at a slant
+    vec3 dir = axis / len;
+    vec3 view = normalize(position - cameraPosition);
+    vec3 toCamera = normalize(cross(side, dir));
+    toCamera *= sign(dot(cameraPosition - at, toCamera));
+    vSlant = dot(view, dir) / min(dot(view, toCamera), -0.05);
 }
 `
 
@@ -237,6 +288,103 @@ void main()
 }
 `
 
+/**
+ * One side of a hollow tube around the core, which the ribbon stands in for. Each point of the ribbon sees the tube at
+ * one point in front of the axis and one behind it. Where that is around the tube is measured from the camera, so where
+ * the pattern doesn't meet up is straight behind the core.
+ */
+const SHELL = /* glsl */ `
+${UNIFORMS}
+${NOISE}
+
+uniform float spread;
+uniform float hueTurn;
+
+varying float vAcross;
+varying float vHalfWidth;
+varying float vSlant;
+
+vec4 mod289(vec4 x)
+{
+    return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 perm(vec4 x)
+{
+    return mod289(((x * 34.0) + 1.0) * x);
+}
+
+/**
+ * Noise that changes with z, so going through it over time changes the spots instead of moving them. It hashes with
+ * permutations instead of sin, which stays the same on all GPUs.
+ */
+float noise3(vec3 p)
+{
+    vec3 a = floor(p);
+    vec3 d = p - a;
+    d = d * d * (3.0 - 2.0 * d);
+    // the pattern repeats every 289 cells anyway, so the hashes stay exact as the time grows
+    a -= floor(a * (1.0 / 289.0)) * 289.0;
+
+    vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 k1 = perm(b.xyxy);
+    vec4 k2 = perm(k1.xyxy + b.zzww);
+
+    vec4 c = k2 + a.zzzz;
+    vec4 k3 = perm(c);
+    vec4 k4 = perm(c + 1.0);
+
+    vec4 o1 = fract(k3 * (1.0 / 41.0));
+    vec4 o2 = fract(k4 * (1.0 / 41.0));
+
+    vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
+    vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
+
+    return o4.y * d.y + o4.x * (1.0 - d.y);
+}
+
+vec3 hueShift(vec3 c, float angle)
+{
+    vec3 k = vec3(0.57735);
+    float cosA = cos(angle);
+    return c * cosA + cross(k, c) * sin(angle) + k * dot(k, c) * (1.0 - cosA);
+}
+
+void main()
+{
+    // the edge of the ribbon is the edge of the tube, which wobbles with it. z goes towards the camera.
+    float x = clamp(vAcross / vHalfWidth, -1.0, 1.0);
+    float z = sqrt(1.0 - x * x);
+#ifdef BACK
+    z = -z;
+#endif
+    float angle = atan(x, z);
+
+    // the spots on the tube, which stay the same size as it wobbles, run along and spin around it
+    float radius = width * spread * 0.5;
+    float along = vAlong + vSlant * z * vHalfWidth;
+    float size = width * ${SHELL_CELL.toFixed(3)};
+    vec2 p = vec2((angle + time * SPIN) * radius, along - time * width * ${SHELL_FLOW.toFixed(2)}) / size;
+    float morph = time * ${SHELL_MORPH.toFixed(3)};
+    p += SEED;
+    float n = noise3(vec3(p, morph)) * 0.65 + noise3(vec3(p * 2.3 + 17.0, morph * 1.7)) * 0.35;
+    if (n < 1.0 - COVER || strength < 0.05)
+    {
+        discard;
+    }
+
+    // seen edge-on it covers more
+    float hue = noise(p * 0.35 + 5.0) - 0.5;
+    vec3 shade = hueShift(color, hue * 2.0 * ${SHELL_HUE.toFixed(3)} + hueTurn);
+    shade = mix(shade, core, step(0.85, n) * 0.5);
+    float alpha = min(${SHELL_OPACITY.toFixed(3)} / max(abs(z), 0.1), ${SHELL_OPACITY_EDGE.toFixed(3)}) * OPACITY * strength;
+#ifdef BACK
+    alpha *= ${SHELL_BACK.toFixed(3)} * strength;
+#endif
+    gl_FragColor = vec4(shade, alpha);
+}
+`
+
 let flareTexture: DataTexture | undefined
 
 /**
@@ -296,7 +444,11 @@ export default class Beam
     private readonly color = new Color()
     private readonly material: ShaderMaterial
     private readonly fringeMaterial: ShaderMaterial
+    private readonly shellMaterials: ShaderMaterial[]
     private readonly ribbon: Mesh
+    private readonly fringe: Mesh
+    private readonly shells: Mesh[]
+    private currentLook: BeamLook = "shell"
     private readonly tipFlare = flareSprite()
     private readonly hitFlare = flareSprite()
     private readonly hitFringe = fringeSprite()
@@ -308,6 +460,7 @@ export default class Beam
     private readonly sparkLives = new Float32Array(SPARKS)
     private readonly sparks: Points
     private sparkDue = 0
+    private fired = false
 
     /**
      * @param color     color of the halo
@@ -345,12 +498,37 @@ export default class Beam
             transparent: true,
             side: DoubleSide
         })
+        // the backs under the glow, the outer one first, and the fronts over it, the outer one last
+        this.shellMaterials = SHELLS.flatMap(({ spread, cover, spin, opacity }, index) => [true, false].map(back => new ShaderMaterial({
+            uniforms: { ...uniforms, spread: { value: spread }, hueTurn: { value: 0 } },
+            defines: {
+                ...back ? { BACK: 1 } : {},
+                COVER: cover.toFixed(3),
+                SPIN: (spin * 2 * Math.PI).toFixed(3),
+                OPACITY: opacity.toFixed(3),
+                SEED: (index * 31.7).toFixed(1)
+            },
+            vertexShader: VERTEX,
+            fragmentShader: SHELL,
+            blending: NormalBlending,
+            depthWrite: false,
+            transparent: true,
+            side: DoubleSide
+        })))
         const ribbon = this.ribbon = new Mesh(geometry, this.material)
-        const fringe = new Mesh(geometry, this.fringeMaterial)
+        const fringe = this.fringe = new Mesh(geometry, this.fringeMaterial)
+        const shells = this.shells = this.shellMaterials.map(material => new Mesh(geometry, material))
         // placed by the shader. Without a GlowPass the pixels go under the light, with one over it.
         ribbon.frustumCulled = fringe.frustumCulled = false
         ribbon.renderOrder = 2
         fringe.renderOrder = 1
+        shells.forEach((shell, i) =>
+        {
+            const index = i >> 1
+            const back = i % 2 === 0
+            shell.frustumCulled = false
+            shell.renderOrder = back ? 1 - index : 3 + index
+        })
 
         const sparkGeometry = new BufferGeometry()
         sparkGeometry.setAttribute("position", new BufferAttribute(this.sparkPositions, 3))
@@ -365,7 +543,7 @@ export default class Beam
         this.sparks.renderOrder = 2
 
         this.hitLight.distance = this.tipLight.distance = width * LIGHT_RANGE
-        this.group.add(fringe, ribbon, this.tipFlare, this.hitFringe, this.hitFlare, this.sparks, this.hitLight, this.tipLight)
+        this.group.add(fringe, ...shells, ribbon, this.tipFlare, this.hitFringe, this.hitFlare, this.sparks, this.hitLight, this.tipLight)
         if (layered)
         {
             // the lights stay where the scene is
@@ -374,9 +552,26 @@ export default class Beam
                 glow.layers.set(GLOW_LAYER)
             }
             fringe.layers.set(OVERLAY_LAYER)
+            shells.forEach((shell, i) => shell.layers.set(i % 2 === 0 ? UNDERLAY_LAYER : OVERLAY_LAYER))
             this.hitFringe.layers.set(UNDERLAY_LAYER)
         }
         this.setColor(color)
+        this.look = this.currentLook
+    }
+
+    get look(): BeamLook
+    {
+        return this.currentLook
+    }
+
+    set look(look: BeamLook)
+    {
+        this.currentLook = look
+        this.fringe.visible = look === "pixels"
+        for (const shell of this.shells)
+        {
+            shell.visible = look === "shell"
+        }
     }
 
     setColor(color: Color): void
@@ -407,6 +602,18 @@ export default class Beam
         uniforms.from.value.copy(from)
         uniforms.to.value.copy(to)
         uniforms.strength.value = strength
+
+        // the shells turn their hue anew each time it fires, the back and the front of each the same
+        if (strength > 0 && !this.fired)
+        {
+            SHELLS.forEach(({ hues }, index) =>
+            {
+                const turn = hues[Math.floor(Math.random() * hues.length)] * 2 * Math.PI
+                this.shellMaterials[index * 2].uniforms.hueTurn.value = turn
+                this.shellMaterials[index * 2 + 1].uniforms.hueTurn.value = turn
+            })
+        }
+        this.fired = strength > 0
         uniforms.time.value = time
 
         // the flares flicker a little, the one where it hits more
@@ -478,6 +685,10 @@ export default class Beam
     {
         this.material.dispose()
         this.fringeMaterial.dispose()
+        for (const material of this.shellMaterials)
+        {
+            material.dispose()
+        }
         this.hitFringe.material.dispose()
         this.tipFlare.material.dispose()
         this.hitFlare.material.dispose()
