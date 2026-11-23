@@ -860,7 +860,9 @@ person: a trader, a stranger with a message, a prisoner who begs.
   left of it goes on as a shove, or when a wall stops more than half of it,
   and the hero bounces off with 0.3 of what the wall stopped. Grazing a wall
   slides along it. The dodge and the wait for the next dash go on as they
-  were.
+  were, so dashing into a cuboid doesn't hurt either: the dash is the
+  dodge for all monsters alike, and the risk is in being bounced off it
+  and still touching it once the dodge runs out.
 - A monster that dies bursts into small cubes (`monster/bursts.ts`), as a
   fallback until monsters get ways of dying of their own. Each kind gives its
   rough volume as a few spheres scaled along the axes of the model, with the
