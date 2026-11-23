@@ -199,7 +199,9 @@ void main()
  */
 const FRINGE = /* glsl */ `
 ${UNIFORMS}
-${NOISE}
+${NOISE} ` +
+    // language=glsl
+    `
 
 uniform float spread;
 
