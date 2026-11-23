@@ -135,6 +135,19 @@ describe("Bumping", () => {
         assert.isBelow(brute.shoveZ, soldier.shoveX)
     })
 
+    it("has a killing blow shove what bursts, the light ones more", () => {
+
+        const soldiers = new SoldierPack(openFloor()), brutes = new BrutePack(openFloor())
+        soldiers.add(SOLDIER, 0, 0.2, 0)
+        brutes.add(BRUTE, 0, 0.2, 0)
+        soldiers.strike(0, 0, Math.PI / 2, 0.5, 1, SOLDIER.hp)
+        brutes.strike(0, 0, Math.PI / 2, 0.5, 1, BRUTE.hp)
+        const [soldier] = soldiers.deaths, [brute] = brutes.deaths
+        assert.closeTo(soldier.vx, SWORD_SHOVE / SOLDIER.mass, 1e-9)
+        assert.closeTo(brute.vx, SWORD_SHOVE / BRUTE.mass, 1e-9)
+        assert(soldier.vz === 0)
+    })
+
     it("doesn't push what the sword misses", () => {
 
         const soldiers = new SoldierPack(openFloor())

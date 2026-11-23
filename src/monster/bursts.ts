@@ -83,6 +83,12 @@ export interface Death
     away: number
     /** share of its volume that bursts, the rest went on in some other way */
     share: number
+    /**
+     * How fast it was shoved when it died, in world units per second, with the blow that killed it, which the particles
+     * carry on with. A light monster flies apart further than a heavy one.
+     */
+    vx: number
+    vz: number
 }
 
 export interface Particle
@@ -145,14 +151,14 @@ export default class Bursts
      * Fills the burst spheres of a monster that died with particles, those of its body only. Spheres that go with a bone
      * are left to the view that poses it, see burst().
      */
-    add({ kind, x, z, yaw, away, share }: Death): void
+    add({ kind, x, z, yaw, away, share, vx, vz }: Death): void
     {
         rootMatrix.compose(position.set(x, 0, z), rotation.setFromAxisAngle(UP, yaw), scale.setScalar(kind.scale * LEVEL_MEEPLE_SCALE))
         for (const sphere of kind.burst)
         {
             if (!sphere.bone)
             {
-                this.burst(sphere, rootMatrix, away, share)
+                this.burst(sphere, rootMatrix, away, share, vx, vz)
             }
         }
     }
@@ -164,11 +170,13 @@ export default class Bursts
      * @param matrix    world matrix of what the sphere is measured from, the model or a bone of it
      * @param away      direction of the blow as a meeple facing
      * @param share     share of the volume that bursts
+     * @param vx        speed the particles carry on with, in world units per second, see Death
+     * @param vz        speed the particles carry on with
      */
-    burst(sphere: BurstSphere, matrix: Matrix4, away: number, share = 1): void
+    burst(sphere: BurstSphere, matrix: Matrix4, away: number, share = 1, vx = 0, vz = 0): void
     {
         const scale = Math.cbrt(Math.abs(matrix.determinant())) / LEVEL_MEEPLE_SCALE
-        const blowX = Math.sin(away) * BLOW_SPEED, blowZ = Math.cos(away) * BLOW_SPEED
+        const blowX = Math.sin(away) * BLOW_SPEED + vx, blowZ = Math.cos(away) * BLOW_SPEED + vz
         const count = particleCount(sphere, scale, share)
         for (let i = 0; i < count; i++)
         {

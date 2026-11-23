@@ -12,11 +12,11 @@ import type { Monster, MonsterKind } from "../../src/monster/monsters"
 const FRAME = 1 / 60
 
 
-function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1): Bursts
+function burst(kind: MonsterKind, yaw = 0, away = 0, share = 1, vx = 0, vz = 0): Bursts
 {
     const bursts = new Bursts()
     const monster = { kind, face: 0, x: 1, z: 2, yaw } as Monster
-    bursts.add({ monster, kind, x: 1, z: 2, yaw, away, share })
+    bursts.add({ monster, kind, x: 1, z: 2, yaw, away, share, vx, vz })
     return bursts
 }
 
@@ -91,6 +91,12 @@ describe("Bursts", () => {
         const particles = burst(BRUTE, 0, Math.PI / 2).particles
         assert(average(particles.map(({ vx }) => vx)) > 0.2)
         assert(Math.abs(average(particles.map(({ vz }) => vz))) < 0.1)
+    })
+
+    it("has them carry on with the shove the monster had", () => {
+
+        const still = burst(SMALL_CUBOID, 0, 0).particles, shoved = burst(SMALL_CUBOID, 0, 0, 1, 0, 2).particles
+        assert.closeTo(average(shoved.map(({ vz }) => vz)) - average(still.map(({ vz }) => vz)), 2, 0.2)
     })
 
     it("lets them fall to the floor and vanish", () => {
