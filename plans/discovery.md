@@ -843,10 +843,19 @@ person: a trader, a stranger with a message, a prisoner who begs.
   front only. Touching hurts, then no cuboid can hurt that hero for a second,
   and after that whatever still touches them hurts again.
 - What all monsters share is in `monster/monsters.ts`: noticing heroes, the
-  sword arc, the hurt cooldown across all of them, and keeping apart.
-  Monsters are big or small and walk or fly. Those on the same ground keep
-  apart, a flying one only from big ones on the ground and from heroes, who
-  count as big.
+  sword arc, the hurt cooldown across all of them, and bumping.
+  Monsters are big or small and walk or fly. Those on the same ground bump
+  into each other, a flying one only into big ones on the ground and into
+  heroes, who count as big.
+- Bumping (`monster/shove.ts`) is circles on the floor that move out of
+  each other by mass, the lighter one more, and trade momentum along the
+  line between them, with a little bounce. What they get goes into a shove
+  speed that dies down to a third in 0.15 seconds, on top of where they
+  go on their own. Speeds come from how far each moved in the frame, so a
+  dash shoves about three times as hard as running, and a brute (3) barely
+  gives way to a hero (1), while an eye (0.4) flies off. Cuboids touch a
+  hero within 10% beyond where they meet, as bumping keeps them from
+  overlapping.
 - A monster that dies bursts into small cubes (`monster/bursts.ts`), as a
   fallback until monsters get ways of dying of their own. Each kind gives its
   rough volume as a few spheres scaled along the axes of the model, with the

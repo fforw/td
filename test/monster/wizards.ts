@@ -21,7 +21,7 @@ function openFloor(): MonsterFloor
 
 function prey(x = 0, z = 0): Prey
 {
-    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0 }
+    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0 }
 }
 
 

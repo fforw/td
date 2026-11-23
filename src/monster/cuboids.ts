@@ -91,6 +91,7 @@ const CUBOID_BURST: readonly BurstSphere[] = [{ x: 0, y: 0.48, z: 0, rx: 0.48, r
 export const BIG_CUBOID: CuboidKind = {
     scale: 1,
     radius: 0.144 * FIGURE_SCALE,
+    mass: 2,
     hp: 8,
     big: true,
     flying: false,
@@ -108,6 +109,7 @@ export const BIG_CUBOID: CuboidKind = {
 export const SMALL_CUBOID: CuboidKind = {
     scale: 0.5,
     radius: 0.072 * FIGURE_SCALE,
+    mass: 0.5,
     hp: 2,
     big: false,
     flying: false,
@@ -205,7 +207,9 @@ export default class CuboidPack extends MonsterPack<Cuboid>
             goalX: 0,
             goalZ: 0,
             lookWait: rng.next() * LOOK_TIME,
-            flash: 0
+            flash: 0,
+            shoveX: 0,
+            shoveZ: 0
         }
         this.members.push(cuboid)
         return cuboid

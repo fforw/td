@@ -31,7 +31,7 @@ function openFloor(sees = (_x0: number, _z0: number, _x1: number, _z1: number) =
 
 function prey(x = 0, z = 0, changes: Partial<Prey> = {}): Prey
 {
-    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, ...changes }
+    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0, ...changes }
 }
 
 /**
@@ -130,8 +130,9 @@ describe("Flying eyes", () => {
             monsters.update(FRAME, [hero])
             assert.isBelow(Math.hypot(overSmall.x - small.x, overSmall.z - small.z), 0.02)
             assert.isAtLeast(Math.hypot(overBig.x - big.x, overBig.z - big.z), FLYING_EYE.radius + BIG_CUBOID.radius - 1e-6)
-            assert.isAtLeast(Math.hypot(overHero.x, overHero.z), FLYING_EYE.radius + HERO_RADIUS - 1e-6)
-            assert(hero.x === 0 && hero.z === 0)
+            assert.isAtLeast(Math.hypot(overHero.x - hero.x, overHero.z - hero.z), FLYING_EYE.radius + HERO_RADIUS - 1e-6)
+            // the light eye gives way more than the hero
+            assert.isBelow(Math.hypot(hero.x, hero.z), Math.hypot(overHero.x, overHero.z) - 0.01)
         })
     })
 

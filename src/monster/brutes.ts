@@ -56,6 +56,7 @@ export interface BruteKind extends MonsterKind
 export const BRUTE: BruteKind = {
     scale: 1,
     radius: 0.11 * FIGURE_SCALE,
+    mass: 3,
     hp: 16,
     big: true,
     flying: false,
@@ -112,7 +113,9 @@ export default class BrutePack extends MonsterPack<Brute>
             goalX: 0,
             goalZ: 0,
             lookWait: rng.next() * LOOK_TIME,
-            flash: 0
+            flash: 0,
+            shoveX: 0,
+            shoveZ: 0
         }
         this.members.push(brute)
         return brute

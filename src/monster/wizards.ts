@@ -36,6 +36,7 @@ export interface WizardKind extends MonsterKind
 export const WIZARD: WizardKind = {
     scale: 1,
     radius: 0.09 * FIGURE_SCALE,
+    mass: 0.8,
     hp: 5,
     big: true,
     flying: false,
@@ -87,7 +88,9 @@ export default class WizardPack extends MonsterPack<Wizard>
             goalZ: 0,
             lookWait: rng.next() * LOOK_TIME,
             robe: Math.floor(rng.next() * ROBE_COUNT),
-            flash: 0
+            flash: 0,
+            shoveX: 0,
+            shoveZ: 0
         }
         this.members.push(wizard)
         return wizard

@@ -48,7 +48,7 @@ function hurt(cuboids: CuboidPack, hero: Prey, delta = FRAME): number
 
 function prey(x = 0, z = 0, changes: Partial<Prey> = {}): Prey
 {
-    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, ...changes }
+    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0, ...changes }
 }
 
 function run(cuboids: CuboidPack, seconds: number, heroes: Prey[]): void

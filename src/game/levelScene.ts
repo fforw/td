@@ -31,6 +31,7 @@ import EyeCrowd from "../monster/EyeCrowd"
 import EyePack from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
+import { fadeShove } from "../monster/shove"
 import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
@@ -742,7 +743,7 @@ export default class LevelScene
                     face,
                     control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
                     steered: false,
-                    prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0 },
+                    prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0 },
                     hp,
                     strikeAt: null,
                     lightOn: true,
@@ -1141,15 +1142,23 @@ export default class LevelScene
             turnToward(meeple, control.turnTo, AIM_TURN_RATE * delta, 1 - Math.exp(-delta / AIM_TURN_LAG))
         }
 
+        // bumping into monsters shoves them on top of where they go
+        const { prey, meeple: { position } } = hero
+        let dx = prey.shoveX * delta, dz = prey.shoveZ * delta
+        fadeShove(prey, delta)
         if (control.moving)
         {
             const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * (hero.speedLeft > 0 ? SPEED_POTION : 1) * delta
-            spot.face = hero.face
-            spot.x = meeple.position.x
-            spot.z = meeple.position.z
-            moveOnFloor(this.meshes!.world, this.solidWalls!, spot, control.velocityX * speed, control.velocityZ * speed)
-            hero.face = spot.face
-            meeple.position.set(spot.x, 0, spot.z)
+            dx += control.velocityX * speed
+            dz += control.velocityZ * speed
+        }
+        const { x, z } = position
+        const otherFace = (dx !== 0 || dz !== 0) && this.moveHero(hero, dx, dz)
+        prey.vx = delta > 0 ? (position.x - x) / delta : 0
+        prey.vz = delta > 0 ? (position.z - z) / delta : 0
+
+        if (control.moving)
+        {
             meeple.walking = true
             hero.steered = true
         }
@@ -1159,6 +1168,28 @@ export default class LevelScene
             meeple.walking = false
             this.onMoved(id, hero.face)
         }
+        else if (otherFace)
+        {
+            this.onMoved(id, hero.face)
+        }
+    }
+
+    /**
+     * Moves a hero by the given world units, as far as the walls let them
+     *
+     * @return whether they got onto another face
+     */
+    private moveHero(hero: ShownHero, dx: number, dz: number): boolean
+    {
+        const { position } = hero.meeple
+        spot.face = hero.face
+        spot.x = position.x
+        spot.z = position.z
+        moveOnFloor(this.meshes!.world, this.solidWalls!, spot, dx, dz)
+        position.set(spot.x, 0, spot.z)
+        const otherFace = spot.face !== hero.face
+        hero.face = spot.face
+        return otherFace
     }
 
     /**
@@ -1413,6 +1444,18 @@ export default class LevelScene
             prey.dodging = control.dodging
         }
         monsters.update(delta, heroes.map(([, { prey }]) => prey))
+        // monsters bumped them aside
+        for (const [id, hero] of heroes)
+        {
+            const { prey, meeple: { position } } = hero
+            const dx = prey.x - position.x, dz = prey.z - position.z
+            if ((dx !== 0 || dz !== 0) && this.moveHero(hero, dx, dz) && !hero.steered)
+            {
+                this.onMoved(id, hero.face)
+            }
+            prey.x = position.x
+            prey.z = position.z
+        }
 
         for (const [id, hero] of heroes)
         {

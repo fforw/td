@@ -86,6 +86,7 @@ export interface EyeKind extends MonsterKind
 export const FLYING_EYE: EyeKind = {
     scale: 1,
     radius: 0.075 * FIGURE_SCALE,
+    mass: 0.4,
     hp: 4,
     big: false,
     flying: true,
@@ -192,6 +193,8 @@ export default class EyePack extends MonsterPack<Eye>
             z,
             yaw: rng.next() * TAU,
             flash: 0,
+            shoveX: 0,
+            shoveZ: 0,
             chase: 0,
             goalX: 0,
             goalZ: 0,

@@ -80,6 +80,7 @@ export interface SoldierKind extends MonsterKind
 export const SOLDIER: SoldierKind = {
     scale: 1,
     radius: 0.09 * FIGURE_SCALE,
+    mass: 1.2,
     hp: 8,
     big: true,
     flying: false,
@@ -146,7 +147,9 @@ export default class SoldierPack extends MonsterPack<Soldier>
             guarding: false,
             guardLeft: 0,
             shield: 0,
-            flash: 0
+            flash: 0,
+            shoveX: 0,
+            shoveZ: 0
         }
         this.members.push(soldier)
         return soldier

@@ -25,7 +25,7 @@ function openFloor(sees = (_x0: number, _z0: number, _x1: number, _z1: number) =
 
 function prey(x = 0, z = 0, changes: Partial<Prey> = {}): Prey
 {
-    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, ...changes }
+    return { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0, ...changes }
 }
 
 /**

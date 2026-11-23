@@ -2,6 +2,7 @@ import type { FloorSpot } from "../map/dungeonWays"
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
 import type { BurstSphere, Death } from "./bursts"
+import { type Body, bump, fadeShove, HERO_MASS } from "./shove"
 
 /**
  * Seconds after a monster did damage to someone in which no monster can do so again
@@ -31,6 +32,8 @@ export interface MonsterKind
     scale: number
     /** half its width in world units */
     radius: number
+    /** how hard it is to shove, against a hero with HERO_MASS */
+    mass: number
     hp: number
     /**
      * Big ones are in the way of everything, small ones only of what is on the same ground. Heroes count as big.
@@ -55,6 +58,9 @@ export interface Monster extends FloorSpot
     /** where it last saw them */
     goalX: number
     goalZ: number
+    /** speed it got from bumping into others, in world units per second */
+    shoveX: number
+    shoveZ: number
 }
 
 /**
@@ -71,7 +77,21 @@ export interface Prey
     dodging: boolean
     /** seconds until monsters can hurt them again */
     hurtWait: number
+    /** how fast they moved in the last frame, in world units per second */
+    vx: number
+    vz: number
+    /**
+     * Speed they got from bumping into monsters, in world units per second, which the scene moves them by and lets die down.
+     * Monsters also move them out of the way in x and z, which the scene moves them to as far as the walls let them.
+     */
+    shoveX: number
+    shoveZ: number
 }
+
+/**
+ * How heroes count for getting in the way, see inTheWay()
+ */
+const HERO_KIND: Pick<MonsterKind, "big" | "flying"> = { big: true, flying: false }
 
 /**
  * What monsters need to know about the level
@@ -94,7 +114,7 @@ export interface MonsterFloor
  * Returns whether two things get in each other's way: those on the same ground always, a flying one and one on the ground only
  * if the one on the ground is big
  */
-export function inTheWay(a: MonsterKind, b: MonsterKind): boolean
+export function inTheWay(a: Pick<MonsterKind, "big" | "flying">, b: Pick<MonsterKind, "big" | "flying">): boolean
 {
     return a.flying === b.flying || (a.flying ? b.big : a.big)
 }
@@ -306,11 +326,19 @@ export default class Monsters
      */
     update(delta: number, heroes: readonly Prey[]): void
     {
+        const before = new Map<Monster, readonly [number, number]>()
+        for (const { members } of this.packs)
+        {
+            for (const monster of members)
+            {
+                before.set(monster, [monster.x, monster.z])
+            }
+        }
         for (const pack of this.packs)
         {
             pack.update(delta, heroes)
         }
-        this.keepApart(heroes)
+        this.bumpAll(delta, heroes, before)
     }
 
     /**
@@ -365,48 +393,65 @@ export default class Monsters
     }
 
     /**
-     * Pushes monsters out of each other, which would otherwise all end up in one spot on their way to the same hero, and flying
-     * ones out of heroes
+     * Has monsters go on by their shoves, and bump into each other and into heroes. Without it, they would all end up in one
+     * spot on their way to the same hero.
+     *
+     * @param before    where each monster was at the start of the frame, to tell how fast it moved
      */
-    private keepApart(heroes: readonly Prey[]): void
+    private bumpAll(delta: number, heroes: readonly Prey[], before: ReadonlyMap<Monster, readonly [number, number]>): void
     {
         const { floor } = this
-        const all = this.packs.flatMap(({ members }) => members as Monster[])
-        for (let i = 0; i < all.length; i++)
+        const monsters = this.packs.flatMap(({ members }) => members as Monster[])
+        const bodies: Body[] = monsters.map(monster =>
         {
-            const a = all[i]
-            for (let j = i + 1; j < all.length; j++)
+            const { kind, shoveX, shoveZ } = monster
+            if (shoveX !== 0 || shoveZ !== 0)
             {
-                const b = all[j]
-                if (!inTheWay(a.kind, b.kind))
+                floor.move(monster, shoveX * delta, shoveZ * delta)
+                fadeShove(monster, delta)
+            }
+            const [x0, z0] = before.get(monster) ?? [monster.x, monster.z]
+            const { x, z } = monster
+            const vx = delta > 0 ? (x - x0) / delta : 0
+            const vz = delta > 0 ? (z - z0) / delta : 0
+            return { x, z, vx, vz, shoveX: monster.shoveX, shoveZ: monster.shoveZ, radius: kind.radius, mass: kind.mass }
+        })
+        const heroBodies: Body[] = heroes.map(({ x, z, vx, vz, shoveX, shoveZ }) =>
+            ({ x, z, vx, vz, shoveX, shoveZ, radius: HERO_RADIUS, mass: HERO_MASS }))
+
+        for (let i = 0; i < monsters.length; i++)
+        {
+            const a = monsters[i]
+            for (let j = i + 1; j < monsters.length; j++)
+            {
+                if (inTheWay(a.kind, monsters[j].kind))
                 {
-                    continue
-                }
-                const dx = b.x - a.x, dz = b.z - a.z
-                const room = a.kind.radius + b.kind.radius
-                const distance = Math.hypot(dx, dz)
-                if (distance > 0 && distance < room)
-                {
-                    const push = (room - distance) / 2 / distance
-                    floor.move(a, -dx * push, -dz * push)
-                    floor.move(b, dx * push, dz * push)
+                    bump(bodies[i], bodies[j])
                 }
             }
-            // heroes go where they are steered
-            if (a.kind.flying)
+            if (inTheWay(a.kind, HERO_KIND))
             {
-                for (const hero of heroes)
+                for (const hero of heroBodies)
                 {
-                    const dx = a.x - hero.x, dz = a.z - hero.z
-                    const room = a.kind.radius + HERO_RADIUS
-                    const distance = Math.hypot(dx, dz)
-                    if (distance > 0 && distance < room)
-                    {
-                        const push = (room - distance) / distance
-                        floor.move(a, dx * push, dz * push)
-                    }
+                    bump(bodies[i], hero)
                 }
             }
         }
+
+        monsters.forEach((monster, i) =>
+        {
+            const body = bodies[i]
+            floor.move(monster, body.x - monster.x, body.z - monster.z)
+            monster.shoveX = body.shoveX
+            monster.shoveZ = body.shoveZ
+        })
+        heroes.forEach((hero, i) =>
+        {
+            const body = heroBodies[i]
+            hero.x = body.x
+            hero.z = body.z
+            hero.shoveX = body.shoveX
+            hero.shoveZ = body.shoveZ
+        })
     }
 }
