@@ -724,7 +724,9 @@ person: a trader, a stranger with a message, a prisoner who begs.
   way (`game/heroControl.ts`). Holding the dash button after a dash sprints
   at 1.5 times running, for 0.5 seconds plus 0.2 for each point of
   strength above 1 (`strSprintTime()`), until letting go, blocking or the
-  next dash. Fighters carry a sword and a shield, and the
+  next dash. The walk cycle steps faster by as much (`Meeple.pace`), and
+  each meeple adds up its own stride so that changing the pace doesn't
+  jump. Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
 - The view of a level looks from one side at a fixed angle, 34 degrees
   above the ground, so that a direction of a stick or the keys always

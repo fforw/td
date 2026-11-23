@@ -288,6 +288,10 @@ export interface Meeple
      * Walks or stands no matter what the crowd does
      */
     walking?: boolean
+    /**
+     * Factor on how fast it steps while walking, e.g. for sprinting, 1 without
+     */
+    pace?: number
 }
 
 
@@ -656,6 +660,10 @@ export default class MeepleCrowd
      */
     private readonly lying: number[] = []
     /**
+     * How far each meeple got through its walk cycle, in radians, which goes on only while it walks
+     */
+    private readonly strides: number[] = []
+    /**
      * Animation states of the right and the left hand
      */
     private readonly itemStates: [ItemState, ItemState][] = []
@@ -906,6 +914,7 @@ export default class MeepleCrowd
         this.attention.push(0)
         // one that already lies when it comes doesn't fall again
         this.lying.push(meeple.fallen ? 1 : 0)
+        this.strides.push(0)
         this.itemStates.push([newItemState(), newItemState()])
         // start somewhere into the first pause, so the crowd doesn't wait and then all start blinking together
         this.nextBlink.push(this.lastTime + rng.next() * blinkPause(meeple.gait))
@@ -926,7 +935,8 @@ export default class MeepleCrowd
         {
             return
         }
-        for (const list of [this.meeples, this.attention, this.lying, this.itemStates, this.nextBlink, this.blinkDuration])
+        const lists = [this.meeples, this.attention, this.lying, this.strides, this.itemStates, this.nextBlink, this.blinkDuration]
+        for (const list of lists)
         {
             list.splice(i, 1)
         }
@@ -1028,7 +1038,8 @@ export default class MeepleCrowd
         const counts = new Map<HairStyle, number>()
         const itemCounts = new Map<ItemName, number>()
         let moustaches = 0
-        const step = Math.min(0.1, Math.max(0, time - this.lastTime)) * ATTENTION_SPEED
+        const elapsed = Math.min(0.1, Math.max(0, time - this.lastTime))
+        const step = elapsed * ATTENTION_SPEED
         this.lastTime = time
         const cam = camera.position
 
@@ -1044,8 +1055,9 @@ export default class MeepleCrowd
             if ((meeple.walking ?? this.walking) && lying === 0)
             {
                 // the body is highest and rocked furthest over the foot it stands on
-                const speed = WALK_SPEED * walkSpeedMultiplier(meeple)
-                const s = Math.sin(time * speed + phase)
+                // added up, so that changing the pace doesn't jump in the cycle
+                const stride = this.strides[i] += elapsed * WALK_SPEED * walkSpeedMultiplier(meeple) * (meeple.pace ?? 1)
+                const s = Math.sin(stride + phase)
                 const bounceFactor = WIDE_GAIT.bounce + (NARROW_GAIT.bounce - WIDE_GAIT.bounce) * gait
                 bounce = Math.abs(s) * WALK_BOUNCE * bounceFactor
                 stretch = 1 + s * WALK_STRETCH * (0.1 + gait * 0.9)

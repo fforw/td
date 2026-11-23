@@ -53,7 +53,7 @@ import TreasureView from "../treasure/TreasureView"
 import type PatchWorld from "../map/PatchWorld"
 import MapWorkerClient from "../worker/MapWorkerClient"
 import type { PadAction, PadInput } from "./gamepad"
-import HeroControl, { type HeroOrders, NO_ORDERS } from "./heroControl"
+import HeroControl, { type HeroOrders, NO_ORDERS, SPRINT_SPEED } from "./heroControl"
 import KeySteer, { type KeyInput } from "./keySteer"
 import Exploration, { inUnexplored, jumpTargets } from "./exploration"
 import { placeFixtures } from "./levelFixtures"
@@ -1180,6 +1180,7 @@ export default class LevelScene
         if (control.moving)
         {
             meeple.walking = true
+            meeple.pace = control.sprinting ? SPRINT_SPEED : 1
             hero.steered = true
         }
         else if (hero.steered)
