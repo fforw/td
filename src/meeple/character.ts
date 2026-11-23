@@ -79,6 +79,12 @@ export type ClassName = keyof typeof CLASSES
  */
 const DEX_WALK_SPEED = 0.05
 
+/**
+ * Seconds a hero with a strength of 1 can sprint after a dash, and how many more each point above that gives
+ */
+const SPRINT_TIME = 0.5
+const STR_SPRINT_TIME = 0.2
+
 export interface Character
 {
     stats: Stats
@@ -117,6 +123,14 @@ export function checkClasses(character: Character): string | null
 export function dexWalkFactor(dex: number): number
 {
     return 1 + (dex - 1) * DEX_WALK_SPEED
+}
+
+/**
+ * Returns the seconds the given strength lets a hero sprint after a dash
+ */
+export function strSprintTime(str: number): number
+{
+    return SPRINT_TIME + (str - 1) * STR_SPRINT_TIME
 }
 
 

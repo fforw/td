@@ -1,9 +1,20 @@
 import { assert, describe, it } from "vitest"
 
-import HeroControl, { BLOCK_SPEED, DASH_COOLDOWN, DASH_SPEED, DASH_TIME, DODGE_TIME, type HeroOrders, NO_ORDERS, RUN_SPEED } from "../../src/game/heroControl"
+import HeroControl, {
+    BLOCK_SPEED,
+    DASH_COOLDOWN,
+    DASH_SPEED,
+    DASH_TIME,
+    DODGE_TIME,
+    type HeroOrders,
+    NO_ORDERS,
+    RUN_SPEED,
+    SPRINT_SPEED
+} from "../../src/game/heroControl"
 
 const FRAME = 1 / 60
 const ATTACK_TIME = 0.5
+const SPRINT_TIME = 1
 
 
 function orders(changes: Partial<HeroOrders>): HeroOrders
@@ -30,7 +41,7 @@ describe("HeroControl", () => {
 
     it("moves as far as the stick goes", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         control.update(orders({ moveX: 0.5 }), FRAME, 0)
         assert.closeTo(control.velocityX, 0.5 * RUN_SPEED, 1e-9)
         assert.equal(control.velocityZ, 0)
@@ -40,7 +51,7 @@ describe("HeroControl", () => {
 
     it("looks where it aims, else where it goes, else stays as it is", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         control.update(orders({ moveX: 1, aimZ: -1 }), FRAME, 0)
         assert.closeTo(control.turnTo!, Math.PI, 1e-9)
         control.update(orders({ moveX: 1 }), FRAME, 0)
@@ -51,18 +62,18 @@ describe("HeroControl", () => {
 
     it("dashes where it goes for a moment at full speed however far the stick is", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         control.update(orders({ moveX: 0.3, dash: true }), FRAME, 0)
         assert(control.dashing)
         assert.closeTo(control.velocityX, RUN_SPEED * DASH_SPEED, 1e-9)
-        run(control, DASH_TIME + FRAME, { moveX: 0.3, dash: true })
+        run(control, DASH_TIME + FRAME, { moveX: 0.3 })
         assert(!control.dashing)
         assert.closeTo(control.velocityX, 0.3 * RUN_SPEED, 1e-9)
     })
 
     it("dashes where it looks when standing", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         control.update(orders({ dash: true }), FRAME, Math.PI / 2)
         assert.closeTo(control.velocityX, RUN_SPEED * DASH_SPEED, 1e-9)
         assert.closeTo(control.velocityZ, 0, 1e-9)
@@ -70,7 +81,7 @@ describe("HeroControl", () => {
 
     it("can't be hurt from the start of a dash until a while after it", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         assert(!control.dodging)
         control.update(orders({ dash: true }), FRAME, 0)
         assert(control.dodging)
@@ -83,21 +94,57 @@ describe("HeroControl", () => {
 
     it("ends a dash that ran into something, but still dodges and waits for the next one", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
         control.stopDash()
-        control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
+        control.update(orders({ moveX: 1 }), FRAME, 0)
         assert(!control.dashing)
         assert(control.dodging)
-        assert.isBelow(control.velocityX, RUN_SPEED + 1e-9)
-        control.update(orders({ moveX: 1 }), FRAME, 0)
+        assert.closeTo(control.velocityX, RUN_SPEED, 1e-9)
         control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
         assert(!control.dashing, "too soon")
     })
 
+    it("sprints after a dash while the button is held, for the time it has", () => {
+
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
+        run(control, DASH_TIME + FRAME, { moveZ: 1, dash: true })
+        assert(control.sprinting)
+        assert.closeTo(control.velocityZ, RUN_SPEED * SPRINT_SPEED, 1e-9)
+        run(control, SPRINT_TIME - FRAME * 3, { moveZ: 1, dash: true })
+        assert(control.sprinting, "the dash doesn't count")
+        run(control, FRAME * 4, { moveZ: 1, dash: true })
+        assert(!control.sprinting)
+        assert.closeTo(control.velocityZ, RUN_SPEED, 1e-9)
+    })
+
+    it("stops sprinting on letting go of the button or blocking, until the next dash", () => {
+
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
+        run(control, DASH_TIME + FRAME, { moveZ: 1, dash: true })
+        control.update(orders({ moveZ: 1 }), FRAME, 0)
+        control.update(orders({ moveZ: 1, dash: true }), FRAME, 0)
+        assert(!control.sprinting && !control.dashing, "letting go ends it, pressing again is too soon for a dash")
+
+        run(control, DASH_COOLDOWN)
+        run(control, DASH_TIME + FRAME, { moveZ: 1, dash: true })
+        assert(control.sprinting)
+        control.update(orders({ moveZ: 1, dash: true, block: true }), FRAME, 0)
+        control.update(orders({ moveZ: 1, dash: true }), FRAME, 0)
+        assert(!control.sprinting)
+    })
+
+    it("doesn't sprint without the time for it", () => {
+
+        const control = new HeroControl(ATTACK_TIME, true, 0)
+        run(control, DASH_TIME + FRAME, { moveZ: 1, dash: true })
+        assert(!control.sprinting)
+        assert.closeTo(control.velocityZ, RUN_SPEED, 1e-9)
+    })
+
     it("needs a new press and the cooldown for the next dash", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         run(control, DASH_COOLDOWN * 2, { dash: true })
         assert(!control.dashing, "holding doesn't dash again")
 
@@ -114,13 +161,13 @@ describe("HeroControl", () => {
 
     it("repeats attacks while held, each after the one before", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         assert.equal(run(control, ATTACK_TIME * 2.5, { attack: true }), 3)
     })
 
     it("attacks once for a tap, even in the middle of something else", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         assert.equal(run(control, FRAME, { attack: true }), 1)
         assert.equal(run(control, FRAME), 0)
         assert.equal(run(control, FRAME, { attack: true }), 0, "still busy")
@@ -134,7 +181,7 @@ describe("HeroControl", () => {
 
     it("slows down and doesn't attack behind the shield", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         assert.equal(run(control, FRAME, { block: true, moveX: 1, attack: true }), 0)
         assert(control.blocking)
         assert.closeTo(control.velocityX, RUN_SPEED * BLOCK_SPEED, 1e-9)
@@ -145,7 +192,7 @@ describe("HeroControl", () => {
 
     it("dashes out from behind the shield", () => {
 
-        const control = new HeroControl(ATTACK_TIME, true)
+        const control = new HeroControl(ATTACK_TIME, true, SPRINT_TIME)
         run(control, FRAME, { block: true })
         control.update(orders({ block: true, dash: true }), FRAME, 0)
         assert(control.dashing && !control.blocking)
@@ -153,7 +200,7 @@ describe("HeroControl", () => {
 
     it("can't attack or block with bare hands", () => {
 
-        const control = new HeroControl(null, false)
+        const control = new HeroControl(null, false, SPRINT_TIME)
         assert.equal(run(control, 1, { attack: true, block: true }), 0)
         assert(!control.blocking)
     })

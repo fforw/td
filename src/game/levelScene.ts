@@ -20,6 +20,7 @@ import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
 import { loadItems } from "../items/itemSprite"
+import { strSprintTime } from "../meeple/character"
 import MeepleCrowd, { LEVEL_MEEPLE_SCALE, type Meeple, MEEPLE_MODELS, type MeepleLook, walkSpeedMultiplier } from "../meeple/Meeple3D"
 import { FIGURE_SCALE, LEVEL_GROWTH } from "../meeple/figureScale"
 import BruteCrowd from "../monster/BruteCrowd"
@@ -255,6 +256,8 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
     gait: number
     /** dexterity */
     dex: number
+    /** strength */
+    str: number
     /** global id of the face to stand on, the entrance without it */
     face?: number
     /** hit points left, none for a hero who lies fallen */
@@ -721,7 +724,7 @@ export default class LevelScene
                 shown.delete(id)
             }
         }
-        for (const { id, look, gait, dex, face = this.entrance, hp, maxHp, ...held } of heroes)
+        for (const { id, look, gait, dex, str, face = this.entrance, hp, maxHp, ...held } of heroes)
         {
             if (!shown.has(id))
             {
@@ -746,7 +749,11 @@ export default class LevelScene
                 shown.set(id, {
                     meeple,
                     face,
-                    control: new HeroControl(held.item ? actionDuration(itemAnimation(held.item).action) : null, !!held.leftItem),
+                    control: new HeroControl(
+                        held.item ? actionDuration(itemAnimation(held.item).action) : null,
+                        !!held.leftItem,
+                        strSprintTime(str)
+                    ),
                     steered: false,
                     prey: { x, z, facing: 0, blocking: false, dodging: false, hurtWait: 0, vx: 0, vz: 0, shoveX: 0, shoveZ: 0 },
                     hp,

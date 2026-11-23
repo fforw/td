@@ -18,6 +18,12 @@ export const DASH_COOLDOWN = 0.55
 export const DODGE_TIME = 0.2
 
 /**
+ * How fast a sprint goes, as a multiple of running. Holding the dash button after a dash sprints for a while, which ends on
+ * letting go, blocking or the next dash.
+ */
+export const SPRINT_SPEED = 1.5
+
+/**
  * How fast someone moves behind their shield as a share of running
  */
 export const BLOCK_SPEED = 0.45
@@ -61,6 +67,7 @@ export default class HeroControl
     private dashX = 0
     private dashZ = 0
     private dashHeld = false
+    private sprintLeft = 0
 
     private attackWait = 0
     private attackHeld = false
@@ -69,14 +76,21 @@ export default class HeroControl
     /**
      * @param attackTime    seconds an attack takes until the next one, null if the hero has nothing to attack with
      * @param canBlock      whether the hero has something to block with
+     * @param sprintTime    seconds the hero can sprint after a dash while holding the button
      */
-    constructor(private readonly attackTime: number | null, private readonly canBlock: boolean)
+    constructor(private readonly attackTime: number | null, private readonly canBlock: boolean, private readonly sprintTime: number)
     {
     }
 
     get dashing(): boolean
     {
         return this.dashLeft > 0
+    }
+
+    /** runs faster right now, from holding on after a dash */
+    get sprinting(): boolean
+    {
+        return this.sprintLeft > 0 && !this.dashing
     }
 
     /** can't be hurt right now, from dashing */
@@ -109,6 +123,11 @@ export default class HeroControl
      */
     update({ moveX, moveZ, aimX, aimZ, dash, attack, block }: HeroOrders, delta: number, facing: number): boolean
     {
+        // the sprint only counts once the dash is over
+        if (this.dashLeft === 0)
+        {
+            this.sprintLeft = Math.max(0, this.sprintLeft - delta)
+        }
         this.dashLeft = Math.max(0, this.dashLeft - delta)
         this.dodgeLeft = Math.max(0, this.dodgeLeft - delta)
         this.dashWait = Math.max(0, this.dashWait - delta)
@@ -123,13 +142,18 @@ export default class HeroControl
             this.dashLeft = DASH_TIME
             this.dodgeLeft = DODGE_TIME
             this.dashWait = DASH_COOLDOWN
+            this.sprintLeft = this.sprintTime
         }
         this.dashHeld = dash
 
         const { dashing } = this
         this.blocking = block && this.canBlock && !dashing
+        if (!dash || this.blocking)
+        {
+            this.sprintLeft = 0
+        }
 
-        const speed = RUN_SPEED * (dashing ? DASH_SPEED : this.blocking ? BLOCK_SPEED : 1)
+        const speed = RUN_SPEED * (dashing ? DASH_SPEED : this.blocking ? BLOCK_SPEED : this.sprinting ? SPRINT_SPEED : 1)
         this.velocityX = (dashing ? this.dashX : moveX) * speed
         this.velocityZ = (dashing ? this.dashZ : moveZ) * speed
 

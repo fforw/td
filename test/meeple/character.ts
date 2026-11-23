@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, dexWalkFactor, heldItems, type Stats } from "../../src/meeple/character"
+import { canEquip, canHaveClass, type Character, checkClasses, type ClassName, dexWalkFactor, heldItems, type Stats, strSprintTime } from "../../src/meeple/character"
 
 
 const STRONG: Stats = { hp: 20, mp: 20, str: 10, dex: 10 }
@@ -17,6 +17,16 @@ describe("dexWalkFactor", function () {
         assert(dexWalkFactor(1) === 1)
         assert(dexWalkFactor(5) > dexWalkFactor(4))
         assert(dexWalkFactor(10) === 1.45)
+    })
+})
+
+
+describe("strSprintTime", function () {
+
+    it("grows with strength from half a second at the lowest", function () {
+        assert(strSprintTime(1) === 0.5)
+        assert(strSprintTime(5) > strSprintTime(4))
+        assert.closeTo(strSprintTime(10), 2.3, 1e-9)
     })
 })
 

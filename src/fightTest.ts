@@ -29,6 +29,7 @@ const hero: LevelHero = {
     look: randomLook(),
     gait: 0.5,
     dex: 5,
+    str: 5,
     hp: maxHp,
     maxHp,
     item: "sword_silver",

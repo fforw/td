@@ -1054,6 +1054,7 @@ export default class GameView implements PadTarget
                 look: meepleSitter(campaign.seed, heroId).look,
                 gait: gaitOf(heroId),
                 dex: character.stats.dex,
+                str: character.stats.str,
                 hp: hp ?? character.stats.hp,
                 maxHp: character.stats.hp,
                 ...heldItems(character),

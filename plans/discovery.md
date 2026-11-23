@@ -721,7 +721,10 @@ person: a trader, a stranger with a message, a prisoner who begs.
   looks where the right stick points on the screen. A dash goes where
   the hero moves, or else looks, and nothing can hurt them from its start
   until a little after it ends (`DODGE_TIME`), and a tapped attack waits for what's in its
-  way (`game/heroControl.ts`). Fighters carry a sword and a shield, and the
+  way (`game/heroControl.ts`). Holding the dash button after a dash sprints
+  at 1.5 times running, for 0.5 seconds plus 0.2 for each point of
+  strength above 1 (`strSprintTime()`), until letting go, blocking or the
+  next dash. Fighters carry a sword and a shield, and the
   others have nothing yet to attack or block with.
 - The view of a level looks from one side at a fixed angle, 34 degrees
   above the ground, so that a direction of a stick or the keys always
