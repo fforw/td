@@ -35,7 +35,7 @@ import MeepleCrowd, { LEVEL_MEEPLE_SCALE, type Meeple, MEEPLE_MODELS, randomTrai
 import { WIZARD } from "./monster/wizards"
 import { ROBE_COLORS } from "./monster/WizardCrowd"
 import { skinnedFigure } from "./monster/skinnedFigure"
-import Beam from "./render/beam"
+import Beam, { type BeamLook } from "./render/beam"
 import GlowPass from "./render/glowPass"
 import { createLevelMeshes } from "./render/dungeonLevel"
 import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "./render/dungeonLighting"
@@ -47,15 +47,16 @@ import MapWorkerClient from "./worker/MapWorkerClient"
  * dungeon=SEED it stands in a room of a lit dungeon level at the scale of the game and fires at a hero with a torch, e.g.
  * beam.html?robe=2&width=0.35&bloom=off&hold=1&glowStrength=0.6&glowRadius=0.3
  * beam.html?dungeon=1&bloom=global&strength=0.45&radius=0.2&threshold=1
- * beam.html?dungeon=1&room=3&hold=1
+ * beam.html?dungeon=1&room=3&hold=1&look=pixels
  *
  * The bloom is off, global over the whole picture with a threshold, or selective for the effects alone, the default.
- * B goes through these, C goes through the robe colors, H holds the beam.
+ * B goes through these, C goes through the robe colors, H holds the beam, L switches between the looks around the glow.
  */
 
 const params = new URLSearchParams(location.search)
 let robe = Number(params.get("robe") ?? 0)
 let hold = params.get("hold") === "1"
+const LOOKS: BeamLook[] = ["shell", "pixels"]
 
 /**
  * Length of the staff bone, from the wizard's Blender file
@@ -360,6 +361,7 @@ async function start(): Promise<void>
     controls.update()
 
     const beam = new Beam(new Color(ROBE_COLORS[robe]), BEAM_WIDTH * stage.scale, true)
+    beam.look = LOOKS.find(look => look === params.get("look")) ?? "shell"
     scene.add(beam.group)
 
     const staff = wizard.getObjectByName("Staff") as Object3D
@@ -380,7 +382,7 @@ async function start(): Promise<void>
 
     function showInfo(): void
     {
-        info.textContent = "bloom " + bloomMode + " (B), robe " + robe + " (C), " + (hold ? "held" : "cycling") + " (H)" + stage.info
+        info.textContent = "bloom " + bloomMode + " (B), robe " + robe + " (C), " + (hold ? "held" : "cycling") + " (H), " + beam.look + " (L)" + stage.info
     }
 
     window.addEventListener("keydown", event => {
@@ -397,6 +399,10 @@ async function start(): Promise<void>
         else if (event.key === "h")
         {
             hold = !hold
+        }
+        else if (event.key === "l")
+        {
+            beam.look = LOOKS[(LOOKS.indexOf(beam.look) + 1) % LOOKS.length]
         }
         showInfo()
     })
