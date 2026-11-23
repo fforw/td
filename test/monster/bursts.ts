@@ -3,7 +3,7 @@ import { assert, describe, it } from "vitest"
 
 import { LEVEL_MEEPLE_SCALE } from "../../src/meeple/Meeple3D"
 import { BRUTE } from "../../src/monster/brutes"
-import Bursts, { DENSITY, FEWEST, particleCount, sphereVolume } from "../../src/monster/bursts"
+import Bursts, { BURST_ENERGY, DENSITY, FEWEST, particleCount, sphereVolume } from "../../src/monster/bursts"
 import { BIG_CUBOID, SMALL_CUBOID } from "../../src/monster/cuboids"
 import { HOVER_HEIGHT } from "../../src/monster/EyeCrowd"
 import { FLYING_EYE } from "../../src/monster/eyes"
@@ -93,10 +93,11 @@ describe("Bursts", () => {
         assert(Math.abs(average(particles.map(({ vz }) => vz))) < 0.1)
     })
 
-    it("has them carry on with the shove the monster had", () => {
+    it("has them carry on with what bursting leaves of the shove the monster had", () => {
 
         const still = burst(SMALL_CUBOID, 0, 0).particles, shoved = burst(SMALL_CUBOID, 0, 0, 1, 0, 2).particles
-        assert.closeTo(average(shoved.map(({ vz }) => vz)) - average(still.map(({ vz }) => vz)), 2, 0.2)
+        const carried = average(shoved.map(({ vz }) => vz)) - average(still.map(({ vz }) => vz))
+        assert.closeTo(carried, 2 * Math.sqrt(BURST_ENERGY), 0.2)
     })
 
     it("lets them fall to the floor and vanish", () => {

@@ -22,6 +22,13 @@ const BURST_SPEED = 0.45 * FIGURE_SCALE
 const BLOW_SPEED = 0.35 * FIGURE_SCALE
 
 /**
+ * Share of the energy of a shove that is left for the particles to carry on with, the rest goes into tearing the monster
+ * apart. Speed goes with the root of energy.
+ */
+export const BURST_ENERGY = 0.25
+const BURST_CARRY = Math.sqrt(BURST_ENERGY)
+
+/**
  * How fast particles fall in world units per second squared, how much of their speed they keep when they hit the floor, and
  * how much of it along the floor
  */
@@ -85,7 +92,8 @@ export interface Death
     share: number
     /**
      * How fast it was shoved when it died, in world units per second, with the blow that killed it, which the particles
-     * carry on with. A light monster flies apart further than a heavy one.
+     * carry on with as far as bursting leaves them the energy (BURST_ENERGY). A light monster flies apart further than a
+     * heavy one.
      */
     vx: number
     vz: number
@@ -176,7 +184,8 @@ export default class Bursts
     burst(sphere: BurstSphere, matrix: Matrix4, away: number, share = 1, vx = 0, vz = 0): void
     {
         const scale = Math.cbrt(Math.abs(matrix.determinant())) / LEVEL_MEEPLE_SCALE
-        const blowX = Math.sin(away) * BLOW_SPEED + vx, blowZ = Math.cos(away) * BLOW_SPEED + vz
+        const blowX = Math.sin(away) * BLOW_SPEED + vx * BURST_CARRY
+        const blowZ = Math.cos(away) * BLOW_SPEED + vz * BURST_CARRY
         const count = particleCount(sphere, scale, share)
         for (let i = 0; i < count; i++)
         {

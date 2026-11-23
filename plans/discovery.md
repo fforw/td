@@ -879,7 +879,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   on the floor and shrink away within 1 to 1.6 seconds. They also carry on
   with the shove the monster had when it died, which for a sword kill
   includes the blow, so a light monster flies apart further than a heavy
-  one. A big cuboid bursts
+  one. Bursting takes 3/4 of its energy, which leaves half the speed
+  (`BURST_ENERGY`). A big cuboid bursts
   only what doesn't go into the small ones it breaks up into, e.g. 3/8 with 5
   of them. Smiting (`MonsterPack.smite()`) is annihilation, for the temporary
   god mode on up on the cross (`GOD_MODE`) and maybe mighty weapons later: the
