@@ -25,6 +25,12 @@ export const CHASE_TIME = 3
  */
 export const FLASH_TIME = 0.12
 
+/**
+ * Momentum a sword blow gives a monster it hits, away from the one with the sword, as mass times world units per second.
+ * It goes into the shove, so a light monster flies back and a heavy one hardly moves.
+ */
+export const SWORD_SHOVE = 1.2 * FIGURE_SCALE
+
 
 export interface MonsterKind
 {
@@ -245,6 +251,10 @@ export abstract class MonsterPack<M extends Monster = Monster>
             if (within && this.floor.sees(x, z, monster.x, monster.z))
             {
                 hits++
+                // even a shield gets pushed back, right on top of the hero it goes where the blow goes
+                const [awayX, awayZ] = distance > 1e-6 ? [dx / distance, dz / distance] : [Math.sin(facing), Math.cos(facing)]
+                monster.shoveX += awayX * SWORD_SHOVE / monster.kind.mass
+                monster.shoveZ += awayZ * SWORD_SHOVE / monster.kind.mass
                 if (this.stops(monster, dx, dz))
                 {
                     monster.chase = CHASE_TIME

@@ -1,8 +1,9 @@
 import { assert, describe, it } from "vitest"
 
 import { DASH_SPEED, RUN_SPEED } from "../../src/game/heroControl"
-import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../../src/monster/monsters"
+import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey, SWORD_SHOVE } from "../../src/monster/monsters"
 import { type Body, BOUNCE, bump, fadeShove, SHOVE_TIME } from "../../src/monster/shove"
+import BrutePack, { BRUTE } from "../../src/monster/brutes"
 import SoldierPack, { SOLDIER } from "../../src/monster/soldiers"
 
 const FRAME = 1 / 60
@@ -119,5 +120,26 @@ describe("Bumping", () => {
         const leaving = prey(0, 0, -1), far = prey(5, 5, 1)
         const bumped = new Monsters([soldiers], openFloor()).update(FRAME, [leaving, far])
         assert(bumped.size === 0)
+    })
+
+    it("has a sword blow push back what it hits, the heavy less", () => {
+
+        const soldiers = new SoldierPack(openFloor()), brutes = new BrutePack(openFloor())
+        const soldier = soldiers.add(SOLDIER, 0, 0.2, 0)
+        const brute = brutes.add(BRUTE, 0, 0, 0.2)
+        soldiers.strike(0, 0, Math.PI / 2, 0.5, 1, 1)
+        brutes.strike(0, 0, 0, 0.5, 1, 1)
+        assert.closeTo(soldier.shoveX * SOLDIER.mass, SWORD_SHOVE, 1e-9)
+        assert(soldier.shoveZ === 0)
+        assert.closeTo(brute.shoveZ * BRUTE.mass, SWORD_SHOVE, 1e-9)
+        assert.isBelow(brute.shoveZ, soldier.shoveX)
+    })
+
+    it("doesn't push what the sword misses", () => {
+
+        const soldiers = new SoldierPack(openFloor())
+        const soldier = soldiers.add(SOLDIER, 0, -0.2, 0)
+        soldiers.strike(0, 0, Math.PI / 2, 0.5, 1, 1)
+        assert(soldier.shoveX === 0 && soldier.shoveZ === 0)
     })
 })

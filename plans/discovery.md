@@ -858,7 +858,10 @@ person: a trader, a stranger with a message, a prisoner who begs.
   speed that dies down to a third in 0.15 seconds, on top of where they
   go on their own. Speeds come from how far each moved in the frame, so a
   dash shoves about three times as hard as running, and a brute (3) barely
-  gives way to a hero (1), while an eye (0.4) flies off. Cuboids touch a
+  gives way to a hero (1), while an eye (0.4) flies off. A sword blow
+  gives what it hits a shove away from the hero (`SWORD_SHOVE`), even
+  when a shield stops it, which by mass is about half a figure for an eye
+  and next to nothing for a brute. Cuboids touch a
   hero within 10% beyond where they meet, as bumping keeps them from
   overlapping.
 - A dash ends when it trades momentum with a monster, and what the bump
@@ -902,7 +905,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   sighting replaces it, and eyes that see the spot fly there to look. Others
   stay put, as eyes don't find ways around walls.
 - The brute (`monster/brutes.ts`) walks after heroes at about a third of their
-  running speed and takes 8 sword blows, which don't stop or push it. Within
+  running speed and takes 8 sword blows, which don't stop it and hardly
+  push it. Within
   reach it swings its club: it turns after the hero while raising it for 0.75
   seconds, and the club comes down after 1 second of the 3 second attack. That
   hurts once for 5, in front only, and no shield stops it, so the way out is
