@@ -85,6 +85,14 @@ export default class HeroControl
         return this.dodgeLeft > 0
     }
 
+    /**
+     * Ends a dash that ran into something, which leaves dodging and the wait for the next one as they are
+     */
+    stopDash(): void
+    {
+        this.dashLeft = 0
+    }
+
     get moving(): boolean
     {
         return this.velocityX !== 0 || this.velocityZ !== 0

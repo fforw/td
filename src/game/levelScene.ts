@@ -31,7 +31,7 @@ import EyeCrowd from "../monster/EyeCrowd"
 import EyePack from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids } from "../monster/cuboids"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/monsters"
-import { fadeShove } from "../monster/shove"
+import { BOUNCE, fadeShove } from "../monster/shove"
 import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
@@ -142,6 +142,11 @@ const STRONG_SWORD_DAMAGE = 4
  * Factor on the walking speed with a speed potion
  */
 const SPEED_POTION = 1.5
+
+/**
+ * Share of a dash a wall has to stop for it to end the dash, so that grazing one slides along it
+ */
+const WALL_STOP = 0.5
 
 /**
  * What the trader of a level offers
@@ -1148,7 +1153,7 @@ export default class LevelScene
         fadeShove(prey, delta)
         if (control.moving)
         {
-            const speed = WALK_SPEED * walkSpeedMultiplier(meeple) * (hero.speedLeft > 0 ? SPEED_POTION : 1) * delta
+            const speed = this.heroSpeed(hero) * delta
             dx += control.velocityX * speed
             dz += control.velocityZ * speed
         }
@@ -1156,6 +1161,14 @@ export default class LevelScene
         const otherFace = (dx !== 0 || dz !== 0) && this.moveHero(hero, dx, dz)
         prey.vx = delta > 0 ? (position.x - x) / delta : 0
         prey.vz = delta > 0 ? (position.z - z) / delta : 0
+        // a wall ends a dash, and they bounce off it with what it stopped
+        const blockedX = x + dx - position.x, blockedZ = z + dz - position.z
+        if (control.dashing && delta > 0 && Math.hypot(blockedX, blockedZ) > Math.hypot(dx, dz) * WALL_STOP)
+        {
+            control.stopDash()
+            prey.shoveX = prey.vx - BOUNCE * blockedX / delta
+            prey.shoveZ = prey.vz - BOUNCE * blockedZ / delta
+        }
 
         if (control.moving)
         {
@@ -1172,6 +1185,14 @@ export default class LevelScene
         {
             this.onMoved(id, hero.face)
         }
+    }
+
+    /**
+     * Returns how fast a hero goes in world units per second, for a velocity of 1 in their HeroControl
+     */
+    private heroSpeed({ meeple, speedLeft }: ShownHero): number
+    {
+        return WALK_SPEED * walkSpeedMultiplier(meeple) * (speedLeft > 0 ? SPEED_POTION : 1)
     }
 
     /**
@@ -1443,11 +1464,19 @@ export default class LevelScene
             prey.blocking = control.blocking
             prey.dodging = control.dodging
         }
-        monsters.update(delta, heroes.map(([, { prey }]) => prey))
+        const bumped = monsters.update(delta, heroes.map(([, { prey }]) => prey))
         // monsters bumped them aside
         for (const [id, hero] of heroes)
         {
-            const { prey, meeple: { position } } = hero
+            const { prey, control, meeple: { position } } = hero
+            if (control.dashing && bumped.has(prey))
+            {
+                // the dash ends, and what the bump left of it goes on as a shove
+                control.stopDash()
+                const speed = this.heroSpeed(hero)
+                prey.shoveX += control.velocityX * speed
+                prey.shoveZ += control.velocityZ * speed
+            }
             const dx = prey.x - position.x, dz = prey.z - position.z
             if ((dx !== 0 || dz !== 0) && this.moveHero(hero, dx, dz) && !hero.steered)
             {

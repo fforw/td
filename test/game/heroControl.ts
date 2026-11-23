@@ -81,6 +81,20 @@ describe("HeroControl", () => {
         assert(!control.dodging)
     })
 
+    it("ends a dash that ran into something, but still dodges and waits for the next one", () => {
+
+        const control = new HeroControl(ATTACK_TIME, true)
+        control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
+        control.stopDash()
+        control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
+        assert(!control.dashing)
+        assert(control.dodging)
+        assert.isBelow(control.velocityX, RUN_SPEED + 1e-9)
+        control.update(orders({ moveX: 1 }), FRAME, 0)
+        control.update(orders({ moveX: 1, dash: true }), FRAME, 0)
+        assert(!control.dashing, "too soon")
+    })
+
     it("needs a new press and the cooldown for the next dash", () => {
 
         const control = new HeroControl(ATTACK_TIME, true)

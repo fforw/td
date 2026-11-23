@@ -39,7 +39,7 @@ describe("Bumping", () => {
     it("leaves those apart alone", () => {
 
         const a = body(0, 0, 1, 0), b = body(0.25, 0, -1, 0)
-        assert(!bump(a, b))
+        assert(bump(a, b) === null)
         assert(a.x === 0 && b.x === 0.25 && a.vx === 1 && b.vx === -1)
     })
 
@@ -47,7 +47,7 @@ describe("Bumping", () => {
 
         const a = body(0, 0, 2, 0.5, 1), b = body(0.15, 0.05, -0.3, 0, 3)
         const [px, pz] = momentum(a, b)
-        assert(bump(a, b))
+        assert.isAbove(bump(a, b)!, 0)
         const [qx, qz] = momentum(a, b)
         assert.closeTo(qx, px, 1e-9)
         assert.closeTo(qz, pz, 1e-9)
@@ -74,7 +74,7 @@ describe("Bumping", () => {
     it("doesn't shove those going apart already", () => {
 
         const a = body(0, 0, -1, 0), b = body(0.15, 0, 1, 0)
-        bump(a, b)
+        assert(bump(a, b) === 0)
         assert(a.vx === -1 && b.vx === 1 && a.shoveX === 0 && b.shoveX === 0)
     })
 
@@ -102,12 +102,22 @@ describe("Bumping", () => {
             const soldiers = new SoldierPack(openFloor())
             const soldier = soldiers.add(SOLDIER, 0, SOLDIER.radius + HERO_RADIUS - 0.005, 0)
             const hero = prey(0, 0, speed)
-            new Monsters([soldiers], openFloor()).update(FRAME, [hero])
+            const bumped = new Monsters([soldiers], openFloor()).update(FRAME, [hero])
+            assert(bumped.has(hero))
             assert.isBelow(hero.shoveX, 0)
             return soldier.shoveX
         }
         const running = shoved(RUN_SPEED * 0.5), dashing = shoved(RUN_SPEED * DASH_SPEED * 0.5)
         assert.isAbove(running, 0)
         assert.isAbove(dashing, running * 3)
+    })
+
+    it("tells only of heroes that ran into a monster", () => {
+
+        const soldiers = new SoldierPack(openFloor())
+        soldiers.add(SOLDIER, 0, SOLDIER.radius + HERO_RADIUS - 0.005, 0)
+        const leaving = prey(0, 0, -1), far = prey(5, 5, 1)
+        const bumped = new Monsters([soldiers], openFloor()).update(FRAME, [leaving, far])
+        assert(bumped.size === 0)
     })
 })

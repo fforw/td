@@ -856,6 +856,11 @@ person: a trader, a stranger with a message, a prisoner who begs.
   gives way to a hero (1), while an eye (0.4) flies off. Cuboids touch a
   hero within 10% beyond where they meet, as bumping keeps them from
   overlapping.
+- A dash ends when it trades momentum with a monster, and what the bump
+  left of it goes on as a shove, or when a wall stops more than half of it,
+  and the hero bounces off with 0.3 of what the wall stopped. Grazing a wall
+  slides along it. The dodge and the wait for the next dash go on as they
+  were.
 - A monster that dies bursts into small cubes (`monster/bursts.ts`), as a
   fallback until monsters get ways of dying of their own. Each kind gives its
   rough volume as a few spheres scaled along the axes of the model, with the

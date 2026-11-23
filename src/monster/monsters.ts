@@ -323,8 +323,10 @@ export default class Monsters
      *
      * @param delta     seconds since the last call
      * @param heroes    everyone in the level
+     *
+     * @return heroes that ran into a monster, or a monster into them
      */
-    update(delta: number, heroes: readonly Prey[]): void
+    update(delta: number, heroes: readonly Prey[]): Set<Prey>
     {
         const before = new Map<Monster, readonly [number, number]>()
         for (const { members } of this.packs)
@@ -338,7 +340,7 @@ export default class Monsters
         {
             pack.update(delta, heroes)
         }
-        this.bumpAll(delta, heroes, before)
+        return this.bumpAll(delta, heroes, before)
     }
 
     /**
@@ -397,9 +399,12 @@ export default class Monsters
      * spot on their way to the same hero.
      *
      * @param before    where each monster was at the start of the frame, to tell how fast it moved
+     *
+     * @return heroes that traded momentum with a monster
      */
-    private bumpAll(delta: number, heroes: readonly Prey[], before: ReadonlyMap<Monster, readonly [number, number]>): void
+    private bumpAll(delta: number, heroes: readonly Prey[], before: ReadonlyMap<Monster, readonly [number, number]>): Set<Prey>
     {
+        const bumped = new Set<Prey>()
         const { floor } = this
         const monsters = this.packs.flatMap(({ members }) => members as Monster[])
         const bodies: Body[] = monsters.map(monster =>
@@ -431,10 +436,13 @@ export default class Monsters
             }
             if (inTheWay(a.kind, HERO_KIND))
             {
-                for (const hero of heroBodies)
+                heroBodies.forEach((hero, h) =>
                 {
-                    bump(bodies[i], hero)
-                }
+                    if (bump(bodies[i], hero)! > 0)
+                    {
+                        bumped.add(heroes[h])
+                    }
+                })
             }
         }
 
@@ -453,5 +461,6 @@ export default class Monsters
             hero.shoveX = body.shoveX
             hero.shoveZ = body.shoveZ
         })
+        return bumped
     }
 }

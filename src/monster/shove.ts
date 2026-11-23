@@ -56,16 +56,16 @@ export function fadeShove(shoved: { shoveX: number, shoveZ: number }, delta: num
  * closer, they trade momentum along the line between them, so that the momentum of both together stays the same. The faster
  * they meet, the harder they shove each other, which goes into their shove speeds.
  *
- * @return whether they touched
+ * @return the momentum they traded, 0 if they touched without coming closer, null if they didn't touch
  */
-export function bump(a: Body, b: Body): boolean
+export function bump(a: Body, b: Body): number | null
 {
     let nx = b.x - a.x, nz = b.z - a.z
     const distance = Math.hypot(nx, nz)
     const depth = a.radius + b.radius - distance
     if (depth <= 0)
     {
-        return false
+        return null
     }
     if (distance > 1e-9)
     {
@@ -87,13 +87,14 @@ export function bump(a: Body, b: Body): boolean
     b.z += nz * depth * inverseB / inverse
 
     const closing = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz
-    if (closing < 0)
+    if (closing >= 0)
     {
-        const impulse = -(1 + BOUNCE) * closing / inverse
-        push(a, -nx * impulse * inverseA, -nz * impulse * inverseA)
-        push(b, nx * impulse * inverseB, nz * impulse * inverseB)
+        return 0
     }
-    return true
+    const impulse = -(1 + BOUNCE) * closing / inverse
+    push(a, -nx * impulse * inverseA, -nz * impulse * inverseA)
+    push(b, nx * impulse * inverseB, nz * impulse * inverseB)
+    return impulse
 }
 
 function push(body: Body, dvx: number, dvz: number): void
