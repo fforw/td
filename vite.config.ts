@@ -54,7 +54,8 @@ export default defineConfig(({ mode }) => {
                     dungeon: resolve(import.meta.dirname, "dungeon.html"),
                     dungeon3d: resolve(import.meta.dirname, "dungeon3d.html"),
                     fight: resolve(import.meta.dirname, "fight.html"),
-                    beam: resolve(import.meta.dirname, "beam.html")
+                    beam: resolve(import.meta.dirname, "beam.html"),
+                    sigil: resolve(import.meta.dirname, "sigil.html")
                 }
             }
         },
