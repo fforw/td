@@ -945,14 +945,27 @@ person: a trader, a stranger with a message, a prisoner who begs.
   tints with one of `ROBE_COLORS` per wizard, through the colors by material name
   that `skinnedFigure()` takes. The face in the hood is dark with glowing eyes from
   an emissive map, which the light field leaves alone.
-- Each robe color gets its own attack: purple fires the beam, red will rain fire
-  and blue casts a sigil on the floor (`render/sigil.ts`, `sigil.html`). So far
-  only blue ones attack. The sigil draws itself under the hero as a dim blue
+- Each robe color gets its own attack: purple fires the beam, red rains fire and
+  blue casts a sigil on the floor (`render/sigil.ts`, `sigil.html`). So far only
+  blue and red ones attack. The sigil draws itself under the hero as a dim blue
   warning and stays there, then flares up blue-white and hurts who is in it,
   shield or not, until it dissolves. It doesn't turn red, as that is the color of
   fire. A blow on the wizard while it draws breaks it. `placeSigil()` moves it off
   the walls by `SIGIL_CLEARANCE` of its radius where it can, but keeps the hero in
   it. The hue of the sigil and the robe varies a little per wizard.
+- The rain of fire (`monster/fireRain.ts`, `render/FireRainCrowd.ts`,
+  `fireRain.html`) doesn't know about wizards, so hazards and bosses can use it
+  as well. A pattern in `FIRE_PATTERNS` lays out spots with delays around an
+  aim: `scatter` at random, `line` from the caster's side through the target,
+  and `rings` from the outermost of three to the innermost, whose strikes
+  overlap in the middle. `FireRain.cast()` leaves out spots in or behind walls.
+  A disc grows to the outline of each until it strikes, with the outline hidden
+  until the disc is big enough to see (`MIN_FILL`), and it hurts for
+  `FIRE_ACTIVE`, shield or not. The flames are cartoon-like: a shader layers
+  see-through circles that rise and go from large and red to small and yellow,
+  and cuts out others that rise at varying speed and size. Red wizards pick a
+  pattern at random and aim until the staff hits the floor (`STAFF_STOMP`). A
+  blow before that stops the rain, after it nothing does.
 - For now cuboids, eyes, brutes, soldiers and wizards are placed in some rooms by the spawn
   planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in

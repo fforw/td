@@ -3,8 +3,9 @@ import { assert, describe, it } from "vitest"
 import type { Prey } from "../../src/monster/monsters"
 import { ROBE_COLORS } from "../../src/monster/WizardCrowd"
 import { SIGIL_RADIUS } from "../../src/monster/sigils"
-import WizardPack, { ROBE_COUNT, SIGIL_ROBE, WIZARD, type Wizard, type WizardFloor } from "../../src/monster/wizards"
+import WizardPack, { FIRE_ROBE, ROBE_COUNT, SIGIL_ROBE, STAFF_STOMP, WIZARD, type Wizard, type WizardFloor } from "../../src/monster/wizards"
 import { SIGIL_DRAW } from "../../src/render/sigilShape"
+import { FIRE_WARN } from "../../src/render/fireTiming"
 
 const FRAME = 1 / 60
 
@@ -54,12 +55,12 @@ describe("WizardPack", () => {
         assert.isFalse(wizard.moving)
     })
 
-    /** a blue wizard that just started a sigil under the hero */
-    function casting(): { pack: WizardPack, wizard: Wizard, hero: Prey }
+    /** a wizard, by default a blue one, that just started casting at the hero */
+    function casting(robe = SIGIL_ROBE): { pack: WizardPack, wizard: Wizard, hero: Prey }
     {
         const pack = new WizardPack(openFloor())
         const wizard = pack.add(WIZARD, 0, 0, 0)
-        wizard.robe = SIGIL_ROBE
+        wizard.robe = robe
         const hero = prey(WIZARD.keepAway, 0)
         for (let i = 0; i < 120 && !wizard.casting; i++)
         {
@@ -69,7 +70,7 @@ describe("WizardPack", () => {
         return { pack, wizard, hero }
     }
 
-    it("only casts sigils in blue", () => {
+    it("only casts in blue and red", () => {
         const pack = new WizardPack(openFloor())
         for (let robe = 0; robe < ROBE_COUNT; robe++)
         {
@@ -79,7 +80,7 @@ describe("WizardPack", () => {
         {
             pack.update(FRAME, [prey(WIZARD.keepAway, 0)])
         }
-        assert.deepEqual(pack.members.filter(({ casting }) => casting).map(({ robe }) => robe), [SIGIL_ROBE])
+        assert.deepEqual(pack.members.filter(({ casting }) => casting).map(({ robe }) => robe), [SIGIL_ROBE, FIRE_ROBE])
     })
 
     it("warns before its sigil hurts who is still in it, and only for a while", () => {
@@ -122,4 +123,43 @@ describe("WizardPack", () => {
             assert.isEmpty(pack.sigils)
         })
     }
+
+    it("shows where fire strikes after stomping the staff, and hurts who stays", () => {
+        const { pack, hero } = casting(FIRE_ROBE)
+        let stomped = 0, hurtAt = 0
+        for (let t = 0; t < STAFF_STOMP + FIRE_WARN + 2.5 && !hurtAt; t += FRAME)
+        {
+            pack.update(FRAME, [hero])
+            stomped ||= pack.fire.drops.length > 0 ? t : 0
+            assert.strictEqual(pack.touch(hero, false), 0)
+            const damage = pack.touch(hero, true)
+            if (damage > 0)
+            {
+                assert.strictEqual(damage, WIZARD.fireDamage)
+                hurtAt = t
+            }
+        }
+        assert.closeTo(stomped, STAFF_STOMP, 2 * FRAME)
+        assert.isAtLeast(hurtAt - stomped, FIRE_WARN - 2 * FRAME)
+        assert.isEmpty(pack.sigils)
+    })
+
+    it("has no fire come if a blow lands before the stomp, but not after", () => {
+        for (const [wait, comes] of [[STAFF_STOMP / 2, false], [STAFF_STOMP + 0.1, true]] as const)
+        {
+            const { pack, wizard, hero } = casting(FIRE_ROBE)
+            for (let t = 0; t < wait; t += FRAME)
+            {
+                pack.update(FRAME, [hero])
+            }
+            pack.strike(0, 0, 0, 1, Math.PI, 1)
+            assert.isNull(wizard.casting)
+            pack.update(FRAME, [hero])
+            for (let t = 0; t < 0.5; t += FRAME)
+            {
+                pack.update(FRAME, [hero])
+            }
+            assert.strictEqual(pack.fire.drops.length > 0, comes)
+        }
+    })
 })

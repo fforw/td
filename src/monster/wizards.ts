@@ -3,6 +3,8 @@ import { FIGURE_SCALE } from "../meeple/figureScale"
 import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, MonsterPack, type Prey, turnTo } from "./monsters"
 import { SIGIL_DRAW, sigilPhase } from "../render/sigilShape"
 import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./sigils"
+import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
+import FireRain, { type FireFloor } from "./fireRain"
 
 const TAU = Math.PI * 2
 
@@ -17,12 +19,24 @@ export const ROBE_COUNT = 7
 export const SIGIL_ROBE = 0
 
 /**
- * How close a hero must be for a wizard to cast a sigil on them, in world units, a bit more than it keeps away
+ * Index of the red robe, whose wizards have it rain fire
+ */
+export const FIRE_ROBE = 2
+
+/**
+ * Seconds into casting a wizard stomps the staff on the floor, which is when a rain of fire starts, and seconds
+ * casting one takes, both as the cast clip goes
+ */
+export const STAFF_STOMP = 0.75
+const FIRE_CAST = 1.25
+
+/**
+ * How close a hero must be for a wizard to cast something at them, in world units, a bit more than it keeps away
  */
 const CAST_RANGE = 2.2 * FIGURE_SCALE
 
 /**
- * Seconds from noticing a hero to the first sigil, and from the end of a cast to the next one
+ * Seconds from noticing a hero to the first spell, and from the end of a cast to the next one
  */
 const FIRST_WAIT_MIN = 0.4
 const FIRST_WAIT_MAX = 1
@@ -53,6 +67,8 @@ export interface WizardKind extends MonsterKind
     keepAway: number
     /** hit points a sigil takes */
     damage: number
+    /** hit points a strike of fire takes */
+    fireDamage: number
 }
 
 export const WIZARD: WizardKind = {
@@ -69,7 +85,24 @@ export const WIZARD: WizardKind = {
     ],
     speed: 0.45 * FIGURE_SCALE,
     keepAway: 1.5 * FIGURE_SCALE,
-    damage: 3
+    damage: 3,
+    fireDamage: 2
+}
+
+/**
+ * A spell a wizard is casting
+ */
+export interface Cast
+{
+    /** seconds since it started */
+    age: number
+    /** where the wizard looks */
+    x: number
+    z: number
+    /** sigil it is drawing, null for a rain of fire */
+    sigil: SigilState | null
+    /** whether the fire is on its way, so putting off the wizard doesn't stop it */
+    released: boolean
 }
 
 export interface Wizard extends Monster
@@ -87,8 +120,8 @@ export interface Wizard extends Monster
     robe: number
     /** varies the hue of its robe and spells, from 0 to 1 */
     hue: number
-    /** sigil it is drawing, null if it isn't */
-    casting: SigilState | null
+    /** spell it is casting, null if it isn't */
+    casting: Cast | null
     /** seconds until it may cast, which pass while it goes after someone */
     castWait: number
 }
@@ -96,23 +129,26 @@ export interface Wizard extends Monster
 /**
  * What wizards need to know about the level
  */
-export interface WizardFloor extends MonsterFloor, SigilFloor
+export interface WizardFloor extends MonsterFloor, SigilFloor, FireFloor
 {
 }
 
 
 /**
  * The wizards of a level. They wander about, and walk up to heroes they see, but stay some way off. Blue ones stop to cast
- * sigils under heroes, the others do no harm yet.
+ * sigils under heroes and red ones to have it rain fire, the others do no harm yet.
  */
 export default class WizardPack extends MonsterPack<Wizard>
 {
     /** on the floor, which stay when their wizard is gone */
     readonly sigils: SigilState[] = []
+    /** goes on when their wizard is gone, too */
+    readonly fire: FireRain
 
     constructor(protected override readonly floor: WizardFloor)
     {
         super(floor)
+        this.fire = new FireRain(floor)
     }
 
     add(kind: WizardKind, face: number, x: number, z: number): Wizard
@@ -146,6 +182,7 @@ export default class WizardPack extends MonsterPack<Wizard>
     update(delta: number, heroes: readonly Prey[]): void
     {
         this.updateSigils(delta)
+        this.fire.update(delta)
         for (const wizard of this.members)
         {
             wizard.flash = Math.max(0, wizard.flash - delta)
@@ -173,11 +210,11 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * Anyone in a sigil gets hurt once it is drawn, no shield helps against it
+     * Anyone in a sigil gets hurt once it is drawn, and anyone fire strikes. No shield helps against either.
      */
     touch(hero: Prey, open: boolean): number
     {
-        let damage = 0
+        let damage = open ? this.fire.damageAt(hero.x, hero.z) : 0
         for (const { x, z, radius, age, broken, damage: taken } of this.sigils)
         {
             if (open && sigilPhase(age, broken).hurts && Math.hypot(hero.x - x, hero.z - z) < radius && this.floor.sees(x, z, hero.x, hero.z))
@@ -200,13 +237,17 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * A blow breaks the sigil a wizard is drawing
+     * A blow breaks the sigil a wizard is drawing, and keeps fire from coming until the staff hits the floor
      */
     private breakOff(wizard: Wizard): void
     {
-        if (wizard.casting)
+        const { casting } = wizard
+        if (casting)
         {
-            wizard.casting.broken = 0
+            if (casting.sigil)
+            {
+                casting.sigil.broken = 0
+            }
             this.endCast(wizard)
         }
     }
@@ -239,30 +280,59 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * Has a blue wizard go on with its sigil, or start one under a hero close enough
+     * Has a wizard go on with its spell, or start one on a hero close enough
      */
     private cast(wizard: Wizard, prey: Prey | null, delta: number): void
     {
-        if (wizard.casting)
+        const { casting, kind, robe } = wizard
+        if (casting)
         {
-            if (wizard.casting.age >= SIGIL_DRAW)
+            casting.age += delta
+            if (!casting.sigil && !casting.released)
+            {
+                // aims at where it last saw them until the staff hits the floor
+                casting.x = wizard.goalX
+                casting.z = wizard.goalZ
+                if (casting.age >= STAFF_STOMP)
+                {
+                    casting.released = true
+                    this.rainFire(wizard, casting.x, casting.z)
+                }
+            }
+            if (casting.age >= (casting.sigil ? SIGIL_DRAW : FIRE_CAST))
             {
                 this.endCast(wizard)
             }
             return
         }
-        if (wizard.robe !== SIGIL_ROBE || wizard.chase === 0)
+        if (robe !== SIGIL_ROBE && robe !== FIRE_ROBE || wizard.chase === 0)
         {
             return
         }
         wizard.castWait = Math.max(0, wizard.castWait - delta)
-        if (wizard.castWait === 0 && prey && Math.hypot(prey.x - wizard.x, prey.z - wizard.z) <= CAST_RANGE)
+        if (wizard.castWait > 0 || !prey || Math.hypot(prey.x - wizard.x, prey.z - wizard.z) > CAST_RANGE)
         {
-            const [x, z] = placeSigil(this.floor, prey.x, prey.z, SIGIL_RADIUS)
-            const sigil: SigilState = { x, z, radius: SIGIL_RADIUS, damage: wizard.kind.damage, age: 0, broken: null, hue: wizard.hue }
-            this.sigils.push(sigil)
-            wizard.casting = sigil
+            return
         }
+        if (robe === FIRE_ROBE)
+        {
+            wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, released: false }
+            return
+        }
+        const [x, z] = placeSigil(this.floor, prey.x, prey.z, SIGIL_RADIUS)
+        const sigil: SigilState = { x, z, radius: SIGIL_RADIUS, damage: kind.damage, age: 0, broken: null, hue: wizard.hue }
+        this.sigils.push(sigil)
+        wizard.casting = { age: 0, x, z, sigil, released: false }
+    }
+
+    /**
+     * Has fire come down in one of the patterns
+     */
+    private rainFire(wizard: Wizard, x: number, z: number): void
+    {
+        const name = FIRE_PATTERN_NAMES[Math.min(FIRE_PATTERN_NAMES.length - 1, Math.floor(rng.next() * FIRE_PATTERN_NAMES.length))]
+        const spots = FIRE_PATTERNS[name]({ x, z, fromX: wizard.x, fromZ: wizard.z })
+        this.fire.cast(spots, x, z, wizard.kind.fireDamage)
     }
 
     /**

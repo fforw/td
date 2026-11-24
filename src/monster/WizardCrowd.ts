@@ -131,7 +131,7 @@ export default class WizardCrowd
         const figure = skinnedFigure("wizard", this.field, { Robe: color })
         const mixer = new AnimationMixer(figure.root)
 
-        // posed by hand, by the ground covered and by how far the sigil is drawn
+        // posed by hand, by the ground covered and by how far the spell is
         const [walk, cast] = ["walk", "cast"].map(name => {
             const action = mixer.clipAction(AnimationClip.findByName([...animations("wizard")], name)!)
             action.timeScale = 0
