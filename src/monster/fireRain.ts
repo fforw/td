@@ -1,5 +1,5 @@
 import { rng } from "../math/random"
-import { FIRE_ACTIVE, FIRE_FADE, FIRE_WARN } from "../render/fireTiming"
+import { FIRE_ACTIVE, FIRE_FADE, FIRE_FALL, FIRE_WARN } from "../render/fireTiming"
 import { FIRE_RADIUS, type FireSpot } from "./firePatterns"
 
 /**
@@ -76,6 +76,15 @@ export default class FireRain
                 })
             }
         }
+    }
+
+    /**
+     * Leaves out what hasn't started to fall yet
+     */
+    cancel(): void
+    {
+        const { drops } = this
+        drops.splice(0, drops.length, ...drops.filter(({ age }) => age >= -FIRE_FALL))
     }
 
     update(delta: number): void
