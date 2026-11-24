@@ -16,6 +16,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
 import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, findRoomRoles, type LevelExit } from "../map/dungeonRoles"
 import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallDistance } from "../map/dungeonWays"
+import { findFireRoom, type FireRoom, SWITCH_REACH } from "../map/fireRoom"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
@@ -37,6 +38,8 @@ import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
 import WizardCrowd from "../monster/WizardCrowd"
+import FireHazard from "../monster/fireHazard"
+import FireRain from "../monster/fireRain"
 import WizardPack from "../monster/wizards"
 import SigilCrowd from "../monster/SigilCrowd"
 import FireRainCrowd from "../render/FireRainCrowd"
@@ -51,6 +54,7 @@ import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
 import { createExitMeshes } from "../render/exitMeshes"
+import SwitchView from "../render/SwitchView"
 import ChestHoard, { type Chest, CHEST_HALF_DEPTH, CHEST_HALF_WIDTH, type ChestSpot, COIN_VALUE, type OpenedChests } from "../treasure/chests"
 import TreasureView from "../treasure/TreasureView"
 import type PatchWorld from "../map/PatchWorld"
@@ -242,6 +246,11 @@ const CHARTED = "charted"
 const MET_STRANGER = "metStranger"
 
 /**
+ * Fact of a level: a hero turned off the fire of its fire room
+ */
+const FIRE_OFF = "fireOff"
+
+/**
  * Counts every face as visited
  */
 const EVERYWHERE = { has: () => true }
@@ -411,6 +420,15 @@ export default class LevelScene
     private wizardCrowd: WizardCrowd | null = null
     private sigilCrowd: SigilCrowd | null = null
     private fireCrowd: FireRainCrowd | null = null
+    /** null for a level without one */
+    private fireRoom: FireRoom | null = null
+    private hazard: FireHazard | null = null
+    private readonly hazardFire = new FireRain({
+        sees: (x0, z0, x1, z1) => seesAcross(this.floorWalls!, x0, z0, x1, z1),
+        // the walls are checked when the lines are laid out
+        wallDistance: () => Infinity
+    })
+    private lever: SwitchView | null = null
     private readonly bursts = new Bursts()
     private burstCrowd: BurstCrowd | null = null
     private readonly marks = new HeroMarks()
@@ -521,7 +539,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "soldier", "wizard", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "soldier", "wizard", "switch", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -549,6 +567,7 @@ export default class LevelScene
         this.scene.add(crowd.group, this.marks.group)
         this.crowd = crowd
         this.addStranger(level, meshes, seed)
+        this.addFireRoom(level, meshes, seed)
         this.addMonsters(level, meshes, seed, chests)
         this.addSound(level, meshes, seed)
 
@@ -636,6 +655,28 @@ export default class LevelScene
         this.stranger = stranger
     }
 
+    /**
+     * Puts the fire and the switch for it into the fire room of the level. It isn't the room of the stranger, who gets to talk
+     * in peace.
+     */
+    private addFireRoom(level: DungeonLevel, { world, segments, field }: LevelMeshes, seed: number): void
+    {
+        const room = findFireRoom(level, world, segments, seed, new Set(this.strangerSpot ? [this.strangerSpot.room] : []))
+        this.fireRoom = room
+        if (!room)
+        {
+            return
+        }
+        this.hazard = new FireHazard(room, new Set(level.rooms[room.room]), this.hazardFire)
+        this.lever = new SwitchView(room.lever, field)
+        this.scene.add(this.lever.group)
+        if (this.facts.has(FIRE_OFF))
+        {
+            this.hazard.switchOff()
+            this.lever.toggle(true)
+        }
+    }
+
     private addMonsters({ rooms, corridors }: DungeonLevel, { world, field }: LevelMeshes, seed: number, solid: Float64Array): void
     {
         const walls = this.solidWalls!
@@ -657,7 +698,7 @@ export default class LevelScene
             // the stranger gets to talk in peace
             closed.add(this.strangerSpot.room)
         }
-        const plan = planSpawns({ rooms, closed }, new Prando(seed))
+        const plan = planSpawns({ rooms, closed, limited: new Set(this.fireRoom ? [this.fireRoom.room] : []) }, new Prando(seed))
         // the plan is the same for the seed, and those on known floor get left out of it
         const spawns = inUnexplored(plan.flatMap(({ spawns }) => spawns), this.exploration!)
 
@@ -711,7 +752,7 @@ export default class LevelScene
         this.sigilCrowd = sigilCrowd
         this.fireCrowd = fireCrowd
 
-        this.monsters = new Monsters([cuboids, eyes, brutes, soldiers, wizards], floor)
+        this.monsters = new Monsters([cuboids, eyes, brutes, soldiers, wizards], floor, [this.hazardFire])
         const burstCrowd = new BurstCrowd(field)
         this.scene.add(burstCrowd.mesh)
         this.burstCrowd = burstCrowd
@@ -859,6 +900,12 @@ export default class LevelScene
             {
                 this.chests!.open(chest, performance.now() / 1000)
                 this.onLoot(this.focus!, 0)
+            }
+            else if (this.nearSwitch(this.focus!))
+            {
+                this.hazard!.switchOff()
+                this.lever!.toggle()
+                this.addFact(FIRE_OFF)
             }
             else if (this.nearStranger(this.focus!))
             {
@@ -1132,6 +1179,21 @@ export default class LevelScene
     {
         const hero = this.shown.get(id)
         return !!hero && hero.hp > 0 && !!this.chestNear(hero)
+    }
+
+    /**
+     * Returns whether the hero with the given id is in the fire room and close enough to its switch, which is still on
+     */
+    nearSwitch(id: number): boolean
+    {
+        const hero = this.shown.get(id)
+        const { hazard, fireRoom, level } = this
+        if (!hero || hero.hp === 0 || !hazard?.on || !fireRoom || !level!.rooms[fireRoom.room].includes(hero.face))
+        {
+            return false
+        }
+        const { lever: { x, z } } = fireRoom
+        return Math.hypot(x - hero.meeple.position.x, z - hero.meeple.position.z) <= SWITCH_REACH
     }
 
     /**
@@ -1506,6 +1568,8 @@ export default class LevelScene
             prey.z = position.z
         }
 
+        this.hazard?.update(delta, heroes.map(([, { face, prey: { x, z } }]) => ({ face, x, z })))
+        this.lever?.update(delta)
         for (const [id, hero] of heroes)
         {
             const { prey, strikeAt } = hero
@@ -1535,7 +1599,7 @@ export default class LevelScene
         this.soldierCrowd!.update(this.soldiers!.members, delta)
         this.wizardCrowd!.update(this.wizards!.members, delta)
         this.sigilCrowd!.update(this.wizards!.sigils)
-        this.fireCrowd!.update(this.wizards!.fire.drops)
+        this.fireCrowd!.update([...this.wizards!.fire.drops, ...this.hazardFire.drops])
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }

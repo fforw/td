@@ -966,6 +966,14 @@ person: a trader, a stranger with a message, a prisoner who begs.
   and cuts out others that rise at varying speed and size. Red wizards pick a
   pattern at random and aim until the staff hits the floor (`STAFF_STOMP`). A
   blow before that stops the rain, after it nothing does.
+- A level has at most one fire room (`findFireRoom()`), a room on the main path
+  that can't be walked around, and not the one of the stranger. Lines of fire
+  cross the ways between all its doors from wall to wall (`FireHazard`), each once
+  per `HAZARD_PERIOD` and one after the other, while a hero is in there or near a
+  door. Doors and switch are safe. The switch is on the wall next to the door
+  towards the exit, if possible on one the view sees. It stops the fire for good,
+  as a fact of the level (`fireOff`). Monsters there come from `LIMITED_GROUPS`,
+  a single one at most. `dungeon.html` shows the lines and the switch.
 - For now cuboids, eyes, brutes, soldiers and wizards are placed in some rooms by the spawn
   planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in

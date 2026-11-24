@@ -403,6 +403,7 @@ export default class GameView implements PadTarget
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
+            ...(this.level?.nearSwitch(following!) ? [{ glyph: "confirm", label: "Switch off" } as const] : []),
             ...(this.level?.nearStranger(following!) ? [{ glyph: "confirm", label: "Talk" } as const] : []),
             ...(this.level?.nearExit(following!) ? [{ glyph: "confirm", label: "Leave" } as const] : []),
             { glyph: "endDay", label: "Light" },
