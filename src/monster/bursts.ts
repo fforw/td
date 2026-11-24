@@ -25,7 +25,7 @@ const BLOW_SPEED = 0.35 * FIGURE_SCALE
  * Share of the energy of a shove that is left for the particles to carry on with, the rest goes into tearing the monster
  * apart. Speed goes with the root of energy.
  */
-export const BURST_ENERGY = 0.25
+export const BURST_ENERGY = 1 / 16
 const BURST_CARRY = Math.sqrt(BURST_ENERGY)
 
 /**
