@@ -751,8 +751,10 @@ person: a trader, a stranger with a message, a prisoner who begs.
   one behind it and the back wall of the one in front, so walls only give
   way for the space the hero is in. Opening the spaces close to the hero
   as well made the wall they walk up to give way. Thick walls are cut
-  about a face deep from the floor, their corners take after the outline
-  segments they end.
+  about a face deep: each corner takes the first floor straight behind it
+  as the view has it, with floor to both sides. Cutting all around the
+  edges of the floor spread to walls in front of other spaces, and through
+  thin walls.
 - Near walls of the open space turn see-through at 30% and stay where
   they are (`render/wallCut.ts`). Walls are drawn twice from the same
   geometry, one mesh without what is cut and one with only that, which

@@ -60,7 +60,7 @@ describe("createNearWalls", () => {
     it("finds the space at the middle of each floor face, and none in the walls", () => {
 
         const { dungeon, world, slots } = level()
-        const { spaceOf, spaceAt } = createNearWalls(world, slots, dungeon)
+        const { spaceOf, spaceAt } = createNearWalls(world, dungeon)
         for (const [face, space] of spaceOf)
         {
             assert.equal(spaceAt(...faceCenter(world, face)), space)
@@ -75,7 +75,7 @@ describe("thinWallSpace", () => {
     it("gives the space behind a wall that faces the view", () => {
 
         const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, slots, dungeon)
+        const near = createNearWalls(world, dungeon)
         let found = 0, sideways = 0
         for (const h of thinWalls(world, slots))
         {
@@ -101,8 +101,8 @@ describe("thinWallSpace", () => {
     it("gives the other side for a view from the other side", () => {
 
         const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, slots, dungeon)
-        const back = createNearWalls(world, slots, dungeon, [-VIEW_AWAY[0], -VIEW_AWAY[1]])
+        const near = createNearWalls(world, dungeon)
+        const back = createNearWalls(world, dungeon, [-VIEW_AWAY[0], -VIEW_AWAY[1]])
         let differ = 0
         for (const h of thinWalls(world, slots))
         {
@@ -120,7 +120,7 @@ describe("thinWallEndSpaces", () => {
     it("has the ends of the near walls only", () => {
 
         const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, slots, dungeon)
+        const near = createNearWalls(world, dungeon)
         const walls = thinWalls(world, slots).filter(h => thinWallSpace(world, h, near))
         const ends = thinWallEndSpaces(world, slots, near)
         assert.isAtLeast(ends.size, walls.length / 2)
@@ -138,35 +138,53 @@ describe("thickWallSpaces", () => {
     it("cuts walls with floor right behind them, about a face deep", () => {
 
         const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, slots, dungeon)
-        const { triangles, outline } = wallGround(world, slots[0])
-        const spaces = thickWallSpaces(triangles, outline, near)
+        const near = createNearWalls(world, dungeon)
+        const { triangles } = wallGround(world, slots[0])
+        const spaces = thickWallSpaces(triangles, near)
 
         assert.isAbove(spaces.size, 50)
         assert.isBelow(spaces.size, triangles.length / 2)
 
-        const reach = THICK_WALL_CUT_DEPTH + 0.75 + 0.01
         for (const [key, [first]] of spaces)
         {
+            // the first floor straight behind the corner as the view has it, so no other space lies in between
             const [x, z] = key.split(",").map(Number)
-            assert.isAbove(first, 0)
-
-            // floor of that space is behind the corner as the view has it
-            let behind = false
-            for (const [face, space] of near.spaceOf)
+            let found = 0
+            for (let reach = 0.1; reach <= THICK_WALL_CUT_DEPTH + 0.01 && !found; reach += 0.1)
             {
-                const [fx, fz] = faceCenter(world, face)
-                behind ||= space === first && fz < z * SCALE + 0.5 && Math.hypot(fx - x * SCALE, fz - z * SCALE) < reach + 0.75
+                found = near.spaceAt(x * SCALE, z * SCALE - reach)
             }
-            assert.isTrue(behind, key)
+            assert.equal(found, first, key)
         }
+    })
+
+    it("doesn't spread sideways, or through a space to the one behind it", () => {
+
+        // two rooms side by side and one behind the left one, walls in front of them
+        const spaceAt = (x: number, z: number) => z >= 0 ? 0 : x < 0 ? (z > -0.3 ? 1 : 3) : 2
+        const near = { spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY }
+        const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 2].map(v => v / SCALE)
+        const spaces = thickWallSpaces(triangles, near)
+
+        assert.deepEqual([...spaces.values()], [[1, 0], [2, 0]])
+    })
+
+    it("keeps the sides of walls that run along the view", () => {
+
+        // floor to the right, the wall sticks out a bit over its edge there
+        const near = { spaceOf: new Map<number, number>(), spaceAt: (x: number, z: number) => x > 0 && z < 0 ? 1 : 0, away: VIEW_AWAY }
+        const triangles = [0.05, 0.2, 0.5, 0.2, 0.5, 0.4].map(v => v / SCALE)
+        const spaces = thickWallSpaces(triangles, near)
+
+        assert.isFalse(spaces.has(triangles[0] + "," + triangles[1]))
+        assert.equal(spaces.size, 2)
     })
 
     it("cuts nothing without floor", () => {
 
         const { world, slots } = level()
-        const near = createNearWalls(world, slots, { rooms: [], corridors: [] })
-        const { triangles, outline } = wallGround(world, slots[0])
-        assert.equal(thickWallSpaces(triangles, outline, near).size, 0)
+        const near = createNearWalls(world, { rooms: [], corridors: [] })
+        const { triangles } = wallGround(world, slots[0])
+        assert.equal(thickWallSpaces(triangles, near).size, 0)
     })
 })

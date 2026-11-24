@@ -73,7 +73,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const world = new PatchWorld()
     const slots = patches.map(patch => world.add(patch))
     const ground = slots.map(slot => createGround(world, slot, LEVEL_PRIORITY, LEVEL_GROUND_COLORS))
-    const near = createNearWalls(world, slots, level)
+    const near = createNearWalls(world, level)
     const sills = createDoorSills(world, slots)
     // the rooms are as good a seed as any, they differ from level to level
     const seed = rooms.reduce((hash, room) => (hash * 31 + room[0]) | 0, rooms.length)

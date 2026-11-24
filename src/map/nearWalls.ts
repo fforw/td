@@ -1,8 +1,8 @@
 import { faceCenter } from "./dungeonLights"
 import type { Corridor } from "./dungeonCorridors"
 import { EdgeType } from "./geometry"
-import PatchWorld, { SLOT_SHIFT } from "./PatchWorld"
-import { faceCount, next } from "./QuadPatch"
+import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./PatchWorld"
+import { next } from "./QuadPatch"
 import { SCALE } from "./scale"
 
 /**
@@ -17,16 +17,21 @@ export const VIEW_AWAY: readonly [number, number] = [0, -1]
 export const NEAR_WALL_FACING = 0.35
 
 /**
- * How far behind the outline of a thick wall to look for the floor it hides, in world units. The outline comes from
- * marching squares and doesn't run along the edges of the faces.
+ * How far into a thick wall the cut reaches from the floor it is near for, in world units, against the view. Only cutting
+ * the edge would do for seeing the floor, but leaves the camera side of the wall standing as a block next to the room. It
+ * counts from the faces of the floor, which the outline of the wall from marching squares stays clear of a bit.
  */
-const FLOOR_PROBES = [0.25, 0.5, 0.75]
+export const THICK_WALL_CUT_DEPTH = 1.2
 
 /**
- * How far into a thick wall the cut reaches from the floor it is near for, in world units, about a face. Only cutting the
- * edge would do for seeing the floor, but leaves the camera side of the wall standing as a block next to the room.
+ * Distance between the places to look for floor at behind a thick wall, in world units
  */
-export const THICK_WALL_CUT_DEPTH = 0.9
+const FLOOR_STEP = 0.1
+
+/**
+ * How far to both sides there has to be floor as well, in world units, or else the wall runs along the view there
+ */
+const FLOOR_ASIDE = 0.15
 
 /**
  * The spaces a wall is near for, 0 for none. A wall is near for a space if it stands between the camera and floor of the
@@ -79,53 +84,67 @@ export function findSpaces({ rooms, corridors }: LevelSpaces): Map<number, numbe
 
 
 /**
- * Returns a function that gives the space at a place in world units, 0 if there is no floor. It goes by the closest
- * middle of a face, which is the face around the place for faces that are close to squares.
+ * Returns a function that gives the space at a place in world units, 0 if there is no floor
  */
-function createSpaceFinder(world: PatchWorld, slots: readonly number[], spaceOf: ReadonlyMap<number, number>): NearWalls["spaceAt"]
+function createSpaceFinder(world: PatchWorld, spaceOf: ReadonlyMap<number, number>): NearWalls["spaceAt"]
 {
-    const cells = new Map<string, number[]>()
-    for (const slot of slots)
+    // faces are about a world unit in size, so the ones around a place have their middle in a cell next to it
+    const cells = new Map<string, { corners: number[], space: number }[]>()
+    for (const [face, space] of spaceOf)
     {
-        const count = faceCount(world.getPatch(slot))
-        for (let local = 0; local < count; local++)
+        const { positions, vertex } = world.getPatch(face >> (SLOT_SHIFT - 2))
+        const first = (face * 4) & LOCAL_MASK
+        const corners: number[] = []
+        for (let h = first; h < first + 4; h++)
         {
-            const [x, z] = faceCenter(world, (slot << (SLOT_SHIFT - 2)) | local)
-            const key = Math.floor(x) + "," + Math.floor(z)
-            const cell = cells.get(key)
-            const entry = [x, z, spaceOf.get((slot << (SLOT_SHIFT - 2)) | local) ?? 0]
-            if (cell)
-            {
-                cell.push(...entry)
-            }
-            else
-            {
-                cells.set(key, entry)
-            }
+            corners.push(positions[vertex[h] * 3] * SCALE, positions[vertex[h] * 3 + 1] * SCALE)
+        }
+        const [x, z] = faceCenter(world, face)
+        const key = Math.floor(x) + "," + Math.floor(z)
+        const cell = cells.get(key)
+        if (cell)
+        {
+            cell.push({ corners, space })
+        }
+        else
+        {
+            cells.set(key, [{ corners, space }])
         }
     }
 
     return (x, z) => {
-        let best = 1, space = 0
         const cx = Math.floor(x), cz = Math.floor(z)
         for (let ix = cx - 1; ix <= cx + 1; ix++)
         {
             for (let iz = cz - 1; iz <= cz + 1; iz++)
             {
-                const cell = cells.get(ix + "," + iz)
-                for (let i = 0; cell && i < cell.length; i += 3)
+                const found = cells.get(ix + "," + iz)?.find(({ corners }) => isInside(corners, x, z))
+                if (found)
                 {
-                    const distance = (cell[i] - x) ** 2 + (cell[i + 1] - z) ** 2
-                    if (distance < best)
-                    {
-                        best = distance
-                        space = cell[i + 2]
-                    }
+                    return found.space
                 }
             }
         }
-        return space
+        return 0
     }
+}
+
+
+/**
+ * Returns whether a place is inside of the polygon with the given corners, x and z of each
+ */
+function isInside(corners: readonly number[], x: number, z: number): boolean
+{
+    let inside = false
+    for (let i = 0, j = corners.length - 2; i < corners.length; j = i, i += 2)
+    {
+        const xi = corners[i], zi = corners[i + 1], xj = corners[j], zj = corners[j + 1]
+        if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi)
+        {
+            inside = !inside
+        }
+    }
+    return inside
 }
 
 
@@ -134,13 +153,12 @@ function createSpaceFinder(world: PatchWorld, slots: readonly number[], spaceOf:
  */
 export function createNearWalls(
     world: PatchWorld,
-    slots: readonly number[],
     level: LevelSpaces,
     away: readonly [number, number] = VIEW_AWAY
 ): NearWalls
 {
     const spaceOf = findSpaces(level)
-    return { spaceOf, spaceAt: createSpaceFinder(world, slots, spaceOf), away }
+    return { spaceOf, spaceAt: createSpaceFinder(world, spaceOf), away }
 }
 
 
@@ -159,62 +177,52 @@ function addSpace(spaces: Map<string, NearSpaces>, key: string, space: number): 
 
 
 /**
- * Returns the spaces the corners of thick walls are near for. A point on the outline takes after the outline segments it
- * ends, and the cut then reaches from there into the wall on the side of the camera.
+ * Returns the spaces the corners of thick walls are near for, which is the first floor straight behind them as the view
+ * has it. Looking any other way finds floor on the other side of thin walls, or spreads the cut along the wall to where it
+ * stands in front of another space.
  *
  * @param triangles corners of the wall ground as from wallGround(), in patch units
- * @param outline   segments as from wallGround(), in patch units, with the wall on their left
  * @param near      tells the near walls
  *
  * @return spaces by "x,z" of the corners as they are in the wall ground, only for those that are near for some space
  */
-export function thickWallSpaces(
-    triangles: readonly number[],
-    outline: readonly (readonly number[])[],
-    { spaceAt, away }: NearWalls
-): Map<string, NearSpaces>
+export function thickWallSpaces(triangles: readonly number[], { spaceAt, away }: NearWalls): Map<string, NearSpaces>
 {
     const spaces = new Map<string, NearSpaces>()
-    for (const [x0, z0, x1, z1] of outline)
-    {
-        // out of the wall, see findWallSegments()
-        const length = Math.hypot(x1 - x0, z1 - z0)
-        const nx = (z0 - z1) / length, nz = (x1 - x0) / length
-        if (!(nx * away[0] + nz * away[1] >= NEAR_WALL_FACING))
-        {
-            continue
-        }
+    const steps = Math.round(THICK_WALL_CUT_DEPTH / FLOOR_STEP)
+    // the edge of a wall that barely faces enough gets this much further away to the side
+    const slack = Math.ceil(FLOOR_ASIDE * Math.sqrt(1 / NEAR_WALL_FACING ** 2 - 1) / FLOOR_STEP)
 
-        const mx = (x0 + x1) / 2 * SCALE, mz = (z0 + z1) / 2 * SCALE
-        for (const probe of FLOOR_PROBES)
+    // the step the first floor is at, 0 for none
+    const firstFloor = (x: number, z: number, count: number): number => {
+        for (let step = 1; step <= count; step++)
         {
-            const space = spaceAt(mx + nx * probe, mz + nz * probe)
-            if (space)
+            const reach = step * FLOOR_STEP
+            if (spaceAt(x + away[0] * reach, z + away[1] * reach))
             {
-                addSpace(spaces, x0 + "," + z0, space)
-                addSpace(spaces, x1 + "," + z1, space)
-                break
+                return step
             }
         }
+        return 0
     }
 
-    const edge = [...spaces].map(([key, [space]]) => [...key.split(",").map(Number), space])
-    const depth = (THICK_WALL_CUT_DEPTH / SCALE) ** 2
+    const asideX = -away[1] * FLOOR_ASIDE, asideZ = away[0] * FLOOR_ASIDE
     for (let i = 0; i < triangles.length; i += 2)
     {
         const x = triangles[i], z = triangles[i + 1]
         const key = x + "," + z
-        if (spaces.get(key)?.[1])
+        if (spaces.has(key))
         {
             continue
         }
-        for (const [ex, ez, space] of edge)
+        const wx = x * SCALE, wz = z * SCALE
+        const step = firstFloor(wx, wz, steps)
+        if (step
+            && firstFloor(wx + asideX, wz + asideZ, step + slack)
+            && firstFloor(wx - asideX, wz - asideZ, step + slack))
         {
-            const dx = x - ex, dz = z - ez
-            if (dx * away[0] + dz * away[1] <= 0 && dx * dx + dz * dz <= depth)
-            {
-                addSpace(spaces, key, space)
-            }
+            const reach = step * FLOOR_STEP
+            spaces.set(key, [spaceAt(wx + away[0] * reach, wz + away[1] * reach), 0])
         }
     }
     return spaces

@@ -105,7 +105,7 @@ export function createThickWalls(world: PatchWorld, slot: number, near?: NearWal
     const positions: number[] = []
     const nearSpace: number[] = []
     const { triangles, outline } = wallGround(world, slot)
-    const spaces = near ? thickWallSpaces(triangles, outline, near) : new Map<string, NearSpaces>()
+    const spaces = near ? thickWallSpaces(triangles, near) : new Map<string, NearSpaces>()
     const spacesAt = (x: number, z: number): NearSpaces => spaces.get(x + "," + z) ?? NO_SPACES
 
     for (let i = 0; i < triangles.length; i += 2)
