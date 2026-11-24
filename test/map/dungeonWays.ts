@@ -2,7 +2,7 @@ import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import { faceCenter, findWallSegments, SEGMENT_SIZE } from "../../src/map/dungeonLights"
-import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../../src/map/dungeonWays"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallDistance } from "../../src/map/dungeonWays"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
@@ -32,6 +32,24 @@ function level(seed: number)
 
 
 describe("Ways through dungeon levels", () => {
+
+    it("tells the distance to the closest wall", () => {
+
+        const { rooms, world, segments, walls } = level(1)
+        for (const face of rooms.flat())
+        {
+            const [x, z] = faceCenter(world, face)
+            let closest = RADIUS
+            for (let s = 0; s < segments.length; s += SEGMENT_SIZE)
+            {
+                const ex = segments[s + 2] - segments[s], ez = segments[s + 3] - segments[s + 1]
+                const px = x - segments[s], pz = z - segments[s + 1]
+                const t = Math.max(0, Math.min(1, (px * ex + pz * ez) / (ex * ex + ez * ez)))
+                closest = Math.min(closest, Math.hypot(px - t * ex, pz - t * ez))
+            }
+            assert.closeTo(wallDistance(walls, x, z), closest, 1e-9)
+        }
+    })
 
     it("sees across the floor up to the first wall", () => {
 

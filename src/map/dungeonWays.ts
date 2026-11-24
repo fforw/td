@@ -299,6 +299,23 @@ export function seesAcross(walls: FloorWalls, x0: number, z0: number, x1: number
 
 
 /**
+ * Returns the distance to the closest wall in world units, or the radius of the walls if there is none within it
+ */
+export function wallDistance({ segments, radius, cells }: FloorWalls, x: number, z: number): number
+{
+    let closest = radius
+    for (const s of cells.get(cellKey(x, z)) ?? [])
+    {
+        const x0 = segments[s], z0 = segments[s + 1]
+        const ex = segments[s + 2] - x0, ez = segments[s + 3] - z0
+        const t = Math.max(0, Math.min(1, ((x - x0) * ex + (z - z0) * ez) / (ex * ex + ez * ez)))
+        closest = Math.min(closest, Math.hypot(x - x0 - t * ex, z - z0 - t * ez))
+    }
+    return closest
+}
+
+
+/**
  * Moves someone over the floor of a level. They slide along the walls in their way, and stay out of them by their radius.
  *
  * @param world     world with all patches of the level
