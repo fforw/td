@@ -117,6 +117,18 @@ export interface MonsterFloor
 
 
 /**
+ * Something of the level that hurts heroes where they stand, shield or not
+ */
+export interface Hazard
+{
+    /**
+     * Returns the hit points it takes from someone at the given point right now
+     */
+    damageAt(x: number, z: number): number
+}
+
+
+/**
  * Returns whether two things get in each other's way: those on the same ground always, a flying one and one on the ground only
  * if the one on the ground is big
  */
@@ -325,7 +337,12 @@ export abstract class MonsterPack<M extends Monster = Monster>
  */
 export default class Monsters
 {
-    constructor(readonly packs: readonly MonsterPack[], private readonly floor: MonsterFloor)
+    /**
+     * @param packs     all monsters
+     * @param floor     the level
+     * @param hazards   what else hurts heroes
+     */
+    constructor(readonly packs: readonly MonsterPack[], private readonly floor: MonsterFloor, private readonly hazards: readonly Hazard[] = [])
     {
     }
 
@@ -367,7 +384,8 @@ export default class Monsters
     {
         hero.hurtWait = Math.max(0, hero.hurtWait - delta)
         const open = hero.hurtWait === 0 && !hero.dodging
-        const damage = this.packs.reduce((most, pack) => Math.max(most, pack.touch(hero, open)), 0)
+        const touched = this.packs.reduce((most, pack) => Math.max(most, pack.touch(hero, open)), 0)
+        const damage = this.hazards.reduce((most, hazard) => Math.max(most, hazard.damageAt(hero.x, hero.z)), touched)
         if (open && damage > 0)
         {
             hero.hurtWait = HURT_WAIT
