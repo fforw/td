@@ -3,12 +3,18 @@ import { LEVEL_MEEPLE_SCALE } from "../meeple/Meeple3D"
 import type { LightField } from "../render/dungeonLighting"
 import { animations } from "../render/scene3d"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
-import type { Wizard } from "./wizards"
+import { SIGIL_HUE_RANGE } from "../render/sigil"
+import { SIGIL_ROBE, type Wizard } from "./wizards"
 
 /**
  * Seconds it takes to start and stop walking
  */
 const FADE_TIME = 0.2
+
+/**
+ * Seconds it takes to start and stop casting
+ */
+const CAST_FADE_TIME = 0.12
 
 /**
  * Colors of the robes of wizards, as many as ROBE_COUNT. The robe of the model is a gradient from white at the head to
@@ -30,6 +36,9 @@ interface Figure extends SkinnedFigure
     walk: AnimationAction
     /** how far it has started walking, from 0 to 1 */
     walking: number
+    cast: AnimationAction
+    /** how far it has started casting, from 0 to 1 */
+    casting: number
 }
 
 
@@ -73,7 +82,7 @@ export default class WizardCrowd
             let figure = figures.get(wizard)
             if (!figure)
             {
-                figure = this.createFigure(wizard.robe)
+                figure = this.createFigure(wizard)
                 figures.set(wizard, figure)
                 this.group.add(figure.root)
             }
@@ -82,12 +91,12 @@ export default class WizardCrowd
     }
 
     /**
-     * Poses a figure by the state of its wizard, with the walk fading in and out
+     * Poses a figure by the state of its wizard, with the walk and the cast fading in and out
      */
     private pose(wizard: Wizard, figure: Figure, delta: number): void
     {
-        const { kind, x, z, yaw, walked, moving, flash, chase } = wizard
-        const { root, mixer, walk } = figure
+        const { kind, x, z, yaw, walked, moving, casting, flash, chase } = wizard
+        const { root, mixer, walk, cast } = figure
 
         root.position.set(x, 0, z)
         root.rotation.y = yaw
@@ -98,23 +107,40 @@ export default class WizardCrowd
         figure.walking = moving ? Math.min(1, figure.walking + step) : Math.max(0, figure.walking - step)
         walk.setEffectiveWeight(figure.walking)
         walk.time = walked / kind.speed % walk.getClip().duration
+
+        const castStep = delta / CAST_FADE_TIME
+        figure.casting = casting ? Math.min(1, figure.casting + castStep) : Math.max(0, figure.casting - castStep)
+        cast.setEffectiveWeight(figure.casting)
+        if (casting)
+        {
+            cast.time = Math.min(casting.age, cast.getClip().duration)
+        }
         mixer.update(0)
 
         tintFigure(figure, flash, chase)
     }
 
-    private createFigure(robe: number): Figure
+    private createFigure({ robe, hue }: Wizard): Figure
     {
-        const figure = skinnedFigure("wizard", this.field, { Robe: new Color(ROBE_COLORS[robe % ROBE_COLORS.length]) })
+        const color = new Color(ROBE_COLORS[robe % ROBE_COLORS.length])
+        if (robe === SIGIL_ROBE)
+        {
+            // as its sigils
+            color.offsetHSL((hue * 2 - 1) * SIGIL_HUE_RANGE, 0, 0)
+        }
+        const figure = skinnedFigure("wizard", this.field, { Robe: color })
         const mixer = new AnimationMixer(figure.root)
 
-        // posed by hand, by the ground covered
-        const walk = mixer.clipAction(AnimationClip.findByName([...animations("wizard")], "walk")!)
-        walk.timeScale = 0
-        walk.setLoop(LoopOnce, 1)
-        walk.clampWhenFinished = true
-        walk.setEffectiveWeight(0)
-        walk.play()
-        return { ...figure, mixer, walk, walking: 0 }
+        // posed by hand, by the ground covered and by how far the sigil is drawn
+        const [walk, cast] = ["walk", "cast"].map(name => {
+            const action = mixer.clipAction(AnimationClip.findByName([...animations("wizard")], name)!)
+            action.timeScale = 0
+            action.setLoop(LoopOnce, 1)
+            action.clampWhenFinished = true
+            action.setEffectiveWeight(0)
+            action.play()
+            return action
+        })
+        return { ...figure, mixer, walk, cast, walking: 0, casting: 0 }
     }
 }
