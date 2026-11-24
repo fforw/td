@@ -73,15 +73,15 @@ export interface WizardKind extends MonsterKind
 
 export const WIZARD: WizardKind = {
     scale: 1,
-    radius: 0.09 * FIGURE_SCALE,
+    radius: 0.11 * FIGURE_SCALE,
     mass: 0.8,
     hp: 5,
     big: true,
     flying: false,
     // the robe, and the staff on its right
     burst: [
-        { x: 0, y: 0.5, z: 0, rx: 0.2, ry: 0.5, rz: 0.2, colors: ["#d8d8d8", "#a0a0a0", "#1a1a1a"] },
-        { x: -0.3, y: 0.55, z: -0.2, rx: 0.04, ry: 0.5, rz: 0.04, colors: ["#5b3a24"] }
+        { x: 0, y: 0.55, z: 0, rx: 0.25, ry: 0.55, rz: 0.22, colors: ["#d8d8d8", "#a0a0a0", "#1a1a1a"] },
+        { x: -0.4, y: 0.6, z: 0.18, rx: 0.04, ry: 0.55, rz: 0.04, colors: ["#5b3a24"] }
     ],
     speed: 0.45 * FIGURE_SCALE,
     keepAway: 1.5 * FIGURE_SCALE,
