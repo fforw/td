@@ -1,14 +1,16 @@
 import "./style.css"
 import { loadLevel } from "./dungeonPage"
 import { placeFixtures } from "./game/levelFixtures"
-import { findWallSegments } from "./map/dungeonLights"
-import { findRoomRoles, type LevelExit, type RoomRoles } from "./map/dungeonRoles"
+import { faceCenter, findWallSegments } from "./map/dungeonLights"
+import { entranceRoom, findRoomRoles, type LevelExit, type RoomRoles } from "./map/dungeonRoles"
+import { findFireRoom, type FireRoom } from "./map/fireRoom"
 import type { FixtureSpot } from "./map/fixtures"
 import type { DungeonLevel } from "./map/generateDungeon"
 import { EdgeType, FaceType } from "./map/geometry"
 import PatchWorld, { LOCAL_MASK, SLOT_SHIFT } from "./map/PatchWorld"
 import { BORDER_FIRST, BORDER_SECOND, BORDER_STRIDE, faceCount, next, type QuadPatch } from "./map/QuadPatch"
 import { SCALE } from "./map/scale"
+import { placeStranger } from "./scene/stranger"
 
 /*
  * Test page for the layout of a dungeon level as a plan, e.g. dungeon.html?seed=1&width=3&height=2&floor=0.5&labyrinth=5
@@ -30,6 +32,7 @@ const ENTRANCE_COLOR = "#40d060"
 const ROOM_MARK_COLOR = "#fff"
 const UNREACHABLE_COLOR = "#606068"
 const EXIT_COLOR = "#ff3030"
+const FIRE_COLOR = "#f02010"
 const CHEST_COLOR = "#ffb020"
 
 /**
@@ -92,6 +95,7 @@ interface Fixtures
 {
     exits: LevelExit[]
     chests: FixtureSpot[]
+    fireRoom: FireRoom | null
 }
 
 
@@ -209,6 +213,22 @@ function draw(level: DungeonLevel, roles: RoomRoles, fixtures: Fixtures): (x: nu
     ctx.beginPath()
     roles.mainPath.forEach(room => ctx.lineTo(...marks[room]))
     ctx.stroke()
+
+    // lines of fire and their switch
+    if (fixtures.fireRoom)
+    {
+        ctx.fillStyle = FIRE_COLOR
+        for (const { x, z } of fixtures.fireRoom.lines.flatMap(({ strikes }) => strikes))
+        {
+            ctx.beginPath()
+            ctx.arc(...toScreen(x / SCALE, z / SCALE), 2, 0, Math.PI * 2)
+            ctx.fill()
+        }
+        const { x, z } = fixtures.fireRoom.lever
+        const [sx, sy] = toScreen(x / SCALE, z / SCALE)
+        ctx.fillStyle = LABEL_COLOR
+        ctx.fillRect(sx - 4, sy - 4, 8, 8)
+    }
 
     // exits and chests where they stand
     for (const [spots, color, half] of [[fixtures.exits, EXIT_COLOR, 5], [fixtures.chests, CHEST_COLOR, 3.5]] as const)
@@ -385,7 +405,12 @@ loadLevel().then(({ level, seed }) => {
     // the same exits and chests as in the game, which takes them from the seed of the level
     const world = new PatchWorld()
     const slots = level.patches.map(patch => world.add(patch))
-    const fixtures = placeFixtures(level, world, findWallSegments(world, slots), seed)
+    const segments = findWallSegments(world, slots)
+    const stranger = placeStranger(level.rooms, entranceRoom(level.rooms, level.corridors), face => faceCenter(world, face), seed)
+    const fixtures = {
+        ...placeFixtures(level, world, segments, seed),
+        fireRoom: findFireRoom(level, world, segments, seed, new Set(stranger ? [stranger.room] : []))
+    }
 
     let roomAt = draw(level, roles, fixtures)
     window.addEventListener("resize", () => {
