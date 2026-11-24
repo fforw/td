@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🏰 ⚔️ 🛡️ fire rain</title>
+    <style>
+        html, body
+        {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #screen
+        {
+            display: block;
+        }
+
+        #info
+        {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            padding: 8px;
+            background: #000c;
+            color: #fff;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<div id="info"></div>
+<script type="module" src="/src/fireRainTest.ts"></script>
+</body>
+</html>
