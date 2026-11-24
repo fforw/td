@@ -920,7 +920,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   Blender: each brute has its own rigged copy with an AnimationMixer
   (`BruteCrowd`), the walk following the ground covered and the attack the
   time into the swing, so they are for few at a time.
-- The soldier (`monster/soldiers.ts`) walks after heroes a bit slower than
+- The soldier (`monster/soldiers.ts`), 1.15 times the size of its model with body
+  and reach to match, walks after heroes a bit slower than
   they run, takes 4 sword blows and swings a sword that hurts for 3 in front,
   which a shield stops. After each swing, and when struck while not swinging,
   it holds up its own shield for 1 to 2.5 seconds, turning after the hero and

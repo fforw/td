@@ -77,9 +77,14 @@ export interface SoldierKind extends MonsterKind
     reach: number
 }
 
+/**
+ * Size of a soldier against its model, which is a bit small next to the heroes
+ */
+const SIZE = 1.15
+
 export const SOLDIER: SoldierKind = {
-    scale: 1,
-    radius: 0.09 * FIGURE_SCALE,
+    scale: SIZE,
+    radius: 0.09 * SIZE * FIGURE_SCALE,
     mass: 1.2,
     hp: 8,
     big: true,
@@ -92,7 +97,7 @@ export const SOLDIER: SoldierKind = {
     ],
     damage: 3,
     speed: 0.55 * FIGURE_SCALE,
-    reach: 0.25 * FIGURE_SCALE
+    reach: 0.25 * SIZE * FIGURE_SCALE
 }
 
 
