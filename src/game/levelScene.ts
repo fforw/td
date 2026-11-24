@@ -15,7 +15,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
 import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, findRoomRoles, type LevelExit } from "../map/dungeonRoles"
-import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross } from "../map/dungeonWays"
+import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallDistance } from "../map/dungeonWays"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
 import { actionDuration, itemAnimation } from "../items/itemAnimation"
@@ -38,6 +38,8 @@ import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
 import WizardCrowd from "../monster/WizardCrowd"
 import WizardPack from "../monster/wizards"
+import SigilCrowd from "../monster/SigilCrowd"
+import { SIGIL_RADIUS } from "../monster/sigils"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
@@ -406,6 +408,7 @@ export default class LevelScene
     private soldierCrowd: SoldierCrowd | null = null
     private wizards: WizardPack | null = null
     private wizardCrowd: WizardCrowd | null = null
+    private sigilCrowd: SigilCrowd | null = null
     private readonly bursts = new Bursts()
     private burstCrowd: BurstCrowd | null = null
     private readonly marks = new HeroMarks()
@@ -636,6 +639,8 @@ export default class LevelScene
         const walls = this.solidWalls!
         const seeing = this.floorWalls!
         const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
+        // chests may stand in a sigil
+        const sigilWalls = createFloorWalls(seeing.segments, SIGIL_RADIUS)
         const floor: MonsterFloor = {
             // flying ones go over chests
             move: (monster, dx, dz) => moveOnFloor(world, monster.kind.flying ? seeing : monster.kind.big ? bigWalls : walls, monster, dx, dz),
@@ -658,7 +663,7 @@ export default class LevelScene
         const eyes = new EyePack(floor)
         const brutes = new BrutePack(floor)
         const soldiers = new SoldierPack(floor)
-        const wizards = new WizardPack(floor)
+        const wizards = new WizardPack({ ...floor, wallDistance: (x, z) => wallDistance(sigilWalls, x, z) })
         for (const spawn of spawns)
         {
             const [x, z] = faceCenter(world, spawn.face)
@@ -687,7 +692,8 @@ export default class LevelScene
         const bruteCrowd = new BruteCrowd(field)
         const soldierCrowd = new SoldierCrowd(field)
         const wizardCrowd = new WizardCrowd(field)
-        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group)
+        const sigilCrowd = new SigilCrowd()
+        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
         this.eyes = eyes
@@ -698,6 +704,7 @@ export default class LevelScene
         this.soldierCrowd = soldierCrowd
         this.wizards = wizards
         this.wizardCrowd = wizardCrowd
+        this.sigilCrowd = sigilCrowd
 
         this.monsters = new Monsters([cuboids, eyes, brutes, soldiers, wizards], floor)
         const burstCrowd = new BurstCrowd(field)
@@ -1522,6 +1529,7 @@ export default class LevelScene
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)
         this.soldierCrowd!.update(this.soldiers!.members, delta)
         this.wizardCrowd!.update(this.wizards!.members, delta)
+        this.sigilCrowd!.update(this.wizards!.sigils)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }

@@ -1,6 +1,8 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { CHASE_TIME, type Monster, type MonsterKind, MonsterPack, type Prey, turnTo } from "./monsters"
+import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, MonsterPack, type Prey, turnTo } from "./monsters"
+import { SIGIL_DRAW, sigilPhase } from "../render/sigilShape"
+import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./sigils"
 
 const TAU = Math.PI * 2
 
@@ -8,6 +10,24 @@ const TAU = Math.PI * 2
  * Number of robe colors to pick from, see ROBE_COLORS in WizardCrowd
  */
 export const ROBE_COUNT = 7
+
+/**
+ * Index of the blue robe, whose wizards cast sigils
+ */
+export const SIGIL_ROBE = 0
+
+/**
+ * How close a hero must be for a wizard to cast a sigil on them, in world units, a bit more than it keeps away
+ */
+const CAST_RANGE = 2.2 * FIGURE_SCALE
+
+/**
+ * Seconds from noticing a hero to the first sigil, and from the end of a cast to the next one
+ */
+const FIRST_WAIT_MIN = 0.4
+const FIRST_WAIT_MAX = 1
+const CAST_WAIT_MIN = 2
+const CAST_WAIT_MAX = 3.5
 
 /**
  * How fast a wizard turns, in radians per second
@@ -31,6 +51,8 @@ export interface WizardKind extends MonsterKind
     speed: number
     /** how close it comes to who it goes after, in world units */
     keepAway: number
+    /** hit points a sigil takes */
+    damage: number
 }
 
 export const WIZARD: WizardKind = {
@@ -46,7 +68,8 @@ export const WIZARD: WizardKind = {
         { x: -0.3, y: 0.55, z: -0.2, rx: 0.04, ry: 0.5, rz: 0.04, colors: ["#5b3a24"] }
     ],
     speed: 0.45 * FIGURE_SCALE,
-    keepAway: 1.5 * FIGURE_SCALE
+    keepAway: 1.5 * FIGURE_SCALE,
+    damage: 3
 }
 
 export interface Wizard extends Monster
@@ -62,15 +85,36 @@ export interface Wizard extends Monster
     lookWait: number
     /** index into the robe colors */
     robe: number
+    /** varies the hue of its robe and spells, from 0 to 1 */
+    hue: number
+    /** sigil it is drawing, null if it isn't */
+    casting: SigilState | null
+    /** seconds until it may cast, which pass while it goes after someone */
+    castWait: number
+}
+
+/**
+ * What wizards need to know about the level
+ */
+export interface WizardFloor extends MonsterFloor, SigilFloor
+{
 }
 
 
 /**
- * The wizards of a level. A placeholder so far: they wander about, and walk up to heroes they see, but stay some way off
- * and do them no harm.
+ * The wizards of a level. They wander about, and walk up to heroes they see, but stay some way off. Blue ones stop to cast
+ * sigils under heroes, the others do no harm yet.
  */
 export default class WizardPack extends MonsterPack<Wizard>
 {
+    /** on the floor, which stay when their wizard is gone */
+    readonly sigils: SigilState[] = []
+
+    constructor(protected override readonly floor: WizardFloor)
+    {
+        super(floor)
+    }
+
     add(kind: WizardKind, face: number, x: number, z: number): Wizard
     {
         const wizard: Wizard = {
@@ -88,6 +132,9 @@ export default class WizardPack extends MonsterPack<Wizard>
             goalZ: 0,
             lookWait: rng.next() * LOOK_TIME,
             robe: Math.floor(rng.next() * ROBE_COUNT),
+            hue: rng.next(),
+            casting: null,
+            castWait: rng.next(FIRST_WAIT_MIN, FIRST_WAIT_MAX),
             flash: 0,
             shoveX: 0,
             shoveZ: 0
@@ -98,6 +145,7 @@ export default class WizardPack extends MonsterPack<Wizard>
 
     update(delta: number, heroes: readonly Prey[]): void
     {
+        this.updateSigils(delta)
         for (const wizard of this.members)
         {
             wizard.flash = Math.max(0, wizard.flash - delta)
@@ -112,20 +160,109 @@ export default class WizardPack extends MonsterPack<Wizard>
                 wizard.goalZ = prey.z
                 wizard.wandering = false
             }
-            this.decide(wizard, delta)
+            this.cast(wizard, prey, delta)
+            if (wizard.casting)
+            {
+                turnTo(wizard, wizard.casting.x, wizard.casting.z, TURN_RATE * delta)
+            }
+            else
+            {
+                this.decide(wizard, delta)
+            }
         }
     }
 
     /**
-     * Wizards don't hurt anyone yet
+     * Anyone in a sigil gets hurt once it is drawn, no shield helps against it
      */
-    touch(_hero: Prey, _open: boolean): number
+    touch(hero: Prey, open: boolean): number
     {
-        return 0
+        let damage = 0
+        for (const { x, z, radius, age, broken, damage: taken } of this.sigils)
+        {
+            if (open && sigilPhase(age, broken).hurts && Math.hypot(hero.x - x, hero.z - z) < radius && this.floor.sees(x, z, hero.x, hero.z))
+            {
+                damage = Math.max(damage, taken)
+            }
+        }
+        return damage
     }
 
-    protected struck(): void
+    protected struck(wizard: Wizard): void
     {
+        this.breakOff(wizard)
+    }
+
+    protected kill(wizard: Wizard): number
+    {
+        this.breakOff(wizard)
+        return 1
+    }
+
+    /**
+     * A blow breaks the sigil a wizard is drawing
+     */
+    private breakOff(wizard: Wizard): void
+    {
+        if (wizard.casting)
+        {
+            wizard.casting.broken = 0
+            this.endCast(wizard)
+        }
+    }
+
+    private endCast(wizard: Wizard): void
+    {
+        wizard.casting = null
+        wizard.castWait = rng.next(CAST_WAIT_MIN, CAST_WAIT_MAX)
+    }
+
+    private updateSigils(delta: number): void
+    {
+        const { sigils } = this
+        for (let i = sigils.length - 1; i >= 0; i--)
+        {
+            const sigil = sigils[i]
+            if (sigil.broken === null)
+            {
+                sigil.age += delta
+            }
+            else
+            {
+                sigil.broken += delta
+            }
+            if (sigilPhase(sigil.age, sigil.broken).opacity === 0)
+            {
+                sigils.splice(i, 1)
+            }
+        }
+    }
+
+    /**
+     * Has a blue wizard go on with its sigil, or start one under a hero close enough
+     */
+    private cast(wizard: Wizard, prey: Prey | null, delta: number): void
+    {
+        if (wizard.casting)
+        {
+            if (wizard.casting.age >= SIGIL_DRAW)
+            {
+                this.endCast(wizard)
+            }
+            return
+        }
+        if (wizard.robe !== SIGIL_ROBE || wizard.chase === 0)
+        {
+            return
+        }
+        wizard.castWait = Math.max(0, wizard.castWait - delta)
+        if (wizard.castWait === 0 && prey && Math.hypot(prey.x - wizard.x, prey.z - wizard.z) <= CAST_RANGE)
+        {
+            const [x, z] = placeSigil(this.floor, prey.x, prey.z, SIGIL_RADIUS)
+            const sigil: SigilState = { x, z, radius: SIGIL_RADIUS, damage: wizard.kind.damage, age: 0, broken: null, hue: wizard.hue }
+            this.sigils.push(sigil)
+            wizard.casting = sigil
+        }
     }
 
     /**

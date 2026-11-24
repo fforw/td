@@ -937,14 +937,22 @@ person: a trader, a stranger with a message, a prisoner who begs.
   guard, while the arms give way to swinging and guarding. Each clip of the
   model has only the bones its action moves, as the export leaves out the
   rest, or a guard would hold the body still.
-- The wizard (`monster/wizards.ts`) is a placeholder so far: it wanders, walks
-  up to heroes it sees but stops 1.5 figure sizes away, and does no harm. Its
-  model has only the soldier's walk, with the staff swaying against the hips
-  like the sword. Wizards differ by the color of their robe: the robe of the
-  model is a gradient from white at the head to middle grey at the hem, which
-  `WizardCrowd` tints with one of `ROBE_COLORS` per wizard, through the colors
-  by material name that `skinnedFigure()` takes. The face in the hood is dark
-  with glowing eyes from an emissive map, which the light field leaves alone.
+- The wizard (`monster/wizards.ts`) wanders, and walks up to heroes it sees but
+  stops 1.5 figure sizes away. Its model has only the soldier's walk, with the
+  staff swaying against the hips like the sword, and casts.
+  Wizards differ by the color of their robe: the robe of the model is a gradient
+  from white at the head to middle grey at the hem, which `WizardCrowd`
+  tints with one of `ROBE_COLORS` per wizard, through the colors by material name
+  that `skinnedFigure()` takes. The face in the hood is dark with glowing eyes from
+  an emissive map, which the light field leaves alone.
+- Each robe color gets its own attack: purple fires the beam, red will rain fire
+  and blue casts a sigil on the floor (`render/sigil.ts`, `sigil.html`). So far
+  only blue ones attack. The sigil draws itself under the hero as a dim blue
+  warning and stays there, then flares up blue-white and hurts who is in it,
+  shield or not, until it dissolves. It doesn't turn red, as that is the color of
+  fire. A blow on the wizard while it draws breaks it. `placeSigil()` moves it off
+  the walls by `SIGIL_CLEARANCE` of its radius where it can, but keeps the hero in
+  it. The hue of the sigil and the robe varies a little per wizard.
 - For now cuboids, eyes, brutes, soldiers and wizards are placed in some rooms by the spawn
   planner (3.7) from the level seed, not by a premise, and aren't saved. Only those on floor no hero has
   been to get created (`inUnexplored()`), so a reload brings back the ones in
