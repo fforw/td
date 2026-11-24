@@ -39,6 +39,7 @@ import { planSpawns } from "../monster/spawns"
 import WizardCrowd from "../monster/WizardCrowd"
 import WizardPack from "../monster/wizards"
 import SigilCrowd from "../monster/SigilCrowd"
+import FireRainCrowd from "../render/FireRainCrowd"
 import { SIGIL_RADIUS } from "../monster/sigils"
 import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
@@ -409,6 +410,7 @@ export default class LevelScene
     private wizards: WizardPack | null = null
     private wizardCrowd: WizardCrowd | null = null
     private sigilCrowd: SigilCrowd | null = null
+    private fireCrowd: FireRainCrowd | null = null
     private readonly bursts = new Bursts()
     private burstCrowd: BurstCrowd | null = null
     private readonly marks = new HeroMarks()
@@ -639,7 +641,7 @@ export default class LevelScene
         const walls = this.solidWalls!
         const seeing = this.floorWalls!
         const bigWalls = createFloorWalls(solid, BIG_MONSTER_RADIUS)
-        // chests may stand in a sigil
+        // chests may stand in a sigil or in fire
         const sigilWalls = createFloorWalls(seeing.segments, SIGIL_RADIUS)
         const floor: MonsterFloor = {
             // flying ones go over chests
@@ -693,7 +695,9 @@ export default class LevelScene
         const soldierCrowd = new SoldierCrowd(field)
         const wizardCrowd = new WizardCrowd(field)
         const sigilCrowd = new SigilCrowd()
-        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group)
+        const fireCrowd = new FireRainCrowd()
+        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group,
+            fireCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
         this.eyes = eyes
@@ -705,6 +709,7 @@ export default class LevelScene
         this.wizards = wizards
         this.wizardCrowd = wizardCrowd
         this.sigilCrowd = sigilCrowd
+        this.fireCrowd = fireCrowd
 
         this.monsters = new Monsters([cuboids, eyes, brutes, soldiers, wizards], floor)
         const burstCrowd = new BurstCrowd(field)
@@ -1530,6 +1535,7 @@ export default class LevelScene
         this.soldierCrowd!.update(this.soldiers!.members, delta)
         this.wizardCrowd!.update(this.wizards!.members, delta)
         this.sigilCrowd!.update(this.wizards!.sigils)
+        this.fireCrowd!.update(this.wizards!.fire.drops)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }
