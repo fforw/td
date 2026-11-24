@@ -67,6 +67,7 @@ export const MODELS = {
     speedPotion: "treasure/speed-potion.glb",
     strengthPotion: "treasure/strength-potion.glb",
     stairs: "dungeon/stairs.glb",
+    switch: "dungeon/switch.glb",
 }
 
 export type ModelName = keyof typeof MODELS
