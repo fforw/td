@@ -59,6 +59,8 @@ export interface SpawnLevel
     rooms: readonly (readonly number[])[]
     /** rooms that stay empty, like the one the heroes come in by */
     closed: ReadonlySet<number>
+    /** rooms dangerous enough to only have few monsters, see LIMITED_GROUPS */
+    limited?: ReadonlySet<number>
 }
 
 /**
@@ -79,25 +81,34 @@ export const SPAWN_GROUPS: readonly SpawnGroup[] = [
     { name: "wizard", weight: 6, members: [{ species: "wizard", kind: WIZARD, min: 1, max: 1 }] }
 ]
 
+/**
+ * The groups for rooms that are dangerous already, with a single monster that doesn't become more
+ */
+export const LIMITED_GROUPS: readonly SpawnGroup[] = [
+    { name: "small cuboid", weight: 15, members: [{ species: "cuboid", kind: SMALL_CUBOID, min: 1, max: 1 }] },
+    { name: "eye", weight: 10, members: [{ species: "eye", kind: FLYING_EYE, min: 1, max: 1 }] },
+    { name: "soldier", weight: 8, members: [{ species: "soldier", kind: SOLDIER, min: 1, max: 1 }] }
+]
+
 
 /**
  * Decides which rooms of a level get monsters and which, for the whole level at once. The same level and seed give the same
  * plan, so whatever comes later and leaves monsters out, like known floor, has to do so on the plan, not before it.
  *
- * @param level     rooms of the level and which of them stay empty
+ * @param level     rooms of the level and which of them stay empty or have few monsters
  * @param random    random numbers from the seed of the level
  * @param groups    groups to pick from
  */
 export function planSpawns(level: SpawnLevel, random: Prando, groups: readonly SpawnGroup[] = SPAWN_GROUPS): PlannedRoom[]
 {
-    const { rooms, closed } = level
+    const { rooms, closed, limited } = level
     const plan: PlannedRoom[] = []
     rooms.forEach((faces, room) => {
         if (closed.has(room) || random.next() >= ROOMS_TAKEN)
         {
             return
         }
-        const group = pickGroup(groups, random)
+        const group = pickGroup(limited?.has(room) ? LIMITED_GROUPS : groups, random)
         const spawns = group.members.flatMap(member => {
             const count = random.nextInt(member.min, member.max)
             return Array.from({ length: count }, () => ({

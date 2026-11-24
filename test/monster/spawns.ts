@@ -1,7 +1,7 @@
 import Prando from "prando"
 import { assert, describe, it } from "vitest"
 import { BRUTE } from "../../src/monster/brutes"
-import { planSpawns, ROOMS_TAKEN, SPAWN_GROUPS, type SpawnGroup } from "../../src/monster/spawns"
+import { LIMITED_GROUPS, planSpawns, ROOMS_TAKEN, SPAWN_GROUPS, type SpawnGroup } from "../../src/monster/spawns"
 
 const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])
 
@@ -16,6 +16,19 @@ describe("spawn planner", () => {
             const plan = planSpawns({ rooms, closed }, new Prando(seed))
             assert(plan.length > 0)
             assert(plan.every(({ room }) => !closed.has(room)))
+        }
+    })
+
+    it("puts a single monster at most into limited rooms", () => {
+
+        const limited = new Set(rooms.keys())
+        for (let seed = 0; seed < 20; seed++)
+        {
+            for (const { group, spawns } of planSpawns({ rooms, closed: new Set(), limited }, new Prando(seed)))
+            {
+                assert(LIMITED_GROUPS.includes(group))
+                assert.equal(spawns.length, 1)
+            }
         }
     })
 
