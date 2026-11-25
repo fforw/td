@@ -18,6 +18,7 @@ import MeepleCrowd, { LEVEL_MEEPLE_SCALE, type Meeple, MEEPLE_MODELS, randomTrai
 import { SIGIL_RADIUS } from "./monster/sigils"
 import { createLevelMeshes } from "./render/dungeonLevel"
 import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "./render/dungeonLighting"
+import GlowView from "./render/glowView"
 import { loadModels, pixelRatio } from "./render/scene3d"
 import Sigil, { sigilColor } from "./render/sigil"
 import { SIGIL_ACTIVE, SIGIL_DRAW, SIGIL_FADE, sigilPhase } from "./render/sigilShape"
@@ -57,7 +58,7 @@ const CAMERA_DISTANCE = 3
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 const info = document.getElementById("info")!
 
-const renderer = new WebGLRenderer({ canvas, antialias: true })
+const renderer = new WebGLRenderer({ canvas })
 renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.toneMapping = ACESFilmicToneMapping
@@ -65,6 +66,7 @@ renderer.toneMapping = ACESFilmicToneMapping
 const scene = new Scene()
 scene.background = new Color("#050508")
 const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 100)
+const view = new GlowView(renderer, scene, camera)
 const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
 
@@ -116,6 +118,10 @@ async function start(): Promise<void>
         {
             held = !held
         }
+        else if (event.key === "b")
+        {
+            view.enabled = !view.enabled
+        }
         else if (event.key === " ")
         {
             seconds = 0
@@ -138,9 +144,9 @@ async function start(): Promise<void>
         updateLightField(renderer, field)
         crowd.update(camera, elapsed)
         controls.update()
-        renderer.render(scene, camera)
+        view.render(true)
         info.textContent = seconds.toFixed(2) + "s, " + (sigilPhase(seconds).hurts ? "hurts" : "harmless")
-            + ", hue (C), " + (held ? "held" : "cycling") + " (H), cast (Space), seed " + seed + ", room " + room
+            + ", hue (C), " + (held ? "held" : "cycling") + " (H), bloom (B), cast (Space), seed " + seed + ", room " + room
     })
     Object.assign(window, { sigil })
 }

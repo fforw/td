@@ -12,13 +12,14 @@ import {
     ShaderMaterial,
     Vector4
 } from "three"
+import { setGlowingLess } from "./glowView"
 import { SIGIL_STROKES, sigilPhase, strokeProgress } from "./sigilShape"
 
 /*
  * A sigil on the floor, as blue wizards cast it: it draws itself in thin, dim lines, flares up blue-white and hurts, with
  * a curtain of light rising from its circle, and dissolves. The strokes are distances in the shader of a single quad, so
  * they are sharp from any distance. The output is premultiplied, so one pass both covers the floor, which keeps the color
- * on bright floors, and adds light. It needs no bloom.
+ * on bright floors, and adds light. A GlowView adds some bloom.
  */
 
 /**
@@ -48,6 +49,11 @@ const HUE = 222 / 360
 const SATURATION = 0.85
 const LIGHTNESS = 0.5
 
+/**
+ * How much of its light goes into the bloom, little enough for the strokes to stay clear
+ */
+const GLOW_SHARE = 0.18
+
 const COUNT = SIGIL_STROKES.length
 
 const QUAD_VERTEX = `
@@ -69,6 +75,7 @@ uniform vec3 color;
 uniform float power;
 uniform float flash;
 uniform float opacity;
+uniform float glowShare;
 uniform float time;
 varying vec2 vPoint;
 
@@ -138,6 +145,7 @@ void main()
     float tint = (1.0 - cover) * min(0.75, halo * 1.1);
     vec3 light = pale * halo * 0.3 * (1.0 - line) + hot * (spark * (1.0 - power) + disc * 0.25) + vec3(line * flash);
     gl_FragColor = vec4(lineColor * cover + base * tint + light, cover + tint) * opacity;
+    gl_FragColor.rgb *= glowShare;
 }
 `
 
@@ -155,6 +163,7 @@ const CURTAIN_FRAGMENT = `
 uniform vec3 color;
 uniform float power;
 uniform float flash;
+uniform float glowShare;
 uniform float time;
 varying vec3 vPoint;
 
@@ -167,7 +176,7 @@ void main()
     float top = 0.65 + 0.2 * waves + 0.3 * flash;
     float light = pow(clamp(1.0 - h / top, 0.0, 1.0), 1.6) * (0.4 + 0.4 * flash);
     vec3 c = linearToOutputTexel(vec4(mix(color, vec3(1.0), 0.3 * (1.0 - h) + 0.4 * flash), 1.0)).rgb;
-    gl_FragColor = vec4(c * light * power, 0.0);
+    gl_FragColor = vec4(c * light * power * glowShare, 0.0);
 }
 `
 
@@ -186,7 +195,8 @@ export function sigilColor(random: number): Color
 function createMaterial(uniforms: ShaderMaterial["uniforms"], vertexShader: string, fragmentShader: string): ShaderMaterial
 {
     return new ShaderMaterial({
-        uniforms,
+        // each has glowShare on its own
+        uniforms: { ...uniforms },
         defines: {
             COUNT,
             EXTENT: EXTENT.toFixed(3),
@@ -250,6 +260,8 @@ export default class Sigil
         this.curtain = new Mesh(curtainGeometry, createMaterial(this.uniforms, CURTAIN_VERTEX, CURTAIN_FRAGMENT))
         this.curtain.renderOrder = 1
 
+        setGlowingLess(this.quad, GLOW_SHARE)
+        setGlowingLess(this.curtain, GLOW_SHARE)
         this.group.add(this.quad, this.curtain)
         this.group.visible = false
     }
