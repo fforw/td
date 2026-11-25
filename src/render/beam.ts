@@ -242,6 +242,8 @@ void main()
 
     vec3 light = core * c * ${CORE_INTENSITY.toFixed(2)} + color * (inner * (0.5 + streaks) + outer * 0.25) * ${HALO_INTENSITY.toFixed(2)};
     gl_FragColor = vec4(light * strength, 1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
 }
 `
 
@@ -285,6 +287,8 @@ void main()
     }
     vec3 shade = mix(color, core, step(0.8, hash(pixel + vec2(3.7, blink))) * 0.5);
     gl_FragColor = vec4(shade, ${FRINGE_OPACITY.toFixed(2)});
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
 }
 `
 
@@ -382,6 +386,8 @@ void main()
     alpha *= ${SHELL_BACK.toFixed(3)} * strength;
 #endif
     gl_FragColor = vec4(shade, alpha);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
 }
 `
 
