@@ -242,11 +242,12 @@ function floorFaceAt(world: PatchWorld, from: number, x: number, z: number): num
 
 
 /**
- * Returns whether a step would go into or through a wall. Walls with a side can be left, for someone who came in on a way
- * that cuts a corner to be able to get out again.
+ * Returns the share of a step up to the first wall it goes into or through, Infinity if there is none. Walls with a side can
+ * be left, for someone who came in on a way that cuts a corner to be able to get out again.
  */
-function hitsWall({ segments, cells }: FloorWalls, x0: number, z0: number, x1: number, z1: number): boolean
+function firstHit({ segments, cells }: FloorWalls, x0: number, z0: number, x1: number, z1: number): number
 {
+    let first = Infinity
     const dx = x1 - x0, dz = z1 - z0
     for (const cell of [cells.get(cellKey(x0, z0)), cells.get(cellKey(x1, z1))])
     {
@@ -264,12 +265,21 @@ function hitsWall({ segments, cells }: FloorWalls, x0: number, z0: number, x1: n
                 const u = ((ax - x0) * dz - (az - z0) * dx) / across
                 if (t >= 0 && t <= 1 && u >= 0 && u <= 1)
                 {
-                    return true
+                    first = Math.min(first, t)
                 }
             }
         }
     }
-    return false
+    return first
+}
+
+
+/**
+ * Returns whether a step would go into or through a wall, see firstHit()
+ */
+function hitsWall(walls: FloorWalls, x0: number, z0: number, x1: number, z1: number): boolean
+{
+    return firstHit(walls, x0, z0, x1, z1) !== Infinity
 }
 
 
@@ -295,6 +305,33 @@ export function seesAcross(walls: FloorWalls, x0: number, z0: number, x1: number
         }
     }
     return true
+}
+
+
+/**
+ * Returns the distance in world units from a point to the first wall in a direction
+ *
+ * @param walls     walls of the level
+ * @param x         point in world units
+ * @param z         point in world units
+ * @param dirX      direction, of length 1
+ * @param dirZ      direction, of length 1
+ * @param most      distance to look at most, which is returned if there is no wall before it
+ */
+export function wallAhead(walls: FloorWalls, x: number, z: number, dirX: number, dirZ: number, most: number): number
+{
+    // as in seesAcross()
+    const step = walls.radius
+    for (let from = 0; from < most; from += step)
+    {
+        const to = Math.min(most, from + step)
+        const hit = firstHit(walls, x + dirX * from, z + dirZ * from, x + dirX * to, z + dirZ * to)
+        if (hit !== Infinity)
+        {
+            return from + (to - from) * hit
+        }
+    }
+    return most
 }
 
 

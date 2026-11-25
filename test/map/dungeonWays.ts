@@ -2,7 +2,7 @@ import Prando from "prando"
 import { assert, describe, it } from "vitest"
 
 import { faceCenter, findWallSegments, SEGMENT_SIZE } from "../../src/map/dungeonLights"
-import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallDistance } from "../../src/map/dungeonWays"
+import { createFloorWalls, entranceFace, findFaces, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallAhead, wallDistance } from "../../src/map/dungeonWays"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
@@ -48,6 +48,26 @@ describe("Ways through dungeon levels", () => {
                 closest = Math.min(closest, Math.hypot(px - t * ex, pz - t * ez))
             }
             assert.closeTo(wallDistance(walls, x, z), closest, 1e-9)
+        }
+    })
+
+    it("finds the first wall ahead", () => {
+
+        const { world, rooms, walls } = level(1)
+        for (const face of rooms.flat().filter((_, i) => i % 11 === 0))
+        {
+            const [x, z] = faceCenter(world, face)
+            for (let i = 0; i < 8; i++)
+            {
+                const angle = i + 0.1
+                const dirX = Math.sin(angle), dirZ = Math.cos(angle)
+                const ahead = wallAhead(walls, x, z, dirX, dirZ, 40)
+                assert(ahead < 40)
+                const before = ahead - 1e-6, after = ahead + 1e-6
+                assert(seesAcross(walls, x, z, x + dirX * before, z + dirZ * before))
+                assert(!seesAcross(walls, x, z, x + dirX * after, z + dirZ * after))
+                assert.equal(wallAhead(walls, x, z, dirX, dirZ, ahead / 2), ahead / 2)
+            }
         }
     })
 
