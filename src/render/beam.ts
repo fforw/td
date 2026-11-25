@@ -17,14 +17,14 @@ import {
     SpriteMaterial,
     Vector3
 } from "three"
-import { GLOW_LAYER, OVERLAY_LAYER, UNDERLAY_LAYER } from "./glowPass"
+import { setGlowing, setOverGlow } from "./glowView"
 
 /*
  * An energy beam, as wizards cast it: a ribbon that faces the camera, with a white-hot core, a colored halo and streaks
  * running along it, a flare at both ends, sparks where it hits and a light there. Its colors go well above 1, so a bloom
  * pass makes them glow, but it reads as a beam without one. Hard-edged pixels in its color run along both sides of the
- * core and blink, which keep its color on bright floors. With the layers of a GlowPass, only the glow blooms and the
- * pixels are drawn over it.
+ * core and blink, which keep its color on bright floors. In a GlowView only the light it adds blooms, and the pixels
+ * keep that off.
  */
 
 /**
@@ -474,10 +474,9 @@ export default class Beam
     /**
      * @param color     color of the halo
      * @param width     width of the halo in world units
-     * @param layered   whether its parts go on the layers of a GlowPass, which only blooms the parts that add light
      * @param lit       whether it lights up what is around it
      */
-    constructor(color: Color, private readonly width: number, layered = false, lit = true)
+    constructor(color: Color, private readonly width: number, lit = true)
     {
         const uniforms = {
             from: { value: new Vector3() },
@@ -528,10 +527,10 @@ export default class Beam
         const ribbon = this.ribbon = new Mesh(geometry, this.material)
         const fringe = this.fringe = new Mesh(geometry, this.fringeMaterial)
         const shells = this.shells = this.shellMaterials.map(material => new Mesh(geometry, material))
-        // placed by the shader. Without a GlowPass the pixels go under the light, with one over it.
+        // placed by the shader
         ribbon.frustumCulled = fringe.frustumCulled = false
         ribbon.renderOrder = 2
-        fringe.renderOrder = 1
+        fringe.renderOrder = 3
         shells.forEach((shell, i) =>
         {
             const index = i >> 1
@@ -559,17 +558,12 @@ export default class Beam
         {
             this.group.add(this.hitLight, this.tipLight)
         }
-        if (layered)
+        for (const glow of [ribbon, this.tipFlare, this.hitFlare, this.sparks])
         {
-            // the lights stay where the scene is
-            for (const glow of [ribbon, this.tipFlare, this.hitFlare, this.sparks])
-            {
-                glow.layers.set(GLOW_LAYER)
-            }
-            fringe.layers.set(OVERLAY_LAYER)
-            shells.forEach((shell, i) => shell.layers.set(i % 2 === 0 ? UNDERLAY_LAYER : OVERLAY_LAYER))
-            this.hitFringe.layers.set(UNDERLAY_LAYER)
+            setGlowing(glow)
         }
+        setOverGlow(fringe)
+        shells.filter((_, i) => i % 2 === 1).forEach(setOverGlow)
         this.setColor(color)
         this.look = this.currentLook
     }

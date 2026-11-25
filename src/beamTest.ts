@@ -5,7 +5,6 @@ import {
     BoxGeometry,
     Color,
     CylinderGeometry,
-    HalfFloatType,
     HemisphereLight,
     LoopOnce,
     Mesh,
@@ -15,16 +14,10 @@ import {
     PlaneGeometry,
     Scene,
     Timer,
-    Vector2,
     Vector3,
-    WebGLRenderer,
-    WebGLRenderTarget
+    WebGLRenderer
 } from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js"
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js"
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js"
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { loadItems } from "./items/itemSprite"
 import { faceCenter } from "./map/dungeonLights"
 import { DEFAULT_DUNGEON_STYLE, DUNGEON_HEIGHT, DUNGEON_WIDTH } from "./map/generateDungeon"
@@ -37,7 +30,7 @@ import { ROBE_COLORS, STAFF_LENGTH } from "./monster/WizardCrowd"
 import { skinnedFigure } from "./monster/skinnedFigure"
 import Beam, { type BeamLook } from "./render/beam"
 import { BEAM_FIRE, beamCastTime, beamPhase } from "./render/beamTiming"
-import GlowPass from "./render/glowPass"
+import GlowView, { GLOW_RADIUS, GLOW_STRENGTH } from "./render/glowView"
 import { createLevelMeshes } from "./render/dungeonLevel"
 import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "./render/dungeonLighting"
 import { animations, loadModels, model, pixelRatio } from "./render/scene3d"
@@ -46,12 +39,11 @@ import MapWorkerClient from "./worker/MapWorkerClient"
 /*
  * Test page for the wizard's beam, with and without bloom. By default the wizard stands in an empty room at scale 1, with
  * dungeon=SEED it stands in a room of a lit dungeon level at the scale of the game and fires at a hero with a torch, e.g.
- * beam.html?robe=red&width=0.35&bloom=off&hold=1&glowStrength=0.6&glowRadius=0.3
- * beam.html?dungeon=1&bloom=global&strength=0.45&radius=0.2&threshold=1
+ * beam.html?robe=red&width=0.35&bloom=off&hold=1
+ * beam.html?dungeon=1&strength=0.6&radius=0.3
  * beam.html?dungeon=1&room=3&hold=1&look=pixels
  *
- * The bloom is off, global over the whole picture with a threshold, or selective for the effects alone, the default.
- * B goes through these, C goes through the robe colors, H holds the beam, L switches between the looks around the glow.
+ * B turns the bloom on and off, C goes through the robe colors, H holds the beam, L switches between the looks around the glow.
  */
 
 const params = new URLSearchParams(location.search)
@@ -96,7 +88,6 @@ const info = document.getElementById("info")!
 const renderer = new WebGLRenderer({ canvas })
 renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
-// applied by the output pass, after the bloom
 renderer.toneMapping = ACESFilmicToneMapping
 
 const scene = new Scene()
@@ -106,40 +97,14 @@ const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight,
 const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
 
-// the composer's targets don't get the canvas' antialiasing, so they need samples of their own
-const composer = new EffectComposer(renderer, new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: 4 }))
-composer.setPixelRatio(pixelRatio())
-composer.setSize(window.innerWidth, window.innerHeight)
-const globalBloom = new UnrealBloomPass(
-    new Vector2(window.innerWidth, window.innerHeight),
-    Number(params.get("strength") ?? 0.45),
-    Number(params.get("radius") ?? 0.2),
-    Number(params.get("threshold") ?? 1)
-)
-const glow = new GlowPass(
+const view = new GlowView(
+    renderer,
     scene,
     camera,
-    window.innerWidth,
-    window.innerHeight,
-    Number(params.get("glowStrength") ?? 0.6),
-    Number(params.get("glowRadius") ?? 0.3)
+    Number(params.get("strength") ?? GLOW_STRENGTH),
+    Number(params.get("radius") ?? GLOW_RADIUS)
 )
-composer.addPass(new RenderPass(scene, camera))
-composer.addPass(glow)
-composer.addPass(globalBloom)
-composer.addPass(new OutputPass())
-
-const BLOOM_MODES = ["off", "global", "selective"] as const
-type BloomMode = typeof BLOOM_MODES[number]
-let bloomMode: BloomMode = "selective"
-
-function setBloom(mode: BloomMode): void
-{
-    bloomMode = mode
-    globalBloom.enabled = mode === "global"
-    glow.bloom.enabled = mode === "selective"
-}
-setBloom(BLOOM_MODES.find(mode => mode === params.get("bloom")) ?? "selective")
+view.enabled = params.get("bloom") !== "off"
 
 
 /**
@@ -326,7 +291,7 @@ async function start(): Promise<void>
     scene.add(wizard)
     controls.update()
 
-    const beam = new Beam(new Color(ROBE_COLORS[robe]), BEAM_WIDTH * stage.scale, true)
+    const beam = new Beam(new Color(ROBE_COLORS[robe]), BEAM_WIDTH * stage.scale)
     beam.look = LOOKS.find(look => look === params.get("look")) ?? "shell"
     scene.add(beam.group)
 
@@ -348,13 +313,13 @@ async function start(): Promise<void>
 
     function showInfo(): void
     {
-        info.textContent = "bloom " + bloomMode + " (B), robe " + robe + " (C), " + (hold ? "held" : "cycling") + " (H), " + beam.look + " (L)" + stage.info
+        info.textContent = "bloom " + (view.enabled ? "on" : "off") + " (B), robe " + robe + " (C), " + (hold ? "held" : "cycling") + " (H), " + beam.look + " (L)" + stage.info
     }
 
     window.addEventListener("keydown", event => {
         if (event.key === "b")
         {
-            setBloom(BLOOM_MODES[(BLOOM_MODES.indexOf(bloomMode) + 1) % BLOOM_MODES.length])
+            view.enabled = !view.enabled
         }
         else if (event.key === "c")
         {
@@ -391,7 +356,7 @@ async function start(): Promise<void>
         beam.update(tip, target, charge, strength, seconds, delta)
         stage.update(seconds)
         controls.update()
-        composer.render(delta)
+        view.render(true)
     })
     showInfo()
     Object.assign(window, { beam, stage })
@@ -401,9 +366,6 @@ window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight
     camera.updateProjectionMatrix()
     renderer.setSize(window.innerWidth, window.innerHeight)
-    composer.setSize(window.innerWidth, window.innerHeight)
 })
 
 void start()
-
-Object.assign(window, { setBloom })

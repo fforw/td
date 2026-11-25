@@ -42,6 +42,12 @@ export default class BeamCrowd
 
     private readonly shown: Shown[]
 
+    /** whether any of them shows */
+    get visible(): boolean
+    {
+        return this.shown.some(({ state, over }) => state || over < LINGER)
+    }
+
     /**
      * @param count     most beams at once. They are all made here, as more lights later on would have every material of the
      *                  level compiled again.
@@ -50,7 +56,7 @@ export default class BeamCrowd
     {
         this.shown = Array.from({ length: count }, (_, i) =>
         {
-            const beam = new Beam(new Color(ROBE_COLORS.purple), BEAM_WIDTH * LEVEL_MEEPLE_SCALE, false, i < MOST_LIT)
+            const beam = new Beam(new Color(ROBE_COLORS.purple), BEAM_WIDTH * LEVEL_MEEPLE_SCALE, i < MOST_LIT)
             beam.visible = false
             this.group.add(beam.group)
             return { beam, state: null, from: new Vector3(), to: new Vector3(), over: LINGER }
