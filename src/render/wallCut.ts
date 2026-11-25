@@ -1,4 +1,5 @@
-import { type Material, Vector4 } from "three"
+import { DataTexture, FloatType, type Material, RGFormat, Vector2, Vector4 } from "three"
+import { SPACE_CELL, type SpaceGrid } from "../map/nearWalls"
 
 /**
  * How much of a cut wall still shows
@@ -154,5 +155,110 @@ export function applyWallCut(material: Material, { uniforms }: WallCut, glass: b
             `)
     }
     material.customProgramCacheKey = () => keyBefore + (glass ? "-wall-glass" : "-wall-cut")
+    material.needsUpdate = true
+}
+
+
+/**
+ * Least way over the floor in world units that counts as seen past the inside of a wall. The outline of walls stays clear
+ * of the faces of the floor a bit.
+ */
+const MIN_INSIDE_REACH = 0.25
+
+/**
+ * How many places along the line of sight get looked at for floor
+ */
+const INSIDE_STEPS = 24
+
+
+/**
+ * Makes the material of the insides of thick walls only draw what hides other spaces than the open ones. Each fragment
+ * follows its line of sight down to the floor, and makes way if it comes to an open space with no wall before that, or if
+ * there is no floor at all. The walls on the way count as they would show, lit by the space in front of them. What is seen
+ * past a place of a wall depends on where the camera is, so nothing that is fixed to the geometry would do.
+ *
+ * @param material  material of the insides
+ * @param cut       wall cut
+ * @param grid      spaces of the level
+ */
+export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX, minZ, width, height, cells }: SpaceGrid): void
+{
+    const spaceGrid = new DataTexture(cells, width, height, RGFormat, FloatType)
+    spaceGrid.needsUpdate = true
+    const own = {
+        spaceGrid: { value: spaceGrid },
+        spaceGridMin: { value: new Vector2(minX, minZ) },
+        spaceGridSize: { value: new Vector2(width * SPACE_CELL, height * SPACE_CELL) }
+    }
+
+    material.onBeforeCompile = shader => {
+        Object.assign(shader.uniforms, uniforms, own)
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", `#include <common>\nvarying vec3 vInside;`)
+            .replace("#include <project_vertex>", /* glsl */`
+                #include <project_vertex>
+                vInside = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            `)
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", /* glsl */`
+                #include <common>
+                varying vec3 vInside;
+                uniform vec4 openSpaces;
+                uniform vec4 openAmounts;
+                uniform sampler2D spaceGrid;
+                uniform vec2 spaceGridMin;
+                uniform vec2 spaceGridSize;
+
+                bool isOpen(float space)
+                {
+                    for (int i = 0; i < ${OPEN_SPACES}; i++)
+                    {
+                        if (openAmounts[i] > 0.001 && abs(openSpaces[i] - space) < 0.5)
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                bool makesWay()
+                {
+                    vec3 ray = vInside - cameraPosition;
+                    float across = max(length(ray.xz), 1e-4);
+                    float reach = max(${MIN_INSIDE_REACH.toFixed(3)}, vInside.y * across / max(-ray.y, 1e-4));
+                    vec2 way = ray.xz / across * reach;
+                    // whether there was floor of another space
+                    bool other = false;
+                    for (int i = 0; i <= ${INSIDE_STEPS}; i++)
+                    {
+                        vec2 uv = (vInside.xz + way * float(i) / ${INSIDE_STEPS.toFixed(1)} - spaceGridMin) / spaceGridSize;
+                        vec2 cell = any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))
+                            ? vec2(0.0) : textureLod(spaceGrid, uv, 0.0).rg;
+                        // walls standing on that floor, thick ones have no floor
+                        if (other && (cell.r < 0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0)))
+                        {
+                            return false;
+                        }
+                        if (cell.r > 0.5)
+                        {
+                            if (isOpen(cell.r))
+                            {
+                                return true;
+                            }
+                            other = true;
+                        }
+                    }
+                    return !other;
+                }
+            `)
+            .replace("#include <clipping_planes_fragment>", /* glsl */`
+                #include <clipping_planes_fragment>
+                if (makesWay())
+                {
+                    discard;
+                }
+            `)
+    }
+    material.customProgramCacheKey = () => "wall-inside"
     material.needsUpdate = true
 }

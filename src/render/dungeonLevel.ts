@@ -3,20 +3,28 @@ import { findWallSegments } from "../map/dungeonLights"
 import type { DungeonLevel } from "../map/generateDungeon"
 import { FaceType } from "../map/geometry"
 import { LEVEL_PRIORITY } from "../map/marchingSquares"
-import { createNearWalls, type NearWalls } from "../map/nearWalls"
+import { createCutFinder, createNearWalls, createSpaceGrid, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
-import { createDoorSills, createThickWalls, createThinWallCorners, createThinWalls } from "./dungeonMeshes"
+import {
+    createDoorSills,
+    createThickWallGround,
+    createThickWallInsides,
+    createThickWalls,
+    createThinWallCorners,
+    createThinWalls,
+    WALL_INSIDE_COLOR
+} from "./dungeonMeshes"
 import { createFloorPatterns } from "./floorPatterns"
 import { createGround } from "./patchMeshes"
 import { GROUND_COLORS } from "./scene3d"
-import { applyWallCut, createWallCut, type WallCut } from "./wallCut"
+import { applyInsideCut, applyWallCut, createWallCut, type WallCut } from "./wallCut"
 
 /**
  * Ground colors of a level. The ground under thick walls is as dark as their unlit tops, as it shows through the walls
  * that are cut. The green it has on the overworld is that of the grass around the walls of the castle.
  */
-const LEVEL_GROUND_COLORS = new Map<FaceType, string>([...GROUND_COLORS, [FaceType.WALL, "#08080a"]])
+const LEVEL_GROUND_COLORS = new Map<FaceType, string>([...GROUND_COLORS, [FaceType.WALL, WALL_INSIDE_COLOR]])
 
 /**
  * What it takes to show a lit dungeon level
@@ -78,12 +86,19 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     // the rooms are as good a seed as any, they differ from level to level
     const seed = rooms.reduce((hash, room) => (hash * 31 + room[0]) | 0, rooms.length)
     const patterns = createFloorPatterns(world, rooms, seed)
+    const wallGrounds = slots.map(slot => createThickWallGround(world, slot, near))
     const walls: Mesh[] = [
-        ...slots.map(slot => createThickWalls(world, slot, near)),
+        ...slots.map((slot, i) => createThickWalls(world, slot, near, wallGrounds[i])),
         createThinWalls(world, slots, false, near),
         createThinWalls(world, slots, true, near),
         createThinWallCorners(world, slots, near)
     ]
+    // unlit, and without a glass side: what is in front of it fades already
+    const cutAt = createCutFinder(wallGrounds)
+    const insides = wallGrounds.map(ground => createThickWallInsides(ground, near, cutAt))
+    const insideMaterial = (insides[0].material as Material).clone()
+    applyInsideCut(insideMaterial, cut, createSpaceGrid(world, near))
+    insides.forEach(mesh => mesh.material = insideMaterial)
     // the see-through side of the cut, see WallCut
     const glass = walls.map(mesh => mesh.clone())
     lightMeshes(ground, field)
@@ -100,7 +115,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 
     return {
         world,
-        meshes: [...ground, ...patterns, sills, ...walls, ...glass],
+        meshes: [...ground, ...patterns, sills, ...walls, ...insides, ...glass],
         field,
         segments: findWallSegments(world, slots),
         cut,

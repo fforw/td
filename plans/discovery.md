@@ -766,6 +766,19 @@ person: a trader, a stranger with a message, a prisoner who begs.
   thick walls shows through them and is near black in levels. Still open:
   several small spaces within a few steps keep the walls changing, which
   could take a delay or merging small spaces with their neighbors.
+- Thick walls are hollow, and their tops and sides only show from outside.
+  Where a cut side met a solid top, the view went under the top and out
+  through the far side into a lit room next door. The insides of the far
+  sides close that off (`createThickWallInsides()`), unlit, in the color of
+  the ground under walls. Which of them make way depends on where the
+  camera is, so each fragment follows its line of sight down to the floor
+  on a grid of the spaces and thin walls (`applyInsideCut()`). It makes way
+  if it comes to an open space with no wall before that. Fixed pieces that
+  went by a view straight on were tried first: they left a third of the
+  leaks, and black shards. Sides with nothing in front that gets cut, or
+  with no other space behind, are left out (`isExposed()`). The convex hull
+  of the spaces would not tell those, only a quarter are within the hull of
+  a space that exposes them.
 - Once cut, a near wall and a gap in it both show the floor, and playtests
   had a hard time telling openings. Each DOOR edge gets a sill, a slab of
   warm stone 0.02 high and 0.12 deep (`findDoorSills()` in

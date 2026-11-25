@@ -29,6 +29,17 @@ export const THICK_WALL_CUT_DEPTH = 1.2
 const FLOOR_STEP = 0.1
 
 /**
+ * Least elevation of the line of sight to the floor in degrees that counts, which is toward the top of the screen
+ */
+const LEAST_ELEVATION = 18
+
+/**
+ * How much the line of sight goes to the side for each unit it goes away, in the perspective from the left to the right of
+ * the screen
+ */
+const VIEW_SPREAD = [0, 0.35, -0.35, 0.7, -0.7]
+
+/**
  * How far to both sides there has to be floor as well, in world units, or else the wall runs along the view there
  */
 const FLOOR_ASIDE = 0.15
@@ -260,6 +271,213 @@ export function thickWallSpaces(triangles: readonly number[], { spaceAt, away }:
         }
     }
     return spaces
+}
+
+
+/**
+ * Cells per world unit to find the triangles of walls in, which are a lot smaller than the faces
+ */
+const CUT_CELLS = 4
+
+
+/**
+ * Tells the spaces a place in the thick walls of a level gets cut for
+ */
+export type CutFinder = (x: number, z: number) => readonly number[]
+
+
+/**
+ * Returns what tells the spaces places in the thick walls get cut for
+ *
+ * @param grounds   triangles of the wall ground of each patch as from wallGround(), in patch units, and what
+ *                  thickWallSpaces() gives for them
+ */
+export function createCutFinder(
+    grounds: readonly { triangles: readonly number[], spaces: ReadonlyMap<string, NearSpaces> }[]
+): CutFinder
+{
+    // each triangle is in all cells that the box around it touches
+    const cells = new Map<number, { corners: number[], cutFor: number[] }[]>()
+    for (const { triangles, spaces } of grounds)
+    {
+        for (let i = 0; i < triangles.length; i += 6)
+        {
+            const corners: number[] = []
+            const cutFor: number[] = []
+            for (let j = i; j < i + 6; j += 2)
+            {
+                corners.push(triangles[j] * SCALE, triangles[j + 1] * SCALE)
+                for (const space of spaces.get(triangles[j] + "," + triangles[j + 1]) ?? [])
+                {
+                    if (space && !cutFor.includes(space))
+                    {
+                        cutFor.push(space)
+                    }
+                }
+            }
+            if (cutFor.length)
+            {
+                addToCells(cells, corners, { corners, cutFor }, CUT_CELLS)
+            }
+        }
+    }
+
+    return (x, z) => cells.get(cellKey(x * CUT_CELLS, z * CUT_CELLS))?.find(({ corners }) => isInside(corners, x, z))?.cutFor ?? []
+}
+
+
+/**
+ * Distance between the places to look for cut wall at, in world units
+ */
+const CUT_STEP = 0.05
+
+
+/**
+ * Returns whether the inside of a side of a thick wall can ever be seen while it has to stay solid: the wall in front of
+ * it gets cut for a space, and there is floor of another space behind it. Most of them never are. Which parts of it stay
+ * solid then depends on the view, see applyInsideCut().
+ *
+ * @param x         x of the place on the side in world units
+ * @param z         z of the place on the side in world units
+ * @param top       height of the wall
+ * @param cutAt     tells what gets cut
+ * @param near      tells the near walls
+ */
+export function isExposed(x: number, z: number, top: number, cutAt: CutFinder, { spaceAt, away }: NearWalls): boolean
+{
+    const reach = top / Math.tan(LEAST_ELEVATION * Math.PI / 180)
+    const behind = new Set<number>()
+    for (const spread of VIEW_SPREAD)
+    {
+        const dx = away[0] - away[1] * spread, dz = away[1] + away[0] * spread
+        for (let along = 0; along <= reach; along += FLOOR_STEP)
+        {
+            const space = spaceAt(x + dx * along, z + dz * along)
+            if (space)
+            {
+                behind.add(space)
+            }
+        }
+    }
+    if (!behind.size)
+    {
+        return false
+    }
+
+    return VIEW_SPREAD.some(spread => {
+        const dx = away[1] * spread - away[0], dz = -away[0] * spread - away[1]
+        // from a bit off the side, which is the edge of the triangles
+        for (let along = CUT_STEP * 0.1; along <= reach; along += CUT_STEP)
+        {
+            if (cutAt(x + dx * along, z + dz * along).some(space => behind.size > 1 || !behind.has(space)))
+            {
+                return true
+            }
+        }
+        return false
+    })
+}
+
+
+/**
+ * Returns whether the inside of a side of a thick wall is turned to the camera anywhere on the screen
+ *
+ * @param nx        x of the way out of the wall
+ * @param nz        z of the way out of the wall
+ * @param near      tells the near walls
+ */
+export function isFarSide(nx: number, nz: number, { away }: NearWalls): boolean
+{
+    return VIEW_SPREAD.some(spread => nx * (away[0] - away[1] * spread) + nz * (away[1] + away[0] * spread) > 0)
+}
+
+
+/**
+ * Spaces of a level as a grid over its floor
+ */
+export interface SpaceGrid
+{
+    /** where the grid starts in world units */
+    minX: number
+    minZ: number
+    /** number of cells */
+    width: number
+    height: number
+    /**
+     * two numbers for each cell, row by row along x: the space at its middle, 0 for no floor, and for cells with a thin
+     * wall one more than the space it is near for, else 0
+     */
+    cells: Float32Array
+}
+
+/**
+ * Size of the cells of a space grid in world units
+ */
+export const SPACE_CELL = 0.05
+
+
+/**
+ * Returns the spaces and thin walls of a level as a grid
+ *
+ * @param world     world with all patches of the level
+ * @param near      tells the near walls
+ */
+export function createSpaceGrid(world: PatchWorld, near: NearWalls): SpaceGrid
+{
+    const { spaceOf, spaceAt } = near
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+    for (const face of spaceOf.keys())
+    {
+        const { positions, vertex } = world.getPatch(face >> (SLOT_SHIFT - 2))
+        const first = (face * 4) & LOCAL_MASK
+        for (let h = first; h < first + 4; h++)
+        {
+            const x = positions[vertex[h] * 3] * SCALE, z = positions[vertex[h] * 3 + 1] * SCALE
+            minX = Math.min(minX, x)
+            minZ = Math.min(minZ, z)
+            maxX = Math.max(maxX, x)
+            maxZ = Math.max(maxZ, z)
+        }
+    }
+    const width = Math.ceil((maxX - minX) / SPACE_CELL), height = Math.ceil((maxZ - minZ) / SPACE_CELL)
+    const cells = new Float32Array(width * height * 2)
+    for (let row = 0; row < height; row++)
+    {
+        for (let column = 0; column < width; column++)
+        {
+            cells[(row * width + column) * 2] = spaceAt(minX + (column + 0.5) * SPACE_CELL, minZ + (row + 0.5) * SPACE_CELL)
+        }
+    }
+
+    for (const face of spaceOf.keys())
+    {
+        const slot = face >> (SLOT_SHIFT - 2)
+        const { positions, vertex, edgeType } = world.getPatch(slot)
+        const first = (face * 4) & LOCAL_MASK
+        for (let h = first; h < first + 4; h++)
+        {
+            if (edgeType[h] !== EdgeType.WALL.index)
+            {
+                continue
+            }
+            const value = thinWallSpace(world, (slot << SLOT_SHIFT) | h, near) + 1
+            const v0 = vertex[h] * 3, v1 = vertex[next(h)] * 3
+            const x = positions[v0] * SCALE, z = positions[v0 + 1] * SCALE
+            const dx = positions[v1] * SCALE - x, dz = positions[v1 + 1] * SCALE - z
+            // close enough for neighboring cells to touch at least at their corners
+            const steps = Math.ceil(Math.hypot(dx, dz) / SPACE_CELL * 2) * 2
+            for (let i = 0; i <= steps; i++)
+            {
+                const column = Math.floor((x + dx * i / steps - minX) / SPACE_CELL)
+                const row = Math.floor((z + dz * i / steps - minZ) / SPACE_CELL)
+                if (column >= 0 && column < width && row >= 0 && row < height)
+                {
+                    cells[(row * width + column) * 2 + 1] = value
+                }
+            }
+        }
+    }
+    return { minX, minZ, width, height, cells }
 }
 
 
