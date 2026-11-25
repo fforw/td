@@ -2,6 +2,7 @@ import { assert, describe, it } from "vitest"
 import { Matrix4, Vector3 } from "three"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
+import { createWallFinder } from "../../src/map/nearWalls"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceOf, next, prev } from "../../src/map/QuadPatch"
 import { FACE_SIZE } from "../../src/map/scale"
@@ -9,6 +10,7 @@ import {
     addFlatCorner,
     addRoundedCorner,
     createDoorSills,
+    createThickWallGround,
     createThickWalls,
     createThinWallCorners,
     createThinWalls,
@@ -184,6 +186,37 @@ describe("createThinWalls", () => {
         {
             assert(singles.has(wall) === keys.every(key => wallsAt.get(key) === 1))
         }
+    })
+
+    it("ends inside of thick walls, and only takes off what is inside of them", () => {
+        const { world, slots } = level()
+        const grounds = slots.map(slot => createThickWallGround(world, slot))
+        const inThickWall = createWallFinder(grounds)
+
+        // pieces across the walls that are inside of thick ones with both sides, and those that aren't
+        const measure = (inside?: typeof inThickWall) => {
+            const matrix = new Matrix4()
+            let hidden = 0, shown = 0
+            for (const single of [false, true])
+            {
+                const mesh = createThinWalls(world, slots, single, undefined, inside)
+                for (let i = 0; i < mesh.count; i++)
+                {
+                    mesh.getMatrixAt(i, matrix)
+                    const length = new Vector3().setFromMatrixColumn(matrix, 0).length()
+                    for (let along = 0.005; along < length; along += 0.01)
+                    {
+                        const sides = [-0.5, 0.5].map(z => new Vector3(along / length - 0.5, 0, z).applyMatrix4(matrix))
+                        sides.every(({ x, z }) => inThickWall(x, z)) ? hidden++ : shown++
+                    }
+                }
+            }
+            return { hidden, shown }
+        }
+
+        const before = measure(), after = measure(inThickWall)
+        assert(after.hidden < before.hidden / 2)
+        assert(Math.abs(after.shown - before.shown) < before.shown * 0.01)
     })
 
     it("stands on its edge and reaches past its ends, except at tight corners", () => {

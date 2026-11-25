@@ -3,7 +3,7 @@ import { findWallSegments } from "../map/dungeonLights"
 import type { DungeonLevel } from "../map/generateDungeon"
 import { FaceType } from "../map/geometry"
 import { LEVEL_PRIORITY } from "../map/marchingSquares"
-import { createCutFinder, createNearWalls, createSpaceGrid, type NearWalls } from "../map/nearWalls"
+import { createCutFinder, createNearWalls, createSpaceGrid, createWallFinder, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
 import {
@@ -87,10 +87,11 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const seed = rooms.reduce((hash, room) => (hash * 31 + room[0]) | 0, rooms.length)
     const patterns = createFloorPatterns(world, rooms, seed)
     const wallGrounds = slots.map(slot => createThickWallGround(world, slot, near))
+    const inThickWall = createWallFinder(wallGrounds)
     const walls: Mesh[] = [
         ...slots.map((slot, i) => createThickWalls(world, slot, near, wallGrounds[i])),
-        createThinWalls(world, slots, false, near),
-        createThinWalls(world, slots, true, near),
+        createThinWalls(world, slots, false, near, inThickWall),
+        createThinWalls(world, slots, true, near, inThickWall),
         createThinWallCorners(world, slots, near)
     ]
     // unlit, and without a glass side: what is in front of it fades already

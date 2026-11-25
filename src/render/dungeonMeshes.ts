@@ -59,6 +59,11 @@ export const THIN_WALL_ROUNDING = 0.16
 export const THIN_WALL_ROUNDING_STEPS = 2
 
 /**
+ * How far thin walls reach into thick ones at most, in world units, which is also the step to look for their sides in
+ */
+const THIN_WALL_INSET = 0.005
+
+/**
  * Corners wider than this in radians are close to a straight wall and stay as they are
  */
 const MAX_ROUNDED_ANGLE = Math.PI * 8 / 9
@@ -447,8 +452,16 @@ export function findThinWallCorners(world: PatchWorld, slots: readonly number[])
  * @param slots     slots of the patches of the level
  * @param single    whether to create the single walls or all others
  * @param near      tells the near walls, which gives each wall the space to get cut for, see applyWallCut()
+ * @param inThickWall   tells the places inside of thick walls, see createWallFinder(). Without it walls don't end there, and
+ *                      show from within thick walls that are cut.
  */
-export function createThinWalls(world: PatchWorld, slots: readonly number[], single: boolean, near?: NearWalls): InstancedMesh
+export function createThinWalls(
+    world: PatchWorld,
+    slots: readonly number[],
+    single: boolean,
+    near?: NearWalls,
+    inThickWall?: (x: number, z: number) => boolean
+): InstancedMesh
 {
     const singles = findSingleThinWalls(world, slots)
     const tight = new Set(findThinWallCorners(world, slots).filter(({ tight }) => tight).map(({ x, z }) => x + "," + z))
@@ -478,10 +491,19 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[], sin
             const v1 = vertex[next(h)] * 3
             const x0 = positions[v0] * SCALE, z0 = positions[v0 + 1] * SCALE
             const x1 = positions[v1] * SCALE, z1 = positions[v1 + 1] * SCALE
-            const reach0 = tight.has(x0 + "," + z0) ? 0 : THIN_WALL_OVERLAP
-            const reach1 = tight.has(x1 + "," + z1) ? 0 : THIN_WALL_OVERLAP
-
             const length = Math.hypot(x1 - x0, z1 - z0)
+            let reach0 = tight.has(x0 + "," + z0) ? 0 : THIN_WALL_OVERLAP
+            let reach1 = tight.has(x1 + "," + z1) ? 0 : THIN_WALL_OVERLAP
+            if (inThickWall)
+            {
+                const dx = (x1 - x0) / length, dz = (z1 - z0) / length
+                reach0 -= lengthInside(x0 - dx * reach0, z0 - dz * reach0, dx, dz, length + reach0, inThickWall)
+                reach1 -= lengthInside(x1 + dx * reach1, z1 + dz * reach1, -dx, -dz, length + reach1, inThickWall)
+                if (length + reach0 + reach1 <= 0)
+                {
+                    continue
+                }
+            }
             const shift = (reach1 - reach0) / 2 / length
             matrices.push(new Matrix4().compose(
                 position.set(
@@ -505,6 +527,33 @@ export function createThinWalls(world: PatchWorld, slots: readonly number[], sin
     const mesh = new InstancedMesh(geometry, single ? singleWallMaterial : wallMaterial, matrices.length)
     matrices.forEach((matrix, i) => mesh.setMatrixAt(i, matrix))
     return mesh
+}
+
+
+/**
+ * Returns how much to take off the end of a thin wall, which is what is inside of thick walls with its full thickness but
+ * for an inset
+ */
+function lengthInside(
+    x: number,
+    z: number,
+    dx: number,
+    dz: number,
+    length: number,
+    inThickWall: (x: number, z: number) => boolean
+): number
+{
+    const sideX = -dz * THIN_WALL_THICKNESS / 2, sideZ = dx * THIN_WALL_THICKNESS / 2
+    let inside = 0
+    while (
+        inside < length
+        && inThickWall(x + dx * inside + sideX, z + dz * inside + sideZ)
+        && inThickWall(x + dx * inside - sideX, z + dz * inside - sideZ)
+    )
+    {
+        inside += THIN_WALL_INSET
+    }
+    return Math.max(0, inside >= length ? inside : inside - THIN_WALL_INSET)
 }
 
 

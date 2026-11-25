@@ -327,6 +327,26 @@ export function createCutFinder(
 
 
 /**
+ * Returns a function that tells whether a place in world units is inside of the thick walls
+ *
+ * @param grounds   wall ground of each patch as from wallGround()
+ */
+export function createWallFinder(grounds: readonly { triangles: readonly number[] }[]): (x: number, z: number) => boolean
+{
+    const cells = new Map<number, number[][]>()
+    for (const { triangles } of grounds)
+    {
+        for (let i = 0; i < triangles.length; i += 6)
+        {
+            const corners = triangles.slice(i, i + 6).map(v => v * SCALE)
+            addToCells(cells, corners, corners, CUT_CELLS)
+        }
+    }
+    return (x, z) => cells.get(cellKey(x * CUT_CELLS, z * CUT_CELLS))?.some(corners => isInside(corners, x, z)) ?? false
+}
+
+
+/**
  * Distance between the places to look for cut wall at, in world units
  */
 const CUT_STEP = 0.05

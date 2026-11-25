@@ -778,7 +778,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
   leaks, and black shards. Sides with nothing in front that gets cut, or
   with no other space behind, are left out (`isExposed()`). The convex hull
   of the spaces would not tell those, only a quarter are within the hull of
-  a space that exposes them.
+  a space that exposes them. Thin walls end right inside of thick ones, as
+  their lit ends showed through a cut.
 - Once cut, a near wall and a gap in it both show the floor, and playtests
   had a hard time telling openings. Each DOOR edge gets a sill, a slab of
   warm stone 0.02 high and 0.12 deep (`findDoorSills()` in
