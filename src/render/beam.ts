@@ -447,6 +447,9 @@ export default class Beam
 {
     readonly group = new Group()
 
+    /** all but the lights */
+    private readonly parts = new Group()
+
     private readonly color = new Color()
     private readonly material: ShaderMaterial
     private readonly fringeMaterial: ShaderMaterial
@@ -472,8 +475,9 @@ export default class Beam
      * @param color     color of the halo
      * @param width     width of the halo in world units
      * @param layered   whether its parts go on the layers of a GlowPass, which only blooms the parts that add light
+     * @param lit       whether it lights up what is around it
      */
-    constructor(color: Color, private readonly width: number, layered = false)
+    constructor(color: Color, private readonly width: number, layered = false, lit = true)
     {
         const uniforms = {
             from: { value: new Vector3() },
@@ -549,7 +553,12 @@ export default class Beam
         this.sparks.renderOrder = 2
 
         this.hitLight.distance = this.tipLight.distance = width * LIGHT_RANGE
-        this.group.add(fringe, ...shells, ribbon, this.tipFlare, this.hitFringe, this.hitFlare, this.sparks, this.hitLight, this.tipLight)
+        this.parts.add(fringe, ...shells, ribbon, this.tipFlare, this.hitFringe, this.hitFlare, this.sparks)
+        this.group.add(this.parts)
+        if (lit)
+        {
+            this.group.add(this.hitLight, this.tipLight)
+        }
         if (layered)
         {
             // the lights stay where the scene is
@@ -563,6 +572,15 @@ export default class Beam
         }
         this.setColor(color)
         this.look = this.currentLook
+    }
+
+    /**
+     * Shows or hides all but the lights. They stay, as a change of their number compiles every lit material again, so they
+     * have to be at a strength and charge of 0 when the beam gets hidden.
+     */
+    set visible(visible: boolean)
+    {
+        this.parts.visible = visible
     }
 
     get look(): BeamLook
