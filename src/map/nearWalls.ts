@@ -34,6 +34,11 @@ const FLOOR_STEP = 0.1
 const FLOOR_ASIDE = 0.15
 
 /**
+ * Makes one key of the two coordinates of a cell, more than levels are wide in world units
+ */
+const CELL_STRIDE = 1 << 16
+
+/**
  * The spaces a wall is near for, 0 for none. A wall is near for a space if it stands between the camera and floor of the
  * space right behind it. Walls are lower than a face is wide and the view is steep, so nothing further away gets hidden,
  * and it takes no more than looking at what's next to a wall.
@@ -83,13 +88,52 @@ export function findSpaces({ rooms, corridors }: LevelSpaces): Map<number, numbe
 }
 
 
+function cellKey(x: number, z: number): number
+{
+    return Math.floor(x) * CELL_STRIDE + Math.floor(z)
+}
+
+
+/**
+ * Adds an entry to all cells touched by the box around the given corners, x and z of each. There are as many
+ * cells to a world unit as the scale says.
+ */
+function addToCells<T>(cells: Map<number, T[]>, corners: readonly number[], entry: T, scale = 1): void
+{
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
+    for (let i = 0; i < corners.length; i += 2)
+    {
+        minX = Math.min(minX, Math.floor(corners[i] * scale))
+        maxX = Math.max(maxX, Math.floor(corners[i] * scale))
+        minZ = Math.min(minZ, Math.floor(corners[i + 1] * scale))
+        maxZ = Math.max(maxZ, Math.floor(corners[i + 1] * scale))
+    }
+    for (let cx = minX; cx <= maxX; cx++)
+    {
+        for (let cz = minZ; cz <= maxZ; cz++)
+        {
+            const key = cellKey(cx, cz)
+            const cell = cells.get(key)
+            if (cell)
+            {
+                cell.push(entry)
+            }
+            else
+            {
+                cells.set(key, [entry])
+            }
+        }
+    }
+}
+
+
 /**
  * Returns a function that gives the space at a place in world units, 0 if there is no floor
  */
 function createSpaceFinder(world: PatchWorld, spaceOf: ReadonlyMap<number, number>): NearWalls["spaceAt"]
 {
-    // faces are about a world unit in size, so the ones around a place have their middle in a cell next to it
-    const cells = new Map<string, { corners: number[], space: number }[]>()
+    // each face is in all cells of a world unit that the box around it touches
+    const cells = new Map<number, { corners: number[], space: number }[]>()
     for (const [face, space] of spaceOf)
     {
         const { positions, vertex } = world.getPatch(face >> (SLOT_SHIFT - 2))
@@ -99,29 +143,19 @@ function createSpaceFinder(world: PatchWorld, spaceOf: ReadonlyMap<number, numbe
         {
             corners.push(positions[vertex[h] * 3] * SCALE, positions[vertex[h] * 3 + 1] * SCALE)
         }
-        const [x, z] = faceCenter(world, face)
-        const key = Math.floor(x) + "," + Math.floor(z)
-        const cell = cells.get(key)
-        if (cell)
-        {
-            cell.push({ corners, space })
-        }
-        else
-        {
-            cells.set(key, [{ corners, space }])
-        }
+        addToCells(cells, corners, { corners, space })
     }
 
+    // a plain loop over number keys, this gets called a few 100,000 times per level
     return (x, z) => {
-        const cx = Math.floor(x), cz = Math.floor(z)
-        for (let ix = cx - 1; ix <= cx + 1; ix++)
+        const cell = cells.get(cellKey(x, z))
+        if (cell)
         {
-            for (let iz = cz - 1; iz <= cz + 1; iz++)
+            for (const { corners, space } of cell)
             {
-                const found = cells.get(ix + "," + iz)?.find(({ corners }) => isInside(corners, x, z))
-                if (found)
+                if (isInside(corners, x, z))
                 {
-                    return found.space
+                    return space
                 }
             }
         }
