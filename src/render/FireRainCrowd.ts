@@ -13,6 +13,7 @@ import {
     ShaderMaterial
 } from "three"
 import type { FireDrop } from "../monster/fireRain"
+import { setGlowingLess } from "./glowView"
 import { FIRE_ACTIVE, FIRE_FADE, FIRE_FALL, FIRE_WARN } from "./fireTiming"
 
 /*
@@ -78,6 +79,11 @@ const BURN_RATE = 5
  */
 const BURN = FIRE_FADE * 0.8
 
+/**
+ * How much of its light goes into the bloom, little enough for the circles of the flames to stay clear
+ */
+const GLOW_SHARE = 0.25
+
 const COMMON_VERTEX = `
 attribute vec4 drop;
 attribute float seed;
@@ -99,6 +105,7 @@ vec4 project(vec3 world)
 const COMMON_FRAGMENT = `
 flat varying float vAge;
 flat varying float vRandom;
+uniform float glowShare;
 
 vec3 outputColor(vec3 c)
 {
@@ -156,6 +163,7 @@ void main()
         vec3 edge = outputColor(mix(vec3(0.8, 0.06, 0.005), vec3(1.0, 0.3, 0.02), near));
         float fill = disc * mix(0.2, 0.65, near) * (1.0 - line);
         gl_FragColor = vec4(edge * (line * 0.9 + fill + halo * (1.0 - line)), line * 0.9 + fill) * appear;
+        gl_FragColor.rgb *= glowShare;
         return;
     }
     float fade = clamp(1.0 - vAge / FADE, 0.0, 1.0);
@@ -169,7 +177,7 @@ void main()
     // what strikes reaches as far as it hurts
     float flash = (1.0 - smoothstep(1.0 - pixel, 1.0 + pixel, r)) * hot;
     vec3 light = outputColor(fireColor(0.3 + 0.7 * hot)) * max(flash * 0.8, glow * fade * fade * 0.5);
-    gl_FragColor = vec4(light, disc * 0.6 * sqrt(fade));
+    gl_FragColor = vec4(light * glowShare, disc * 0.6 * sqrt(fade));
 }
 `
 
@@ -254,7 +262,7 @@ void main()
         color *= keep;
         alpha *= keep;
     }
-    gl_FragColor = vec4(color, alpha);
+    gl_FragColor = vec4(color * glowShare, alpha);
 }
 `
 
@@ -296,7 +304,7 @@ void main()
 {
     float strength = 1.0 - smoothstep(0.75, 1.0, length(vPoint));
     float heat = 0.75 - 0.4 * vAge / FADE;
-    gl_FragColor = vec4(outputColor(fireColor(heat)) * strength, strength * 0.4);
+    gl_FragColor = vec4(outputColor(fireColor(heat)) * strength * glowShare, strength * 0.4);
 }
 `
 
@@ -384,6 +392,7 @@ export default class FireRainCrowd
         ] as const).map(([count, vertex, fragment], i) => {
             const mesh = new Mesh(quads(count, drop, seed), createMaterial(vertex, fragment))
             mesh.frustumCulled = false
+            setGlowingLess(mesh, GLOW_SHARE)
             // flames over what is on the floor
             mesh.renderOrder = i === 0 ? 0 : 1
             mesh.visible = false

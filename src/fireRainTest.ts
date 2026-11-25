@@ -22,6 +22,7 @@ import { SIGIL_RADIUS } from "./monster/sigils"
 import { WIZARD } from "./monster/wizards"
 import { createLevelMeshes } from "./render/dungeonLevel"
 import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "./render/dungeonLighting"
+import GlowView from "./render/glowView"
 import { loadModels, pixelRatio } from "./render/scene3d"
 import FireRainCrowd from "./render/FireRainCrowd"
 import MapWorkerClient from "./worker/MapWorkerClient"
@@ -61,7 +62,7 @@ const CAMERA_DISTANCE = 3
 const canvas = document.getElementById("screen") as HTMLCanvasElement
 const info = document.getElementById("info")!
 
-const renderer = new WebGLRenderer({ canvas, antialias: true })
+const renderer = new WebGLRenderer({ canvas })
 renderer.setPixelRatio(pixelRatio())
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.toneMapping = ACESFilmicToneMapping
@@ -69,6 +70,7 @@ renderer.toneMapping = ACESFilmicToneMapping
 const scene = new Scene()
 scene.background = new Color("#050508")
 const camera = new PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.01, 100)
+const view = new GlowView(renderer, scene, camera)
 const controls = new OrbitControls(camera, canvas)
 controls.enableDamping = true
 
@@ -147,6 +149,10 @@ async function start(): Promise<void>
         {
             held = !held
         }
+        else if (event.key === "b")
+        {
+            view.enabled = !view.enabled
+        }
         else if (event.key === " ")
         {
             cast()
@@ -175,10 +181,10 @@ async function start(): Promise<void>
         updateLightField(renderer, field)
         crowd.update(camera, elapsed)
         controls.update()
-        renderer.render(scene, camera)
+        view.render(true)
         info.textContent = seconds.toFixed(2) + "s, " + FIRE_PATTERN_NAMES[pattern] + " (P), " + rain.drops.length + " strikes, "
             + (rain.damageAt(x, z) > 0 ? "hurts" : "harmless") + ", " + (held ? "held" : "cycling")
-            + " (H), cast (Space), seed " + seed + ", room " + room
+            + " (H), bloom (B), cast (Space), seed " + seed + ", room " + room
     })
     Object.assign(window, { rain })
 }
