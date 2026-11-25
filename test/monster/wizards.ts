@@ -1,10 +1,10 @@
 import { assert, describe, it } from "vitest"
 
 import type { Prey } from "../../src/monster/monsters"
-import { ROBE_COLORS } from "../../src/monster/WizardCrowd"
 import { SIGIL_RADIUS } from "../../src/monster/sigils"
-import WizardPack, { FIRE_ROBE, ROBE_COUNT, SIGIL_ROBE, STAFF_STOMP, WIZARD, type Wizard, type WizardFloor } from "../../src/monster/wizards"
+import WizardPack, { BEAM_TURN, BEAM_TURN_RATE, BLUE_WIZARD, PURPLE_WIZARD, RED_WIZARD, STAFF_STOMP, WIZARD, type Wizard, type WizardFloor, type WizardKind } from "../../src/monster/wizards"
 import { SIGIL_DRAW } from "../../src/render/sigilShape"
+import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, BEAM_FIRE_TIME } from "../../src/render/beamTiming"
 import { FIRE_WARN } from "../../src/render/fireTiming"
 
 const FRAME = 1 / 60
@@ -19,7 +19,8 @@ function openFloor(): WizardFloor
             monster.z += dz
         },
         sees: () => true,
-        wallDistance: () => Infinity
+        wallDistance: () => Infinity,
+        wallAhead: (_x, _z, _dirX, _dirZ, most) => most
     }
 }
 
@@ -30,20 +31,10 @@ function prey(x = 0, z = 0): Prey
 
 
 describe("WizardPack", () => {
-    it("has a robe color for every robe", () => {
-        assert.lengthOf(ROBE_COLORS, ROBE_COUNT)
-        const pack = new WizardPack(openFloor())
-        for (let i = 0; i < 50; i++)
-        {
-            const { robe } = pack.add(WIZARD, 0, 0, 0)
-            assert.isTrue(Number.isInteger(robe) && robe >= 0 && robe < ROBE_COUNT)
-        }
-    })
-
     it("walks up to a hero it sees, but stays some way off", () => {
         const pack = new WizardPack(openFloor())
-        const wizard = pack.add(WIZARD, 0, 0, 0)
-        wizard.robe = SIGIL_ROBE + 1
+        const wizard = pack.add(BLUE_WIZARD, 0, 0, 0)
+        wizard.castWait = Infinity
         // within sight, see NOTICE_DISTANCE
         const hero = prey(WIZARD.keepAway * 1.8, 0)
         for (let i = 0; i < 60 * 20; i++)
@@ -56,11 +47,10 @@ describe("WizardPack", () => {
     })
 
     /** a wizard, by default a blue one, that just started casting at the hero */
-    function casting(robe = SIGIL_ROBE): { pack: WizardPack, wizard: Wizard, hero: Prey }
+    function casting(kind: WizardKind = BLUE_WIZARD): { pack: WizardPack, wizard: Wizard, hero: Prey }
     {
         const pack = new WizardPack(openFloor())
-        const wizard = pack.add(WIZARD, 0, 0, 0)
-        wizard.robe = robe
+        const wizard = pack.add(kind, 0, 0, 0)
         const hero = prey(WIZARD.keepAway, 0)
         for (let i = 0; i < 120 && !wizard.casting; i++)
         {
@@ -69,19 +59,6 @@ describe("WizardPack", () => {
         assert.isNotNull(wizard.casting)
         return { pack, wizard, hero }
     }
-
-    it("only casts in blue and red", () => {
-        const pack = new WizardPack(openFloor())
-        for (let robe = 0; robe < ROBE_COUNT; robe++)
-        {
-            pack.add(WIZARD, 0, 0, 0).robe = robe
-        }
-        for (let i = 0; i < 70; i++)
-        {
-            pack.update(FRAME, [prey(WIZARD.keepAway, 0)])
-        }
-        assert.deepEqual(pack.members.filter(({ casting }) => casting).map(({ robe }) => robe), [SIGIL_ROBE, FIRE_ROBE])
-    })
 
     it("warns before its sigil hurts who is still in it, and only for a while", () => {
         const { pack, wizard, hero } = casting()
@@ -125,7 +102,7 @@ describe("WizardPack", () => {
     }
 
     it("shows where fire strikes after stomping the staff, and hurts who stays", () => {
-        const { pack, hero } = casting(FIRE_ROBE)
+        const { pack, hero } = casting(RED_WIZARD)
         let stomped = 0, hurtAt = 0
         for (let t = 0; t < STAFF_STOMP + FIRE_WARN + 2.5 && !hurtAt; t += FRAME)
         {
@@ -147,7 +124,7 @@ describe("WizardPack", () => {
     it("has no fire come if a blow lands before the stomp, but not after", () => {
         for (const [wait, comes] of [[STAFF_STOMP / 2, false], [STAFF_STOMP + 0.1, true]] as const)
         {
-            const { pack, wizard, hero } = casting(FIRE_ROBE)
+            const { pack, wizard, hero } = casting(RED_WIZARD)
             for (let t = 0; t < wait; t += FRAME)
             {
                 pack.update(FRAME, [hero])
@@ -162,4 +139,89 @@ describe("WizardPack", () => {
             assert.strictEqual(pack.fire.drops.length > 0, comes)
         }
     })
+
+    it("turns around once with its beam while it stands", () => {
+        const { pack, wizard, hero } = casting(PURPLE_WIZARD)
+        const { x, z, yaw } = wizard
+        const { spin } = pack.beams[0]
+        let seconds = 0, turned = yaw
+        while (wizard.casting && seconds < 60)
+        {
+            turned = wizard.yaw
+            pack.update(FRAME, [hero])
+            seconds += FRAME
+        }
+        assert.deepEqual([wizard.x, wizard.z], [x, z])
+        // it turns while the staff charges, too
+        assert.closeTo(turned - yaw, spin * (BEAM_TURN + BEAM_FIRE * BEAM_TURN_RATE), 0.05)
+        assert.closeTo(seconds, BEAM_FIRE + BEAM_TURN / BEAM_TURN_RATE + BEAM_CAST_END, 0.1)
+        assert.isEmpty(pack.beams)
+    })
+
+    /** has the beam of a wizard point at the hero, at full strength */
+    function pointAt(pack: WizardPack, wizard: Wizard, heroes: Prey[]): void
+    {
+        for (let t = 0; t < BEAM_FIRE + BEAM_FIRE_TIME + FRAME; t += FRAME)
+        {
+            pack.update(FRAME, heroes)
+        }
+        const { beams: [beam] } = pack
+        // the beam starts beside the wizard, so the hero goes where it points instead
+        heroes.forEach((hero, i) => {
+            hero.x = beam.x + Math.sin(wizard.yaw) * (i + 1)
+            hero.z = beam.z + Math.cos(wizard.yaw) * (i + 1)
+        })
+        pack.update(FRAME, heroes)
+    }
+
+    it("hurts the first hero its beam hits, unless a shield is in the way or they dodge", () => {
+        const { pack, wizard, hero } = casting(PURPLE_WIZARD)
+        const behind = prey(9, 9)
+        pointAt(pack, wizard, [hero, behind])
+        assert.isBelow(pack.beams[0].reach, 1)
+        assert.strictEqual(pack.touch(hero, true), WIZARD.beamDamage)
+        assert.strictEqual(pack.touch(hero, false), 0)
+        assert.strictEqual(pack.touch(behind, true), 0)
+
+        hero.blocking = true
+        hero.facing = wizard.yaw + Math.PI
+        assert.strictEqual(pack.touch(hero, true), 0)
+        hero.facing = wizard.yaw
+        assert.strictEqual(pack.touch(hero, true), WIZARD.beamDamage)
+
+        hero.dodging = true
+        pack.update(FRAME, [hero, behind])
+        assert.strictEqual(pack.beams[0].hit, behind)
+    })
+
+    it("has no beam go through walls", () => {
+        const floor = openFloor()
+        floor.wallAhead = () => 0.5
+        const pack = new WizardPack(floor)
+        const wizard = pack.add(PURPLE_WIZARD, 0, 0, 0)
+        const hero = prey(WIZARD.keepAway, 0)
+        for (let i = 0; i < 120 && !wizard.casting; i++)
+        {
+            pack.update(FRAME, [hero])
+        }
+        pointAt(pack, wizard, [hero])
+        assert.strictEqual(pack.beams[0].reach, 0.5)
+        assert.strictEqual(pack.touch(hero, true), 0)
+    })
+
+    for (const [blow, damage] of [["a hit", 1], ["its death", 100]] as const)
+    {
+        it("ends the beam with " + blow, () => {
+            const { pack, wizard, hero } = casting(PURPLE_WIZARD)
+            pointAt(pack, wizard, [hero])
+            pack.strike(wizard.x, wizard.z, 0, 1, Math.PI, damage)
+            assert.isNull(wizard.casting)
+            assert.strictEqual(pack.touch(hero, true), 0)
+            for (let t = 0; t < BEAM_FADE_TIME + FRAME; t += FRAME)
+            {
+                pack.update(FRAME, [])
+            }
+            assert.isEmpty(pack.beams)
+        })
+    }
 })

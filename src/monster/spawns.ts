@@ -3,7 +3,7 @@ import { BRUTE, type BruteKind } from "./brutes"
 import { BIG_CUBOID, type CuboidKind, SMALL_CUBOID } from "./cuboids"
 import { type EyeKind, FLYING_EYE } from "./eyes"
 import { SOLDIER, type SoldierKind } from "./soldiers"
-import { WIZARD, type WizardKind } from "./wizards"
+import { BLUE_WIZARD, PURPLE_WIZARD, RED_WIZARD, type WizardKind } from "./wizards"
 
 /**
  * Kinds of monster each pack of a level takes, by the name of the species
@@ -78,7 +78,9 @@ export const SPAWN_GROUPS: readonly SpawnGroup[] = [
     { name: "eye pair", weight: 2.5, members: [{ species: "eye", kind: FLYING_EYE, min: 2, max: 2 }] },
     { name: "brute", weight: 8, members: [{ species: "brute", kind: BRUTE, min: 1, max: 1 }] },
     { name: "soldiers", weight: 8, members: [{ species: "soldier", kind: SOLDIER, min: 1, max: 2 }] },
-    { name: "wizard", weight: 6, members: [{ species: "wizard", kind: WIZARD, min: 1, max: 1 }] }
+    { name: "blue wizard", weight: 2, members: [{ species: "wizard", kind: BLUE_WIZARD, min: 1, max: 1 }] },
+    { name: "red wizard", weight: 2, members: [{ species: "wizard", kind: RED_WIZARD, min: 1, max: 1 }] },
+    { name: "purple wizards", weight: 2, members: [{ species: "wizard", kind: PURPLE_WIZARD, min: 2, max: 3 }] }
 ]
 
 /**

@@ -1,27 +1,39 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, MonsterPack, type Prey, turnTo } from "./monsters"
+import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, HERO_RADIUS, MonsterPack, type Prey, turnTo } from "./monsters"
+import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, beamPhase } from "../render/beamTiming"
 import { SIGIL_DRAW, sigilPhase } from "../render/sigilShape"
 import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./sigils"
 import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
+import { BLOCK_ANGLE } from "./eyes"
 import FireRain, { type FireFloor } from "./fireRain"
 
 const TAU = Math.PI * 2
 
 /**
- * Number of robe colors to pick from, see ROBE_COLORS in WizardCrowd
+ * Colors of robes: blue wizards cast sigils, red ones have it rain fire, and purple ones sweep a beam around
  */
-export const ROBE_COUNT = 7
+export type Robe = "blue" | "red" | "purple"
 
 /**
- * Index of the blue robe, whose wizards cast sigils
+ * How fast a wizard turns around with its beam, in radians per second, and how far in all. Heroes can keep ahead of it
+ * close by.
  */
-export const SIGIL_ROBE = 0
+export const BEAM_TURN_RATE = 0.6
+export const BEAM_TURN = TAU
 
 /**
- * Index of the red robe, whose wizards have it rain fire
+ * How far from its axis a beam hits heroes besides their own radius, and how far it goes at most, in world units
  */
-export const FIRE_ROBE = 2
+const BEAM_RADIUS = 0.03 * FIGURE_SCALE
+const BEAM_REACH = 40 * FIGURE_SCALE
+
+/**
+ * Where the tip of the staff is while it fires, to the left of a wizard and ahead of it, in world units. These are for a
+ * wizard of scale 1, with the 0.3 world units per unit of the models that meeples have.
+ */
+const TIP_LEFT = -0.298 * 0.3 * FIGURE_SCALE
+const TIP_AHEAD = 0.675 * 0.3 * FIGURE_SCALE
 
 /**
  * Seconds into casting a wizard stomps the staff on the floor, which is when a rain of fire starts, and seconds
@@ -61,6 +73,7 @@ const WANDER_LENGTH = 0.6 * FIGURE_SCALE
 
 export interface WizardKind extends MonsterKind
 {
+    robe: Robe
     /** walking speed in world units per second */
     speed: number
     /** how close it comes to who it goes after, in world units */
@@ -69,9 +82,14 @@ export interface WizardKind extends MonsterKind
     damage: number
     /** hit points a strike of fire takes */
     fireDamage: number
+    /** hit points a beam takes */
+    beamDamage: number
 }
 
-export const WIZARD: WizardKind = {
+/**
+ * What wizards of all colors have in common
+ */
+export const WIZARD: Omit<WizardKind, "robe"> = {
     scale: 1,
     radius: 0.11 * FIGURE_SCALE,
     mass: 0.8,
@@ -86,7 +104,35 @@ export const WIZARD: WizardKind = {
     speed: 0.45 * FIGURE_SCALE,
     keepAway: 1.5 * FIGURE_SCALE,
     damage: 3,
-    fireDamage: 2
+    fireDamage: 2,
+    beamDamage: 2
+}
+
+export const BLUE_WIZARD: WizardKind = { ...WIZARD, robe: "blue" }
+export const RED_WIZARD: WizardKind = { ...WIZARD, robe: "red" }
+export const PURPLE_WIZARD: WizardKind = { ...WIZARD, robe: "purple" }
+
+/**
+ * A beam that turns around with its wizard
+ */
+export interface BeamState
+{
+    caster: Wizard
+    /** seconds since the staff started to charge */
+    age: number
+    /** age at which it starts to fade */
+    until: number
+    /** where it starts, in world units */
+    x: number
+    z: number
+    /** which way it goes, in radians */
+    yaw: number
+    /** which way it turns, 1 or -1 */
+    spin: number
+    /** how far it goes in world units */
+    reach: number
+    /** who it ends at, null if it hits a wall */
+    hit: Prey | null
 }
 
 /**
@@ -99,8 +145,10 @@ export interface Cast
     /** where the wizard looks */
     x: number
     z: number
-    /** sigil it is drawing, null for a rain of fire */
+    /** sigil it is drawing, null for another spell */
     sigil: SigilState | null
+    /** beam it fires, null for another spell */
+    beam: BeamState | null
     /** whether the fire is on its way, so putting off the wizard doesn't stop it */
     released: boolean
 }
@@ -116,8 +164,6 @@ export interface Wizard extends Monster
     moving: boolean
     /** seconds until it looks around again */
     lookWait: number
-    /** index into the robe colors */
-    robe: number
     /** varies the hue of its robe and spells, from 0 to 1 */
     hue: number
     /** spell it is casting, null if it isn't */
@@ -131,17 +177,23 @@ export interface Wizard extends Monster
  */
 export interface WizardFloor extends MonsterFloor, SigilFloor, FireFloor
 {
+    /**
+     * Returns the distance from a point to the first wall in a direction of length 1, but not more than the given one
+     */
+    wallAhead(x: number, z: number, dirX: number, dirZ: number, most: number): number
 }
 
 
 /**
  * The wizards of a level. They wander about, and walk up to heroes they see, but stay some way off. Blue ones stop to cast
- * sigils under heroes and red ones to have it rain fire, the others do no harm yet.
+ * sigils under heroes and red ones to have it rain fire. Purple ones stop to turn around once with a beam, whoever is there.
  */
 export default class WizardPack extends MonsterPack<Wizard>
 {
     /** on the floor, which stay when their wizard is gone */
     readonly sigils: SigilState[] = []
+    /** turn with their wizard, and fade where they are when it is put off or gone */
+    readonly beams: BeamState[] = []
     /** goes on when their wizard is gone, too */
     readonly fire: FireRain
 
@@ -167,7 +219,6 @@ export default class WizardPack extends MonsterPack<Wizard>
             goalX: 0,
             goalZ: 0,
             lookWait: rng.next() * LOOK_TIME,
-            robe: Math.floor(rng.next() * ROBE_COUNT),
             hue: rng.next(),
             casting: null,
             castWait: rng.next(FIRST_WAIT_MIN, FIRST_WAIT_MAX),
@@ -198,7 +249,12 @@ export default class WizardPack extends MonsterPack<Wizard>
                 wizard.wandering = false
             }
             this.cast(wizard, prey, delta)
-            if (wizard.casting)
+            if (wizard.casting?.beam)
+            {
+                const { age, until, spin } = wizard.casting.beam
+                wizard.yaw += age < until ? spin * BEAM_TURN_RATE * delta : 0
+            }
+            else if (wizard.casting)
             {
                 turnTo(wizard, wizard.casting.x, wizard.casting.z, TURN_RATE * delta)
             }
@@ -207,10 +263,12 @@ export default class WizardPack extends MonsterPack<Wizard>
                 this.decide(wizard, delta)
             }
         }
+        this.updateBeams(delta, heroes)
     }
 
     /**
-     * Anyone in a sigil gets hurt once it is drawn, and anyone fire strikes. No shield helps against either.
+     * Anyone in a sigil gets hurt once it is drawn, and anyone fire strikes. No shield helps against either, but one in about
+     * the right direction does against a beam.
      */
     touch(hero: Prey, open: boolean): number
     {
@@ -220,6 +278,14 @@ export default class WizardPack extends MonsterPack<Wizard>
             if (open && sigilPhase(age, broken).hurts && Math.hypot(hero.x - x, hero.z - z) < radius && this.floor.sees(x, z, hero.x, hero.z))
             {
                 damage = Math.max(damage, taken)
+            }
+        }
+        for (const { age, until, yaw, hit, caster } of this.beams)
+        {
+            const blocked = hero.blocking && -Math.cos(hero.facing - yaw) >= Math.cos(BLOCK_ANGLE)
+            if (open && hit === hero && !blocked && beamPhase(age, until).hurts)
+            {
+                damage = Math.max(damage, caster.kind.beamDamage)
             }
         }
         return damage
@@ -237,7 +303,7 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * A blow breaks the sigil a wizard is drawing, and keeps fire from coming until the staff hits the floor
+     * A blow breaks the sigil a wizard is drawing and its beam, and keeps fire from coming until the staff hits the floor
      */
     private breakOff(wizard: Wizard): void
     {
@@ -247,6 +313,10 @@ export default class WizardPack extends MonsterPack<Wizard>
             if (casting.sigil)
             {
                 casting.sigil.broken = 0
+            }
+            if (casting.beam)
+            {
+                casting.beam.until = Math.min(casting.beam.until, casting.beam.age)
             }
             this.endCast(wizard)
         }
@@ -280,15 +350,62 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * Has a wizard go on with its spell, or start one on a hero close enough
+     * Has the beams go on, and stop at the first wall or hero in their way
+     */
+    private updateBeams(delta: number, heroes: readonly Prey[]): void
+    {
+        const { beams, floor } = this
+        for (let i = beams.length - 1; i >= 0; i--)
+        {
+            const beam = beams[i]
+            const { caster } = beam
+            beam.age += delta
+            if (beam.age >= beam.until + BEAM_FADE_TIME)
+            {
+                beams.splice(i, 1)
+                continue
+            }
+            if (caster.casting?.beam === beam)
+            {
+                const { x, z, yaw, kind: { scale } } = caster
+                const sin = Math.sin(yaw), cos = Math.cos(yaw)
+                beam.yaw = yaw
+                beam.x = x + (cos * TIP_LEFT + sin * TIP_AHEAD) * scale
+                beam.z = z + (cos * TIP_AHEAD - sin * TIP_LEFT) * scale
+            }
+            const dirX = Math.sin(beam.yaw), dirZ = Math.cos(beam.yaw)
+            // the staff can stick into a wall
+            beam.reach = floor.sees(caster.x, caster.z, beam.x, beam.z) ? floor.wallAhead(beam.x, beam.z, dirX, dirZ, BEAM_REACH) : 0
+            beam.hit = null
+            for (const hero of heroes)
+            {
+                const dx = hero.x - beam.x, dz = hero.z - beam.z
+                const along = dx * dirX + dz * dirZ
+                const aside = Math.abs(dx * dirZ - dz * dirX)
+                if (!hero.dodging && along > 0 && aside < HERO_RADIUS + BEAM_RADIUS)
+                {
+                    const reach = Math.max(0, along - Math.sqrt(Math.max(0, HERO_RADIUS ** 2 - aside ** 2)))
+                    if (reach < beam.reach)
+                    {
+                        beam.reach = reach
+                        beam.hit = hero
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Has a wizard go on with its spell, or start one on a hero close enough, or in sight for a beam
      */
     private cast(wizard: Wizard, prey: Prey | null, delta: number): void
     {
-        const { casting, kind, robe } = wizard
+        const { casting, kind } = wizard
+        const { robe } = kind
         if (casting)
         {
             casting.age += delta
-            if (!casting.sigil && !casting.released)
+            if (robe === "red" && !casting.released)
             {
                 // aims at where it last saw them until the staff hits the floor
                 casting.x = wizard.goalX
@@ -299,30 +416,47 @@ export default class WizardPack extends MonsterPack<Wizard>
                     this.rainFire(wizard, casting.x, casting.z)
                 }
             }
-            if (casting.age >= (casting.sigil ? SIGIL_DRAW : FIRE_CAST))
+            if (casting.age >= (casting.beam ? casting.beam.until + BEAM_CAST_END : casting.sigil ? SIGIL_DRAW : FIRE_CAST))
             {
                 this.endCast(wizard)
             }
             return
         }
-        if (robe !== SIGIL_ROBE && robe !== FIRE_ROBE || wizard.chase === 0)
+        if (wizard.chase === 0)
         {
             return
         }
         wizard.castWait = Math.max(0, wizard.castWait - delta)
-        if (wizard.castWait > 0 || !prey || Math.hypot(prey.x - wizard.x, prey.z - wizard.z) > CAST_RANGE)
+        if (wizard.castWait > 0 || !prey || robe !== "purple" && Math.hypot(prey.x - wizard.x, prey.z - wizard.z) > CAST_RANGE)
         {
             return
         }
-        if (robe === FIRE_ROBE)
+        if (robe === "purple")
         {
-            wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, released: false }
+            const beam: BeamState = {
+                caster: wizard,
+                age: 0,
+                until: BEAM_FIRE + BEAM_TURN / BEAM_TURN_RATE,
+                x: wizard.x,
+                z: wizard.z,
+                yaw: wizard.yaw,
+                spin: rng.next() < 0.5 ? 1 : -1,
+                reach: 0,
+                hit: null
+            }
+            this.beams.push(beam)
+            wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, beam, released: false }
+            return
+        }
+        if (robe === "red")
+        {
+            wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, beam: null, released: false }
             return
         }
         const [x, z] = placeSigil(this.floor, prey.x, prey.z, SIGIL_RADIUS)
         const sigil: SigilState = { x, z, radius: SIGIL_RADIUS, damage: kind.damage, age: 0, broken: null, hue: wizard.hue }
         this.sigils.push(sigil)
-        wizard.casting = { age: 0, x, z, sigil, released: false }
+        wizard.casting = { age: 0, x, z, sigil, beam: null, released: false }
     }
 
     /**

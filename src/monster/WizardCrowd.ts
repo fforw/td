@@ -1,10 +1,11 @@
-import { type AnimationAction, AnimationClip, AnimationMixer, Color, Group, LoopOnce } from "three"
+import { type AnimationAction, AnimationClip, AnimationMixer, Color, Group, LoopOnce, type Object3D, type Vector3 } from "three"
 import { LEVEL_MEEPLE_SCALE } from "../meeple/Meeple3D"
 import type { LightField } from "../render/dungeonLighting"
 import { animations } from "../render/scene3d"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
 import { SIGIL_HUE_RANGE } from "../render/sigil"
-import { SIGIL_ROBE, type Wizard } from "./wizards"
+import { beamCastTime } from "../render/beamTiming"
+import type { Robe, Wizard } from "./wizards"
 
 /**
  * Seconds it takes to start and stop walking
@@ -17,22 +18,24 @@ const FADE_TIME = 0.2
 const CAST_FADE_TIME = 0.12
 
 /**
- * Colors of the robes of wizards, as many as ROBE_COUNT. The robe of the model is a gradient from white at the head to
- * middle grey at the hem, which these tint.
+ * Colors of the robes of wizards. The robe of the model is a gradient from white at the head to middle grey at the hem,
+ * which these tint.
  */
-export const ROBE_COLORS: readonly string[] = [
-    "#3d4fb8",
-    "#8e2f9c",
-    "#b3322c",
-    "#2f8a4a",
-    "#c08a2a",
-    "#2a8a8c",
-    "#5a5560"
-]
+export const ROBE_COLORS: Readonly<Record<Robe, string>> = {
+    blue: "#3d4fb8",
+    red: "#b3322c",
+    purple: "#8e2f9c"
+}
+
+/**
+ * Length of the staff bone, from the wizard's Blender file
+ */
+export const STAFF_LENGTH = 0.617
 
 interface Figure extends SkinnedFigure
 {
     mixer: AnimationMixer
+    staff: Object3D
     walk: AnimationAction
     /** how far it has started walking, from 0 to 1 */
     walking: number
@@ -91,6 +94,23 @@ export default class WizardCrowd
     }
 
     /**
+     * Writes where the tip of the staff of a wizard is in the world
+     *
+     * @return false if the wizard isn't shown
+     */
+    findTip(wizard: Wizard, out: Vector3): boolean
+    {
+        const figure = this.figures.get(wizard)
+        if (!figure)
+        {
+            return false
+        }
+        figure.staff.updateWorldMatrix(true, false)
+        figure.staff.localToWorld(out.set(0, STAFF_LENGTH, 0))
+        return true
+    }
+
+    /**
      * Poses a figure by the state of its wizard, with the walk and the cast fading in and out
      */
     private pose(wizard: Wizard, figure: Figure, delta: number): void
@@ -113,17 +133,18 @@ export default class WizardCrowd
         cast.setEffectiveWeight(figure.casting)
         if (casting)
         {
-            cast.time = Math.min(casting.age, cast.getClip().duration)
+            const { age, beam } = casting
+            cast.time = beam ? beamCastTime(age, beam.until) : Math.min(age, cast.getClip().duration)
         }
         mixer.update(0)
 
         tintFigure(figure, flash, chase)
     }
 
-    private createFigure({ robe, hue }: Wizard): Figure
+    private createFigure({ kind: { robe }, hue }: Wizard): Figure
     {
-        const color = new Color(ROBE_COLORS[robe % ROBE_COLORS.length])
-        if (robe === SIGIL_ROBE)
+        const color = new Color(ROBE_COLORS[robe])
+        if (robe === "blue")
         {
             // as its sigils
             color.offsetHSL((hue * 2 - 1) * SIGIL_HUE_RANGE, 0, 0)
@@ -132,7 +153,7 @@ export default class WizardCrowd
         const mixer = new AnimationMixer(figure.root)
 
         // posed by hand, by the ground covered and by how far the spell is
-        const [walk, cast] = ["walk", "cast"].map(name => {
+        const [walk, cast] = ["walk", robe === "purple" ? "cast-2" : "cast"].map(name => {
             const action = mixer.clipAction(AnimationClip.findByName([...animations("wizard")], name)!)
             action.timeScale = 0
             action.setLoop(LoopOnce, 1)
@@ -141,6 +162,6 @@ export default class WizardCrowd
             action.play()
             return action
         })
-        return { ...figure, mixer, walk, cast, walking: 0, casting: 0 }
+        return { ...figure, mixer, staff: figure.root.getObjectByName("Staff")!, walk, cast, walking: 0, casting: 0 }
     }
 }

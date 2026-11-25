@@ -15,7 +15,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { faceCenter } from "../map/dungeonLights"
 import { entranceRoom, EXIT_HALF_SIZE, EXIT_REACH, findRoomRoles, type LevelExit } from "../map/dungeonRoles"
-import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallDistance } from "../map/dungeonWays"
+import { createFloorWalls, entranceFace, type FloorSpot, type FloorWalls, moveOnFloor, seesAcross, wallAhead, wallDistance } from "../map/dungeonWays"
 import { findFireRoom, type FireRoom, SWITCH_REACH } from "../map/fireRoom"
 import { fixtureSegments } from "../map/fixtures"
 import { DUNGEON_HEIGHT, DUNGEON_WIDTH, type DungeonLevel } from "../map/generateDungeon"
@@ -37,6 +37,7 @@ import { BOUNCE, fadeShove } from "../monster/shove"
 import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
 import { planSpawns } from "../monster/spawns"
+import BeamCrowd from "../monster/BeamCrowd"
 import WizardCrowd from "../monster/WizardCrowd"
 import FireHazard from "../monster/fireHazard"
 import FireRain from "../monster/fireRain"
@@ -418,6 +419,7 @@ export default class LevelScene
     private soldierCrowd: SoldierCrowd | null = null
     private wizards: WizardPack | null = null
     private wizardCrowd: WizardCrowd | null = null
+    private beamCrowd: BeamCrowd | null = null
     private sigilCrowd: SigilCrowd | null = null
     private fireCrowd: FireRainCrowd | null = null
     /** null for a level without one */
@@ -706,7 +708,11 @@ export default class LevelScene
         const eyes = new EyePack(floor)
         const brutes = new BrutePack(floor)
         const soldiers = new SoldierPack(floor)
-        const wizards = new WizardPack({ ...floor, wallDistance: (x, z) => wallDistance(sigilWalls, x, z) })
+        const wizards = new WizardPack({
+            ...floor,
+            wallDistance: (x, z) => wallDistance(sigilWalls, x, z),
+            wallAhead: (x, z, dirX, dirZ, most) => wallAhead(seeing, x, z, dirX, dirZ, most)
+        })
         for (const spawn of spawns)
         {
             const [x, z] = faceCenter(world, spawn.face)
@@ -735,10 +741,11 @@ export default class LevelScene
         const bruteCrowd = new BruteCrowd(field)
         const soldierCrowd = new SoldierCrowd(field)
         const wizardCrowd = new WizardCrowd(field)
+        const beamCrowd = new BeamCrowd(wizards.members.filter(({ kind }) => kind.robe === "purple").length)
         const sigilCrowd = new SigilCrowd()
         const fireCrowd = new FireRainCrowd()
         this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group,
-            fireCrowd.group)
+            fireCrowd.group, beamCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
         this.eyes = eyes
@@ -749,6 +756,7 @@ export default class LevelScene
         this.soldierCrowd = soldierCrowd
         this.wizards = wizards
         this.wizardCrowd = wizardCrowd
+        this.beamCrowd = beamCrowd
         this.sigilCrowd = sigilCrowd
         this.fireCrowd = fireCrowd
 
@@ -1598,6 +1606,7 @@ export default class LevelScene
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)
         this.soldierCrowd!.update(this.soldiers!.members, delta)
         this.wizardCrowd!.update(this.wizards!.members, delta)
+        this.beamCrowd!.update(this.wizards!.beams, (wizard, out) => this.wizardCrowd!.findTip(wizard, out), time, delta)
         this.sigilCrowd!.update(this.wizards!.sigils)
         this.fireCrowd!.update([...this.wizards!.fire.drops, ...this.hazardFire.drops])
         bursts.update(delta)

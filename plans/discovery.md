@@ -957,12 +957,22 @@ person: a trader, a stranger with a message, a prisoner who begs.
   staff swaying against the hips like the sword, and casts.
   Wizards differ by the color of their robe: the robe of the model is a gradient
   from white at the head to middle grey at the hem, which `WizardCrowd`
-  tints with one of `ROBE_COLORS` per wizard, through the colors by material name
+  tints with the one of `ROBE_COLORS` for its kind, through the colors by material name
   that `skinnedFigure()` takes. The face in the hood is dark with glowing eyes from
   an emissive map, which the light field leaves alone.
-- Each robe color gets its own attack: purple fires the beam, red rains fire and
-  blue casts a sigil on the floor (`render/sigil.ts`, `sigil.html`). So far only
-  blue and red ones attack. The sigil draws itself under the hero as a dim blue
+- Each robe color has its own attack: purple fires the beam, red rains fire and
+  blue casts a sigil on the floor (`render/sigil.ts`, `sigil.html`). More colors
+  can come with more attacks.
+- Purple wizards come in groups of 2 or 3 and are living obstacles. Once they see
+  a hero they stand still and turn around the vertical axis once, at
+  `BEAM_TURN_RATE`, with the beam (`render/beam.ts`, `beam.html`) and the cast-2
+  clip. They don't aim: a turn starts where they look and goes either way, so it
+  starts by moving off the hero. The beam goes from the staff to the first wall or
+  hero, hurts that hero unless they dodge or hold a shield against it, and passes
+  over monsters. A blow ends it. Between turns they walk like the others. The game
+  has no bloom, so the beam is drawn without a `GlowPass`. At most three beams of
+  a level light up what is around them (`BeamCrowd`).
+- The sigil draws itself under the hero as a dim blue
   warning and stays there, then flares up blue-white and hurts who is in it,
   shield or not, until it dissolves. It doesn't turn red, as that is the color of
   fire. A blow on the wizard while it draws breaks it. `placeSigil()` moves it off
@@ -1213,7 +1223,8 @@ person: a trader, a stranger with a message, a prisoner who begs.
 - For now the groups are the old kinds on their own, weighted like the
   shares of rooms they took before (`SPAWN_GROUPS`): a big cuboid, 1 to 3
   small ones, an eye, a pair of eyes, a brute, 1 or 2 soldiers, as
-  often as a brute, and a wizard, a bit less often. 42% of the open rooms are
+  often as a brute, and wizards, a bit less often: a blue one, a red one or 2
+  to 3 purple ones. 42% of the open rooms are
   taken, about as many as had any monster before. Mixes are gone until
   groups bring them back on purpose.
 - Next: groups of mixed kinds, like a brute with an eye watching for it,

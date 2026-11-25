@@ -32,10 +32,11 @@ import type PatchWorld from "./map/PatchWorld"
 import { FACE_SIZE } from "./map/scale"
 import { randomLook } from "./meeple/look"
 import MeepleCrowd, { LEVEL_MEEPLE_SCALE, type Meeple, MEEPLE_MODELS, randomTraits } from "./meeple/Meeple3D"
-import { WIZARD } from "./monster/wizards"
-import { ROBE_COLORS } from "./monster/WizardCrowd"
+import { type Robe, WIZARD } from "./monster/wizards"
+import { ROBE_COLORS, STAFF_LENGTH } from "./monster/WizardCrowd"
 import { skinnedFigure } from "./monster/skinnedFigure"
 import Beam, { type BeamLook } from "./render/beam"
+import { BEAM_FIRE, beamCastTime, beamPhase } from "./render/beamTiming"
 import GlowPass from "./render/glowPass"
 import { createLevelMeshes } from "./render/dungeonLevel"
 import { flickerHeroLight, flickerLights, moveHeroLight, updateLightField } from "./render/dungeonLighting"
@@ -45,7 +46,7 @@ import MapWorkerClient from "./worker/MapWorkerClient"
 /*
  * Test page for the wizard's beam, with and without bloom. By default the wizard stands in an empty room at scale 1, with
  * dungeon=SEED it stands in a room of a lit dungeon level at the scale of the game and fires at a hero with a torch, e.g.
- * beam.html?robe=2&width=0.35&bloom=off&hold=1&glowStrength=0.6&glowRadius=0.3
+ * beam.html?robe=red&width=0.35&bloom=off&hold=1&glowStrength=0.6&glowRadius=0.3
  * beam.html?dungeon=1&bloom=global&strength=0.45&radius=0.2&threshold=1
  * beam.html?dungeon=1&room=3&hold=1&look=pixels
  *
@@ -54,14 +55,10 @@ import MapWorkerClient from "./worker/MapWorkerClient"
  */
 
 const params = new URLSearchParams(location.search)
-let robe = Number(params.get("robe") ?? 0)
+const ROBES = Object.keys(ROBE_COLORS) as Robe[]
+let robe = ROBES.find(robe => robe === params.get("robe")) ?? "purple"
 let hold = params.get("hold") === "1"
 const LOOKS: BeamLook[] = ["shell", "pixels"]
-
-/**
- * Length of the staff bone, from the wizard's Blender file
- */
-const STAFF_LENGTH = 0.617
 
 /**
  * Width of the beam in world units, with the wizard at scale 1
@@ -69,13 +66,10 @@ const STAFF_LENGTH = 0.617
 const BEAM_WIDTH = Number(params.get("width") ?? 0.35)
 
 /**
- * Seconds of the cast: the staff swings down until FIRE, stays there while the beam lasts until FADE, swings back up
- * and the wizard rests until CYCLE. FIRE is the frame of cast-2 where the staff points ahead, at 24 frames per second.
+ * Seconds of the cast: the staff swings down, stays there while the beam lasts until FADE, swings back up and the
+ * wizard rests until CYCLE
  */
-const FIRE = 11 / 24
-const FIRE_TIME = 0.08
 const FADE = 2.2
-const FADE_TIME = 0.3
 const CYCLE = 3.6
 
 /**
@@ -322,34 +316,6 @@ async function dungeonStage(seed: number): Promise<Stage>
 }
 
 
-/**
- * Returns how far the staff has charged and the beam has fired at the given second of the cycle
- */
-function phase(t: number): { charge: number, strength: number }
-{
-    if (hold)
-    {
-        return { charge: 1, strength: 1 }
-    }
-    const charge = t < FIRE ? t / FIRE : t < FADE + FADE_TIME ? 1 - Math.max(0, t - FADE) / FADE_TIME : 0
-    const strength = t < FIRE ? 0 : t < FIRE + FIRE_TIME ? (t - FIRE) / FIRE_TIME : t < FADE ? 1 : Math.max(0, 1 - (t - FADE) / FADE_TIME)
-    return { charge: charge * charge, strength }
-}
-
-/**
- * Returns the second of cast-2 to show at the given second of the cycle: on until it points ahead, held there while the
- * beam lasts, then on to its end
- */
-function castTime(t: number, duration: number): number
-{
-    const held = FIRE + 1 / 24
-    if (hold)
-    {
-        return held
-    }
-    return t < held ? t : t < FADE ? held : Math.min(duration, held + t - FADE)
-}
-
 async function start(): Promise<void>
 {
     const dungeon = params.get("dungeon")
@@ -392,7 +358,7 @@ async function start(): Promise<void>
         }
         else if (event.key === "c")
         {
-            robe = (robe + 1) % ROBE_COLORS.length
+            robe = ROBES[(ROBES.indexOf(robe) + 1) % ROBES.length]
             beam.setColor(new Color(ROBE_COLORS[robe]))
             stage.setRobe(new Color(ROBE_COLORS[robe]))
         }
@@ -416,12 +382,12 @@ async function start(): Promise<void>
         const t = seconds % CYCLE
         if (cast)
         {
-            cast.time = castTime(t, clip.duration)
+            cast.time = beamCastTime(hold ? BEAM_FIRE * 2 : t, hold ? Infinity : FADE)
             mixer.update(0)
         }
         wizard.updateMatrixWorld(true)
         staff.localToWorld(tip.set(0, STAFF_LENGTH, 0))
-        const { charge, strength } = phase(t)
+        const { charge, strength } = beamPhase(hold ? BEAM_FIRE * 2 : t, hold ? Infinity : FADE)
         beam.update(tip, target, charge, strength, seconds, delta)
         stage.update(seconds)
         controls.update()
