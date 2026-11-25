@@ -51,6 +51,7 @@ import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
+import GlowView from "../render/glowView"
 import HeroMarks, { SLASH_OUTER, SLASH_WIDTH } from "../render/heroMarks"
 import { flickerHeroLight, flickerLights, heroBurn, hideHeroLight, moveHeroLight, updateLightField } from "../render/dungeonLighting"
 import { FACE_SIZE, loadModels, pixelRatio } from "../render/scene3d"
@@ -386,6 +387,7 @@ export default class LevelScene
     private readonly renderer: WebGLRenderer
     private readonly scene = new Scene()
     private readonly camera: PerspectiveCamera
+    private readonly view: GlowView
     private readonly controls: OrbitControls
     private readonly client = new MapWorkerClient()
     private readonly raycaster = new Raycaster()
@@ -519,7 +521,7 @@ export default class LevelScene
         canvas.className = "level-scene"
         this.element = canvas
 
-        const renderer = new WebGLRenderer({ canvas, antialias: true })
+        const renderer = new WebGLRenderer({ canvas })
         renderer.setPixelRatio(pixelRatio())
         renderer.toneMapping = ACESFilmicToneMapping
         this.renderer = renderer
@@ -528,6 +530,7 @@ export default class LevelScene
         this.scene.add(new HemisphereLight("#8fa0d0", "#303048", AMBIENT))
 
         this.camera = new PerspectiveCamera(40, 1, 0.1, 500)
+        this.view = new GlowView(renderer, this.scene, this.camera)
 
         const controls = new OrbitControls(this.camera, canvas)
         controls.enableDamping = true
@@ -1826,8 +1829,17 @@ export default class LevelScene
             {
                 this.controls.update()
             }
-            this.renderer.render(this.scene, this.camera)
+            this.view.render(this.glowing())
         } : null)
+    }
+
+    /**
+     * Returns whether there are any effects that glow
+     */
+    private glowing(): boolean
+    {
+        const { wizards, beamCrowd, hazardFire } = this
+        return hazardFire.drops.length > 0 || !!wizards && (wizards.fire.drops.length > 0 || wizards.sigils.length > 0) || !!beamCrowd?.visible
     }
 
     /**
@@ -1840,6 +1852,7 @@ export default class LevelScene
         this.controls.dispose()
         this.listening.abort()
         this.client.terminate()
+        this.view.dispose()
         this.renderer.dispose()
         this.renderer.forceContextLoss()
         this.element.remove()

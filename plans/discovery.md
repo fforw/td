@@ -969,9 +969,15 @@ person: a trader, a stranger with a message, a prisoner who begs.
   clip. They don't aim: a turn starts where they look and goes either way, so it
   starts by moving off the hero. The beam goes from the staff to the first wall or
   hero, hurts that hero unless they dodge or hold a shield against it, and passes
-  over monsters. A blow ends it. Between turns they walk like the others. The game
-  has no bloom, so the beam is drawn without a `GlowPass`. At most three beams of
+  over monsters. A blow ends it. Between turns they walk like the others. At most three beams of
   a level light up what is around them (`BeamCrowd`).
+- Levels are drawn by a `GlowView` (`render/glowView.ts`), which adds bloom for
+  effects alone: the beam, the sigil and the fire. The scene is drawn as it would
+  be on the canvas, with tone mapping per material, so the bloom changes nothing
+  else. What glows (`setGlowing()`) is drawn again on its own, behind the depth of
+  the picture, and only its bloom is added. The sigil and the fire only put a share
+  of their light into it (`GLOW_SHARE`), which keeps their shapes clear. With no
+  effect around it costs only a copy of the picture.
 - The sigil draws itself under the hero as a dim blue
   warning and stays there, then flares up blue-white and hurts who is in it,
   shield or not, until it dissolves. It doesn't turn red, as that is the color of
