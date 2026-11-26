@@ -25,7 +25,7 @@ export type Species = keyof SpeciesKinds
 export type SpawnMember = { [S in Species]: { species: S, kind: SpeciesKinds[S], min: number, max: number } }[Species]
 
 /**
- * Monsters that go into a room together. Which group a room gets is decided once, by the planner, see plans/discovery.md 3.7.
+ * Monsters that go into a room together. Which group a room gets is decided once, by the planner, see plans/dungeon/spawns.md.
  */
 export interface SpawnGroup
 {

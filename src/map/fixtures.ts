@@ -13,7 +13,7 @@ const OPENING_DISTANCE = 1.5
 const WALL_REACH = 1
 
 /**
- * Where a fixture stands on the floor of a level, see plans/discovery.md, 3.2
+ * Where a fixture stands on the floor of a level, see plans/dungeon/fixtures.md
  */
 export interface FixtureSpot
 {

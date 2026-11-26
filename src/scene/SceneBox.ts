@@ -5,7 +5,7 @@ import type { ActorRole, Emotion, Offer, Saying, Ware, Word } from "./script"
 import type SceneStage from "./stage"
 
 /**
- * Emoji for the words of scenes, until the glyph language of 2.5 shows them
+ * Emoji for the words of scenes, until the glyph language (plans/story/glyphs.md) shows them
  */
 const WORD_EMOJI: Record<Word, string> = {
     greeting: "👋",
@@ -26,7 +26,8 @@ const WARE_ITEM: Record<Ware, string> = {
 }
 
 /**
- * Glyphs of the wares while the player doesn't know them, placeholders until the glyph language of 2.5 makes them
+ * Glyphs of the wares while the player doesn't know them, placeholders until the glyph language
+ * (plans/story/glyphs.md) makes them
  */
 const WARE_GLYPH: Record<Ware, string> = {
     healing: "ᛉ",

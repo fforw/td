@@ -74,9 +74,9 @@ const generatedKind: GeneratedKind = (seed, q, r, kind) => withSeed(
 
 
 /**
- * Returns the kind edits a campaign starts with. The first dungeon (plan 1.2) has to be next to the castle, so it goes on
- * the first patch next to the castle that has room for it, starting at one picked by the seed. A world without such a
- * patch starts without an edit.
+ * Returns the kind edits a campaign starts with. The first dungeon (plans/world/discovery.md) has to be next to the
+ * castle, so it goes on the first patch next to the castle that has room for it, starting at one picked by the seed. A
+ * world without such a patch starts without an edit.
  *
  * @param seed          campaign seed
  * @param generated     what patches end up as

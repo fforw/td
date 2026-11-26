@@ -4,7 +4,7 @@ import { faceCount, faceOf, prev } from "./QuadPatch"
 import { globalFace } from "./route"
 
 /*
- * Rooms of a dungeon level, found in the mesh of its connected patches. See plans/discovery.md, 3.4.
+ * Rooms of a dungeon level, found in the mesh of its connected patches. See plans/dungeon/generation.md.
  */
 
 /**

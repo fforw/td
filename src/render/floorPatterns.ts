@@ -19,7 +19,7 @@ import type PatchWorld from "../map/PatchWorld"
 import { SCALE } from "./scene3d"
 
 /*
- * Patterns laid over the floor of some rooms, to vary them a little. See plans/discovery.md, 3.4.
+ * Patterns laid over the floor of some rooms, to vary them a little. See plans/dungeon/generation.md.
  */
 
 const PATTERN_DIR = import.meta.env.BASE_URL + "media/patterns/"

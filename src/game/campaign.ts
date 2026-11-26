@@ -190,7 +190,7 @@ export interface Campaign
      * a level starts anew, like explored.
      */
     facts?: Record<string, string[]>
-    /** concepts of the glyph language the player learned, see plans/discovery.md 2.5, missing before the first */
+    /** concepts of the glyph language the player learned, see plans/story/glyphs.md, missing before the first */
     concepts?: string[]
     /**
      * How often levels started anew, by the key of their patch, missing for those that never did. Each attempt has a seed

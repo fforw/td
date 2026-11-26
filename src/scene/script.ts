@@ -1,7 +1,7 @@
 import type { Potion } from "../treasure/chests"
 
 /**
- * Scripts of scenes, see plans/discovery.md 2.7. A script is a graph of beats. The player walks it, and whatever shows
+ * Scripts of scenes, see plans/story/scenes.md. A script is a graph of beats. The player walks it, and whatever shows
  * the scene tells it when a beat that takes time is over, or what the player chose.
  */
 
@@ -111,7 +111,7 @@ export interface SceneWorld
     use(ware: Ware): void
     fact(name: string): boolean
     setFact(name: string): void
-    /** whether the player knows a concept of the glyph language, see plans/discovery.md 2.5 */
+    /** whether the player knows a concept of the glyph language, see plans/story/glyphs.md */
     knows(concept: Word): boolean
     learn(concept: Word): void
 }

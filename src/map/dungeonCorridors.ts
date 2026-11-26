@@ -6,7 +6,7 @@ import { FaceHeap } from "./route"
 /*
  * Corridors between the rooms of a dungeon level. They are one face wide and don't need any wall faces next to them:
  * wall edges keep them apart from everything they run along, like they keep rooms apart that touch. See
- * plans/discovery.md, 3.4.
+ * plans/dungeon/generation.md.
  */
 
 /**

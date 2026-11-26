@@ -1,0 +1,153 @@
+# Monsters
+
+What all of them share is in [combat](combat.md), which rooms they get
+placed in is in [spawns](../dungeon/spawns.md).
+
+## Placement and reloading
+
+- The spawn planner places monsters from the level seed. They aren't
+  saved.
+- Only those on floor no hero has been to get created
+  (`inUnexplored()`). So a reload brings back the ones in the unexplored
+  parts, and whatever lived on known floor is gone for good, killed or
+  not.
+
+## Acid cuboid
+
+`monster/cuboids.ts`. Comes big, or at half the size.
+
+- Hops after heroes it sees, the big one slower.
+- The big one can lunge, half as far again as a hop, after a moment of
+  winding up.
+- The big one breaks up into 2 to 7 small ones when it dies. They hop
+  off in a fan away from the blow, so they rarely land on whoever struck
+  it.
+- Touching hurts. A shield stops small ones, from the front only.
+- It hurts from a little beyond where they meet (`TOUCH_SLACK`), as
+  bumping keeps the two from overlapping.
+
+## Flying eye
+
+`monster/eyes.ts`. Hovers low over the floor and keeps away from heroes.
+
+- It picks a spot that sees them, as far off as it can get without a
+  long way there.
+- While it sees someone it fires fast bolts at random intervals. Showing
+  the lower eye of its texture for half a second is the warning.
+- A shield stops a bolt coming from roughly in front, dodging lets it
+  pass, walls put it out.
+- A blow knocks the eye back and spoils its shot.
+- The eyes of a level share a memory of where one of them last saw a
+  hero, or got hit from (`MEMORY_TIME`). Each new sighting replaces it.
+  Eyes that see the spot fly there to look, others stay put, as eyes
+  don't find ways around walls.
+
+## Brute
+
+`monster/brutes.ts`. Slow and heavy: it walks at about a third of a
+hero's running speed and takes 8 sword blows, which don't stop it and
+hardly push it.
+
+- Within reach it swings its club. It turns after the hero while raising
+  the club and stops turning before it comes down (`AIM_TIME`,
+  `IMPACT_TIME`).
+- The club hurts once and a lot, in front only, and no shield stops it.
+  The way out is to step back or aside, or to dodge.
+- Each brute has its own rigged copy with an `AnimationMixer`
+  (`BruteCrowd`), so brutes are for few at a time. The walk follows the
+  ground covered, the attack the time into the swing.
+- When it dies, its body bursts right away and the club goes on alone,
+  with the die clip: it drops from the hand, tips over and comes to rest,
+  baked from a rigid body simulation in `media-src/brute2.blend`. The
+  club bursts at a random frame after it first hits the floor, more
+  likely a later one, so not every club takes the whole fall. A smitten
+  brute goes the same way.
+
+## Soldier
+
+`monster/soldiers.ts`. Walks after heroes a bit slower than they run and
+takes 4 sword blows. It is drawn a bit larger than its model, with body
+and reach to match.
+
+- It swings a sword that hurts in front, which a shield stops.
+- After each swing, and when struck while not swinging, it holds up its
+  own shield for a while, turning after the hero and closing in slowly.
+  Then it lowers the shield and swings again once it is all the way down.
+- A blow from the front does nothing once the shield is up far enough
+  (`SHIELD_UP`, `SHIELD_ARC`), so the way in is from the side or behind,
+  or during the swing. A monster that stops a blow says so with
+  `MonsterPack.stops()`.
+- Blocking is a mode, not a move: the state keeps how far up the shield
+  is, and `SoldierCrowd` takes the time into the block clip from that.
+  The first half of the clip goes up, the second half comes down from as
+  far as it got. Swing and block never overlap and start and end at rest,
+  so neither fades.
+- The walk splits by bone: the body walks on beneath a guard, while the
+  arms give way to swinging and guarding. Each clip has only the bones
+  its action moves, or a guard would hold the body still.
+
+## Wizard
+
+`monster/wizards.ts`. Wanders, and walks up to heroes it sees, but stops
+at a distance (`CAST_RANGE`).
+
+- The color of the robe tells the attack: purple fires the beam, red
+  rains fire, blue casts a sigil on the floor. More colors can come with
+  more attacks.
+- The robe of the model is a gradient from white to grey, which
+  `WizardCrowd` tints (`ROBE_COLORS`). The face in the hood is dark with
+  glowing eyes, which the light field leaves alone.
+- The model has only the soldier's walk and casts.
+
+## Beam
+
+`render/beam.ts`, test page `beam.html`. The attack of purple wizards,
+who come in groups and are living obstacles.
+
+- Once they see a hero they stand still and turn around once with the
+  beam. They don't aim: a turn starts where they look and goes either
+  way, so it starts by moving off the hero.
+- The beam goes from the staff to the first wall or hero and passes over
+  monsters. It hurts that hero unless they dodge or hold a shield against
+  it.
+- A blow ends it. Between turns they walk like other wizards.
+- Only a few beams of a level light up what is around them (`BeamCrowd`).
+
+## Sigil
+
+`render/sigil.ts`, test page `sigil.html`. The attack of blue wizards.
+
+- It draws itself under the hero as a dim blue warning and stays there,
+  then flares up blue-white and hurts who is in it, shield or not, until
+  it dissolves. It doesn't turn red, as that is the color of fire.
+- A blow on the wizard while it draws breaks it.
+- `placeSigil()` moves it off the walls where it can, but keeps the hero
+  in it.
+- The hue of the sigil and the robe varies a little per wizard.
+
+## Rain of fire
+
+`monster/fireRain.ts`, `render/FireRainCrowd.ts`, test page
+`fireRain.html`. The attack of red wizards, but it doesn't know about
+them, so hazards and bosses can use it as well.
+
+- A pattern (`FIRE_PATTERNS`) lays out spots with delays around an aim:
+  `scatter` at random, `line` from the caster's side through the target,
+  and `rings` from the outermost to the innermost, whose strikes overlap
+  in the middle. Spots in or behind walls are left out.
+- A disc grows to the outline of each spot until it strikes and hurts,
+  shield or not. The outline hides until the disc is big enough to see.
+- The flames are cartoon-like: a shader layers see-through circles that
+  rise and go from large and red to small and yellow, and cuts out others
+  that rise at varying speed and size.
+- Red wizards pick a pattern at random and aim until the staff hits the
+  floor (`STAFF_STOMP`). A blow before that stops the rain, after it
+  nothing does.
+
+## Planned
+
+- Monsters and meeples as simulation state: live ones are saved while
+  their level is active. On reload unchanged inhabitants are regenerated,
+  and the record keeps who is dead, fled or moved.
+- Inhabitants fill stereotype slots or are placed by the dungeon premise,
+  with a reason to be there. No generic spawners.
