@@ -159,7 +159,7 @@ export interface Spark
 /**
  * Returns the shortest distance between a point and a line segment
  */
-function segmentDistance(x: number, z: number, x0: number, z0: number, x1: number, z1: number): number
+export function segmentDistance(x: number, z: number, x0: number, z0: number, x1: number, z1: number): number
 {
     const dx = x1 - x0, dz = z1 - z0
     const length = dx * dx + dz * dz

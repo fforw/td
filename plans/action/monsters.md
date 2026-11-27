@@ -42,6 +42,30 @@ placed in is in [spawns](../dungeon/spawns.md).
   Eyes that see the spot fly there to look, others stay put, as eyes
   don't find ways around walls.
 
+## Construct
+
+`monster/constructs.ts`. A metal cage around a glowing core that pulses,
+hovering like an eye. It takes 2 sword blows.
+
+- With nobody around it flies straight from point to point at an even
+  speed and holds still at each for a moment, which makes it look made
+  rather than alive.
+- Once it sees a hero it zips through them, to as far behind them as it
+  was in front, or less if a wall is in the way, but always a little
+  behind. Without room behind them it doesn't zip.
+- The line is fixed when the zip starts. It eases in by the fifth power
+  of the time, so it creeps for most of the zip, which is the warning,
+  and passes the hero late. Stepping aside makes it miss. A long zip
+  takes longer, so it never gets faster than a set speed at the end
+  (`MAX_ZIP_SPEED`), which would be too fast to see. The core beats
+  faster and burns brighter as the zip goes on.
+- Only the zip hurts, touching it otherwise does not. A shield stops it
+  from the front and throws it back, dodging lets it pass.
+- While zipping it goes through heroes and monsters without bumping, as
+  bumping would carry whoever it hits along to the end.
+- After a zip it holds still a moment and looks again, so it keeps
+  zipping back and forth through a hero it sees. A blow stops the zip.
+
 ## Brute
 
 `monster/brutes.ts`. Slow and heavy: it walks at about a third of a
