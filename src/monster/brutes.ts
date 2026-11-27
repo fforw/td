@@ -65,6 +65,7 @@ export const BRUTE: BruteKind = {
         { x: 0, y: 0.58, z: 0.02, rx: 0.33, ry: 0.58, rz: 0.26, colors: ["#706f59", "#706f59", "#2c33a8"] },
         { bone: "Club", x: 0, y: 0.75, z: 0, rx: 0.18, ry: 0.75, rz: 0.18, colors: ["#4c291f"] }
     ],
+    material: "flesh",
     damage: 5,
     speed: 0.35 * FIGURE_SCALE,
     reach: 0.32 * FIGURE_SCALE

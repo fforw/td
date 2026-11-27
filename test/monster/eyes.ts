@@ -315,7 +315,7 @@ describe("Flying eyes", () => {
             const [eyes, monsters] = setup()
             const eye = eyes.add(FLYING_EYE, 0, 0, 0.4)
             eye.warning = WARN_TIME
-            assert(monsters.strike(0, 0, 0, 0.55, 2.2, 1) === 1)
+            assert(monsters.strike(0, 0, 0, 0.55, 2.2, 1).length === 1)
             assert(eye.warning === 0)
             assert(eye.flash > 0)
             assert.isAbove(eye.vz, 0)

@@ -261,7 +261,7 @@ describe("WizardPack", () => {
     it("stops blows from the front with the staff up, but not from behind", () => {
         const { pack, wizard, hero } = threatened(1)
         run(pack, hero, reactionTime(1, BLOCK_SKILL) + 0.6)
-        assert.strictEqual(pack.strike(hero.x, hero.z, hero.facing, THREAT_RANGE, 2, 1), 1)
+        assert.strictEqual(pack.strike(hero.x, hero.z, hero.facing, THREAT_RANGE, 2, 1).length, 1)
         assert.strictEqual(wizard.hp, WIZARD.hp)
 
         pack.strike(-hero.x, hero.z, -hero.facing, THREAT_RANGE, 2, 1)

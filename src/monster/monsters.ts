@@ -39,6 +39,21 @@ export const FLASH_TIME = 0.12
 export const SWORD_SHOVE = 1.2 * FIGURE_SCALE
 
 
+/**
+ * What a sword blow on a monster sounds like
+ */
+export type HitMaterial = "flesh" | "metal" | "armor"
+
+/**
+ * What a sword blow did to one monster
+ */
+export interface Blow
+{
+    material: HitMaterial
+    /** its shield stopped the blow, which left it unhurt */
+    stopped: boolean
+}
+
 export interface MonsterKind
 {
     /** size of the model as a multiple of how it was made */
@@ -56,6 +71,8 @@ export interface MonsterKind
     flying: boolean
     /** rough volume it bursts into particles from when it dies, none for one that goes another way */
     burst: readonly BurstSphere[]
+    /** what a sword blow on it sounds like */
+    material: HitMaterial
 }
 
 export interface Monster extends FloorSpot
@@ -268,11 +285,11 @@ export abstract class MonsterPack<M extends Monster = Monster>
      * @param width     width of the arc in radians
      * @param damage    hit points it takes
      *
-     * @return number of monsters hit
+     * @return what the blow did to each monster it hit
      */
-    strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): number
+    strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): Blow[]
     {
-        let hits = 0
+        const blows: Blow[] = []
         for (const monster of [...this.members])
         {
             const dx = monster.x - x, dz = monster.z - z
@@ -283,12 +300,13 @@ export abstract class MonsterPack<M extends Monster = Monster>
             const within = distance < monster.kind.radius + HERO_RADIUS || inArc && distance <= reach + monster.kind.radius
             if (within && this.floor.sees(x, z, monster.x, monster.z))
             {
-                hits++
                 // even a shield gets pushed back, right on top of the hero it goes where the blow goes
                 const [awayX, awayZ] = distance > 1e-6 ? [dx / distance, dz / distance] : [Math.sin(facing), Math.cos(facing)]
                 monster.shoveX += awayX * SWORD_SHOVE / monster.kind.mass
                 monster.shoveZ += awayZ * SWORD_SHOVE / monster.kind.mass
-                if (this.stops(monster, dx, dz))
+                const stopped = this.stops(monster, dx, dz)
+                blows.push({ material: monster.kind.material, stopped })
+                if (stopped)
                 {
                     monster.chase = CHASE_TIME
                     monster.goalX = x
@@ -311,7 +329,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
                 }
             }
         }
-        return hits
+        return blows
     }
 
     /**
@@ -417,11 +435,11 @@ export default class Monsters
     /**
      * Has a sword go through all monsters within its arc, see MonsterPack.strike()
      *
-     * @return number of monsters hit
+     * @return what the blow did to each monster it hit
      */
-    strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): number
+    strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): Blow[]
     {
-        return this.packs.reduce((hits, pack) => hits + pack.strike(x, z, facing, reach, width, damage), 0)
+        return this.packs.flatMap(pack => pack.strike(x, z, facing, reach, width, damage))
     }
 
     /**

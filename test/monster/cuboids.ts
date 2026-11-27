@@ -303,7 +303,7 @@ describe("Acid cuboids", () => {
             const inFront = cuboids.add(BIG_CUBOID, 0, 0, 0.4)
             const behind = cuboids.add(BIG_CUBOID, 0, 0, -0.4)
             const away = cuboids.add(BIG_CUBOID, 0, 0, 2)
-            assert(cuboids.strike(0, 0, 0, REACH, WIDTH, 2) === 1)
+            assert(cuboids.strike(0, 0, 0, REACH, WIDTH, 2).length === 1)
             assert(inFront.hp === BIG_CUBOID.hp - 2)
             assert(behind.hp === BIG_CUBOID.hp)
             assert(away.hp === BIG_CUBOID.hp)
@@ -313,7 +313,7 @@ describe("Acid cuboids", () => {
 
             const cuboids = pack(() => false)
             cuboids.add(BIG_CUBOID, 0, 0, 0.4)
-            assert(cuboids.strike(0, 0, 0, REACH, WIDTH, 2) === 0)
+            assert(cuboids.strike(0, 0, 0, REACH, WIDTH, 2).length === 0)
         })
 
         it("drives back and calls off a lunge", () => {

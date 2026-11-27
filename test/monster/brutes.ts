@@ -163,7 +163,7 @@ describe("Brutes", () => {
         const blows = BRUTE.hp / SWORD_DAMAGE
         for (let i = 1; i < blows; i++)
         {
-            assert(brutes.strike(0, 0, 0, REACH, WIDTH, SWORD_DAMAGE) === 1)
+            assert(brutes.strike(0, 0, 0, REACH, WIDTH, SWORD_DAMAGE).length === 1)
         }
         assert.lengthOf(brutes.members, 1)
         assert(brute.attack !== null)
