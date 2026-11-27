@@ -55,7 +55,9 @@
   spaces and thin walls (`applyInsideCut()`). It makes way if it comes to
   an open space with no wall before that, or to floor of another space
   with an open one straight on within the depth of the cut, which shows
-  through the cut anyway. Fixed pieces for a view
+  through the cut anyway. The gap that thick walls keep from the floor
+  doesn't count as wall, else lines of sight grazing it left slivers.
+  Fixed pieces for a view
   straight on left a third of the leaks, and black shards.
 - Sides with nothing in front that gets cut, or with no other space
   behind, are left out (`isExposed()`). The convex hull of the spaces

@@ -434,8 +434,9 @@ export interface SpaceGrid
     width: number
     height: number
     /**
-     * two numbers for each cell, row by row along x: the space at its middle, 0 for no floor, and for cells with a thin
-     * wall one more than the space it is near for, else 0
+     * two numbers for each cell, row by row along x: the space at its middle, 0 for no floor and -1 for a thick wall
+     * there, and for cells with a thin wall one more than the space it is near for, else 0. Thick walls stay clear of the
+     * floor a bit, so a cell can have neither.
      */
     cells: Float32Array
 }
@@ -449,10 +450,11 @@ export const SPACE_CELL = 0.05
 /**
  * Returns the spaces and thin walls of a level as a grid
  *
- * @param world     world with all patches of the level
- * @param near      tells the near walls
+ * @param world         world with all patches of the level
+ * @param near          tells the near walls
+ * @param inThickWall   tells whether a place in world units is inside of the thick walls
  */
-export function createSpaceGrid(world: PatchWorld, near: NearWalls): SpaceGrid
+export function createSpaceGrid(world: PatchWorld, near: NearWalls, inThickWall: (x: number, z: number) => boolean): SpaceGrid
 {
     const { spaceOf, spaceAt } = near
     let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity
@@ -475,7 +477,8 @@ export function createSpaceGrid(world: PatchWorld, near: NearWalls): SpaceGrid
     {
         for (let column = 0; column < width; column++)
         {
-            cells[(row * width + column) * 2] = spaceAt(minX + (column + 0.5) * SPACE_CELL, minZ + (row + 0.5) * SPACE_CELL)
+            const x = minX + (column + 0.5) * SPACE_CELL, z = minZ + (row + 0.5) * SPACE_CELL
+            cells[(row * width + column) * 2] = spaceAt(x, z) || (inThickWall(x, z) ? -1 : 0)
         }
     }
 

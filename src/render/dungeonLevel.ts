@@ -98,7 +98,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const cutAt = createCutFinder(wallGrounds)
     const insides = wallGrounds.map(ground => createThickWallInsides(ground, near, cutAt))
     const insideMaterial = (insides[0].material as Material).clone()
-    applyInsideCut(insideMaterial, cut, createSpaceGrid(world, near))
+    applyInsideCut(insideMaterial, cut, createSpaceGrid(world, near, inThickWall))
     insides.forEach(mesh => mesh.material = insideMaterial)
     // the see-through side of the cut, see WallCut
     const glass = walls.map(mesh => mesh.clone())

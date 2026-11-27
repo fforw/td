@@ -223,12 +223,12 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                     return false;
                 }
 
-                // the space at a place, and one more than the space a thin wall there is near for
+                // the space at a place, -1 for a thick wall, and one more than the space a thin wall there is near for
                 vec2 spaceCell(vec2 place)
                 {
                     vec2 uv = (place - spaceGridMin) / spaceGridSize;
                     return any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))
-                        ? vec2(0.0) : textureLod(spaceGrid, uv, 0.0).rg;
+                        ? vec2(-1.0, 0.0) : textureLod(spaceGrid, uv, 0.0).rg;
                 }
 
                 bool makesWay()
@@ -242,8 +242,8 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                     for (int i = 0; i <= ${INSIDE_STEPS}; i++)
                     {
                         vec2 cell = spaceCell(vInside.xz + way * float(i) / ${INSIDE_STEPS.toFixed(1)});
-                        // walls standing on that floor, thick ones have no floor
-                        if (other && (cell.r < 0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0)))
+                        // walls standing on that floor, without the gap between thick walls and the floor
+                        if (other && (cell.r < -0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0)))
                         {
                             return false;
                         }
@@ -266,11 +266,11 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                     for (int i = 1; i <= ${INSIDE_STEPS}; i++)
                     {
                         vec2 cell = spaceCell(end + ahead * float(i) / ${INSIDE_STEPS.toFixed(1)});
-                        if (cell.r < 0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0))
+                        if (cell.r < -0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0))
                         {
                             return false;
                         }
-                        if (isOpen(cell.r))
+                        if (cell.r > 0.5 && isOpen(cell.r))
                         {
                             return true;
                         }

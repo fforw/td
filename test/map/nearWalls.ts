@@ -7,6 +7,7 @@ import {
     createCutFinder,
     createNearWalls,
     createSpaceGrid,
+    createWallFinder,
     findSpaces,
     isExposed,
     SPACE_CELL,
@@ -242,7 +243,7 @@ describe("createSpaceGrid", () => {
 
         const { dungeon, world } = level()
         const near = createNearWalls(world, dungeon)
-        const { minX, minZ, width, height, cells } = createSpaceGrid(world, near)
+        const { minX, minZ, width, height, cells } = createSpaceGrid(world, near, () => false)
         assert.equal(cells.length, width * height * 2)
         for (const [face, space] of near.spaceOf)
         {
@@ -253,11 +254,44 @@ describe("createSpaceGrid", () => {
         }
     })
 
+    it("tells thick walls from the gap between them and the floor", () => {
+
+        const { dungeon, world, slots } = level()
+        const near = createNearWalls(world, dungeon)
+        const inThickWall = createWallFinder(slots.map(slot => wallGround(world, slot)))
+        const { minX, minZ, width, height, cells } = createSpaceGrid(world, near, inThickWall)
+        let walls = 0, gaps = 0
+        for (let row = 0; row < height; row++)
+        {
+            for (let column = 0; column < width; column++)
+            {
+                const x = minX + (column + 0.5) * SPACE_CELL, z = minZ + (row + 0.5) * SPACE_CELL
+                const value = cells[(row * width + column) * 2]
+                if (value > 0)
+                {
+                    assert.equal(value, near.spaceAt(x, z))
+                }
+                else if (inThickWall(x, z))
+                {
+                    assert.equal(value, -1)
+                    walls++
+                }
+                else
+                {
+                    assert.equal(value, 0)
+                    gaps++
+                }
+            }
+        }
+        assert.isAbove(walls, 0)
+        assert.isAbove(gaps, 0)
+    })
+
     it("marks the cells along thin walls with the space they are near for", () => {
 
         const { dungeon, world, slots } = level()
         const near = createNearWalls(world, dungeon)
-        const { minX, minZ, width, cells } = createSpaceGrid(world, near)
+        const { minX, minZ, width, cells } = createSpaceGrid(world, near, () => false)
         const values = new Set<number>()
         for (const h of thinWalls(world, slots))
         {
