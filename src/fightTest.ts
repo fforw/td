@@ -48,6 +48,8 @@ const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), s
     gold += found
     showHp(shownHp)
 }, () => {}, undefined, () => {}, {
+    monsterSkill: 0,
+    achieve: () => {},
     knows: concept => concepts.has(concept),
     learn: concept => concepts.add(concept),
     gold: () => gold,

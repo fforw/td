@@ -15,7 +15,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 export const START_GOLD = 1000
 
@@ -53,6 +53,8 @@ export interface PatchNode
     parent: string | null
     /** noted by an explorer passing through, stays when the patch gets targeted */
     impression?: Impression
+    /** a hero has been there, which gains experience the first time, missing before */
+    entered?: true
     /**
      * an explorer found no way there from the castle, within what they can carry along. Stays when the patch gets
      * targeted again, until it gets discovered.
@@ -171,6 +173,8 @@ export interface Campaign
     characterName: string
     gold: number
     day: number
+    /** experience the campaign gained, which makes its level, see campaignLevel() */
+    xp: number
     levels: Record<string, LevelRecord>
     /** explorers loitering in the tavern */
     tavern: Explorer[]
@@ -233,6 +237,7 @@ export function createCampaign(seed: number): Campaign
         characterName,
         gold: START_GOLD,
         day: 1,
+        xp: 0,
         levels: {
             [OVERWORLD]: {
                 id: OVERWORLD,

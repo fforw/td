@@ -2,6 +2,7 @@ import type { Route } from "../map/route"
 import { type Campaign, type Explorer, overworld, type PassedPatch, type PatchKind, patchKey } from "./campaign"
 import { impressionOf, NEIGHBORS } from "./patchKinds"
 import { price, returnToTavern, updateTavern } from "./tavern"
+import { gainXp } from "./campaignLevel"
 
 /**
  * Days per patch of distance from the castle for a job of a hero
@@ -211,6 +212,10 @@ export function advanceDay(campaign: Campaign): void
         {
             node.state = "discovered"
             delete node.unreachable
+            if (node.kind !== "EMPTY")
+            {
+                gainXp(campaign, "tile")
+            }
         }
         else
         {

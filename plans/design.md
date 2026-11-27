@@ -18,6 +18,14 @@ takes and whom they leave alive comes back later as threats.
 - **Days at the castle, real time in levels.** The overworld moves in
   days, ended by hand at the castle. Inside a level the game is a
   twin-stick action game, frozen whenever the view is elsewhere.
+- **Progress belongs to the campaign.** The player plays all heroes, so
+  what they find, take and kill gains the campaign experience, not one
+  hero, and nobody has to choose whom to make better. Its level is what
+  bonuses come with. *(Bonuses not built yet.)*
+- **Harder the longer you play.** Monsters get better with the level of
+  the campaign, across the whole of it rather than within a dungeon,
+  and ever slower, like the levels themselves. A level gets hard at its
+  end, where the boss guards the way out. *(Boss not built yet.)*
 - **One go per attempt.** A level has to be beaten in one go. When
   nobody is left standing in it, the heroes are carried out, robbed of
   what they carried, and the next attempt is another level.

@@ -144,15 +144,3 @@ function pickGroup(groups: readonly SpawnGroup[], random: Prando): SpawnGroup
     }
     return groups[groups.length - 1]
 }
-
-/**
- * Returns the skill of monsters in a room, from 0 in the first room to 1 in the deepest, so they get better the further
- * the heroes go
- *
- * @param depths    how far the rooms are from the first room, Infinity for those that can't be reached
- */
-export function depthSkill(depths: readonly number[], room: number): number
-{
-    const deepest = Math.max(0, ...depths.filter(Number.isFinite))
-    return deepest > 0 && Number.isFinite(depths[room]) ? depths[room] / deepest : 0
-}

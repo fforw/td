@@ -38,7 +38,8 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { BOUNCE, fadeShove } from "../monster/shove"
 import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
-import { depthSkill, planSpawns } from "../monster/spawns"
+import { planSpawns } from "../monster/spawns"
+import type { Deed } from "./campaignLevel"
 import BeamCrowd from "../monster/BeamCrowd"
 import WizardCrowd from "../monster/WizardCrowd"
 import FireHazard from "../monster/fireHazard"
@@ -293,6 +294,10 @@ export interface LevelOutside
     pay(id: number, gold: number): void
     knows(concept: string): boolean
     learn(concept: string): void
+    /** skill of all monsters, from 0 to 1, which grows with the campaign */
+    monsterSkill: number
+    /** the heroes did something that gains the campaign experience */
+    achieve(deed: Deed): void
 }
 
 interface ShownHero
@@ -444,6 +449,8 @@ export default class LevelScene
     private entrance = 0
     /** null until the level is there */
     private exploration: Exploration | null = null
+    /** rooms of the level a hero has seen any of, by index */
+    private roomsFound: boolean[] = []
     /** null for a level without one */
     private strangerSpot: StrangerSpot | null = null
     private stranger: Meeple | null = null
@@ -566,7 +573,10 @@ export default class LevelScene
         this.slots = level.patches.map((_, slot) => slot)
         this.entrance = entranceFace(meshes.world, level)
         this.floorSet = new Set([...level.rooms.flat(), ...level.corridors.flatMap(({ faces }) => faces)])
-        this.exploration = new Exploration(meshes.world, this.slots, this.explored)
+        const exploration = new Exploration(meshes.world, this.slots, this.explored)
+        this.exploration = exploration
+        // those found before gained their experience then
+        this.roomsFound = level.rooms.map(faces => faces.some(face => exploration.has(face)))
         const chests = this.addChests(level, meshes, seed)
 
         // the stranger takes one more
@@ -739,10 +749,10 @@ export default class LevelScene
                     brutes.add(spawn.kind, spawn.face, x, z)
                     break
                 case "soldier":
-                    soldiers.add(spawn.kind, spawn.face, x, z, depthSkill(depths, spawn.room))
+                    soldiers.add(spawn.kind, spawn.face, x, z, this.outside.monsterSkill)
                     break
                 case "wizard":
-                    wizards.add(spawn.kind, spawn.face, x, z, depthSkill(depths, spawn.room))
+                    wizards.add(spawn.kind, spawn.face, x, z, this.outside.monsterSkill)
                     break
             }
         }
@@ -1437,7 +1447,24 @@ export default class LevelScene
         if (changed)
         {
             this.onExplored(this.exploration!.encode())
+            this.findRooms()
         }
+    }
+
+    /**
+     * Has the campaign gain experience for each room the heroes saw some of for the first time
+     */
+    private findRooms(): void
+    {
+        const exploration = this.exploration!
+        this.level!.rooms.forEach((faces, room) =>
+        {
+            if (!this.roomsFound[room] && faces.some(face => exploration.has(face)))
+            {
+                this.roomsFound[room] = true
+                this.outside.achieve("room")
+            }
+        })
     }
 
     /**
@@ -1616,6 +1643,7 @@ export default class LevelScene
         for (const death of deaths)
         {
             bursts.add(death)
+            this.outside.achieve("kill")
         }
         // brutes keep their club a while
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)

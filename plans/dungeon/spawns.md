@@ -30,12 +30,14 @@
 
 ## Planned
 
-- Groups of mixed kinds, like a brute with an eye watching for it, or
-  small cuboids around a big one. They are just more entries in the
-  table.
+- Groups of mixed kinds that play together, by role: one that hits
+  hard with several fast ones that distract, like a brute with eyes or
+  small cuboids around it, or ranged ones behind something in the way.
+  This replaces the weighted table.
+- An end boss guarding the main exit of each level, as the hard thing
+  at its end, which gains the campaign the most experience.
 - Escalation: the planner gets a threat level for the level, which grows
-  with how far its patch is from the castle and maybe with the days gone
-  by. Each group gets a cost, the sum of what its members are worth, and
+  with the [campaign level](../world/campaign.md#campaign-level). Each group gets a cost, the sum of what its members are worth, and
   a lowest threat level it shows up at. The level gets a budget from its
   threat level. The planner spends it on rooms, picking from the groups
   it can afford and that are unlocked, with weights that move toward

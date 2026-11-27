@@ -10,6 +10,7 @@ import {
     type PatchKind,
     type PatchNode
 } from "./campaign"
+import { campaignLevel, gainXp, levelXp, monsterSkill } from "./campaignLevel"
 import { attemptSeed, levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
 import {
@@ -204,6 +205,8 @@ export default class GameView implements PadTarget
 
     /** id of the explorer or hero the view follows, null for the castle */
     private following: number | null = null
+    /** campaign level reported last, null until the first render of a campaign */
+    private levelShown: number | null = null
 
     /** mission just finished by the explorer the view follows, who stays there for now */
     private finished: Mission | null = null
@@ -1135,6 +1138,11 @@ export default class GameView implements PadTarget
                             this.store.save(this.campaign)
                         }
                     },
+                    monsterSkill: monsterSkill(campaignLevel(campaign.xp)),
+                    achieve: deed => {
+                        gainXp(this.campaign, deed)
+                        this.changed()
+                    },
                     gold: id => this.campaign.jobs.find(j => j.heroId === id)?.gold ?? 0,
                     pay: (id, gold) => {
                         const paying = this.campaign.jobs.find(j => j.heroId === id)!
@@ -1181,6 +1189,12 @@ export default class GameView implements PadTarget
     private render(): void
     {
         const { campaign } = this
+        const level = campaignLevel(campaign.xp)
+        if (this.levelShown !== null && level > this.levelShown)
+        {
+            this.report("The campaign reached level " + level)
+        }
+        this.levelShown = level
         this.updateScenes()
         this.castle?.show(this.shownPatches())
         this.castle?.setWalkers(this.walkers())
@@ -1226,6 +1240,10 @@ export default class GameView implements PadTarget
             !!job && el("span", { className: "hp", title: "Hit points" }, "❤️ " + (job.hp ?? maxHp) + " / " + maxHp),
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
+            el("span", {
+                className: "campaign-level",
+                title: "Campaign level, with " + campaign.xp + " of " + levelXp(campaignLevel(campaign.xp) + 1) + " experience for the next"
+            }, "⭐ " + campaignLevel(campaign.xp)),
             el("button", {
                 type: "button",
                 className: "end-day",
@@ -1249,6 +1267,7 @@ export default class GameView implements PadTarget
                     onclick: () => importSave().then(
                         loaded => {
                             this.campaign = loaded
+                            this.levelShown = null
                             this.selected = null
                             this.popup.hidden = true
                             this.dialog.hidden = true

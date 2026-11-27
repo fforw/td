@@ -62,6 +62,10 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
     // version 7 remembers where heroes have been in levels
     6: campaign => {
         campaign.explored = {}
+    },
+    // version 8 has the campaign gain experience, from then on
+    7: campaign => {
+        campaign.xp = 0
     }
 }
 

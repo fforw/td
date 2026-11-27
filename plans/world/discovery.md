@@ -111,7 +111,8 @@ Heroes do everything that happens inside a discovered patch.
   castle, meeples with a class beyond peasant. They live there, are
   small-time at the beginning and take on special jobs from the castle.
   They are not hired per job like explorers.
-- They learn from their jobs.
+- What they do gains the campaign experience
+  ([campaign level](campaign.md#campaign-level)), not themselves.
 - Unlike explorers they get noticed, so they only travel over discovered
   patches. A job without a way over known land is blocked until
   explorers have discovered enough of it, and the popup for the job says

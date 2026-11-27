@@ -37,9 +37,11 @@ far.
   tricks rather than being another monster, and leaves tune themselves
   by it, like how fast they react. Whole trees are for another
   character, not for being harder.
-- For now skill grows with the depth of the room, from 0 in the first
-  room to 1 in the deepest (`depthSkill()`), so a level gets harder as
-  the heroes go in, the same for the seed.
+- All monsters of a level take their skill from the
+  [campaign level](../world/campaign.md#campaign-level), so they get
+  better over the whole campaign rather than within a dungeon. What
+  gets harder within a level is what the rooms hold, and the end boss
+  ([spawns](../dungeon/spawns.md#planned)).
 
 ## Acid cuboid
 
@@ -229,8 +231,8 @@ them, so hazards and bosses can use it as well.
 
 ## Planned
 
-- Skill from the threat level of [escalation](../dungeon/spawns.md#planned)
-  as well as the depth of the room.
+- A small spread of skill around that of the campaign, from the seed,
+  so no two soldiers play alike, and more for bosses.
 - Trees for the flying eye and brutes: eyes moving to another spot when
   a hero closes in and hiding when hurt, brutes charging from afar.
 - Showing the path of the tree over a monster on a test page.

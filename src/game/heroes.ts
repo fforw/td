@@ -1,7 +1,8 @@
 import { patchSeed, withSeed } from "../math/random"
 import { randomCharacter } from "../meeple/character"
 import { meepleNameGenerator } from "../meeple/nameGenerator"
-import { type Campaign, type Hero, type Job, overworld } from "./campaign"
+import { type Campaign, type Hero, type Job, overworld, type PatchKind } from "./campaign"
+import { type Deed, gainXp } from "./campaignLevel"
 import { reverseWay } from "./journey"
 import { type MissionRoute, travelDays } from "./missions"
 
@@ -120,6 +121,30 @@ export function enterJob(campaign: Campaign, heroId: number): void
     }
     campaign.heroes.find(h => h.id === heroId)!.experience++
     campaign.jobs = campaign.jobs.filter(j => j !== job)
+    firstVisit(campaign, job.target)
+}
+
+/**
+ * What going to a patch for the first time counts as, by its kind
+ */
+const FIRST_VISIT_DEEDS: Partial<Record<PatchKind, Deed>> = { DUNGEON: "dungeon", TEMPLE: "temple", TREASURE: "treasure" }
+
+/**
+ * The first hero at a dungeon, temple or treasure gains the campaign experience
+ */
+function firstVisit(campaign: Campaign, target: string): void
+{
+    const node = overworld(campaign).patches[target]
+    if (node.entered)
+    {
+        return
+    }
+    node.entered = true
+    const deed = FIRST_VISIT_DEEDS[node.kind]
+    if (deed)
+    {
+        gainXp(campaign, deed)
+    }
 }
 
 
@@ -140,6 +165,7 @@ export function enterLevel(campaign: Campaign, heroId: number): void
         job.entered = true
         campaign.heroes.find(h => h.id === heroId)!.experience++
     }
+    firstVisit(campaign, job.target)
 }
 
 
