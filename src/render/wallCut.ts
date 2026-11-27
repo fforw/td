@@ -1,5 +1,5 @@
 import { DataTexture, FloatType, type Material, RGFormat, Vector2, Vector4 } from "three"
-import { SPACE_CELL, type SpaceGrid } from "../map/nearWalls"
+import { SPACE_CELL, type SpaceGrid, THICK_WALL_CUT_DEPTH } from "../map/nearWalls"
 
 /**
  * How much of a cut wall still shows
@@ -174,7 +174,9 @@ const INSIDE_STEPS = 24
 /**
  * Makes the material of the insides of thick walls only draw what hides other spaces than the open ones. Each fragment
  * follows its line of sight down to the floor, and makes way if it comes to an open space with no wall before that, or if
- * there is no floor at all. The walls on the way count as they would show, lit by the space in front of them. What is seen
+ * there is no floor at all. Floor of another space counts as open if an open space follows it straight on within the depth
+ * of the cut, as the wall in front gets cut for both then. The walls on the way count as they would show, lit by the space
+ * in front of them. What is seen
  * past a place of a wall depends on where the camera is, so nothing that is fixed to the geometry would do.
  *
  * @param material  material of the insides
@@ -221,6 +223,14 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                     return false;
                 }
 
+                // the space at a place, and one more than the space a thin wall there is near for
+                vec2 spaceCell(vec2 place)
+                {
+                    vec2 uv = (place - spaceGridMin) / spaceGridSize;
+                    return any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))
+                        ? vec2(0.0) : textureLod(spaceGrid, uv, 0.0).rg;
+                }
+
                 bool makesWay()
                 {
                     vec3 ray = vInside - cameraPosition;
@@ -231,9 +241,7 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                     bool other = false;
                     for (int i = 0; i <= ${INSIDE_STEPS}; i++)
                     {
-                        vec2 uv = (vInside.xz + way * float(i) / ${INSIDE_STEPS.toFixed(1)} - spaceGridMin) / spaceGridSize;
-                        vec2 cell = any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))
-                            ? vec2(0.0) : textureLod(spaceGrid, uv, 0.0).rg;
+                        vec2 cell = spaceCell(vInside.xz + way * float(i) / ${INSIDE_STEPS.toFixed(1)});
                         // walls standing on that floor, thick ones have no floor
                         if (other && (cell.r < 0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0)))
                         {
@@ -248,7 +256,26 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                             other = true;
                         }
                     }
-                    return !other;
+                    if (!other)
+                    {
+                        return true;
+                    }
+                    // a strip of another space in front of an open one shows through the cut anyway, see thickWallSpaces()
+                    vec2 end = vInside.xz + way;
+                    vec2 ahead = way / reach * ${THICK_WALL_CUT_DEPTH.toFixed(3)};
+                    for (int i = 1; i <= ${INSIDE_STEPS}; i++)
+                    {
+                        vec2 cell = spaceCell(end + ahead * float(i) / ${INSIDE_STEPS.toFixed(1)});
+                        if (cell.r < 0.5 || cell.g > 0.5 && !isOpen(cell.g - 1.0))
+                        {
+                            return false;
+                        }
+                        if (isOpen(cell.r))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
                 }
             `)
             .replace("#include <clipping_planes_fragment>", /* glsl */`

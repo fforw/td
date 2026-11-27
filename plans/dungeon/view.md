@@ -53,7 +53,9 @@
 - Which of them make way depends on where the camera is, so each
   fragment follows its line of sight down to the floor on a grid of the
   spaces and thin walls (`applyInsideCut()`). It makes way if it comes to
-  an open space with no wall before that. Fixed pieces for a view
+  an open space with no wall before that, or to floor of another space
+  with an open one straight on within the depth of the cut, which shows
+  through the cut anyway. Fixed pieces for a view
   straight on left a third of the leaks, and black shards.
 - Sides with nothing in front that gets cut, or with no other space
   behind, are left out (`isExposed()`). The convex hull of the spaces
