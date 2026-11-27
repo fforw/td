@@ -1,8 +1,10 @@
+import type { Construct } from "../monster/constructs"
 import type { Blow, HitMaterial } from "../monster/monsters"
 import { loadEffect, playEffect } from "./effects"
 
 /**
- * A sound that lands on something: its file, and seconds into it where the blade lands, after the whoosh of the swing
+ * A sound that lands on something: its file, and seconds into it where it lands, like the blade after the whoosh of the
+ * swing
  */
 interface HitSound
 {
@@ -38,6 +40,17 @@ const MISS_VOLUME = 0.6
 const HURT_SOUNDS = numbered("meeple-hurt", 7)
 const HURT_RATE = 1.12
 const HURT_VOLUME = 0.8
+
+/**
+ * Recorded zips of constructs, with seconds into each where it is loudest, which goes with the construct passing through
+ * the hero
+ */
+const ZIP_SOUNDS: readonly HitSound[] = [
+    { name: "construct-zip-01.mp3", impact: 0.1 },
+    { name: "construct-zip-02.mp3", impact: 0.17 },
+    { name: "construct-zip-03.mp3", impact: 0.17 }
+]
+const ZIP_VOLUME = 0.8
 
 /**
  * How far the rate of a variant strays either way, so that a sound repeating doesn't sound the same each time
@@ -86,7 +99,8 @@ function spread(rate: number): number
  */
 export function loadFightSounds(): void
 {
-    for (const name of [...Object.values(HIT_SOUNDS).map(({ name }) => name), ...MISS_SOUNDS, ...HURT_SOUNDS])
+    const loudest = [...Object.values(HIT_SOUNDS), ...ZIP_SOUNDS].map(({ name }) => name)
+    for (const name of [...loudest, ...MISS_SOUNDS, ...HURT_SOUNDS])
     {
         void loadEffect(name)
     }
@@ -118,4 +132,54 @@ export function playBlow(blows: readonly Blow[]): void
 export function playHurt(): void
 {
     playEffect(hurts.next(), spread(HURT_RATE), HURT_VOLUME)
+}
+
+/**
+ * Plays the zips of constructs, each timed for the loudest part to come as the construct passes through the hero. A zip
+ * that ends before, as a blow stops it, stays silent.
+ */
+export class ZipSounds
+{
+    private readonly zips = new Variants(ZIP_SOUNDS.map(({ name }) => name))
+
+    /**
+     * Constructs on a zip, with the sound for it, or null once it played
+     */
+    private readonly playing = new Map<Construct, HitSound | null>()
+
+    /**
+     * Plays what is due by now
+     *
+     * @param constructs    all constructs of the level
+     */
+    update(constructs: readonly Construct[]): void
+    {
+        for (const construct of this.playing.keys())
+        {
+            if (!construct.zipping || !constructs.includes(construct))
+            {
+                this.playing.delete(construct)
+            }
+        }
+        for (const construct of constructs)
+        {
+            if (!construct.zipping)
+            {
+                continue
+            }
+            let sound = this.playing.get(construct)
+            if (sound === undefined)
+            {
+                const name = this.zips.next()
+                sound = ZIP_SOUNDS.find(zip => zip.name === name)!
+                this.playing.set(construct, sound)
+            }
+            const rate = spread(1)
+            if (sound && construct.zipTime >= construct.passTime - sound.impact / rate)
+            {
+                playEffect(sound.name, rate, ZIP_VOLUME)
+                this.playing.set(construct, null)
+            }
+        }
+    }
 }

@@ -61,6 +61,9 @@ travels along the room graph instead.
   counts once the swing is done, so they start just before the blade
   lands and leave most of the whoosh out.
 - A hero who gets hurt says ouch (`meeple-hurt-*`), whatever hurt them.
+- A construct's zip (`construct-zip-*`) is timed for its loudest part to
+  come as the construct passes through the hero, late in the zip, as
+  that is when it matters. A zip a blow stops before then stays silent.
 - The swings and ouches play a bit faster and higher than recorded,
   which suits the small figures. Every sound strays a little in rate,
   and of the numbered variants the one before is never picked again, so
@@ -80,3 +83,5 @@ travels along the room graph instead.
   sound (`meeple-death-*`), since they are rare enough to be dramatic.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
+- Spells: a strike of the rain of fire, the sigil drawing and flaring,
+  and a hum that loops while a beam is on.

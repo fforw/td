@@ -52,7 +52,7 @@ import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
-import { loadFightSounds, playBlow, playHurt } from "../sound/fightSounds"
+import { loadFightSounds, playBlow, playHurt, ZipSounds } from "../sound/fightSounds"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import GlowView from "../render/glowView"
@@ -404,6 +404,7 @@ export default class LevelScene
     /** ends the listening to the window */
     private readonly listening = new AbortController()
     private readonly pickUpSound = new EffectVoices(PICK_UP_SOUND, PICK_UP_VOICES, PICK_UP_GAP)
+    private readonly zipSounds = new ZipSounds()
 
     /** null until the level is there */
     private level: DungeonLevel | null = null
@@ -1640,6 +1641,7 @@ export default class LevelScene
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
         this.constructCrowd!.update(this.constructs!.members, time)
+        this.zipSounds.update(this.constructs!.members)
 
         const { bursts } = this
         const deaths = monsters.packs.flatMap(pack => pack.deaths.splice(0))
