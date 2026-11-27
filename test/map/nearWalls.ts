@@ -163,15 +163,26 @@ describe("thickWallSpaces", () => {
         }
     })
 
-    it("doesn't spread sideways, or through a space to the one behind it", () => {
+    it("doesn't spread sideways, or through a space to one further behind than the cut is deep", () => {
 
-        // two rooms side by side and one behind the left one, walls in front of them
-        const spaceAt = (x: number, z: number) => z >= 0 ? 0 : x < 0 ? (z > -0.3 ? 1 : 3) : 2
+        // two rooms side by side and one far behind the right one, walls in front of them
+        const spaceAt = (x: number, z: number) => z >= 0 ? 0 : x < 0 ? 1 : z > -2 ? 2 : 3
         const near = { spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY }
         const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 2].map(v => v / SCALE)
         const spaces = thickWallSpaces(triangles, near)
 
         assert.deepEqual([...spaces.values()], [[1, 0], [2, 0]])
+    })
+
+    it("cuts for the space behind a narrow strip of another one", () => {
+
+        // a strip of a room in front of another room, the wall in front hides both
+        const spaceAt = (x: number, z: number) => z >= 0 ? 0 : z > -0.3 ? 1 : 2
+        const near = { spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY }
+        const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 2].map(v => v / SCALE)
+        const spaces = thickWallSpaces(triangles, near)
+
+        assert.deepEqual([...spaces.values()], [[1, 2], [1, 2]])
     })
 
     it("keeps the sides of walls that run along the view", () => {

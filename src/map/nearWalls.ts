@@ -223,8 +223,9 @@ function addSpace(spaces: Map<string, NearSpaces>, key: string, space: number): 
 
 /**
  * Returns the spaces the corners of thick walls are near for, which is the first floor straight behind them as the view
- * has it. Looking any other way finds floor on the other side of thin walls, or spreads the cut along the wall to where it
- * stands in front of another space.
+ * has it, and the next space behind that within the depth of the cut. A narrow strip of another space between a wall and
+ * the open one would else leave the wall standing in front of the open space. Looking any other way finds floor on the
+ * other side of thin walls, or spreads the cut along the wall to where it stands in front of another space.
  *
  * @param triangles corners of the wall ground as from wallGround(), in patch units
  * @param near      tells the near walls
@@ -266,8 +267,17 @@ export function thickWallSpaces(triangles: readonly number[], { spaceAt, away }:
             && firstFloor(wx + asideX, wz + asideZ, step + slack)
             && firstFloor(wx - asideX, wz - asideZ, step + slack))
         {
-            const reach = step * FLOOR_STEP
-            spaces.set(key, [spaceAt(wx + away[0] * reach, wz + away[1] * reach), 0])
+            const first = spaceAt(wx + away[0] * step * FLOOR_STEP, wz + away[1] * step * FLOOR_STEP)
+            let second = 0
+            for (let next = step + 1; next <= steps && !second; next++)
+            {
+                const space = spaceAt(wx + away[0] * next * FLOOR_STEP, wz + away[1] * next * FLOOR_STEP)
+                if (space !== first)
+                {
+                    second = space
+                }
+            }
+            spaces.set(key, [first, second])
         }
     }
     return spaces

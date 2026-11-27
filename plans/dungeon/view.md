@@ -29,6 +29,9 @@
   floor straight behind it as the view has it, with floor to both sides.
   Cutting all around the edges of the floor spread to walls in front of
   other spaces, and through thin walls.
+- A corner also takes the next space straight behind the first one
+  within that depth. Else a narrow strip of another space between a wall
+  and the open space leaves the wall standing in front of the open one.
 - Near walls of the open space turn see-through and stay where they are
   (`render/wallCut.ts`). Lowering them to a curb looked wrong in motion.
 - Walls are drawn twice from the same geometry, one mesh without what is
