@@ -2,15 +2,23 @@ import type { FireDrop } from "../monster/fireRain"
 import { loadEffect, playEffect } from "./effects"
 
 /**
- * A fireball, with seconds into it where it hits the floor after its whoosh
+ * A fireball, with seconds into it where it hits the floor, after the whoosh of one that has it
  */
-const STRIKE_SOUND = "fire-strike.mp3"
-const STRIKE_IMPACT = 0.2
+interface StrikeSound
+{
+    name: string
+    impact: number
+}
+
+const STRIKE_SOUNDS: readonly StrikeSound[] = [
+    { name: "fire-strike-01.mp3", impact: 0.2 },
+    { name: "fire-strike-02.mp3", impact: 0.02 }
+]
 
 const STRIKE_VOLUME = 0.6
 
 /**
- * Lowest and highest playback rate of a strike, as there is only one recording. Lower ones sound bigger, higher ones
+ * Lowest and highest playback rate of a strike, as there are only a few recordings. Lower ones sound bigger, higher ones
  * smaller.
  */
 const STRIKE_RATE_MIN = 0.8
@@ -33,9 +41,9 @@ const STRIKE_LATE = 0.1
 export default class FireSounds
 {
     /**
-     * Drops whose strike played
+     * Drops with the sound and rate they strike with, or null once it played
      */
-    private readonly played = new WeakSet<FireDrop>()
+    private readonly strikes = new WeakMap<FireDrop, { sound: StrikeSound, rate: number } | null>()
 
     /**
      * When the strikes that are sounding started, in seconds by performance.now()
@@ -44,7 +52,10 @@ export default class FireSounds
 
     constructor()
     {
-        void loadEffect(STRIKE_SOUND)
+        for (const { name } of STRIKE_SOUNDS)
+        {
+            void loadEffect(name)
+        }
     }
 
     /**
@@ -58,20 +69,29 @@ export default class FireSounds
         this.starts = this.starts.filter(start => now - start < STRIKE_TIME)
         for (const drop of drops)
         {
-            if (this.played.has(drop))
+            let strike = this.strikes.get(drop)
+            if (strike === undefined)
+            {
+                strike = {
+                    sound: STRIKE_SOUNDS[Math.floor(Math.random() * STRIKE_SOUNDS.length)],
+                    rate: STRIKE_RATE_MIN * Math.pow(STRIKE_RATE_MAX / STRIKE_RATE_MIN, Math.random())
+                }
+                this.strikes.set(drop, strike)
+            }
+            if (!strike)
             {
                 continue
             }
-            const rate = STRIKE_RATE_MIN * Math.pow(STRIKE_RATE_MAX / STRIKE_RATE_MIN, Math.random())
-            if (drop.age >= -STRIKE_IMPACT / rate)
+            const { sound: { name, impact }, rate } = strike
+            if (drop.age >= -impact / rate)
             {
-                this.played.add(drop)
+                this.strikes.set(drop, null)
                 if (drop.age < STRIKE_LATE && this.starts.length < STRIKE_VOICES)
                 {
                     this.starts.push(now)
                     // late for a frame that took long, so the impact still comes with the strike
-                    const late = Math.max(0, drop.age + STRIKE_IMPACT / rate) * rate
-                    playEffect(STRIKE_SOUND, rate, STRIKE_VOLUME, Math.min(late, STRIKE_IMPACT))
+                    const late = Math.max(0, drop.age + impact / rate) * rate
+                    playEffect(name, rate, STRIKE_VOLUME, Math.min(late, impact))
                 }
             }
         }

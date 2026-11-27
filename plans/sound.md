@@ -75,12 +75,12 @@ travels along the room graph instead.
   sound onto itself at that length (`foldLoop()`) makes a loop without a
   seam. It is folded in the browser, as an mp3 loop would gap. Each beam
   starts somewhere else in the loop, so a group doesn't hum in step.
-- Rain of fire (`fire-strike`, from Freesound, `sound/fireSounds.ts`)
-  sounds for each drop, timed for the fireball to hit as the drop
-  strikes. A drop is only sure to strike once it falls, which leaves time
-  for the whoosh before. There is one recording, so each strike plays at
-  a random rate, lower ones bigger and higher ones smaller. Only a few
-  sound at once, as a ring of them would roar.
+- Rain of fire (`fire-strike-*`, from Freesound, `sound/fireSounds.ts`)
+  sounds for each drop with one of the fireballs, timed for it to hit as
+  the drop strikes. A drop is only sure to strike once it falls, which
+  leaves time for a whoosh before. There are only two recordings, so
+  each strike also plays at a random rate, lower ones bigger and higher
+  ones smaller. Only a few sound at once, as a ring of them would roar.
 - The burst of a monster that dies has no sound of its own, as the blow
   that killed it already said it and monsters die often.
 
