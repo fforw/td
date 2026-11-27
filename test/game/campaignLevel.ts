@@ -100,6 +100,19 @@ describe("Campaign level", () => {
         }
     })
 
+    it("drops the experience of heroes from older saves", () => {
+        const campaign = createCampaign(5)
+        const old = {
+            ...campaign,
+            saveVersion: 8,
+            heroes: campaign.heroes.map(hero => ({ ...hero, experience: 2 })),
+            jobs: [{ heroId: campaign.heroes[0].id, target: "1/0", startDay: 1, endDay: 2, way: [], entered: true }]
+        }
+        const loaded = parseSave(JSON.stringify(old))
+        assert.isFalse(loaded.heroes.some(hero => "experience" in hero))
+        assert.isFalse("entered" in loaded.jobs[0])
+    })
+
     it("starts older saves without experience", () => {
         const campaign: Partial<ReturnType<typeof createCampaign>> = { ...createCampaign(5), saveVersion: 7 }
         delete campaign.xp

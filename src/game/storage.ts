@@ -66,6 +66,17 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
     // version 8 has the campaign gain experience, from then on
     7: campaign => {
         campaign.xp = 0
+    },
+    // version 9 drops the experience of heroes, as progress belongs to the campaign
+    8: campaign => {
+        for (const hero of campaign.heroes)
+        {
+            delete (hero as { experience?: number }).experience
+        }
+        for (const job of campaign.jobs)
+        {
+            delete (job as { entered?: boolean }).entered
+        }
     }
 }
 

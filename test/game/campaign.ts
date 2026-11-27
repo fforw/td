@@ -326,11 +326,9 @@ describe("Heroes", () => {
         // no matter how long it takes
         advanceDay(campaign)
         assert(isAway(campaign, hero))
-        assert.equal(hero.experience, 0)
 
         enterJob(campaign, hero.id)
         assert(!isAway(campaign, hero))
-        assert(hero.experience === 1)
     })
 
     it("goes into a level and comes out to wait outside again", () => {
@@ -348,7 +346,6 @@ describe("Heroes", () => {
 
         enterLevel(campaign, hero.id)
         assert(job.inside)
-        assert(hero.experience === 1)
         assert.throws(() => enterJob(campaign, hero.id))
         assert.throws(() => returnHome(campaign, hero.id))
         assert.throws(() => enterLevel(campaign, hero.id))
@@ -363,10 +360,10 @@ describe("Heroes", () => {
         assert(!job.inside && job.face === undefined && hasArrived(campaign, job))
         assert.throws(() => leaveLevel(campaign, hero.id))
 
-        // going back in during the job teaches nothing more
+        // and back in during the job
         enterLevel(campaign, hero.id)
+        assert(job.inside)
         leaveLevel(campaign, hero.id)
-        assert(hero.experience === 1)
 
         returnHome(campaign, hero.id)
         assert(job.returning)
@@ -530,7 +527,7 @@ describe("Heroes", () => {
         assert(isAway(campaign, hero))
     })
 
-    it("has a hero walk back home without entering, learning nothing", () => {
+    it("has a hero walk back home without entering", () => {
 
         const campaign = createCampaign(21)
         const hero = campaign.heroes[0]
@@ -557,7 +554,6 @@ describe("Heroes", () => {
         }
         advanceDay(campaign)
         assert(!isAway(campaign, hero))
-        assert.equal(hero.experience, 0)
     })
 
     it("can't return before getting there", () => {

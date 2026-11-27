@@ -1407,7 +1407,6 @@ export default class GameView implements PadTarget
                     el("span", { className: "name" }, hero.name + " · " + classes.join(", ")),
                     el("span", { className: "stats" },
                         "hp " + stats.hp + " · mp " + stats.mp + " · str " + stats.str + " · dex " + stats.dex +
-                        (hero.experience ? " · " + hero.experience + (hero.experience === 1 ? " job" : " jobs") : "") +
                         (away ? " · " + this.jobStatus(away) : "")
                     ),
                     el("input", {

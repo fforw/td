@@ -125,8 +125,7 @@ Heroes do everything that happens inside a discovered patch.
   Other kinds have no levels yet, and entering those brings the hero
   straight back with a report.
 - The hero can also be told to return instead, which takes the same days
-  back along the way and teaches nothing unless they went in. The target
-  is free for another hero meanwhile.
+  back along the way. The target is free for another hero meanwhile.
 - They enter levels, take treasure and fight, and are the ones who get
   seen, followed and hated ([threats](../threats.md)).
 

@@ -28,7 +28,7 @@ export function createHeroes(campaign: Campaign, count: number): Hero[]
             const character = randomCharacter()
             if (character.classes.some(name => name !== "peasant"))
             {
-                heroes.push({ id: campaign.nextId++, name: meepleNameGenerator(4), character, experience: 0 })
+                heroes.push({ id: campaign.nextId++, name: meepleNameGenerator(4), character })
             }
         }
         return heroes
@@ -110,7 +110,7 @@ export function startJob(campaign: Campaign, heroId: number, target: string, rou
 
 /**
  * Has a hero who got to the target of their job enter it. What happens there comes with the levels, for now the hero
- * comes straight back home a bit more experienced.
+ * comes straight back home.
  */
 export function enterJob(campaign: Campaign, heroId: number): void
 {
@@ -119,7 +119,6 @@ export function enterJob(campaign: Campaign, heroId: number): void
     {
         throw new Error("Hero " + heroId + " isn't at a target")
     }
-    campaign.heroes.find(h => h.id === heroId)!.experience++
     campaign.jobs = campaign.jobs.filter(j => j !== job)
     firstVisit(campaign, job.target)
 }
@@ -149,8 +148,7 @@ function firstVisit(campaign: Campaign, target: string): void
 
 
 /**
- * Has a hero who got to the target of their job go into the level there. The first time teaches them something, however
- * often they go back in during the job. They come in at the entrance of the level.
+ * Has a hero who got to the target of their job go into the level there. They come in at the entrance of the level.
  */
 export function enterLevel(campaign: Campaign, heroId: number): void
 {
@@ -160,11 +158,6 @@ export function enterLevel(campaign: Campaign, heroId: number): void
         throw new Error("Hero " + heroId + " isn't at a target")
     }
     job.inside = true
-    if (!job.entered)
-    {
-        job.entered = true
-        campaign.heroes.find(h => h.id === heroId)!.experience++
-    }
     firstVisit(campaign, job.target)
 }
 

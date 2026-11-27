@@ -15,7 +15,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 export const START_GOLD = 1000
 
@@ -132,8 +132,6 @@ export interface Hero
     name: string
     /** stats and classes, at least one beyond peasant */
     character: Character
-    /** number of jobs done */
-    experience: number
 }
 
 /**
@@ -154,8 +152,6 @@ export interface Job extends Journey
      * level until nobody stands in there anymore.
      */
     hp?: number
-    /** went into the level at some point of the job */
-    entered?: boolean
     /** gold found in levels and carried along, which only goes to the castle's once the hero is back, missing without */
     gold?: number
 }
