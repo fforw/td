@@ -1,6 +1,6 @@
 /**
  * Behavior trees for monsters. A tree is shared by all monsters of a kind and holds no state of its own: what a monster
- * is doing is in its Brain. Structure is data, so it can be walked to show what a monster does, while leaves are code.
+ * is doing is in its Memory. Structure is data, so it can be walked to show what a monster does, while leaves are code.
  *
  * Only leaves act. Conditions only read, so going through the tree again each frame never changes anything by itself.
  */
@@ -10,23 +10,23 @@ export type Status = "success" | "failure" | "running"
 /**
  * What a tree keeps for each monster
  */
-export interface Brain
+export interface Memory
 {
     /** index of the leaf that was running after the last frame, -1 for none */
     running: number
 }
 
-export function brain(): Brain
+export function memory(): Memory
 {
     return { running: -1 }
 }
 
 /**
- * Monster with a brain, as trees see it
+ * Monster with a memory, as trees see it
  */
-export interface Thinker
+export interface Agent
 {
-    brain: Brain
+    memory: Memory
     /** how good it is at what it does, from 0 to 1, which gates and tunes branches */
     skill: number
 }
@@ -34,7 +34,7 @@ export interface Thinker
 /**
  * Something a monster does
  */
-export interface Leaf<M extends Thinker, C>
+export interface Leaf<M extends Agent, C>
 {
     type: "leaf"
     name: string
@@ -54,7 +54,7 @@ export interface Leaf<M extends Thinker, C>
     stop?(monster: M): void
 }
 
-export interface Condition<M extends Thinker, C>
+export interface Condition<M extends Agent, C>
 {
     type: "condition"
     name: string
@@ -64,26 +64,26 @@ export interface Condition<M extends Thinker, C>
 /**
  * A selector goes on with the first child that doesn't fail, a sequence with the first that doesn't succeed
  */
-export interface Composite<M extends Thinker, C>
+export interface Composite<M extends Agent, C>
 {
     type: "selector" | "sequence"
     name: string
     children: readonly Node<M, C>[]
 }
 
-export type Node<M extends Thinker, C> = Leaf<M, C> | Condition<M, C> | Composite<M, C>
+export type Node<M extends Agent, C> = Leaf<M, C> | Condition<M, C> | Composite<M, C>
 
 /**
  * What a leaf does, for leaf()
  */
-export type LeafSpec<M extends Thinker, C> = Omit<Leaf<M, C>, "type" | "name" | "commits"> & { commits?: boolean }
+export type LeafSpec<M extends Agent, C> = Omit<Leaf<M, C>, "type" | "name" | "commits"> & { commits?: boolean }
 
-export function leaf<M extends Thinker, C>(name: string, spec: LeafSpec<M, C>): Leaf<M, C>
+export function leaf<M extends Agent, C>(name: string, spec: LeafSpec<M, C>): Leaf<M, C>
 {
     return { type: "leaf", name, commits: false, ...spec }
 }
 
-export function condition<M extends Thinker, C>(name: string, test: (monster: M, context: C) => boolean): Condition<M, C>
+export function condition<M extends Agent, C>(name: string, test: (monster: M, context: C) => boolean): Condition<M, C>
 {
     return { type: "condition", name, test }
 }
@@ -91,17 +91,17 @@ export function condition<M extends Thinker, C>(name: string, test: (monster: M,
 /**
  * Succeeds for monsters with at least the given skill, which keeps the branches after it for better ones
  */
-export function skilled<M extends Thinker, C>(least: number): Condition<M, C>
+export function skilled<M extends Agent, C>(least: number): Condition<M, C>
 {
     return condition(`skill ${least}`, ({ skill }) => skill >= least)
 }
 
-export function selector<M extends Thinker, C>(name: string, ...children: Node<M, C>[]): Composite<M, C>
+export function selector<M extends Agent, C>(name: string, ...children: Node<M, C>[]): Composite<M, C>
 {
     return { type: "selector", name, children }
 }
 
-export function sequence<M extends Thinker, C>(name: string, ...children: Node<M, C>[]): Composite<M, C>
+export function sequence<M extends Agent, C>(name: string, ...children: Node<M, C>[]): Composite<M, C>
 {
     return { type: "sequence", name, children }
 }
@@ -110,7 +110,7 @@ export function sequence<M extends Thinker, C>(name: string, ...children: Node<M
 /**
  * A tree built from nodes, which it numbers. The same node object must not appear twice in it.
  */
-export class Tree<M extends Thinker, C>
+export class Tree<M extends Agent, C>
 {
     private readonly nodes: Node<M, C>[] = []
     private readonly parents: number[] = []
@@ -130,23 +130,23 @@ export class Tree<M extends Thinker, C>
      */
     tick(monster: M, context: C): void
     {
-        const { brain } = monster
-        const running = brain.running >= 0 ? this.nodes[brain.running] as Leaf<M, C> : null
+        const { memory } = monster
+        const running = memory.running >= 0 ? this.nodes[memory.running] as Leaf<M, C> : null
         if (running?.commits)
         {
             if (running.tick(monster, context) !== "running")
             {
-                brain.running = -1
+                memory.running = -1
             }
             return
         }
         this.active = -1
         this.run(this.root, monster, context)
-        if (running && brain.running !== this.active)
+        if (running && memory.running !== this.active)
         {
             running.stop?.(monster)
         }
-        brain.running = this.active
+        memory.running = this.active
     }
 
     /**
@@ -154,11 +154,11 @@ export class Tree<M extends Thinker, C>
      */
     interrupt(monster: M): void
     {
-        const { brain } = monster
-        if (brain.running >= 0)
+        const { memory } = monster
+        if (memory.running >= 0)
         {
-            const running = this.nodes[brain.running] as Leaf<M, C>
-            brain.running = -1
+            const running = this.nodes[memory.running] as Leaf<M, C>
+            memory.running = -1
             running.stop?.(monster)
         }
     }
@@ -166,10 +166,10 @@ export class Tree<M extends Thinker, C>
     /**
      * Returns the names of the nodes from the root to the leaf a monster runs, or an empty list if none runs
      */
-    path({ brain }: M): string[]
+    path({ memory }: M): string[]
     {
         const path: string[] = []
-        for (let index = brain.running; index >= 0; index = this.parents[index])
+        for (let index = memory.running; index >= 0; index = this.parents[index])
         {
             path.unshift(this.nodes[index].name)
         }
@@ -204,7 +204,7 @@ export class Tree<M extends Thinker, C>
             case "leaf":
             {
                 const index = this.indices.get(node)!
-                if (index !== monster.brain.running && node.start && !node.start(monster, context))
+                if (index !== monster.memory.running && node.start && !node.start(monster, context))
                 {
                     return "failure"
                 }

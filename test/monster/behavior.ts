@@ -1,8 +1,8 @@
 import { assert, describe, it } from "vitest"
 
-import { brain, condition, leaf, selector, sequence, skilled, type Status, type Thinker, Tree } from "../../src/monster/behavior"
+import { type Agent, condition, leaf, memory, selector, sequence, skilled, type Status, Tree } from "../../src/monster/behavior"
 
-interface Bot extends Thinker
+interface Bot extends Agent
 {
     log: string[]
     near: boolean
@@ -12,7 +12,7 @@ interface Bot extends Thinker
 
 function bot(skill = 0): Bot
 {
-    return { brain: brain(), skill, log: [], near: false, moveLeft: 0 }
+    return { memory: memory(), skill, log: [], near: false, moveLeft: 0 }
 }
 
 /** a leaf that logs its start, frames and stop, and runs while `keeps` says so */

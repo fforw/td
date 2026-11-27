@@ -7,7 +7,7 @@ import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./si
 import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
 import { BLOCK_ANGLE } from "./eyes"
 import FireRain, { type FireFloor } from "./fireRain"
-import { brain, type Brain, condition, leaf, selector, sequence, skilled, Tree } from "./behavior"
+import { condition, leaf, memory, type Memory, selector, sequence, skilled, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -202,7 +202,7 @@ export interface Cast
 export interface Wizard extends Monster
 {
     kind: WizardKind
-    brain: Brain
+    memory: Memory
     /** how good it is at fighting, from 0 to 1 */
     skill: number
     /** walking somewhere with nobody to go after */
@@ -269,7 +269,7 @@ export default class WizardPack extends MonsterPack<Wizard>
     {
         const wizard: Wizard = {
             kind,
-            brain: brain(),
+            memory: memory(),
             skill,
             hp: kind.hp,
             face,

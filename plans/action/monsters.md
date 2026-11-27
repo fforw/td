@@ -18,7 +18,7 @@ placed in is in [spawns](../dungeon/spawns.md).
 the simple ones keep their own code. Wizards are on one so far.
 
 - A tree is shared by all monsters of a kind and holds no state. What a
-  monster runs is in its `Brain`, and anything else the tree needs is
+  monster runs is in its `Memory`, and anything else the tree needs is
   plain state on the monster, so monsters stay plain objects.
 - The structure is data built by small functions, and the leaves are
   code. So `Tree.path()` names what a monster does, for tests and
