@@ -121,6 +121,7 @@ export const SOLDIER: SoldierKind = {
         { x: -0.33, y: 0.78, z: 0, rx: 0.04, ry: 0.33, rz: 0.04, colors: ["#989bd9"] }
     ],
     material: "armor",
+    deathCry: false,
     damage: 3,
     speed: 0.55 * FIGURE_SCALE,
     reach: 0.25 * SIZE * FIGURE_SCALE

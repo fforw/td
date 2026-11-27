@@ -42,6 +42,13 @@ const HURT_RATE = 1.12
 const HURT_VOLUME = 0.8
 
 /**
+ * Cries of the big monsters that die with one, a bit lower than recorded for their size
+ */
+const DEATH_SOUNDS = numbered("meeple-death", 2)
+const DEATH_RATE = 0.9
+const DEATH_VOLUME = 0.9
+
+/**
  * Recorded zips of constructs, with seconds into each where it is loudest, which goes with the construct passing through
  * the hero
  */
@@ -88,6 +95,7 @@ class Variants
 
 const misses = new Variants(MISS_SOUNDS)
 const hurts = new Variants(HURT_SOUNDS)
+const deathCries = new Variants(DEATH_SOUNDS)
 
 function spread(rate: number): number
 {
@@ -100,7 +108,7 @@ function spread(rate: number): number
 export function loadFightSounds(): void
 {
     const loudest = [...Object.values(HIT_SOUNDS), ...ZIP_SOUNDS].map(({ name }) => name)
-    for (const name of [...loudest, ...MISS_SOUNDS, ...HURT_SOUNDS])
+    for (const name of [...loudest, ...MISS_SOUNDS, ...HURT_SOUNDS, ...DEATH_SOUNDS])
     {
         void loadEffect(name)
     }
@@ -132,6 +140,14 @@ export function playBlow(blows: readonly Blow[]): void
 export function playHurt(): void
 {
     playEffect(hurts.next(), spread(HURT_RATE), HURT_VOLUME)
+}
+
+/**
+ * Plays a big monster crying out as it dies
+ */
+export function playDeathCry(): void
+{
+    playEffect(deathCries.next(), spread(DEATH_RATE), DEATH_VOLUME)
 }
 
 /**

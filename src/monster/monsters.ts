@@ -73,6 +73,8 @@ export interface MonsterKind
     burst: readonly BurstSphere[]
     /** what a sword blow on it sounds like */
     material: HitMaterial
+    /** cries out when it dies, which only a few big ones do, as they are rare enough for it to be dramatic */
+    deathCry: boolean
 }
 
 export interface Monster extends FloorSpot

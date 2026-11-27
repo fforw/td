@@ -80,6 +80,7 @@ export const CONSTRUCT: ConstructKind = {
     // at the height it hovers at
     burst: [{ x: 0, y: 1.05, z: 0, rx: 0.35, ry: 0.35, rz: 0.35, colors: ["#8a9099", "#5d636b", "#7fe8ff"] }],
     material: "metal",
+    deathCry: false,
     damage: 2,
     speed: 0.7 * FIGURE_SCALE
 }

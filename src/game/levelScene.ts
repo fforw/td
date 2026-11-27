@@ -52,7 +52,7 @@ import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
-import { loadFightSounds, playBlow, playHurt, ZipSounds } from "../sound/fightSounds"
+import { loadFightSounds, playBlow, playDeathCry, playHurt, ZipSounds } from "../sound/fightSounds"
 import BeamSounds from "../sound/beamSounds"
 import FireSounds from "../sound/fireSounds"
 import SigilSounds from "../sound/sigilSounds"
@@ -1655,6 +1655,10 @@ export default class LevelScene
         {
             bursts.add(death)
             this.outside.achieve("kill")
+            if (death.kind.deathCry)
+            {
+                playDeathCry()
+            }
         }
         // brutes keep their club a while
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)

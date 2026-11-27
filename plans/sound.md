@@ -89,7 +89,10 @@ travels along the room graph instead.
   (`sigil-trigger`) as it flares up and starts to hurt. A broken sigil
   goes quiet.
 - The burst of a monster that dies has no sound of its own, as the blow
-  that killed it already said it and monsters die often.
+  that killed it already said it and monsters die often. Only a few big
+  ones cry out as they die (`meeple-death-*`, `deathCry` of the kind),
+  as they are rare enough for it to be dramatic: so far the brute, a bit
+  lower than recorded for its size.
 
 ## Planned
 
@@ -99,7 +102,6 @@ travels along the room graph instead.
   next to the lighting, once single mobiles make noise. Mobiles could
   hear heroes over the same distance.
 - Recorded ambience: dripping, fire, wind.
-- Big deaths, like the brute's and later the end boss's, get a death
-  sound (`meeple-death-*`), since they are rare enough to be dramatic.
+- The end boss cries out as it dies, like the brute.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
