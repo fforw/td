@@ -103,5 +103,6 @@ travels along the room graph instead.
   hear heroes over the same distance.
 - Recorded ambience: dripping, fire, wind.
 - The end boss cries out as it dies, like the brute.
+- Acid cuboids squelch as they move over the ground.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
