@@ -247,12 +247,12 @@ describe("WizardPack", () => {
     it("blocks a hero that comes at it once skilled enough, sooner the more skilled", () => {
         const { pack, wizard, hero } = threatened(1)
         run(pack, hero, reactionTime(wizard) + 0.6)
-        assert.strictEqual(wizard.staff, 1)
+        assert.strictEqual(wizard.staffRaise, 1)
         assert.deepEqual(WIZARD_TREE.path(wizard), ["wizard", "guard", "block"])
 
         const novice = threatened(0)
         run(novice.pack, novice.hero, 2)
-        assert.strictEqual(novice.wizard.staff, 0)
+        assert.strictEqual(novice.wizard.staffRaise, 0)
 
         assert.isAbove(reactionTime({ ...wizard, skill: 0.3 }), reactionTime(wizard))
     })
@@ -274,8 +274,8 @@ describe("WizardPack", () => {
         for (let t = 0; t < GUARD_MAX + 3; t += FRAME)
         {
             pack.update(FRAME, [hero])
-            lowered ||= wizard.staff === 0 && t > GUARD_MAX
-            raisedAgain ||= lowered && wizard.staff > 0
+            lowered ||= wizard.staffRaise === 0 && t > GUARD_MAX
+            raisedAgain ||= lowered && wizard.staffRaise > 0
         }
         assert.isTrue(raisedAgain)
     })

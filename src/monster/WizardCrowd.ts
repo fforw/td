@@ -51,9 +51,9 @@ interface Figure extends SkinnedFigure
  *
  * @param duration  length of the block clip in seconds
  */
-export function staffTime({ guarding, staff }: Wizard, duration: number): number
+export function staffTime({ guarding, staffRaise }: Wizard, duration: number): number
 {
-    return guarding ? staff * RAISE_TIME : duration - staff * (duration - RAISE_TIME)
+    return guarding ? staffRaise * RAISE_TIME : duration - staffRaise * (duration - RAISE_TIME)
 }
 
 
@@ -127,7 +127,7 @@ export default class WizardCrowd
      */
     private pose(wizard: Wizard, figure: Figure, delta: number): void
     {
-        const { kind, x, z, yaw, walked, moving, casting, staff, flash, chase } = wizard
+        const { kind, x, z, yaw, walked, moving, casting, staffRaise, flash, chase } = wizard
         const { root, mixer, walk, cast, block } = figure
 
         root.position.set(x, 0, z)
@@ -150,7 +150,7 @@ export default class WizardCrowd
             const { age, beam } = casting
             cast.time = beam ? beamCastTime(age, beam.until) : Math.min(age, cast.getClip().duration)
         }
-        block.setEffectiveWeight(staff > 0 ? 1 : 0)
+        block.setEffectiveWeight(staffRaise > 0 ? 1 : 0)
         block.time = staffTime(wizard, block.getClip().duration)
         mixer.update(0)
 

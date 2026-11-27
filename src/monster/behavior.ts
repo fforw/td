@@ -13,12 +13,12 @@ export type Status = "success" | "failure" | "running"
 export interface Memory
 {
     /** index of the leaf that was running after the last frame, -1 for none */
-    running: number
+    runningIndex: number
 }
 
 export function memory(): Memory
 {
-    return { running: -1 }
+    return { runningIndex: -1 }
 }
 
 /**
@@ -117,7 +117,7 @@ export class Tree<M extends Agent, C>
     private readonly indices = new Map<Node<M, C>, number>()
 
     /** leaf found running in the current frame */
-    private active = -1
+    private chosenIndex = -1
 
     constructor(readonly root: Node<M, C>)
     {
@@ -131,22 +131,22 @@ export class Tree<M extends Agent, C>
     tick(monster: M, context: C): void
     {
         const { memory } = monster
-        const running = memory.running >= 0 ? this.nodes[memory.running] as Leaf<M, C> : null
-        if (running?.commits)
+        const runningLeaf = memory.runningIndex >= 0 ? this.nodes[memory.runningIndex] as Leaf<M, C> : null
+        if (runningLeaf?.commits)
         {
-            if (running.tick(monster, context) !== "running")
+            if (runningLeaf.tick(monster, context) !== "running")
             {
-                memory.running = -1
+                memory.runningIndex = -1
             }
             return
         }
-        this.active = -1
+        this.chosenIndex = -1
         this.run(this.root, monster, context)
-        if (running && memory.running !== this.active)
+        if (runningLeaf && memory.runningIndex !== this.chosenIndex)
         {
-            running.stop?.(monster)
+            runningLeaf.stop?.(monster)
         }
-        memory.running = this.active
+        memory.runningIndex = this.chosenIndex
     }
 
     /**
@@ -155,11 +155,11 @@ export class Tree<M extends Agent, C>
     interrupt(monster: M): void
     {
         const { memory } = monster
-        if (memory.running >= 0)
+        if (memory.runningIndex >= 0)
         {
-            const running = this.nodes[memory.running] as Leaf<M, C>
-            memory.running = -1
-            running.stop?.(monster)
+            const runningLeaf = this.nodes[memory.runningIndex] as Leaf<M, C>
+            memory.runningIndex = -1
+            runningLeaf.stop?.(monster)
         }
     }
 
@@ -169,7 +169,7 @@ export class Tree<M extends Agent, C>
     path({ memory }: M): string[]
     {
         const path: string[] = []
-        for (let index = memory.running; index >= 0; index = this.parents[index])
+        for (let index = memory.runningIndex; index >= 0; index = this.parents[index])
         {
             path.unshift(this.nodes[index].name)
         }
@@ -204,14 +204,14 @@ export class Tree<M extends Agent, C>
             case "leaf":
             {
                 const index = this.indices.get(node)!
-                if (index !== monster.memory.running && node.start && !node.start(monster, context))
+                if (index !== monster.memory.runningIndex && node.start && !node.start(monster, context))
                 {
                     return "failure"
                 }
                 const status = node.tick(monster, context)
                 if (status === "running")
                 {
-                    this.active = index
+                    this.chosenIndex = index
                 }
                 return status
             }
