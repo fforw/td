@@ -53,3 +53,12 @@ travels along the room graph instead.
   next to the lighting, once single mobiles make noise. Mobiles could
   hear heroes over the same distance.
 - Recorded ambience: dripping, fire, wind.
+- Combat sounds for humanoid characters: a sword hit for every hit and
+  a hurt sound (`meeple-hurt-*`) from the one it hits. The sword hit
+  sounds of what it lands on: flesh, armor, metal, or wood for shields
+  and staffs (`sword-on-*`, from Freesound). Most of them lead in with
+  a whoosh, so they start a moment before the blade lands. The burst of
+  a monster that dies has no sound of its own; its last hit plays a
+  hurt sound like any other. Big deaths, like the brute's and later the
+  end boss's, get a death sound (`meeple-death-*`) instead, since they
+  are rare enough to be dramatic.

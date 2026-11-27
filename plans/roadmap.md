@@ -44,4 +44,5 @@ each file.
 - [Threats](threats.md): grudges, knowledge, search, bandits, none built
   yet.
 - [Economy](economy.md#planned): resources, facilities, consumers.
-- [Sound](sound.md#planned): group volumes, walking distance.
+- [Sound](sound.md#planned): group volumes, walking distance, combat sounds.
+- [Sound](sound.md#planned): what the recorded sword hits (`sword-hit-*`) are for next to the material hits, maybe blocked hits or misses.
