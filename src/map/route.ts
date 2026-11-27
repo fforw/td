@@ -236,7 +236,7 @@ export function findRoute(
     }
     const heap = new FaceHeap()
     heap.push(0, start)
-    const done = new Set<number>()
+    const settled = new Set<number>()
     const entered = new Set<number>()
 
     const [targetX, targetY] = patchCenter(world, target)
@@ -271,11 +271,11 @@ export function findRoute(
     while (heap.size > 0)
     {
         const face = heap.pop()
-        if (done.has(face))
+        if (settled.has(face))
         {
             continue
         }
-        done.add(face)
+        settled.add(face)
 
         const slot = slotOf(face)
         if (enter && !entered.has(slot))
@@ -318,7 +318,7 @@ export function findRoute(
                 continue
             }
             const next = twin >> 2
-            if (done.has(next) || !allowed.has(next >> FACE_SHIFT))
+            if (settled.has(next) || !allowed.has(next >> FACE_SHIFT))
             {
                 continue
             }

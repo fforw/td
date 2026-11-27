@@ -126,7 +126,7 @@ const vs: number[] = []
  * Bilinear interpolation of the cell corners. Edge midpoints only depend on the two corners of the edge, so cells
  * sharing an edge also share the points on it.
  */
-function emitPolygon(type: FaceType, cb: TriangleCallback): void
+function emitPolygon(type: FaceType, emitTriangle: TriangleCallback): void
 {
     const px: number[] = []
     const py: number[] = []
@@ -145,7 +145,7 @@ function emitPolygon(type: FaceType, cb: TriangleCallback): void
     // all case polygons are convex
     for (let i = 2; i < px.length; i++)
     {
-        cb(type, px[0], py[0], px[i - 1], py[i - 1], px[i], py[i])
+        emitTriangle(type, px[0], py[0], px[i - 1], py[i - 1], px[i], py[i])
     }
 
     us.length = 0
@@ -178,7 +178,7 @@ function center(): void
  * Single corner case, the islands "case-1" to "case-8". If the neighboring corners are of different types, the corner
  * takes the whole quadrant ("case-m1" to "case-m4") to not leave a gap in the middle.
  */
-function single(i: number, cb: TriangleCallback): void
+function single(i: number, emitTriangle: TriangleCallback): void
 {
     const next = (i + 1) & 3
     const prev = (i + 3) & 3
@@ -189,10 +189,10 @@ function single(i: number, cb: TriangleCallback): void
         center()
     }
     mid(prev, i)
-    emitPolygon(ground[i], cb)
+    emitPolygon(ground[i], emitTriangle)
 }
 
-function marchCell(cb: TriangleCallback): void
+function marchCell(emitTriangle: TriangleCallback): void
 {
     for (let i = 0; i < 4; i++)
     {
@@ -217,7 +217,7 @@ function marchCell(cb: TriangleCallback): void
 
         if (count === 1)
         {
-            single(i, cb)
+            single(i, emitTriangle)
             continue
         }
 
@@ -228,8 +228,8 @@ function marchCell(cb: TriangleCallback): void
             const other = ground[i + 1]
             if (other === ground[(i + 3) & 3] && rank(other) > rank(type))
             {
-                single(i, cb)
-                single(i + 2, cb)
+                single(i, emitTriangle)
+                single(i + 2, emitTriangle)
                 continue
             }
         }
@@ -247,14 +247,14 @@ function marchCell(cb: TriangleCallback): void
                 mid(j, next)
             }
         }
-        emitPolygon(type, cb)
+        emitPolygon(type, emitTriangle)
     }
 }
 
 /**
  * Creates the ground triangles for the given faces.
  */
-export default function marchingSquares(faces: Face[], cb: TriangleCallback): void
+export default function marchingSquares(faces: Face[], emitTriangle: TriangleCallback): void
 {
     priority = GROUND_PRIORITY
     const vertices = vertexGround(faces)
@@ -285,7 +285,7 @@ export default function marchingSquares(faces: Face[], cb: TriangleCallback): vo
             ground[2] = face.type
             ground[3] = edgeGround(prev)
 
-            marchCell(cb)
+            marchCell(emitTriangle)
 
             prev = curr
             curr = curr.next
@@ -390,13 +390,13 @@ function splitsAtVertex(world: PatchWorld, h: number): boolean
  *
  * @param world             world with the patch
  * @param slot              slot of the patch
- * @param cb                receives the triangles
+ * @param emitTriangle      receives the triangles
  * @param groundPriority    ground types from background to foreground
  */
 export function marchingSquaresPatch(
     world: PatchWorld,
     slot: number,
-    cb: TriangleCallback,
+    emitTriangle: TriangleCallback,
     groundPriority: FaceType[] = GROUND_PRIORITY
 ): void
 {
@@ -451,7 +451,7 @@ export function marchingSquaresPatch(
             ground[2] = type
             ground[3] = packedEdgeGround(p, type)
 
-            marchCell(cb)
+            marchCell(emitTriangle)
         }
     }
 }
