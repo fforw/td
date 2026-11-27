@@ -7,6 +7,7 @@ import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./si
 import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
 import { BLOCK_ANGLE } from "./eyes"
 import FireRain, { type FireFloor } from "./fireRain"
+import { brain, type Brain, condition, leaf, selector, sequence, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -156,6 +157,9 @@ export interface Cast
 export interface Wizard extends Monster
 {
     kind: WizardKind
+    brain: Brain
+    /** how good it is at fighting, from 0 to 1 */
+    skill: number
     /** walking somewhere with nobody to go after */
     wandering: boolean
     /** world units walked in all, which the walk clip follows */
@@ -203,10 +207,15 @@ export default class WizardPack extends MonsterPack<Wizard>
         this.fire = new FireRain(floor)
     }
 
-    add(kind: WizardKind, face: number, x: number, z: number): Wizard
+    /**
+     * @param skill     how good it is at fighting, from 0 to 1
+     */
+    add(kind: WizardKind, face: number, x: number, z: number, skill = 0): Wizard
     {
         const wizard: Wizard = {
             kind,
+            brain: brain(),
+            skill,
             hp: kind.hp,
             face,
             x,
@@ -248,20 +257,11 @@ export default class WizardPack extends MonsterPack<Wizard>
                 wizard.goalZ = prey.z
                 wizard.wandering = false
             }
-            this.cast(wizard, prey, delta)
-            if (wizard.casting?.beam)
+            if (wizard.chase > 0 && !wizard.casting)
             {
-                const { age, until, spin } = wizard.casting.beam
-                wizard.yaw += age < until ? spin * BEAM_TURN_RATE * delta : 0
+                wizard.castWait = Math.max(0, wizard.castWait - delta)
             }
-            else if (wizard.casting)
-            {
-                turnTo(wizard, wizard.casting.x, wizard.casting.z, TURN_RATE * delta)
-            }
-            else
-            {
-                this.decide(wizard, delta)
-            }
+            WIZARD_TREE.tick(wizard, { pack: this, prey, delta })
         }
         this.updateBeams(delta, heroes)
     }
@@ -293,19 +293,19 @@ export default class WizardPack extends MonsterPack<Wizard>
 
     protected struck(wizard: Wizard): void
     {
-        this.breakOff(wizard)
+        WIZARD_TREE.interrupt(wizard)
     }
 
     protected kill(wizard: Wizard): number
     {
-        this.breakOff(wizard)
+        WIZARD_TREE.interrupt(wizard)
         return 1
     }
 
     /**
      * A blow breaks the sigil a wizard is drawing and its beam, and keeps fire from coming until the staff hits the floor
      */
-    private breakOff(wizard: Wizard): void
+    static breakOff(wizard: Wizard): void
     {
         const { casting } = wizard
         if (casting)
@@ -318,11 +318,11 @@ export default class WizardPack extends MonsterPack<Wizard>
             {
                 casting.beam.until = Math.min(casting.beam.until, casting.beam.age)
             }
-            this.endCast(wizard)
+            WizardPack.endCast(wizard)
         }
     }
 
-    private endCast(wizard: Wizard): void
+    private static endCast(wizard: Wizard): void
     {
         wizard.casting = null
         wizard.castWait = rng.next(CAST_WAIT_MIN, CAST_WAIT_MAX)
@@ -396,40 +396,45 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * Has a wizard go on with its spell, or start one on a hero close enough, or in sight for a beam
+     * Has a wizard go on with its spell, and turn with its beam or to where it casts
+     *
+     * @return false once it is done
      */
-    private cast(wizard: Wizard, prey: Prey | null, delta: number): void
+    goOnCasting(wizard: Wizard, delta: number): boolean
     {
-        const { casting, kind } = wizard
+        const casting = wizard.casting!
+        casting.age += delta
+        if (wizard.kind.robe === "red" && !casting.released)
+        {
+            // aims at where it last saw them until the staff hits the floor
+            casting.x = wizard.goalX
+            casting.z = wizard.goalZ
+            if (casting.age >= STAFF_STOMP)
+            {
+                casting.released = true
+                this.rainFire(wizard, casting.x, casting.z)
+            }
+        }
+        if (casting.age >= (casting.beam ? casting.beam.until + BEAM_CAST_END : casting.sigil ? SIGIL_DRAW : FIRE_CAST))
+        {
+            WizardPack.endCast(wizard)
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Has a wizard start a spell on a hero close enough, or in sight for a beam
+     *
+     * @return false if it can't
+     */
+    startCast(wizard: Wizard, prey: Prey | null): boolean
+    {
+        const { kind } = wizard
         const { robe } = kind
-        if (casting)
-        {
-            casting.age += delta
-            if (robe === "red" && !casting.released)
-            {
-                // aims at where it last saw them until the staff hits the floor
-                casting.x = wizard.goalX
-                casting.z = wizard.goalZ
-                if (casting.age >= STAFF_STOMP)
-                {
-                    casting.released = true
-                    this.rainFire(wizard, casting.x, casting.z)
-                }
-            }
-            if (casting.age >= (casting.beam ? casting.beam.until + BEAM_CAST_END : casting.sigil ? SIGIL_DRAW : FIRE_CAST))
-            {
-                this.endCast(wizard)
-            }
-            return
-        }
-        if (wizard.chase === 0)
-        {
-            return
-        }
-        wizard.castWait = Math.max(0, wizard.castWait - delta)
         if (wizard.castWait > 0 || !prey || robe !== "purple" && Math.hypot(prey.x - wizard.x, prey.z - wizard.z) > CAST_RANGE)
         {
-            return
+            return false
         }
         if (robe === "purple")
         {
@@ -446,17 +451,18 @@ export default class WizardPack extends MonsterPack<Wizard>
             }
             this.beams.push(beam)
             wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, beam, released: false }
-            return
+            return true
         }
         if (robe === "red")
         {
             wizard.casting = { age: 0, x: prey.x, z: prey.z, sigil: null, beam: null, released: false }
-            return
+            return true
         }
         const [x, z] = placeSigil(this.floor, prey.x, prey.z, SIGIL_RADIUS)
         const sigil: SigilState = { x, z, radius: SIGIL_RADIUS, damage: kind.damage, age: 0, broken: null, hue: wizard.hue }
         this.sigils.push(sigil)
         wizard.casting = { age: 0, x, z, sigil, beam: null, released: false }
+        return true
     }
 
     /**
@@ -470,11 +476,11 @@ export default class WizardPack extends MonsterPack<Wizard>
     }
 
     /**
-     * Walks a wizard after who it goes after, or about now and then with nobody to go after
+     * With nobody to go after, has a wizard look around now and then, and walk somewhere sometimes
      */
-    private decide(wizard: Wizard, delta: number): void
+    wander(wizard: Wizard, delta: number): void
     {
-        if (wizard.chase === 0 && !wizard.wandering)
+        if (!wizard.wandering)
         {
             wizard.lookWait -= delta
             if (wizard.lookWait > 0)
@@ -491,27 +497,100 @@ export default class WizardPack extends MonsterPack<Wizard>
             }
             return
         }
+        const step = wizard.kind.speed * delta
+        // a wall in the way ends a walk about
+        if (this.walkTo(wizard, 0.01, delta) < step / 2)
+        {
+            wizard.wandering = false
+        }
+    }
 
+    /**
+     * Turns a wizard to its goal and walks it there, up to the given distance away
+     *
+     * @return world units walked
+     */
+    walkTo(wizard: Wizard, stop: number, delta: number): number
+    {
         turnTo(wizard, wizard.goalX, wizard.goalZ, TURN_RATE * delta)
-        const stop = wizard.wandering ? 0.01 : wizard.kind.keepAway
         const dx = wizard.goalX - wizard.x, dz = wizard.goalZ - wizard.z
         const distance = Math.hypot(dx, dz)
         if (distance <= stop)
         {
-            wizard.wandering = false
-            return
+            return 0
         }
-        const step = wizard.kind.speed * delta
-        const length = Math.min(step, distance - stop)
+        const length = Math.min(wizard.kind.speed * delta, distance - stop)
         const { x, z } = wizard
         this.floor.move(wizard, dx / distance * length, dz / distance * length)
         const moved = Math.hypot(wizard.x - x, wizard.z - z)
         wizard.walked += moved
         wizard.moving = moved > 0
-        // a wall in the way ends a walk about
-        if (wizard.wandering && moved < step / 2)
-        {
-            wizard.wandering = false
-        }
+        return moved
     }
 }
+
+
+/**
+ * What the wizard tree gets each frame
+ */
+interface WizardContext
+{
+    pack: WizardPack
+    /** closest hero in sight */
+    prey: Prey | null
+    delta: number
+}
+
+const cast = leaf<Wizard, WizardContext>("cast", {
+    commits: true,
+    start: (wizard, { pack, prey }) => pack.startCast(wizard, prey),
+    tick: (wizard, { pack, delta }) =>
+    {
+        if (!pack.goOnCasting(wizard, delta))
+        {
+            return "success"
+        }
+        const { casting } = wizard
+        if (casting?.beam)
+        {
+            const { age, until, spin } = casting.beam
+            wizard.yaw += age < until ? spin * BEAM_TURN_RATE * delta : 0
+        }
+        else if (casting)
+        {
+            turnTo(wizard, casting.x, casting.z, TURN_RATE * delta)
+        }
+        return "running"
+    },
+    stop: wizard => WizardPack.breakOff(wizard)
+})
+
+const approach = leaf<Wizard, WizardContext>("approach", {
+    tick: (wizard, { pack, delta }) =>
+    {
+        pack.walkTo(wizard, wizard.kind.keepAway, delta)
+        return "running"
+    }
+})
+
+const wander = leaf<Wizard, WizardContext>("wander", {
+    tick: (wizard, { pack, delta }) =>
+    {
+        pack.wander(wizard, delta)
+        return "running"
+    }
+})
+
+/**
+ * Wizards go after heroes they saw and cast at them when they can, and wander about otherwise
+ */
+export const WIZARD_TREE = new Tree<Wizard, WizardContext>(selector("wizard",
+    sequence("fight",
+        condition("hunting", ({ chase }) => chase > 0),
+        selector("attack or close in",
+            sequence("spell", condition("ready", ({ castWait }, { prey }) => castWait === 0 && prey !== null), cast),
+            approach
+        )
+    ),
+    wander
+))
