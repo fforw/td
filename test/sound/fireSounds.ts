@@ -100,4 +100,12 @@ describe("FireSounds", () => {
         single.update(alone)
         assert.isAbove(loudest, played[0].volume)
     })
+
+    it("varies the volume of the strikes", () => {
+
+        const sounds = new FireSounds()
+        const strikes = Array.from({ length: 30 }, (_, i) => drop(-1 - i * 0.2))
+        run(sounds, strikes, 8)
+        assert.isAbove(new Set(played.map(({ volume }) => volume.toFixed(3))).size, 10)
+    })
 })

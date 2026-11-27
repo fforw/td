@@ -80,7 +80,7 @@ travels along the room graph instead.
   the drop strikes. A drop is only sure to strike once it falls, which
   leaves time for a whoosh before. There are only two recordings, so
   each strike also plays at a random rate, lower ones bigger and higher
-  ones smaller.
+  ones smaller, and at a random volume.
 - Strikes keep a short gap between them, and only a few sound at once.
   The lines of a fire room strike faster than that, so every second or
   third strike sounds, all along the line, where a cap on voices alone

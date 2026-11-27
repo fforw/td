@@ -25,6 +25,12 @@ const STRIKE_RATE_MIN = 0.8
 const STRIKE_RATE_MAX = 1.25
 
 /**
+ * Least share of the volume a strike plays at, each at random between that and all of it, so a line of them rolls
+ * instead of ticking
+ */
+const STRIKE_VOLUME_MIN = 0.6
+
+/**
  * Seconds at least between the starts of two strikes, and strikes that may sound at once, with the seconds one counts
  * as sounding. The lines of a fire room strike one spot after another faster than that, so every second or third
  * sounds, all along the line, and a ring of them doesn't roar.
@@ -44,7 +50,7 @@ const CROWD_MAX = 1.6
 const STRIKE_LATE = 0.1
 
 /**
- * Plays the fire of a rain striking the floor, each timed to hit as the drop does, in a different tone each
+ * Plays the fire of a rain striking the floor, each timed to hit as the drop does, in a different tone and volume each
  */
 export default class FireSounds
 {
@@ -108,7 +114,8 @@ export default class FireSounds
         if (first && this.starts.length < STRIKE_VOICES && now - last >= STRIKE_GAP)
         {
             this.starts.push(now)
-            playEffect(first.name, first.rate, STRIKE_VOLUME * Math.min(CROWD_MAX, Math.sqrt(due)), first.skip)
+            const volume = STRIKE_VOLUME * (STRIKE_VOLUME_MIN + Math.random() * (1 - STRIKE_VOLUME_MIN))
+            playEffect(first.name, first.rate, volume * Math.min(CROWD_MAX, Math.sqrt(due)), first.skip)
         }
     }
 }
