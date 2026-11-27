@@ -13,7 +13,7 @@ each file.
 ## Planned
 
 - [Monsters](action/monsters.md#planned): saved monsters, inhabitants
-  from the story.
+  from the story, skill from escalation, trees for more monsters.
 - [Combat](action/combat.md#planned): ways of dying, dying heroes.
 - [Dungeon generation](dungeon/generation.md#planned): premises, room
   splitting, loops, roles and content, locks and keys, rebaking lights.

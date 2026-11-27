@@ -12,6 +12,34 @@ placed in is in [spawns](../dungeon/spawns.md).
   parts, and whatever lived on known floor is gone for good, killed or
   not.
 
+## Behavior trees
+
+`monster/behavior.ts`. Monsters with choices to make decide by a tree,
+the simple ones keep their own code. Wizards are on one so far.
+
+- A tree is shared by all monsters of a kind and holds no state. What a
+  monster runs is in its `Brain`, and anything else the tree needs is
+  plain state on the monster, so monsters stay plain objects.
+- The structure is data built by small functions, and the leaves are
+  code. So `Tree.path()` names what a monster does, for tests and
+  checks, without a file format nobody would edit.
+- Only leaves act. Conditions only read, so going through the tree
+  every frame changes nothing by itself. What a monster notices, like
+  how long a hero has threatened it, the pack works out before the tree
+  runs.
+- A move with a warning or a fixed timing is a committed leaf: it runs
+  to its end without the tree being gone through, so a warning always
+  means what it says. Only an interrupt, like a blow, ends it early.
+  Walking somewhere isn't committed, so anything more urgent takes over.
+- Skill, from 0 to 1, makes a monster harder in two ways: `skilled()`
+  keeps branches for the better ones, so a harder monster knows more
+  tricks rather than being another monster, and leaves tune themselves
+  by it, like how fast they react. Whole trees are for another
+  character, not for being harder.
+- For now skill grows with the depth of the room, from 0 in the first
+  room to 1 in the deepest (`depthSkill()`), so a level gets harder as
+  the heroes go in, the same for the seed.
+
 ## Acid cuboid
 
 `monster/cuboids.ts`. Comes big, or at half the size.
@@ -169,6 +197,14 @@ them, so hazards and bosses can use it as well.
   nothing does.
 
 ## Planned
+
+- Skill from the threat level of [escalation](../dungeon/spawns.md#planned)
+  as well as the depth of the room.
+- Trees for the flying eye, soldiers and brutes: eyes moving to another
+  spot when a hero closes in and hiding when hurt, soldiers circling to
+  keep the shield toward a hero and waiting for each other, brutes
+  charging from afar.
+- Showing the path of the tree over a monster on a test page.
 
 - Monsters and meeples as simulation state: live ones are saved while
   their level is active. On reload unchanged inhabitants are regenerated,
