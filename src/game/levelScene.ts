@@ -54,6 +54,7 @@ import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
 import { loadFightSounds, playBlow, playHurt, ZipSounds } from "../sound/fightSounds"
 import BeamSounds from "../sound/beamSounds"
+import FireSounds from "../sound/fireSounds"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import GlowView from "../render/glowView"
@@ -407,6 +408,7 @@ export default class LevelScene
     private readonly pickUpSound = new EffectVoices(PICK_UP_SOUND, PICK_UP_VOICES, PICK_UP_GAP)
     private readonly zipSounds = new ZipSounds()
     private readonly beamSounds = new BeamSounds()
+    private readonly fireSounds = new FireSounds()
 
     /** null until the level is there */
     private level: DungeonLevel | null = null
@@ -1659,7 +1661,9 @@ export default class LevelScene
         this.beamSounds.update(this.wizards!.beams)
         this.beamCrowd!.update(this.wizards!.beams, (wizard, out) => this.wizardCrowd!.findTip(wizard, out), time, delta)
         this.sigilCrowd!.update(this.wizards!.sigils)
-        this.fireCrowd!.update([...this.wizards!.fire.drops, ...this.hazardFire.drops])
+        const fire = [...this.wizards!.fire.drops, ...this.hazardFire.drops]
+        this.fireSounds.update(fire)
+        this.fireCrowd!.update(fire)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
     }

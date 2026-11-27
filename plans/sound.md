@@ -75,6 +75,12 @@ travels along the room graph instead.
   sound onto itself at that length (`foldLoop()`) makes a loop without a
   seam. It is folded in the browser, as an mp3 loop would gap. Each beam
   starts somewhere else in the loop, so a group doesn't hum in step.
+- Rain of fire (`fire-strike`, from Freesound, `sound/fireSounds.ts`)
+  sounds for each drop, timed for the fireball to hit as the drop
+  strikes. A drop is only sure to strike once it falls, which leaves time
+  for the whoosh before. There is one recording, so each strike plays at
+  a random rate, lower ones bigger and higher ones smaller. Only a few
+  sound at once, as a ring of them would roar.
 - The burst of a monster that dies has no sound of its own, as the blow
   that killed it already said it and monsters die often.
 
@@ -90,4 +96,4 @@ travels along the room graph instead.
   sound (`meeple-death-*`), since they are rare enough to be dramatic.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
-- Spells: a strike of the rain of fire, the sigil drawing and flaring.
+- Spells: the sigil drawing and flaring.

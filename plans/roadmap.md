@@ -44,4 +44,4 @@ each file.
 - [Threats](threats.md): grudges, knowledge, search, bandits, none built
   yet.
 - [Economy](economy.md#planned): resources, facilities, consumers.
-- [Sound](sound.md#planned): group volumes, walking distance, death sounds, blows of monsters, spells.
+- [Sound](sound.md#planned): group volumes, walking distance, death sounds, blows of monsters, the sigil.
