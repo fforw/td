@@ -12,3 +12,7 @@ Gets copied to "docs/media/"
  * dungeon/: Stairs from [Mini Dungeon by Kenney](https://www.kenney.nl) (CC0), see dungeon/License.txt.
 
  * patterns/: Floor patterns from [Pattern Pack by Kenney](https://www.kenney.nl) (CC0), see patterns/License.txt.
+
+ * sounds/sword-on-*.mp3: Sword hits from Freesound (CC BY 4.0), trimmed and normalized; the originals are in media-src/freesound/.
+   * sword-on-wood: [Sword_Hit_Wood_1](https://freesound.org/people/gronnie/sounds/563173/) by gronnie
+   * sword-on-metal, sword-on-flesh, sword-on-armor: [Whoosh+Sword_Hit Metal](https://freesound.org/people/marb7e/sounds/620353/), [Flesh](https://freesound.org/people/marb7e/sounds/620354/) and [Armor](https://freesound.org/people/marb7e/sounds/620355/) by Patrick-Raul Babinsky (marb7e)
