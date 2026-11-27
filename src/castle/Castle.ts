@@ -69,12 +69,12 @@ function extendRing(ring: Set<Face>, all: Set<Face>): Set<Face>
     return outer
 }
 
-function findInRings(rings: Set<Face>[], f: Face): number
+function findInRings(rings: Set<Face>[], face: Face): number
 {
     for (let i = 0; i < rings.length; i++)
     {
         const ring = rings[i]
-        if (ring.has(f))
+        if (ring.has(face))
         {
             return i;
         }
@@ -358,10 +358,10 @@ function buildWallSegments(faces: Face[], wallFaces: Face[]): Face[][]
         const wallFace = wallFaces[i]
         if (!all.has(wallFace) && wallFace.type === FaceType.WALL)
         {
-            const s = followWall(wallFace, all, [])
-            if (s.length)
+            const wall = followWall(wallFace, all, [])
+            if (wall.length)
             {
-                segments.push(s)
+                segments.push(wall)
             }
         }
     }
@@ -580,26 +580,26 @@ export default class Castle
 
         moat.forEach(f => f.type = FaceType.GRASS)
 
-        const c = randomConnections()
-        if ((c & 1) !== 0)
+        const connections = randomConnections()
+        if ((connections & 1) !== 0)
         {
             //console.log("ROAD NORTH")
             const dir = new Vector(0,-1)
             constructRoad(center, dir, this.insideWall)
         }
-        if ((c & 2) !== 0)
+        if ((connections & 2) !== 0)
         {
             //console.log("ROAD EAST")
             const dir = new Vector(1,0)
             constructRoad(center, dir, this.insideWall)
         }
-        if ((c & 4) !== 0)
+        if ((connections & 4) !== 0)
         {
             //console.log("ROAD SOUTH")
             const dir = new Vector(0,1)
             constructRoad(center, dir, this.insideWall)
         }
-        if ((c & 8) !== 0)
+        if ((connections & 8) !== 0)
         {
             //console.log("ROAD WEST")
             const dir = new Vector(-1,0)
@@ -635,8 +635,8 @@ export default class Castle
 
         // and turn 3/4 of those into houses, the others into plots
         best.forEach(pc => {
-            let n = rng.next()
-            pc[0].type = n < 0.75 ? FaceType.HOUSE : FaceType.PLOT
+            let roll = rng.next()
+            pc[0].type = roll < 0.75 ? FaceType.HOUSE : FaceType.PLOT
         })
 
         // the house or plot closest to the market is the tavern

@@ -144,15 +144,15 @@ export function strokeProgress({ start, end }: SigilStroke, drawn: number): numb
  */
 export function sigilPhase(time: number, broken: number | null = null): SigilPhase
 {
-    const active = time - SIGIL_DRAW
-    const fade = Math.max(0, active - SIGIL_ACTIVE) / SIGIL_FADE
+    const sinceDrawn = time - SIGIL_DRAW
+    const fade = Math.max(0, sinceDrawn - SIGIL_ACTIVE) / SIGIL_FADE
     const opacity = time < 0 ? 0 : Math.max(0, 1 - fade - (broken ?? 0) / SIGIL_FADE)
     return {
         drawn: Math.max(0, Math.min(1, time / SIGIL_DRAW)),
         // falls off faster than it fades, so it can't be taken for one that still hurts
-        power: active < 0 ? 0 : opacity ** 3,
-        flash: active < 0 ? 0 : Math.max(0, 1 - active / FLASH),
+        power: sinceDrawn < 0 ? 0 : opacity ** 3,
+        flash: sinceDrawn < 0 ? 0 : Math.max(0, 1 - sinceDrawn / FLASH),
         opacity,
-        hurts: broken === null && active >= 0 && active < SIGIL_ACTIVE
+        hurts: broken === null && sinceDrawn >= 0 && sinceDrawn < SIGIL_ACTIVE
     }
 }

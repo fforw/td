@@ -482,10 +482,10 @@ export function createCastle(plan: CastlePlan): Group
     const group = new Group()
 
     plan.houses.forEach((house, index) => {
-        const obj = createHouse(house)
+        const house3d = createHouse(house)
         // lets clicks find out which house of the plan they hit
-        obj.userData.house = index
-        group.add(obj)
+        house3d.userData.house = index
+        group.add(house3d)
     })
 
     if (plan.tavern)

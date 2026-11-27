@@ -435,7 +435,7 @@ function fringeSprite(): Sprite
 }
 
 const WHITE = new Color(1, 1, 1)
-const tmp = new Vector3()
+const sparkVelocity = new Vector3()
 const direction = new Vector3()
 
 
@@ -683,9 +683,9 @@ export default class Beam
                     this.sparkDue--
                     lives[i] = SPARK_LIFE * (0.4 + Math.random() * 0.6)
                     // back towards the staff, spread out and up
-                    tmp.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).multiplyScalar(2)
+                    sparkVelocity.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).multiplyScalar(2)
                         .addScaledVector(direction, -1).normalize().multiplyScalar(SPARK_SPEED * width * (0.5 + Math.random()))
-                    velocities.set([tmp.x, tmp.y, tmp.z], i * 3)
+                    velocities.set([sparkVelocity.x, sparkVelocity.y, sparkVelocity.z], i * 3)
                     positions.set([to.x, to.y, to.z], i * 3)
                 }
                 else
