@@ -739,7 +739,7 @@ export default class LevelScene
                     brutes.add(spawn.kind, spawn.face, x, z)
                     break
                 case "soldier":
-                    soldiers.add(spawn.kind, spawn.face, x, z)
+                    soldiers.add(spawn.kind, spawn.face, x, z, depthSkill(depths, spawn.room))
                     break
                 case "wizard":
                     wizards.add(spawn.kind, spawn.face, x, z, depthSkill(depths, spawn.room))
