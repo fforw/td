@@ -67,6 +67,8 @@ export interface Monster extends FloorSpot
     /** speed it got from bumping into others, in world units per second */
     shoveX: number
     shoveZ: number
+    /** goes through everyone without bumping into them, as it would carry them along otherwise */
+    passing?: boolean
 }
 
 /**
@@ -456,9 +458,13 @@ export default class Monsters
         for (let i = 0; i < monsters.length; i++)
         {
             const a = monsters[i]
+            if (a.passing)
+            {
+                continue
+            }
             for (let j = i + 1; j < monsters.length; j++)
             {
-                if (inTheWay(a.kind, monsters[j].kind))
+                if (!monsters[j].passing && inTheWay(a.kind, monsters[j].kind))
                 {
                     bump(bodies[i], bodies[j])
                 }

@@ -13,7 +13,8 @@ noticing heroes, the sword arc, the hurt cooldown and bumping.
 
 - Monsters are big or small and walk or fly. Those on the same ground
   bump into each other, a flying one only into big ones on the ground and
-  into heroes, who count as big.
+  into heroes, who count as big. A monster that is passing, like a
+  construct zipping, bumps into nothing.
 - Bumping (`monster/shove.ts`) is circles on the floor that move out of
   each other by mass, the lighter one more, and trade momentum along the
   line between them, with a little bounce.
