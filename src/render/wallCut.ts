@@ -170,11 +170,19 @@ const MIN_INSIDE_REACH = 0.25
  */
 const INSIDE_STEPS = 24
 
+/**
+ * How much further than the floor under it the line of sight past the inside of a wall looks for floor, in world units.
+ * Where it comes down in the gap between the wall and the floor, at a slant to the wall, the floor can be further away
+ * than the gap is wide.
+ */
+const GAP_REACH = 0.5
+
 
 /**
  * Makes the material of the insides of thick walls only draw what hides other spaces than the open ones. Each fragment
  * follows its line of sight down to the floor, and makes way if it comes to an open space with no wall before that, or if
- * there is no floor at all. Floor of another space counts as open if an open space follows it straight on within the depth
+ * there is no floor at all. Coming down in the gap between the wall and the floor counts as the floor right past it.
+ * Floor of another space counts as open if an open space follows it straight on within the depth
  * of the cut, as the wall in front gets cut for both then. The walls on the way count as they would show, lit by the space
  * in front of them. What is seen
  * past a place of a wall depends on where the camera is, so nothing that is fixed to the geometry would do.
@@ -256,12 +264,32 @@ export function applyInsideCut(material: Material, { uniforms }: WallCut, { minX
                             other = true;
                         }
                     }
+                    vec2 end = vInside.xz + way;
+                    // down in the gap between the wall and the floor, which goes with the floor right past it
+                    vec2 on = way / reach * ${GAP_REACH.toFixed(3)};
+                    for (int i = 1; i <= ${INSIDE_STEPS} && !other; i++)
+                    {
+                        vec2 place = vInside.xz + way + on * float(i) / ${INSIDE_STEPS.toFixed(1)};
+                        vec2 cell = spaceCell(place);
+                        if (cell.r < -0.5)
+                        {
+                            break;
+                        }
+                        if (cell.r > 0.5)
+                        {
+                            if (isOpen(cell.r))
+                            {
+                                return true;
+                            }
+                            other = true;
+                            end = place;
+                        }
+                    }
                     if (!other)
                     {
                         return true;
                     }
                     // a strip of another space in front of an open one shows through the cut anyway, see thickWallSpaces()
-                    vec2 end = vInside.xz + way;
                     vec2 ahead = way / reach * ${THICK_WALL_CUT_DEPTH.toFixed(3)};
                     for (int i = 1; i <= ${INSIDE_STEPS}; i++)
                     {

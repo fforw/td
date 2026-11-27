@@ -57,6 +57,9 @@
   with an open one straight on within the depth of the cut, which shows
   through the cut anyway. The gap that thick walls keep from the floor
   doesn't count as wall, else lines of sight grazing it left slivers.
+  Coming down in that gap counts as the floor right past it. Taken as no
+  floor at all, it made holes where lines of sight met the wall at a
+  slant, with the room behind showing through.
   Fixed pieces for a view
   straight on left a third of the leaks, and black shards.
 - Sides with nothing in front that gets cut, or with no other space
