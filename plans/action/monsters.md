@@ -144,6 +144,10 @@ and reach to match.
 - They swing together, once all are in place, so the hero can't face
   them all. One that can't get there doesn't hold the others up for
   long (`CUE_WAIT_TIME`).
+- From `COVER_SKILL` up a flanking soldier that a hero faces raises its
+  shield once it saw that long enough, so the one the hero turns to is
+  covered and the others strike. It has to see the next blow coming
+  anew after that. Alone it doesn't, as it would never strike.
 - The walk splits by bone: the body walks on beneath a guard, while the
   arms give way to swinging and guarding. Each clip has only the bones
   its action moves, or a guard would hold the body still.

@@ -1,8 +1,8 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
 import { BLOCK_ANGLE } from "./eyes"
-import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, THREAT_RANGE, turnBetween, turnTo } from "./monsters"
-import { condition, leaf, memory, type Memory, selector, sequence, skilled, Tree } from "./behavior"
+import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, THREAT_RANGE, threatens, turnBetween, turnTo } from "./monsters"
+import { condition, leaf, memory, type Memory, reactionTime, selector, sequence, skilled, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -72,6 +72,11 @@ const CLOSE_IN = 0.8
  * Skill a soldier needs to flank a hero with others and swing together with them
  */
 export const FLANK_SKILL = 0.3
+
+/**
+ * Skill a soldier flanking a hero needs to take cover when the hero faces it, which leaves the strike to the others
+ */
+export const COVER_SKILL = 0.5
 
 /**
  * How far off its slot around a hero a soldier counts as in place, in radians, how far round it goes at a time while
@@ -155,6 +160,8 @@ export interface Soldier extends Monster
     inPlaceTime: number
     /** may swing, as all who flank its target with it are in place, or it waited long enough */
     onCue: boolean
+    /** seconds a hero has threatened it in a row */
+    threatTime: number
 }
 
 
@@ -195,6 +202,7 @@ export default class SoldierPack extends MonsterPack<Soldier>
             inPlace: false,
             inPlaceTime: 0,
             onCue: false,
+            threatTime: 0,
             flash: 0,
             shoveX: 0,
             shoveZ: 0
@@ -226,6 +234,7 @@ export default class SoldierPack extends MonsterPack<Soldier>
             {
                 soldier.target = null
             }
+            soldier.threatTime = prey && threatens(prey, soldier) ? soldier.threatTime + delta : 0
             return prey
         })
         this.assignSlots(heroes, delta)
@@ -520,6 +529,18 @@ interface SoldierContext
     delta: number
 }
 
+/**
+ * Raises the shield, and has it see the next blow coming anew
+ */
+const cover = leaf<Soldier, SoldierContext>("cover", {
+    tick: (soldier, { pack }) =>
+    {
+        pack.raiseGuard(soldier)
+        soldier.threatTime = 0
+        return "success"
+    }
+})
+
 const guard = leaf<Soldier, SoldierContext>("guard", {
     tick: (soldier, { pack, delta }) =>
     {
@@ -583,9 +604,17 @@ const wander = leaf<Soldier, SoldierContext>("wander", {
 /**
  * Soldiers guard for a while after each swing and when struck, go after heroes they saw and swing at them once in reach
  * with the shield down, and wander about otherwise. Skilled ones going after the same hero flank them from all sides and
- * swing together.
+ * swing together, and better ones take cover from the hero that faces them, while the others strike. Alone they don't, as
+ * they would never strike.
  */
 export const SOLDIER_TREE = new Tree<Soldier, SoldierContext>(selector("soldier",
+    sequence("take cover",
+        skilled(COVER_SKILL),
+        condition("has a partner", ({ slotAngle }) => slotAngle !== null),
+        condition("not guarding", ({ guarding }) => !guarding),
+        condition("threatened", ({ threatTime, skill }) => threatTime >= reactionTime(skill, COVER_SKILL)),
+        cover
+    ),
     sequence("guard", condition("guarding", ({ guarding }) => guarding), guard),
     sequence("fight",
         condition("hunting", ({ chase }) => chase > 0),

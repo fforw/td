@@ -6,6 +6,7 @@ import { blockTime } from "../../src/monster/SoldierCrowd"
 import SoldierPack, {
     CUE_WAIT_TIME,
     CUT_TIME,
+    FLANK_SKILL,
     GUARD_MAX,
     GUARD_MIN,
     LOWER_TIME,
@@ -246,7 +247,7 @@ describe("Soldiers together", () => {
     }
 
     it("flank a hero from opposite sides once skilled, and swing together", () => {
-        const { a, b, started } = fight(0.5)
+        const { a, b, started } = fight(FLANK_SKILL)
         assert.isBelow(Math.max(...started), Infinity)
         assert.isAtMost(Math.abs(started[0] - started[1]), 2 * FRAME)
         assert.isAtLeast(Math.abs(Math.atan2(Math.sin(angleOf(a) - angleOf(b)), Math.cos(angleOf(a) - angleOf(b)))), Math.PI - 2 * SLOT_ANGLE_TOLERANCE)
@@ -259,8 +260,34 @@ describe("Soldiers together", () => {
     })
 
     it("swing alone after a while when the other can't get to its place", () => {
-        const { started } = fight(0.5, { ...SOLDIER, speed: 0 })
+        const { started } = fight(FLANK_SKILL, { ...SOLDIER, speed: 0 })
         assert.isAtLeast(started[0], CUE_WAIT_TIME)
         assert.strictEqual(started[1], Infinity)
+    })
+
+    it("take cover from the hero that faces them once skilled, and leave the strike to the other", () => {
+        const soldiers = new SoldierPack(openFloor())
+        // the hero at the origin faces the one to the north, which sees it coming as they close in
+        const faced = soldiers.add(SOLDIER, 0, 0, SOLDIER.reach * 2, 1)
+        faced.yaw = Math.PI
+        const behind = soldiers.add(SOLDIER, 0, 0, -SOLDIER.reach * 2, 1)
+        behind.yaw = 0
+        let facedSwung = false, behindSwung = false
+        run(soldiers, 2, [prey()], () =>
+        {
+            facedSwung ||= faced.attack !== null
+            behindSwung ||= behind.attack !== null
+        })
+        assert.isTrue(behindSwung)
+        assert.isFalse(facedSwung)
+        assert.isTrue(faced.guarding)
+    })
+
+    it("don't take cover alone, as they would never strike", () => {
+        const soldiers = new SoldierPack(openFloor())
+        const soldier = soldiers.add(SOLDIER, 0, 0, SOLDIER.reach * 0.8, 1)
+        soldier.yaw = Math.PI
+        run(soldiers, 0.5, [prey()])
+        assert.isNotNull(soldier.attack)
     })
 })
