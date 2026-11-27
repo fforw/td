@@ -1,13 +1,13 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, HERO_RADIUS, MonsterPack, type Prey, turnBetween, turnTo } from "./monsters"
+import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, HERO_RADIUS, MonsterPack, type Prey, threatens, turnBetween, turnTo } from "./monsters"
 import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, beamPhase } from "../render/beamTiming"
 import { SIGIL_DRAW, sigilPhase } from "../render/sigilShape"
 import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./sigils"
 import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
 import { BLOCK_ANGLE } from "./eyes"
 import FireRain, { type FireFloor } from "./fireRain"
-import { condition, leaf, memory, type Memory, selector, sequence, skilled, Tree } from "./behavior"
+import { condition, leaf, memory, type Memory, reactionTime, selector, sequence, skilled, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -77,19 +77,6 @@ const WANDER_LENGTH = 0.6 * FIGURE_SCALE
  */
 export const BLOCK_SKILL = 0.25
 export const BACK_OFF_SKILL = 0.5
-
-/**
- * Seconds a hero has to threaten a wizard before it blocks, for the least skilled blocker and the best
- */
-export const REACTION_SLOW = 0.6
-export const REACTION_FAST = 0.15
-
-/**
- * How close a hero threatens a wizard, in world units, a bit beyond the reach of a sword, and how far off facing it in
- * radians
- */
-export const THREAT_RANGE = 0.9 * FIGURE_SCALE
-const THREAT_ANGLE = 0.6
 
 /**
  * Seconds it takes to raise the staff all the way and to lower it again, as in the block clip of the model
@@ -634,26 +621,6 @@ export default class WizardPack extends MonsterPack<Wizard>
 
 
 /**
- * Returns whether a hero is close to a wizard and faces it, ready to strike
- */
-export function threatens(hero: Prey, wizard: Wizard): boolean
-{
-    const dx = wizard.x - hero.x, dz = wizard.z - hero.z
-    return !hero.dodging && Math.hypot(dx, dz) <= THREAT_RANGE + wizard.kind.radius &&
-        Math.abs(turnBetween(hero.facing, Math.atan2(dx, dz))) <= THREAT_ANGLE
-}
-
-/**
- * Returns the seconds a hero has to threaten a wizard before it blocks, shorter the more skilled it is
- */
-export function reactionTime({ skill }: Wizard): number
-{
-    const share = Math.min(1, Math.max(0, (skill - BLOCK_SKILL) / (1 - BLOCK_SKILL)))
-    return REACTION_SLOW + (REACTION_FAST - REACTION_SLOW) * share
-}
-
-
-/**
  * What the wizard tree gets each frame
  */
 interface WizardContext
@@ -773,7 +740,7 @@ const wander = leaf<Wizard, WizardContext>("wander", {
 export const WIZARD_TREE = new Tree<Wizard, WizardContext>(selector("wizard",
     sequence("guard",
         skilled(BLOCK_SKILL),
-        condition("threatened", wizard => wizard.threatTime >= reactionTime(wizard)),
+        condition("threatened", ({ threatTime, skill }) => threatTime >= reactionTime(skill, BLOCK_SKILL)),
         block
     ),
     sequence("recover", condition("staff up", ({ staffRaise }) => staffRaise > 0), lower),

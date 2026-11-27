@@ -96,6 +96,23 @@ export function skilled<M extends Agent, C>(least: number): Condition<M, C>
     return condition(`skill ${least}`, ({ skill }) => skill >= least)
 }
 
+/**
+ * Seconds an agent takes to react, for the least skilled one that does and for the best
+ */
+export const REACTION_SLOW = 0.6
+export const REACTION_FAST = 0.15
+
+/**
+ * Returns the seconds an agent takes to react, shorter the more skilled it is
+ *
+ * @param least     skill at which it starts to react at all, with REACTION_SLOW
+ */
+export function reactionTime(skill: number, least: number): number
+{
+    const share = Math.min(1, Math.max(0, (skill - least) / (1 - least)))
+    return REACTION_SLOW + (REACTION_FAST - REACTION_SLOW) * share
+}
+
 export function selector<M extends Agent, C>(name: string, ...children: Node<M, C>[]): Composite<M, C>
 {
     return { type: "selector", name, children }

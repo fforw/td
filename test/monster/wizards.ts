@@ -1,8 +1,9 @@
 import { assert, describe, it } from "vitest"
 
-import type { Prey } from "../../src/monster/monsters"
+import { type Prey, THREAT_RANGE } from "../../src/monster/monsters"
 import { SIGIL_RADIUS } from "../../src/monster/sigils"
-import WizardPack, { BEAM_TURN, BEAM_TURN_RATE, BLUE_WIZARD, GUARD_MAX, PURPLE_WIZARD, reactionTime, RED_WIZARD, STAFF_STOMP, THREAT_RANGE, WIZARD, WIZARD_TREE, type Wizard, type WizardFloor, type WizardKind } from "../../src/monster/wizards"
+import WizardPack, { BEAM_TURN, BEAM_TURN_RATE, BLOCK_SKILL, BLUE_WIZARD, GUARD_MAX, PURPLE_WIZARD, RED_WIZARD, STAFF_STOMP, WIZARD, WIZARD_TREE, type Wizard, type WizardFloor, type WizardKind } from "../../src/monster/wizards"
+import { reactionTime } from "../../src/monster/behavior"
 import { SIGIL_DRAW } from "../../src/render/sigilShape"
 import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, BEAM_FIRE_TIME } from "../../src/render/beamTiming"
 import { FIRE_WARN } from "../../src/render/fireTiming"
@@ -246,7 +247,7 @@ describe("WizardPack", () => {
 
     it("blocks a hero that comes at it once skilled enough, sooner the more skilled", () => {
         const { pack, wizard, hero } = threatened(1)
-        run(pack, hero, reactionTime(wizard) + 0.6)
+        run(pack, hero, reactionTime(1, BLOCK_SKILL) + 0.6)
         assert.strictEqual(wizard.staffRaise, 1)
         assert.deepEqual(WIZARD_TREE.path(wizard), ["wizard", "guard", "block"])
 
@@ -254,12 +255,12 @@ describe("WizardPack", () => {
         run(novice.pack, novice.hero, 2)
         assert.strictEqual(novice.wizard.staffRaise, 0)
 
-        assert.isAbove(reactionTime({ ...wizard, skill: 0.3 }), reactionTime(wizard))
+        assert.isAbove(reactionTime(0.3, BLOCK_SKILL), reactionTime(1, BLOCK_SKILL))
     })
 
     it("stops blows from the front with the staff up, but not from behind", () => {
         const { pack, wizard, hero } = threatened(1)
-        run(pack, hero, reactionTime(wizard) + 0.6)
+        run(pack, hero, reactionTime(1, BLOCK_SKILL) + 0.6)
         assert.strictEqual(pack.strike(hero.x, hero.z, hero.facing, THREAT_RANGE, 2, 1), 1)
         assert.strictEqual(wizard.hp, WIZARD.hp)
 

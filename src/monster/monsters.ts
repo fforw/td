@@ -18,6 +18,13 @@ export const HERO_RADIUS = 0.09 * FIGURE_SCALE
  * How far a monster notices a hero in world units, and for how many seconds it goes on after losing sight of them
  */
 export const NOTICE_DISTANCE = 3 * FIGURE_SCALE
+
+/**
+ * How close a hero threatens a monster, in world units beyond its radius, a bit beyond the reach of a sword, and how far
+ * off facing it in radians
+ */
+export const THREAT_RANGE = 0.9 * FIGURE_SCALE
+const THREAT_ANGLE = 0.6
 export const CHASE_TIME = 3
 
 /**
@@ -146,6 +153,17 @@ export function turnBetween(from: number, to: number): number
 {
     const turn = to - from
     return Math.atan2(Math.sin(turn), Math.cos(turn))
+}
+
+/**
+ * Returns whether a hero is close to a monster and faces it, ready to strike. A sword blow lands too soon after the swing
+ * starts to react to it, so monsters that block have to go by this.
+ */
+export function threatens(hero: Prey, monster: Monster): boolean
+{
+    const dx = monster.x - hero.x, dz = monster.z - hero.z
+    return !hero.dodging && Math.hypot(dx, dz) <= THREAT_RANGE + monster.kind.radius &&
+        Math.abs(turnBetween(hero.facing, Math.atan2(dx, dz))) <= THREAT_ANGLE
 }
 
 /**
