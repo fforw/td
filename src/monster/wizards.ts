@@ -326,7 +326,7 @@ export default class WizardPack extends MonsterPack<Wizard>
             {
                 wizard.staff = Math.max(0, wizard.staff - delta / LOWER_TIME)
             }
-            WIZARD_TREE.tick(wizard, { pack: this, prey, delta })
+            WIZARD_TREE.tick(wizard, { pack: this, prey, deltaTime: delta })
         }
         this.updateBeams(delta, heroes)
     }
@@ -468,6 +468,8 @@ export default class WizardPack extends MonsterPack<Wizard>
     /**
      * Has a wizard go on with its spell, and turn with its beam or to where it casts
      *
+     * @param delta     seconds since the last frame
+     *
      * @return false once it is done
      */
     goOnCasting(wizard: Wizard, delta: number): boolean
@@ -547,6 +549,8 @@ export default class WizardPack extends MonsterPack<Wizard>
 
     /**
      * With nobody to go after, has a wizard look around now and then, and walk somewhere sometimes
+     *
+     * @param delta     seconds since the last frame
      */
     wander(wizard: Wizard, delta: number): void
     {
@@ -578,6 +582,8 @@ export default class WizardPack extends MonsterPack<Wizard>
     /**
      * Turns a wizard to its goal and walks it there, up to the given distance away
      *
+     * @param delta     seconds since the last frame
+     *
      * @return world units walked
      */
     walkTo(wizard: Wizard, stop: number, delta: number): number
@@ -600,6 +606,8 @@ export default class WizardPack extends MonsterPack<Wizard>
 
     /**
      * Walks a wizard backwards away from a hero while facing them, up to the distance it keeps
+     *
+     * @param delta     seconds since the last frame
      *
      * @return false once it is that far, or a wall is in the way
      */
@@ -653,15 +661,16 @@ interface WizardContext
     pack: WizardPack
     /** closest hero in sight */
     prey: Prey | null
-    delta: number
+    /** seconds since the last frame */
+    deltaTime: number
 }
 
 const cast = leaf<Wizard, WizardContext>("cast", {
     commits: true,
     start: (wizard, { pack, prey }) => pack.startCast(wizard, prey),
-    tick: (wizard, { pack, delta }) =>
+    tick: (wizard, { pack, deltaTime }) =>
     {
-        if (!pack.goOnCasting(wizard, delta))
+        if (!pack.goOnCasting(wizard, deltaTime))
         {
             return "success"
         }
@@ -669,11 +678,11 @@ const cast = leaf<Wizard, WizardContext>("cast", {
         if (casting?.beam)
         {
             const { age, until, spin } = casting.beam
-            wizard.yaw += age < until ? spin * BEAM_TURN_RATE * delta : 0
+            wizard.yaw += age < until ? spin * BEAM_TURN_RATE * deltaTime : 0
         }
         else if (casting)
         {
-            turnTo(wizard, casting.x, casting.z, TURN_RATE * delta)
+            turnTo(wizard, casting.x, casting.z, TURN_RATE * deltaTime)
         }
         return "running"
     },
@@ -691,16 +700,16 @@ const block = leaf<Wizard, WizardContext>("block", {
         wizard.guardTime = 0
         return true
     },
-    tick: (wizard, { prey, delta }) =>
+    tick: (wizard, { prey, deltaTime }) =>
     {
         if (prey)
         {
-            turnTo(wizard, prey.x, prey.z, GUARD_TURN_RATE * delta)
+            turnTo(wizard, prey.x, prey.z, GUARD_TURN_RATE * deltaTime)
         }
         if (wizard.guarding)
         {
-            wizard.guardTime += delta
-            wizard.staff = Math.min(1, wizard.staff + delta / RAISE_TIME)
+            wizard.guardTime += deltaTime
+            wizard.staff = Math.min(1, wizard.staff + deltaTime / RAISE_TIME)
             const threatened = prey !== null && threatens(prey, wizard)
             if (wizard.staff === 1 && wizard.guardTime >= GUARD_MIN && (!threatened || wizard.guardTime >= GUARD_MAX))
             {
@@ -734,7 +743,7 @@ const backOff = leaf<Wizard, WizardContext>("back off", {
         wizard.backing = true
         return true
     },
-    tick: (wizard, { pack, prey, delta }) => prey && pack.backOff(wizard, prey, delta) ? "running" : "success",
+    tick: (wizard, { pack, prey, deltaTime }) => prey && pack.backOff(wizard, prey, deltaTime) ? "running" : "success",
     stop: wizard =>
     {
         wizard.backing = false
@@ -742,17 +751,17 @@ const backOff = leaf<Wizard, WizardContext>("back off", {
 })
 
 const approach = leaf<Wizard, WizardContext>("approach", {
-    tick: (wizard, { pack, delta }) =>
+    tick: (wizard, { pack, deltaTime }) =>
     {
-        pack.walkTo(wizard, wizard.kind.keepAway, delta)
+        pack.walkTo(wizard, wizard.kind.keepAway, deltaTime)
         return "running"
     }
 })
 
 const wander = leaf<Wizard, WizardContext>("wander", {
-    tick: (wizard, { pack, delta }) =>
+    tick: (wizard, { pack, deltaTime }) =>
     {
-        pack.wander(wizard, delta)
+        pack.wander(wizard, deltaTime)
         return "running"
     }
 })
