@@ -81,6 +81,13 @@ travels along the room graph instead.
   leaves time for a whoosh before. There are only two recordings, so
   each strike also plays at a random rate, lower ones bigger and higher
   ones smaller. Only a few sound at once, as a ring of them would roar.
+- A sigil (`sound/sigilSounds.ts`) swishes for each line of its star
+  and for the circle around it (`sigil-stroke`), played quicker for the
+  short lines and a bit slower for the long circle, each loudest as its
+  stroke shoots to its end. The small circles are drawn at the same time
+  and stay silent, as they would blur the lines. It sounds a short siren
+  (`sigil-trigger`) as it flares up and starts to hurt. A broken sigil
+  goes quiet.
 - The burst of a monster that dies has no sound of its own, as the blow
   that killed it already said it and monsters die often.
 
@@ -96,4 +103,3 @@ travels along the room graph instead.
   sound (`meeple-death-*`), since they are rare enough to be dramatic.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
-- Spells: the sigil drawing and flaring.

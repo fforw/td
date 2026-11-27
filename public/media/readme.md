@@ -22,3 +22,7 @@ Gets copied to "docs/media/"
  * sounds/fire-strike-01.mp3: [SFX_MAGIC_FIREBALL_001](https://freesound.org/people/JoelAudio/sounds/77691/) by JoelAudio from Freesound (CC BY 4.0), trimmed; the original is in media-src/freesound/.
 
  * sounds/fire-strike-02.mp3: [Fire Magic](https://freesound.org/people/qubodup/sounds/442872/) by qubodup from Freesound (CC0); the original is in media-src/freesound/.
+
+ * sounds/sigil-stroke.mp3: [Sword_Fire01](https://freesound.org/people/SonoFxAudio/sounds/649361/) by SonoFxAudio from Freesound (CC BY 4.0); the original is in media-src/freesound/.
+
+ * sounds/sigil-trigger.mp3: [Abstract Siren](https://freesound.org/people/Zeraora/sounds/875686/) by Zeraora from Freesound (CC0), shortened; the original is in media-src/freesound/.
