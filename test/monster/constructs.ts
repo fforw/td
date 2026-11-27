@@ -109,6 +109,18 @@ describe("Constructs", () => {
         assert.closeTo(construct.toZ, -1.5, 1e-9)
     })
 
+    it("know when they pass through the hero", () => {
+
+        const [constructs, monsters] = setup()
+        const construct = ready(constructs, 0, 1.5)
+        const hero = prey()
+        monsters.update(FRAME, [hero])
+        assert.isAbove(construct.passTime, construct.zipDuration * 0.8)
+        run(monsters, construct.passTime - construct.zipTime, [prey(5, 5)])
+        assert(construct.zipping)
+        assert.closeTo(construct.z, 0, 0.1)
+    })
+
     it("creep at first and pass the hero late in the zip", () => {
 
         assert.isBelow(zipEase(0.5), 0.05)

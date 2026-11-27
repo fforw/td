@@ -101,6 +101,8 @@ export interface Construct extends Monster
     zipping: boolean
     zipTime: number
     zipDuration: number
+    /** seconds into its zip it passes through the hero */
+    passTime: number
     /** where the zip started and where it ends */
     fromX: number
     fromZ: number
@@ -127,6 +129,14 @@ export function zipEase(t: number): number
 export function zipDuration(length: number): number
 {
     return Math.max(ZIP_TIME, 5 * length / MAX_ZIP_SPEED)
+}
+
+/**
+ * Returns the share of its time a zip takes to get the given share of its way, the inverse of zipEase()
+ */
+export function zipEaseTime(share: number): number
+{
+    return Math.pow(share, 1 / 5)
 }
 
 
@@ -162,6 +172,7 @@ export default class ConstructPack extends MonsterPack<Construct>
             zipping: false,
             zipTime: 0,
             zipDuration: ZIP_TIME,
+            passTime: 0,
             fromX: x,
             fromZ: z,
             toX: x,
@@ -291,11 +302,13 @@ export default class ConstructPack extends MonsterPack<Construct>
             const toX = hero.x + dirX * behind, toZ = hero.z + dirZ * behind
             if (this.floor.sees(construct.x, construct.z, toX, toZ))
             {
+                const duration = zipDuration(distance + behind)
                 Object.assign(construct, {
                     zipping: true,
                     passing: true,
                     zipTime: 0,
-                    zipDuration: zipDuration(distance + behind),
+                    zipDuration: duration,
+                    passTime: duration * zipEaseTime(distance / (distance + behind)),
                     fromX: construct.x,
                     fromZ: construct.z,
                     toX,
