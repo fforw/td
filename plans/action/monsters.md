@@ -231,10 +231,8 @@ them, so hazards and bosses can use it as well.
 
 - Skill from the threat level of [escalation](../dungeon/spawns.md#planned)
   as well as the depth of the room.
-- Trees for the flying eye, soldiers and brutes: eyes moving to another
-  spot when a hero closes in and hiding when hurt, soldiers circling to
-  keep the shield toward a hero and waiting for each other, brutes
-  charging from afar.
+- Trees for the flying eye and brutes: eyes moving to another spot when
+  a hero closes in and hiding when hurt, brutes charging from afar.
 - Showing the path of the tree over a monster on a test page.
 
 - Monsters and meeples as simulation state: live ones are saved while
