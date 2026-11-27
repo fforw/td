@@ -126,11 +126,22 @@ describe("Soldiers", () => {
         assert(soldier.attack === null && soldier.guarding)
         assert.isAtLeast(soldier.guardLeft, GUARD_MIN - 2 * FRAME)
 
-        run(soldiers, GUARD_MAX + 0.05, [hero])
-        assert(!soldier.guarding)
-        assert(soldier.attack === null || soldier.shield === 0, "doesn't swing with the shield up")
-        run(soldiers, LOWER_TIME + 0.05, [hero])
-        assert(soldier.attack !== null)
+        // frame by frame, as how long it guards is random, and a short guard leaves time for the whole next swing
+        let guarded = 0
+        while (soldier.guarding)
+        {
+            run(soldiers, FRAME, [hero])
+            guarded += FRAME
+            assert.isAtMost(guarded, GUARD_MAX)
+        }
+        let lowered = 0
+        while (soldier.attack === null)
+        {
+            run(soldiers, FRAME, [hero])
+            lowered += FRAME
+            assert.isAtMost(lowered, LOWER_TIME + 0.05)
+        }
+        assert(soldier.shield === 0, "doesn't swing with the shield up")
     })
 
     it("stop blows from the front with the shield up", () => {
