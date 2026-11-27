@@ -5,7 +5,7 @@ import { animations } from "../render/scene3d"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
 import { SIGIL_HUE_RANGE } from "../render/sigil"
 import { beamCastTime } from "../render/beamTiming"
-import type { Robe, Wizard } from "./wizards"
+import { RAISE_TIME, type Robe, type Wizard } from "./wizards"
 
 /**
  * Seconds it takes to start and stop walking
@@ -42,6 +42,18 @@ interface Figure extends SkinnedFigure
     cast: AnimationAction
     /** how far it has started casting, from 0 to 1 */
     casting: number
+    block: AnimationAction
+}
+
+/**
+ * Returns the time into the block clip for how far up the staff of a wizard is: the first half raises it, the second half
+ * lowers it, and it holds in between for as long as the wizard guards. Lowering starts from as far up as the staff got.
+ *
+ * @param duration  length of the block clip in seconds
+ */
+export function staffTime({ guarding, staff }: Wizard, duration: number): number
+{
+    return guarding ? staff * RAISE_TIME : duration - staff * (duration - RAISE_TIME)
 }
 
 
@@ -115,8 +127,8 @@ export default class WizardCrowd
      */
     private pose(wizard: Wizard, figure: Figure, delta: number): void
     {
-        const { kind, x, z, yaw, walked, moving, casting, flash, chase } = wizard
-        const { root, mixer, walk, cast } = figure
+        const { kind, x, z, yaw, walked, moving, casting, staff, flash, chase } = wizard
+        const { root, mixer, walk, cast, block } = figure
 
         root.position.set(x, 0, z)
         root.rotation.y = yaw
@@ -126,7 +138,9 @@ export default class WizardCrowd
         const step = delta / FADE_TIME
         figure.walking = moving ? Math.min(1, figure.walking + step) : Math.max(0, figure.walking - step)
         walk.setEffectiveWeight(figure.walking)
-        walk.time = walked / kind.speed % walk.getClip().duration
+        const walkDuration = walk.getClip().duration
+        // backing off walks it backwards
+        walk.time = (walked / kind.speed % walkDuration + walkDuration) % walkDuration
 
         const castStep = delta / CAST_FADE_TIME
         figure.casting = casting ? Math.min(1, figure.casting + castStep) : Math.max(0, figure.casting - castStep)
@@ -136,6 +150,8 @@ export default class WizardCrowd
             const { age, beam } = casting
             cast.time = beam ? beamCastTime(age, beam.until) : Math.min(age, cast.getClip().duration)
         }
+        block.setEffectiveWeight(staff > 0 ? 1 : 0)
+        block.time = staffTime(wizard, block.getClip().duration)
         mixer.update(0)
 
         tintFigure(figure, flash, chase)
@@ -152,8 +168,8 @@ export default class WizardCrowd
         const figure = skinnedFigure("wizard", this.field, { Robe: color })
         const mixer = new AnimationMixer(figure.root)
 
-        // posed by hand, by the ground covered and by how far the spell is
-        const [walk, cast] = ["walk", robe === "purple" ? "cast-2" : "cast"].map(name => {
+        // posed by hand, by the ground covered, by how far the spell is and how far up the staff
+        const [walk, cast, block] = ["walk", robe === "purple" ? "cast-2" : "cast", "block"].map(name => {
             const action = mixer.clipAction(AnimationClip.findByName([...animations("wizard")], name)!)
             action.timeScale = 0
             action.setLoop(LoopOnce, 1)
@@ -162,6 +178,6 @@ export default class WizardCrowd
             action.play()
             return action
         })
-        return { ...figure, mixer, staff: figure.root.getObjectByName("Staff")!, walk, cast, walking: 0, casting: 0 }
+        return { ...figure, mixer, staff: figure.root.getObjectByName("Staff")!, walk, cast, block, walking: 0, casting: 0 }
     }
 }

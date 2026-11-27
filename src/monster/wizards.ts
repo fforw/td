@@ -1,13 +1,13 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
-import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, HERO_RADIUS, MonsterPack, type Prey, turnTo } from "./monsters"
+import { CHASE_TIME, type Monster, type MonsterFloor, type MonsterKind, HERO_RADIUS, MonsterPack, type Prey, turnBetween, turnTo } from "./monsters"
 import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, beamPhase } from "../render/beamTiming"
 import { SIGIL_DRAW, sigilPhase } from "../render/sigilShape"
 import { placeSigil, type SigilFloor, type SigilState, SIGIL_RADIUS } from "./sigils"
 import { FIRE_PATTERN_NAMES, FIRE_PATTERNS } from "./firePatterns"
 import { BLOCK_ANGLE } from "./eyes"
 import FireRain, { type FireFloor } from "./fireRain"
-import { brain, type Brain, condition, leaf, selector, sequence, Tree } from "./behavior"
+import { brain, type Brain, condition, leaf, selector, sequence, skilled, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -71,6 +71,51 @@ const LOOK_TIME = 0.25
  */
 const WANDER_CHANCE = 0.03
 const WANDER_LENGTH = 0.6 * FIGURE_SCALE
+
+/**
+ * Skill a wizard needs to block with its staff, and to back off from heroes that come too close
+ */
+export const BLOCK_SKILL = 0.25
+export const BACK_OFF_SKILL = 0.5
+
+/**
+ * Seconds a hero has to threaten a wizard before it blocks, for the least skilled blocker and the best
+ */
+export const REACTION_SLOW = 0.6
+export const REACTION_FAST = 0.15
+
+/**
+ * How close a hero threatens a wizard, in world units, a bit beyond the reach of a sword, and how far off facing it in
+ * radians
+ */
+export const THREAT_RANGE = 0.9 * FIGURE_SCALE
+const THREAT_ANGLE = 0.6
+
+/**
+ * Seconds it takes to raise the staff all the way and to lower it again, as in the block clip of the model
+ */
+export const RAISE_TIME = 0.5
+export const LOWER_TIME = 0.5
+
+/**
+ * How far up the staff has to be to stop a blow, from 0 down to 1 all the way up, and the width in radians of the arc
+ * in front that it covers
+ */
+export const STAFF_UP = 0.6
+export const STAFF_ARC = Math.PI * 0.6
+
+/**
+ * Seconds a wizard keeps its staff up at least, and at most while threatened, and how fast it turns meanwhile in radians
+ * per second, slow enough to get around it
+ */
+export const GUARD_MIN = 0.6
+export const GUARD_MAX = 2
+const GUARD_TURN_RATE = 1.5
+
+/**
+ * Share of the distance it keeps at which a wizard backs off, which it then does all the way
+ */
+const TOO_CLOSE = 0.6
 
 export interface WizardKind extends MonsterKind
 {
@@ -174,6 +219,16 @@ export interface Wizard extends Monster
     casting: Cast | null
     /** seconds until it may cast, which pass while it goes after someone */
     castWait: number
+    /** seconds a hero has threatened it in a row */
+    wary: number
+    /** how far up it holds the staff to block, from 0 to 1 */
+    staff: number
+    /** raising or holding the staff, lowering it otherwise */
+    guarding: boolean
+    /** seconds since it raised the staff */
+    guardTime: number
+    /** backing off from a hero too close */
+    backing: boolean
 }
 
 /**
@@ -231,6 +286,11 @@ export default class WizardPack extends MonsterPack<Wizard>
             hue: rng.next(),
             casting: null,
             castWait: rng.next(FIRST_WAIT_MIN, FIRST_WAIT_MAX),
+            wary: 0,
+            staff: 0,
+            guarding: false,
+            guardTime: 0,
+            backing: false,
             flash: 0,
             shoveX: 0,
             shoveZ: 0
@@ -261,6 +321,11 @@ export default class WizardPack extends MonsterPack<Wizard>
             {
                 wizard.castWait = Math.max(0, wizard.castWait - delta)
             }
+            wizard.wary = prey && threatens(prey, wizard) ? wizard.wary + delta : 0
+            if (!wizard.guarding)
+            {
+                wizard.staff = Math.max(0, wizard.staff - delta / LOWER_TIME)
+            }
             WIZARD_TREE.tick(wizard, { pack: this, prey, delta })
         }
         this.updateBeams(delta, heroes)
@@ -289,6 +354,11 @@ export default class WizardPack extends MonsterPack<Wizard>
             }
         }
         return damage
+    }
+
+    protected override stops({ yaw, staff }: Wizard, dx: number, dz: number): boolean
+    {
+        return staff >= STAFF_UP && Math.abs(turnBetween(yaw, Math.atan2(-dx, -dz))) <= STAFF_ARC / 2
     }
 
     protected struck(wizard: Wizard): void
@@ -527,6 +597,51 @@ export default class WizardPack extends MonsterPack<Wizard>
         wizard.moving = moved > 0
         return moved
     }
+
+    /**
+     * Walks a wizard backwards away from a hero while facing them, up to the distance it keeps
+     *
+     * @return false once it is that far, or a wall is in the way
+     */
+    backOff(wizard: Wizard, prey: Prey, delta: number): boolean
+    {
+        turnTo(wizard, prey.x, prey.z, TURN_RATE * delta)
+        const dx = wizard.x - prey.x, dz = wizard.z - prey.z
+        const distance = Math.hypot(dx, dz)
+        const step = wizard.kind.speed * delta
+        if (distance >= wizard.kind.keepAway || distance < 1e-6)
+        {
+            return false
+        }
+        const length = Math.min(step, wizard.kind.keepAway - distance)
+        const { x, z } = wizard
+        this.floor.move(wizard, dx / distance * length, dz / distance * length)
+        const moved = Math.hypot(wizard.x - x, wizard.z - z)
+        // the walk goes backwards
+        wizard.walked -= moved
+        wizard.moving = moved > 0
+        return moved >= length / 2
+    }
+}
+
+
+/**
+ * Returns whether a hero is close to a wizard and faces it, ready to strike
+ */
+export function threatens(hero: Prey, wizard: Wizard): boolean
+{
+    const dx = wizard.x - hero.x, dz = wizard.z - hero.z
+    return !hero.dodging && Math.hypot(dx, dz) <= THREAT_RANGE + wizard.kind.radius &&
+        Math.abs(turnBetween(hero.facing, Math.atan2(dx, dz))) <= THREAT_ANGLE
+}
+
+/**
+ * Returns the seconds a hero has to threaten a wizard before it blocks, shorter the more skilled it is
+ */
+export function reactionTime({ skill }: Wizard): number
+{
+    const share = Math.min(1, Math.max(0, (skill - BLOCK_SKILL) / (1 - BLOCK_SKILL)))
+    return REACTION_SLOW + (REACTION_FAST - REACTION_SLOW) * share
 }
 
 
@@ -565,6 +680,67 @@ const cast = leaf<Wizard, WizardContext>("cast", {
     stop: wizard => WizardPack.breakOff(wizard)
 })
 
+/**
+ * Raises the staff, holds it while threatened, but not for too long, and lowers it again
+ */
+const block = leaf<Wizard, WizardContext>("block", {
+    commits: true,
+    start: wizard =>
+    {
+        wizard.guarding = true
+        wizard.guardTime = 0
+        return true
+    },
+    tick: (wizard, { prey, delta }) =>
+    {
+        if (prey)
+        {
+            turnTo(wizard, prey.x, prey.z, GUARD_TURN_RATE * delta)
+        }
+        if (wizard.guarding)
+        {
+            wizard.guardTime += delta
+            wizard.staff = Math.min(1, wizard.staff + delta / RAISE_TIME)
+            const threatened = prey !== null && threatens(prey, wizard)
+            if (wizard.staff === 1 && wizard.guardTime >= GUARD_MIN && (!threatened || wizard.guardTime >= GUARD_MAX))
+            {
+                wizard.guarding = false
+            }
+            return "running"
+        }
+        // it has to see them coming anew, which is the way in
+        wizard.wary = 0
+        return wizard.staff > 0 ? "running" : "success"
+    },
+    stop: wizard =>
+    {
+        wizard.guarding = false
+    }
+})
+
+/**
+ * Waits for the staff to come down after a blow ended the block
+ */
+const lower = leaf<Wizard, WizardContext>("lower", {
+    tick: () => "running"
+})
+
+/**
+ * Not committed, so it can still block on the way
+ */
+const backOff = leaf<Wizard, WizardContext>("back off", {
+    start: wizard =>
+    {
+        wizard.backing = true
+        return true
+    },
+    tick: (wizard, { pack, prey, delta }) => prey && pack.backOff(wizard, prey, delta) ? "running" : "success",
+    stop: wizard =>
+    {
+        wizard.backing = false
+    }
+})
+
 const approach = leaf<Wizard, WizardContext>("approach", {
     tick: (wizard, { pack, delta }) =>
     {
@@ -582,13 +758,26 @@ const wander = leaf<Wizard, WizardContext>("wander", {
 })
 
 /**
- * Wizards go after heroes they saw and cast at them when they can, and wander about otherwise
+ * Wizards go after heroes they saw and cast at them when they can, and wander about otherwise. Skilled ones see a blow
+ * coming and block it with the staff, and better ones back off from heroes that come too close.
  */
 export const WIZARD_TREE = new Tree<Wizard, WizardContext>(selector("wizard",
+    sequence("guard",
+        skilled(BLOCK_SKILL),
+        condition("threatened", wizard => wizard.wary >= reactionTime(wizard)),
+        block
+    ),
+    sequence("recover", condition("staff up", ({ staff }) => staff > 0), lower),
     sequence("fight",
         condition("hunting", ({ chase }) => chase > 0),
-        selector("attack or close in",
+        selector("attack or keep away",
             sequence("spell", condition("ready", ({ castWait }, { prey }) => castWait === 0 && prey !== null), cast),
+            sequence("distance",
+                skilled(BACK_OFF_SKILL),
+                condition("too close", ({ x, z, kind, backing }, { prey }) =>
+                    prey !== null && Math.hypot(prey.x - x, prey.z - z) < kind.keepAway * (backing ? 1 : TOO_CLOSE)),
+                backOff
+            ),
             approach
         )
     ),

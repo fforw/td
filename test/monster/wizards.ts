@@ -2,7 +2,7 @@ import { assert, describe, it } from "vitest"
 
 import type { Prey } from "../../src/monster/monsters"
 import { SIGIL_RADIUS } from "../../src/monster/sigils"
-import WizardPack, { BEAM_TURN, BEAM_TURN_RATE, BLUE_WIZARD, PURPLE_WIZARD, RED_WIZARD, STAFF_STOMP, WIZARD, type Wizard, type WizardFloor, type WizardKind } from "../../src/monster/wizards"
+import WizardPack, { BEAM_TURN, BEAM_TURN_RATE, BLUE_WIZARD, GUARD_MAX, PURPLE_WIZARD, reactionTime, RED_WIZARD, STAFF_STOMP, THREAT_RANGE, WIZARD, WIZARD_TREE, type Wizard, type WizardFloor, type WizardKind } from "../../src/monster/wizards"
 import { SIGIL_DRAW } from "../../src/render/sigilShape"
 import { BEAM_CAST_END, BEAM_FADE_TIME, BEAM_FIRE, BEAM_FIRE_TIME } from "../../src/render/beamTiming"
 import { FIRE_WARN } from "../../src/render/fireTiming"
@@ -224,4 +224,82 @@ describe("WizardPack", () => {
             assert.isEmpty(pack.beams)
         })
     }
+
+    /** a wizard of the given skill at the origin facing a hero that comes at it from the east, close enough to strike */
+    function threatened(skill: number): { pack: WizardPack, wizard: Wizard, hero: Prey }
+    {
+        const pack = new WizardPack(openFloor())
+        const wizard = pack.add(BLUE_WIZARD, 0, 0, 0, skill)
+        wizard.castWait = Infinity
+        wizard.yaw = Math.PI / 2
+        const hero = { ...prey(THREAT_RANGE * 0.8, 0), facing: -Math.PI / 2 }
+        return { pack, wizard, hero }
+    }
+
+    function run(pack: WizardPack, hero: Prey, seconds: number): void
+    {
+        for (let t = 0; t < seconds; t += FRAME)
+        {
+            pack.update(FRAME, [hero])
+        }
+    }
+
+    it("blocks a hero that comes at it once skilled enough, sooner the more skilled", () => {
+        const { pack, wizard, hero } = threatened(1)
+        run(pack, hero, reactionTime(wizard) + 0.6)
+        assert.strictEqual(wizard.staff, 1)
+        assert.deepEqual(WIZARD_TREE.path(wizard), ["wizard", "guard", "block"])
+
+        const novice = threatened(0)
+        run(novice.pack, novice.hero, 2)
+        assert.strictEqual(novice.wizard.staff, 0)
+
+        assert.isAbove(reactionTime({ ...wizard, skill: 0.3 }), reactionTime(wizard))
+    })
+
+    it("stops blows from the front with the staff up, but not from behind", () => {
+        const { pack, wizard, hero } = threatened(1)
+        run(pack, hero, reactionTime(wizard) + 0.6)
+        assert.strictEqual(pack.strike(hero.x, hero.z, hero.facing, THREAT_RANGE, 2, 1), 1)
+        assert.strictEqual(wizard.hp, WIZARD.hp)
+
+        pack.strike(-hero.x, hero.z, -hero.facing, THREAT_RANGE, 2, 1)
+        assert.strictEqual(wizard.hp, WIZARD.hp - 1)
+        assert.isFalse(wizard.guarding)
+    })
+
+    it("lowers the staff after a while, and has to see the next blow coming anew", () => {
+        const { pack, wizard, hero } = threatened(0.5)
+        let lowered = false, raisedAgain = false
+        for (let t = 0; t < GUARD_MAX + 3; t += FRAME)
+        {
+            pack.update(FRAME, [hero])
+            lowered ||= wizard.staff === 0 && t > GUARD_MAX
+            raisedAgain ||= lowered && wizard.staff > 0
+        }
+        assert.isTrue(raisedAgain)
+    })
+
+    it("backs off from a hero too close once skilled enough, facing them", () => {
+        for (const [skill, backs] of [[0.6, true], [0, false]] as const)
+        {
+            const pack = new WizardPack(openFloor())
+            const wizard = pack.add(BLUE_WIZARD, 0, 0, 0, skill)
+            wizard.castWait = Infinity
+            // facing away, so it doesn't block
+            const hero = { ...prey(WIZARD.keepAway * 0.4, 0), facing: Math.PI / 2 }
+            run(pack, hero, 4)
+            const distance = Math.hypot(hero.x - wizard.x, hero.z - wizard.z)
+            if (backs)
+            {
+                assert.closeTo(distance, WIZARD.keepAway, 1e-6)
+                assert.isBelow(wizard.walked, 0)
+                assert.closeTo(wizard.yaw % (Math.PI * 2), Math.PI / 2, 0.01)
+            }
+            else
+            {
+                assert.closeTo(distance, WIZARD.keepAway * 0.4, 1e-9)
+            }
+        }
+    })
 })

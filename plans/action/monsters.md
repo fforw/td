@@ -149,7 +149,22 @@ at a distance (`CAST_RANGE`).
 - The robe of the model is a gradient from white to grey, which
   `WizardCrowd` tints (`ROBE_COLORS`). The face in the hood is dark with
   glowing eyes, which the light field leaves alone.
-- The model has only the soldier's walk and casts.
+- The model has the soldier's walk, the casts and a block.
+- From `BLOCK_SKILL` up it sees blows coming: a hero close by who faces
+  it threatens it, and once that lasted its reaction time, shorter the
+  more skilled it is, it raises the staff. A sword blow strikes too
+  soon after the swing starts to react to it, so the block has to come
+  first.
+- With the staff up far enough a blow from the front does nothing, as
+  with the soldier's shield. It turns slowly while it guards, so the way
+  in is around it. It holds the staff for a while, longer while still
+  threatened but not for long, and has to see the next blow coming
+  anew after lowering it, which leaves a gap. It doesn't cast with the
+  staff up.
+- From `BACK_OFF_SKILL` up it backs off from a hero that comes well
+  within the distance it keeps, walking backwards while facing them,
+  until it is that far again. Backing off isn't committed, so it can
+  still block on the way.
 
 ## Beam
 
