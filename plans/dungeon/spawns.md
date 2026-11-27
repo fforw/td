@@ -23,8 +23,9 @@
 ## Groups
 
 - The groups (`SPAWN_GROUPS`) are single kinds for now: a big cuboid,
-  small cuboids, an eye, a pair of eyes, a brute, soldiers, and wizards,
-  either a blue one, a red one or a group of purple ones.
+  small cuboids, an eye, a pair of eyes, a construct, a pair of
+  constructs, a brute, soldiers, and wizards, either a blue one, a red
+  one or a group of purple ones.
 - A fixed share of the open rooms is taken.
 
 ## Planned

@@ -29,6 +29,8 @@ import BurstCrowd from "../monster/BurstCrowd"
 import Bursts from "../monster/bursts"
 import BrutePack from "../monster/brutes"
 import CuboidCrowd from "../monster/CuboidCrowd"
+import ConstructCrowd from "../monster/ConstructCrowd"
+import ConstructPack from "../monster/constructs"
 import EyeCrowd from "../monster/EyeCrowd"
 import EyePack from "../monster/eyes"
 import CuboidPack, { BIG_CUBOID, mostCuboids } from "../monster/cuboids"
@@ -415,6 +417,8 @@ export default class LevelScene
     private cuboidCrowd: CuboidCrowd | null = null
     private eyes: EyePack | null = null
     private eyeCrowd: EyeCrowd | null = null
+    private constructs: ConstructPack | null = null
+    private constructCrowd: ConstructCrowd | null = null
     private brutes: BrutePack | null = null
     private bruteCrowd: BruteCrowd | null = null
     private soldiers: SoldierPack | null = null
@@ -544,7 +548,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "brute", "soldier", "wizard", "switch", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "construct", "brute", "soldier", "wizard", "switch", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -709,6 +713,7 @@ export default class LevelScene
 
         const cuboids = new CuboidPack(floor)
         const eyes = new EyePack(floor)
+        const constructs = new ConstructPack(floor)
         const brutes = new BrutePack(floor)
         const soldiers = new SoldierPack(floor)
         const wizards = new WizardPack({
@@ -727,6 +732,9 @@ export default class LevelScene
                 case "eye":
                     eyes.add(spawn.kind, spawn.face, x, z)
                     break
+                case "construct":
+                    constructs.add(spawn.kind, spawn.face, x, z)
+                    break
                 case "brute":
                     brutes.add(spawn.kind, spawn.face, x, z)
                     break
@@ -741,18 +749,21 @@ export default class LevelScene
 
         const cuboidCrowd = new CuboidCrowd(mostCuboids(spawns.flatMap(spawn => spawn.species === "cuboid" ? [spawn.kind] : [])), field)
         const eyeCrowd = new EyeCrowd(spawns.filter(({ species }) => species === "eye").length, field)
+        const constructCrowd = new ConstructCrowd(spawns.filter(({ species }) => species === "construct").length, field)
         const bruteCrowd = new BruteCrowd(field)
         const soldierCrowd = new SoldierCrowd(field)
         const wizardCrowd = new WizardCrowd(field)
         const beamCrowd = new BeamCrowd(wizards.members.filter(({ kind }) => kind.robe === "purple").length)
         const sigilCrowd = new SigilCrowd()
         const fireCrowd = new FireRainCrowd()
-        this.scene.add(cuboidCrowd.group, eyeCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group,
+        this.scene.add(cuboidCrowd.group, eyeCrowd.group, constructCrowd.group, bruteCrowd.group, soldierCrowd.group, wizardCrowd.group, sigilCrowd.group,
             fireCrowd.group, beamCrowd.group)
         this.cuboids = cuboids
         this.cuboidCrowd = cuboidCrowd
         this.eyes = eyes
         this.eyeCrowd = eyeCrowd
+        this.constructs = constructs
+        this.constructCrowd = constructCrowd
         this.brutes = brutes
         this.bruteCrowd = bruteCrowd
         this.soldiers = soldiers
@@ -763,7 +774,7 @@ export default class LevelScene
         this.sigilCrowd = sigilCrowd
         this.fireCrowd = fireCrowd
 
-        this.monsters = new Monsters([cuboids, eyes, brutes, soldiers, wizards], floor, [this.hazardFire])
+        this.monsters = new Monsters([cuboids, eyes, constructs, brutes, soldiers, wizards], floor, [this.hazardFire])
         const burstCrowd = new BurstCrowd(field)
         this.scene.add(burstCrowd.mesh)
         this.burstCrowd = burstCrowd
@@ -1598,6 +1609,7 @@ export default class LevelScene
         this.cuboidCrowd!.update(this.cuboids!.members, time)
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
+        this.constructCrowd!.update(this.constructs!.members, time)
 
         const { bursts } = this
         const deaths = monsters.packs.flatMap(pack => pack.deaths.splice(0))
@@ -1838,8 +1850,8 @@ export default class LevelScene
      */
     private glowing(): boolean
     {
-        const { wizards, beamCrowd, hazardFire } = this
-        return hazardFire.drops.length > 0 || !!wizards && (wizards.fire.drops.length > 0 || wizards.sigils.length > 0) || !!beamCrowd?.visible
+        const { wizards, constructs, beamCrowd, hazardFire } = this
+        return hazardFire.drops.length > 0 || !!constructs && constructs.members.length > 0 || !!wizards && (wizards.fire.drops.length > 0 || wizards.sigils.length > 0) || !!beamCrowd?.visible
     }
 
     /**

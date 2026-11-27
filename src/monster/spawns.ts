@@ -1,5 +1,6 @@
 import type Prando from "prando"
 import { BRUTE, type BruteKind } from "./brutes"
+import { CONSTRUCT, type ConstructKind } from "./constructs"
 import { BIG_CUBOID, type CuboidKind, SMALL_CUBOID } from "./cuboids"
 import { type EyeKind, FLYING_EYE } from "./eyes"
 import { SOLDIER, type SoldierKind } from "./soldiers"
@@ -12,6 +13,7 @@ export interface SpeciesKinds
 {
     cuboid: CuboidKind
     eye: EyeKind
+    construct: ConstructKind
     brute: BruteKind
     soldier: SoldierKind
     wizard: WizardKind
@@ -76,6 +78,8 @@ export const SPAWN_GROUPS: readonly SpawnGroup[] = [
     { name: "small cuboids", weight: 15, members: [{ species: "cuboid", kind: SMALL_CUBOID, min: 1, max: 3 }] },
     { name: "eye", weight: 7.5, members: [{ species: "eye", kind: FLYING_EYE, min: 1, max: 1 }] },
     { name: "eye pair", weight: 2.5, members: [{ species: "eye", kind: FLYING_EYE, min: 2, max: 2 }] },
+    { name: "construct", weight: 5, members: [{ species: "construct", kind: CONSTRUCT, min: 1, max: 1 }] },
+    { name: "construct pair", weight: 1.5, members: [{ species: "construct", kind: CONSTRUCT, min: 2, max: 2 }] },
     { name: "brute", weight: 8, members: [{ species: "brute", kind: BRUTE, min: 1, max: 1 }] },
     { name: "soldiers", weight: 8, members: [{ species: "soldier", kind: SOLDIER, min: 1, max: 2 }] },
     { name: "blue wizard", weight: 2, members: [{ species: "wizard", kind: BLUE_WIZARD, min: 1, max: 1 }] },
