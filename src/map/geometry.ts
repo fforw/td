@@ -235,15 +235,10 @@ export class Face
     halfEdge: HalfEdge;
 
     /**
-     * Type of the data
+     * Type of the face
      */
     type: FaceType = rng.nextArrayItem(DEFAULT_TYPES);
 
-    /**
-     * Type dependent user data
-     */
-    data: unknown = null
-    
     constructor(halfEdge: HalfEdge | null)
     {
         this.halfEdge = halfEdge!;
