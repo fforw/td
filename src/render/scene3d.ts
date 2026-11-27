@@ -58,6 +58,7 @@ export const MODELS = {
 
     acidCuboid: "monster/acid-cuboid.glb",
     brute: "monster/brute.glb",
+    construct: "monster/construct.glb",
     flyingEye: "monster/flying-eye.glb",
     soldier: "monster/soldier.glb",
     wizard: "monster/wizard.glb",
