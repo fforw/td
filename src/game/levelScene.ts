@@ -53,6 +53,7 @@ import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
 import { loadFightSounds, playBlow, playHurt, ZipSounds } from "../sound/fightSounds"
+import BeamSounds from "../sound/beamSounds"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import GlowView from "../render/glowView"
@@ -405,6 +406,7 @@ export default class LevelScene
     private readonly listening = new AbortController()
     private readonly pickUpSound = new EffectVoices(PICK_UP_SOUND, PICK_UP_VOICES, PICK_UP_GAP)
     private readonly zipSounds = new ZipSounds()
+    private readonly beamSounds = new BeamSounds()
 
     /** null until the level is there */
     private level: DungeonLevel | null = null
@@ -1654,6 +1656,7 @@ export default class LevelScene
         this.bruteCrowd!.update(this.brutes!.members, deaths, bursts, delta)
         this.soldierCrowd!.update(this.soldiers!.members, delta)
         this.wizardCrowd!.update(this.wizards!.members, delta)
+        this.beamSounds.update(this.wizards!.beams)
         this.beamCrowd!.update(this.wizards!.beams, (wizard, out) => this.wizardCrowd!.findTip(wizard, out), time, delta)
         this.sigilCrowd!.update(this.wizards!.sigils)
         this.fireCrowd!.update([...this.wizards!.fire.drops, ...this.hazardFire.drops])
@@ -1847,6 +1850,8 @@ export default class LevelScene
         if (!running)
         {
             this.keys.release()
+            // the drones start again with the next frame
+            this.beamSounds.stop()
         }
         this.sound?.setRunning(running)
         this.lastFrame = performance.now() / 1000

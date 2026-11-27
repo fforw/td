@@ -68,6 +68,13 @@ travels along the room graph instead.
   which suits the small figures. Every sound strays a little in rate,
   and of the numbered variants the one before is never picked again, so
   a long fight doesn't repeat itself.
+- A beam hums (`beam-energy`, from Freesound) from when the staff starts
+  to charge, quietly as a warning, at full while it fires, and fades with
+  it. The hum is the sound starting over every 2 seconds on top of
+  itself, which repeats exactly once all copies overlap, so folding the
+  sound onto itself at that length (`foldLoop()`) makes a loop without a
+  seam. It is folded in the browser, as an mp3 loop would gap. Each beam
+  starts somewhere else in the loop, so a group doesn't hum in step.
 - The burst of a monster that dies has no sound of its own, as the blow
   that killed it already said it and monsters die often.
 
@@ -83,5 +90,4 @@ travels along the room graph instead.
   sound (`meeple-death-*`), since they are rare enough to be dramatic.
 - Blows of monsters: the soldier's sword on a hero's shield (wood) and
   through the air, the brute's club.
-- Spells: a strike of the rain of fire, the sigil drawing and flaring,
-  and a hum that loops while a beam is on.
+- Spells: a strike of the rain of fire, the sigil drawing and flaring.

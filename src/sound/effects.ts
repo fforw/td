@@ -122,3 +122,90 @@ export class EffectVoices
         })
     }
 }
+
+/**
+ * Loudest sample of a folded loop
+ */
+const LOOP_PEAK = 0.9
+
+/**
+ * Returns a loop that sounds like the given sound starting over at an even interval, each start on top of those still
+ * ringing. Once all of them overlap that repeats with the interval, so folding the sound onto itself at that length makes
+ * a loop without a seam. The loop is scaled for its loudest sample to stay below 1.
+ *
+ * @param buffer    the sound
+ * @param period    seconds between the starts, and length of the loop
+ */
+export function foldLoop(buffer: AudioBuffer, period: number): AudioBuffer
+{
+    const { numberOfChannels, sampleRate } = buffer
+    const length = Math.round(period * sampleRate)
+    const loop = new AudioBuffer({ numberOfChannels, length, sampleRate })
+    let peak = 0
+    for (let channel = 0; channel < numberOfChannels; channel++)
+    {
+        const from = buffer.getChannelData(channel)
+        const to = loop.getChannelData(channel)
+        for (let i = 0; i < from.length; i++)
+        {
+            to[i % length] += from[i]
+        }
+        for (const sample of to)
+        {
+            peak = Math.max(peak, Math.abs(sample))
+        }
+    }
+    if (peak > LOOP_PEAK)
+    {
+        for (let channel = 0; channel < numberOfChannels; channel++)
+        {
+            const to = loop.getChannelData(channel)
+            for (let i = 0; i < length; i++)
+            {
+                to[i] *= LOOP_PEAK / peak
+            }
+        }
+    }
+    return loop
+}
+
+/**
+ * Seconds a loop takes to follow a change of its volume, short enough to keep up and long enough not to click
+ */
+const LOOP_SMOOTHING = 0.03
+
+/**
+ * Plays a sound over and over through the effects of the mixer, at a volume that can change while it plays, until it is
+ * stopped
+ */
+export class EffectLoop
+{
+    private readonly source: AudioBufferSourceNode
+    private readonly gain: GainNode
+
+    /**
+     * @param buffer    the loop
+     * @param volume    gain it starts at
+     * @param offset    seconds into the loop it starts at, for loops of the same sound not to play in step
+     */
+    constructor(buffer: AudioBuffer, volume: number, offset = 0)
+    {
+        const { context } = mixer()
+        this.gain = new GainNode(context, { gain: volume })
+        this.source = new AudioBufferSourceNode(context, { buffer, loop: true })
+        this.source.connect(this.gain).connect(mixer().input("effects"))
+        this.source.start(context.currentTime, offset % buffer.duration)
+    }
+
+    set volume(volume: number)
+    {
+        this.gain.gain.setTargetAtTime(volume, mixer().context.currentTime, LOOP_SMOOTHING)
+    }
+
+    stop(): void
+    {
+        this.source.stop()
+        this.source.disconnect()
+        this.gain.disconnect()
+    }
+}
