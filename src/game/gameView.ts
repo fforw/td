@@ -661,8 +661,8 @@ export default class GameView implements PadTarget
     private openLevelMap(): void
     {
         const { levelMap, levelMapPopup } = this
-        const state = this.viewedLevelJob() && !this.inFight() ? this.level?.mapState() : null
-        if (!levelMap || !state)
+        const mapState = this.viewedLevelJob() && !this.inFight() ? this.level?.mapState() : null
+        if (!levelMap || !mapState)
         {
             return
         }
@@ -691,7 +691,7 @@ export default class GameView implements PadTarget
         const { clientWidth, clientHeight } = levelMapPopup
         const { paddingLeft, paddingRight, paddingTop, paddingBottom } = getComputedStyle(levelMapPopup)
         levelMap.update(
-            state,
+            mapState,
             clientWidth - parseFloat(paddingLeft) - parseFloat(paddingRight),
             clientHeight - parseFloat(paddingTop) - parseFloat(paddingBottom)
         )
@@ -785,15 +785,15 @@ export default class GameView implements PadTarget
             const hero = campaign.heroes.find(h => h.id === heroId)!
             if (returning)
             {
-                const result = hero.name + " is back at " + campaign.castleName + (gold ? " with 🪙 " + gold : "")
-                this.reports.unshift("Day " + campaign.day + ": " + result)
+                const report = hero.name + " is back at " + campaign.castleName + (gold ? " with 🪙 " + gold : "")
+                this.reports.unshift("Day " + campaign.day + ": " + report)
                 if (heroId === following)
                 {
                     this.follow(null)
                 }
                 else
                 {
-                    this.news.unshift("🛡️ " + result)
+                    this.news.unshift("🛡️ " + report)
                 }
                 continue
             }

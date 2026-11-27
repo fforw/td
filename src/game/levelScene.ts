@@ -1558,9 +1558,8 @@ export default class LevelScene
      */
     private jumpTargets(hero: ShownHero): LevelMapState["rooms"]
     {
-        const at = hero.face
         // TEMP god mode: every room once the map is revealed
-        return jumpTargets(this.meshes!.world, this.level!.rooms, this.revealed ? EVERYWHERE : this.exploration!, at)
+        return jumpTargets(this.meshes!.world, this.level!.rooms, this.revealed ? EVERYWHERE : this.exploration!, hero.face)
     }
 
     /**

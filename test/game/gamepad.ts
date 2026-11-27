@@ -95,7 +95,7 @@ describe("Reading a controller", () => {
         assert.isNull(input.direction)
         assert.equal(input.lookX, 0)
         assert.equal(input.lookY, 0)
-        assert.isFalse(input.active)
+        assert.isFalse(input.inUse)
     })
 
     it("counts the right stick and the triggers as being used", () => {
@@ -103,18 +103,18 @@ describe("Reading a controller", () => {
         const look = readPad(pad([], [0, 0, 0.6, -0.4]))
         assert.equal(look.lookX, 0.6)
         assert.equal(look.lookY, -0.4)
-        assert.isTrue(look.active)
+        assert.isTrue(look.inUse)
 
         assert.equal(readPad(pad([7])).zoom, 1)
         assert.equal(readPad(pad([6])).zoom, -1)
-        assert.isTrue(readPad(pad([6])).active)
+        assert.isTrue(readPad(pad([6])).inUse)
     })
 
     it("reads the sticks for moving from the dead zone to the rim, in any direction", () => {
 
         assert.equal(readPad(pad([], [0.15, 0, 0, 0])).moveX, 0)
         assert.closeTo(readPad(pad([], [0.6, 0, 0, 0])).moveX, 0.5, 1e-9)
-        assert.isTrue(readPad(pad([], [0.3, 0, 0, 0])).active)
+        assert.isTrue(readPad(pad([], [0.3, 0, 0, 0])).inUse)
 
         const { moveX, moveY } = readPad(pad([], [-1, 1, 0, 0]))
         assert.closeTo(Math.hypot(moveX, moveY), 1, 1e-9)
@@ -133,7 +133,7 @@ describe("Reading a controller", () => {
 
         const dash = readPad(pad([4]))
         assert.isTrue(dash.dash)
-        assert.isTrue(dash.active)
+        assert.isTrue(dash.inUse)
         assert.isTrue(readPad(pad([5])).attack)
         assert.isTrue(readPad(pad([6])).block)
         assert.isFalse(readPad(pad([7])).block)

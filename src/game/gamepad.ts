@@ -27,7 +27,7 @@ export interface PadInput
 {
     scheme: Scheme
     /** something is deliberately being used, which leaves out the noise of a resting stick */
-    active: boolean
+    inUse: boolean
     actions: PadAction[]
     direction: Direction | null
     /** right stick */
@@ -315,7 +315,7 @@ export function readPad(pad: PadState): PadInput
     const block = left >= TRIGGER_PRESS
     return {
         scheme,
-        active: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom || !!moveX || !!moveY || dash || attack,
+        inUse: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom || !!moveX || !!moveY || dash || attack,
         actions,
         direction,
         lookX,

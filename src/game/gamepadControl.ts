@@ -113,7 +113,7 @@ export default class GamepadControl
     private readonly trackers = new Map<number, PadTracker>()
 
     private target: PadTarget | null = null
-    private active = false
+    private padMode = false
     private running = false
     private scheme: Scheme = "xbox"
     private lastTime = 0
@@ -140,7 +140,7 @@ export default class GamepadControl
         const handOver = (ev: Event) => {
             if (!(ev instanceof PointerEvent) || ev.type !== "pointermove" || ev.movementX || ev.movementY)
             {
-                this.setActive(false)
+                this.switchPadMode(false)
             }
         }
         // ahead of the handlers of the things on the screen, for them to see the mode they work in
@@ -157,7 +157,7 @@ export default class GamepadControl
     setTarget(target: PadTarget): void
     {
         this.target = target
-        target.setPadMode?.(this.active)
+        target.setPadMode?.(this.padMode)
     }
 
     private start(): void
@@ -179,15 +179,15 @@ export default class GamepadControl
         return (navigator.getGamepads?.() ?? []).filter(pad => pad?.connected) as Gamepad[]
     }
 
-    private setActive(active: boolean): void
+    private switchPadMode(padMode: boolean): void
     {
-        if (active !== this.active)
+        if (padMode !== this.padMode)
         {
-            this.active = active
-            document.body.classList.toggle("gamepad", active)
-            this.bar.hidden = !active
+            this.padMode = padMode
+            document.body.classList.toggle("gamepad", padMode)
+            this.bar.hidden = !padMode
             this.scopeOwner = null
-            this.target?.setPadMode?.(active)
+            this.target?.setPadMode?.(padMode)
         }
     }
 
@@ -197,7 +197,7 @@ export default class GamepadControl
         if (pads.length === 0)
         {
             this.running = false
-            this.setActive(false)
+            this.switchPadMode(false)
             return
         }
         requestAnimationFrame(next => this.frame(next))
@@ -222,11 +222,11 @@ export default class GamepadControl
             const change = tracker.update(padInput, time)
             pressed.push(...change.pressed)
             move ??= change.move
-            if (!input?.active)
+            if (!input?.inUse)
             {
                 input = padInput
             }
-            if (padInput.active)
+            if (padInput.inUse)
             {
                 used = true
                 this.scheme = padInput.scheme
@@ -236,14 +236,14 @@ export default class GamepadControl
             }
         }
 
-        if (!this.active)
+        if (!this.padMode)
         {
             if (!used)
             {
                 return
             }
             // only comes to the front for now, nobody knows yet what the buttons are about to do
-            this.setActive(true)
+            this.switchPadMode(true)
             pressed.length = 0
             move = null
             input = null

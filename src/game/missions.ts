@@ -50,13 +50,13 @@ export function frontier(campaign: Campaign): string[]
 {
     const { patches } = overworld(campaign)
     const keys = new Set<string>()
-    for (const node of Object.values(patches))
+    for (const patch of Object.values(patches))
     {
-        if (node.state === "discovered")
+        if (patch.state === "discovered")
         {
             for (const [dq, dr] of NEIGHBORS)
             {
-                const key = patchKey(node.q + dq, node.r + dr)
+                const key = patchKey(patch.q + dq, patch.r + dr)
                 if (!patches[key] || patches[key].state === "passed")
                 {
                     keys.add(key)
@@ -108,11 +108,11 @@ function parentOf(campaign: Campaign, q: number, r: number): string
     let bestDistance = Infinity
     for (const [dq, dr] of NEIGHBORS)
     {
-        const node = patches[patchKey(q + dq, r + dr)]
-        const distance = node && Math.max(Math.abs(node.q), Math.abs(node.r))
-        if (node && node.state === "discovered" && distance < bestDistance)
+        const neighbor = patches[patchKey(q + dq, r + dr)]
+        const distance = neighbor && Math.max(Math.abs(neighbor.q), Math.abs(neighbor.r))
+        if (neighbor && neighbor.state === "discovered" && distance < bestDistance)
         {
-            best = patchKey(node.q, node.r)
+            best = patchKey(neighbor.q, neighbor.r)
             bestDistance = distance
         }
     }
@@ -207,12 +207,12 @@ export function advanceDay(campaign: Campaign): void
             }
         }
 
-        const node = patches[mission.target]
+        const targetPatch = patches[mission.target]
         if (!mission.failed)
         {
-            node.state = "discovered"
-            delete node.unreachable
-            if (node.kind !== "EMPTY")
+            targetPatch.state = "discovered"
+            delete targetPatch.unreachable
+            if (targetPatch.kind !== "EMPTY")
             {
                 gainXp(campaign, "tile")
             }
@@ -220,9 +220,9 @@ export function advanceDay(campaign: Campaign): void
         else
         {
             // still unknown, it can be tried again, maybe from somewhere else one day
-            node.state = "passed"
-            node.parent = null
-            node.unreachable = true
+            targetPatch.state = "passed"
+            targetPatch.parent = null
+            targetPatch.unreachable = true
         }
         returnToTavern(campaign, mission.explorer)
     }

@@ -205,19 +205,19 @@ export function areaAround(points: readonly number[], margin: number): MapArea
  * @param world         world with all patches of the level
  * @param rooms         global face ids per room
  * @param exploration   faces the heroes visited, or whatever else counts as visited
- * @param at            face the hero is on
+ * @param heroFace      face the hero is on
  */
 export function jumpTargets(
     world: PatchWorld,
     rooms: readonly number[][],
     exploration: Pick<Exploration, "has">,
-    at: number
+    heroFace: number
 ): { face: number, x: number, z: number }[]
 {
     const targets: { face: number, x: number, z: number }[] = []
     for (const room of rooms)
     {
-        if (room.includes(at))
+        if (room.includes(heroFace))
         {
             continue
         }
