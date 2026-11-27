@@ -52,6 +52,7 @@ import { createLevelMeshes, type LevelMeshes } from "../render/dungeonLevel"
 import { updateWallCut } from "../render/wallCut"
 import LevelSound from "../sound/LevelSound"
 import { EffectVoices, loadEffect, playEffect } from "../sound/effects"
+import { loadFightSounds, playBlow, playHurt } from "../sound/fightSounds"
 import { mixer } from "../sound/mixer"
 import SoundSpaces from "../sound/soundSpaces"
 import GlowView from "../render/glowView"
@@ -527,6 +528,7 @@ export default class LevelScene
             void loadEffect(SMITE_SOUND)
         }
         void loadEffect(PICK_UP_SOUND)
+        loadFightSounds()
 
         const canvas = document.createElement("canvas")
         canvas.className = "level-scene"
@@ -1625,7 +1627,8 @@ export default class LevelScene
             if (strikeAt !== null && time >= strikeAt)
             {
                 hero.strikeAt = null
-                monsters.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, hero.strengthLeft > 0 ? STRONG_SWORD_DAMAGE : SWORD_DAMAGE)
+                const blows = monsters.strike(prey.x, prey.z, prey.facing, SLASH_OUTER, SLASH_WIDTH, hero.strengthLeft > 0 ? STRONG_SWORD_DAMAGE : SWORD_DAMAGE)
+                playBlow(blows)
             }
             const damage = monsters.hurt(prey, delta)
             if (damage > 0)
@@ -1704,6 +1707,7 @@ export default class LevelScene
     private hurtHero(id: number, hero: ShownHero, damage: number): void
     {
         hero.hp = Math.max(0, hero.hp - damage)
+        playHurt()
         if (id === this.focus)
         {
             this.element.animate(HURT_FLASH, HURT_FLASH_TIME)

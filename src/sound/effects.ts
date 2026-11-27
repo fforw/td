@@ -35,13 +35,14 @@ export function loadEffect(name: string): Promise<AudioBuffer | null>
  * @param name    file name
  * @param rate    playback rate, which shifts pitch and length together
  * @param volume  gain the sound plays at
+ * @param skip    seconds of the recording to leave out at its start
  */
-export function playEffect(name: string, rate = 1, volume = 1): void
+export function playEffect(name: string, rate = 1, volume = 1, skip = 0): void
 {
     void loadEffect(name).then(buffer => {
         if (buffer)
         {
-            start(buffer, mixer().context.currentTime, rate, volume)
+            start(buffer, mixer().context.currentTime, rate, volume, skip)
         }
     })
 }
@@ -49,7 +50,7 @@ export function playEffect(name: string, rate = 1, volume = 1): void
 /**
  * Starts a loaded sound effect through the effects of the mixer at the given time of the audio context
  */
-function start(buffer: AudioBuffer, when: number, rate: number, volume: number): void
+function start(buffer: AudioBuffer, when: number, rate: number, volume: number, skip = 0): void
 {
     const { context } = mixer()
     const source = new AudioBufferSourceNode(context, { buffer, playbackRate: rate })
@@ -62,7 +63,7 @@ function start(buffer: AudioBuffer, when: number, rate: number, volume: number):
     {
         source.connect(new GainNode(context, { gain: volume })).connect(output)
     }
-    source.start(when)
+    source.start(when, skip)
 }
 
 

@@ -48,6 +48,26 @@ travels along the room graph instead.
   several variants of one sound numbered, so a sound that repeats a lot
   can vary.
 
+## Fights
+
+`sound/fightSounds.ts`, played by the level scene.
+
+- A sword blow of a hero sounds once it lands: a swing through the air
+  (`sword-miss-*`) when it hits nothing, otherwise of what it lands on
+  (`sword-on-*`): flesh, metal, armor, or wood for a shield that stops
+  it. Each kind of monster says what it is made of. A blow that hits
+  several of the same plays that sound once.
+- The hits come from Freesound and lead in with a whoosh. The blow only
+  counts once the swing is done, so they start just before the blade
+  lands and leave most of the whoosh out.
+- A hero who gets hurt says ouch (`meeple-hurt-*`), whatever hurt them.
+- The swings and ouches play a bit faster and higher than recorded,
+  which suits the small figures. Every sound strays a little in rate,
+  and of the numbered variants the one before is never picked again, so
+  a long fight doesn't repeat itself.
+- The burst of a monster that dies has no sound of its own, as the blow
+  that killed it already said it and monsters die often.
+
 ## Planned
 
 - A volume per group in the options, and fades and ducking for the
@@ -56,12 +76,7 @@ travels along the room graph instead.
   next to the lighting, once single mobiles make noise. Mobiles could
   hear heroes over the same distance.
 - Recorded ambience: dripping, fire, wind.
-- Combat sounds for humanoid characters: a sword hit for every hit and
-  a hurt sound (`meeple-hurt-*`) from the one it hits. The sword hit
-  sounds of what it lands on: flesh, armor, metal, or wood for shields
-  and staffs (`sword-on-*`, from Freesound). Most of them lead in with
-  a whoosh, so they start a moment before the blade lands. The burst of
-  a monster that dies has no sound of its own; its last hit plays a
-  hurt sound like any other. Big deaths, like the brute's and later the
-  end boss's, get a death sound (`meeple-death-*`) instead, since they
-  are rare enough to be dramatic.
+- Big deaths, like the brute's and later the end boss's, get a death
+  sound (`meeple-death-*`), since they are rare enough to be dramatic.
+- Blows of monsters: the soldier's sword on a hero's shield (wood) and
+  through the air, the brute's club.
