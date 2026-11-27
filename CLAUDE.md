@@ -9,7 +9,7 @@ Context stays in the session once loaded, so look things up narrowly.
 - Find code with `grep -n` and read ranges. Read a large file whole only if the task needs all of it, and not twice in a
   session. Large ones: `src/map/HexagonPatch.ts`, `src/game/gameView.ts`, `src/meeple/Meeple3D.ts`,
   `src/map/dungeonLights.ts`, `src/game/castleScene.ts`, `src/render/dungeonLighting.ts`.
-- `plans/discovery.md` is long. Run `grep -n '^#' plans/discovery.md`, then read just the section you need.
+- `plans/design.md` lists the plan files by topic, read just the ones you need. `grep -n '^#'` finds a section.
 - Check behavior with tests or `--eval` before taking screenshots. Keep screenshots small, and clip them for details.
 
 ## Commands
@@ -43,7 +43,11 @@ headless Chrome mean nothing, as it renders in software.
   needs Blender on the PATH or in `BLENDER`
 - `src/worker`: the map worker, which generates patches off the main thread
 - `test/` mirrors `src/`
-- `plans/discovery.md`: the implementation plan, update it when the design changes
+- `plans/`: the design by topic, update the topic file when the design changes. Link by file and heading, without
+  numbers for sections. Open questions go into `plans/roadmap.md`. Topic files describe what
+  exists, in the present tense with the reason, and what isn't built under `## Planned`, with a line in the roadmap.
+  Leave out history, unless a rejected approach would be tried again, and tuning values, unless they are the design.
+  `plans/design.md` holds the principles, without file names or numbers.
 - `*.html` in the root: `index.html` is the game, the others are test pages for single parts (`src/*Test.ts`)
 - `docs/` is ignored build output, don't search it
 
