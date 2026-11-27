@@ -2,6 +2,7 @@ import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
 import { BLOCK_ANGLE } from "./eyes"
 import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, turnBetween, turnTo } from "./monsters"
+import { condition, leaf, memory, type Memory, selector, sequence, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -104,6 +105,9 @@ export const SOLDIER: SoldierKind = {
 export interface Soldier extends Monster
 {
     kind: SoldierKind
+    memory: Memory
+    /** how good it is at fighting, from 0 to 1 */
+    skill: number
     /** walking somewhere with nobody to go after */
     wandering: boolean
     /** seconds into the current attack, null without one */
@@ -131,10 +135,15 @@ export interface Soldier extends Monster
  */
 export default class SoldierPack extends MonsterPack<Soldier>
 {
-    add(kind: SoldierKind, face: number, x: number, z: number): Soldier
+    /**
+     * @param skill     how good it is at fighting, from 0 to 1
+     */
+    add(kind: SoldierKind, face: number, x: number, z: number, skill = 0): Soldier
     {
         const soldier: Soldier = {
             kind,
+            memory: memory(),
+            skill,
             hp: kind.hp,
             face,
             x,
@@ -177,19 +186,7 @@ export default class SoldierPack extends MonsterPack<Soldier>
                 soldier.goalZ = prey.z
                 soldier.wandering = false
             }
-
-            if (soldier.attack !== null)
-            {
-                this.swing(soldier, delta)
-            }
-            else if (soldier.guarding)
-            {
-                this.guard(soldier, delta)
-            }
-            else
-            {
-                this.decide(soldier, delta, prey !== null)
-            }
+            SOLDIER_TREE.tick(soldier, { pack: this, prey, delta })
 
             soldier.shield = soldier.guarding
                 ? Math.min(1, soldier.shield + delta / RAISE_TIME)
@@ -257,14 +254,19 @@ export default class SoldierPack extends MonsterPack<Soldier>
         return hero.blocking && (distance < 1e-6 || dx * Math.sin(hero.facing) + dz * Math.cos(hero.facing) >= Math.cos(BLOCK_ANGLE) * distance)
     }
 
-    private raiseGuard(soldier: Soldier): void
+    raiseGuard(soldier: Soldier): void
     {
         soldier.guarding = true
         soldier.guardLeft = rng.next(GUARD_MIN, GUARD_MAX)
         soldier.wandering = false
     }
 
-    private swing(soldier: Soldier, delta: number): void
+    /**
+     * Has a soldier go on with its swing, and raise the shield after it
+     *
+     * @param delta     seconds since the last frame
+     */
+    swing(soldier: Soldier, delta: number): void
     {
         const before = soldier.attack!
         const now = before + delta
@@ -286,8 +288,10 @@ export default class SoldierPack extends MonsterPack<Soldier>
 
     /**
      * Has a soldier behind its shield face who it goes after and close in slowly, until it lowers the shield again
+     *
+     * @param delta     seconds since the last frame
      */
-    private guard(soldier: Soldier, delta: number): void
+    guard(soldier: Soldier, delta: number): void
     {
         soldier.guardLeft -= delta
         if (soldier.guardLeft <= 0)
@@ -302,15 +306,13 @@ export default class SoldierPack extends MonsterPack<Soldier>
     }
 
     /**
-     * Has a soldier with its shield down go after who it saw last, or wander about. It swings once the shield is all the way
-     * down.
+     * With nobody to go after, has a soldier look around now and then, and walk somewhere sometimes
      *
-     * @param sees  whether it sees someone right now
+     * @param delta     seconds since the last frame
      */
-    private decide(soldier: Soldier, delta: number, sees: boolean): void
+    wander(soldier: Soldier, delta: number): void
     {
-        const { kind } = soldier
-        if (soldier.chase === 0 && !soldier.wandering)
+        if (!soldier.wandering)
         {
             soldier.lookWait -= delta
             if (soldier.lookWait > 0)
@@ -327,31 +329,34 @@ export default class SoldierPack extends MonsterPack<Soldier>
             }
             return
         }
-
-        const distance = Math.hypot(soldier.goalX - soldier.x, soldier.goalZ - soldier.z)
-        if (sees && distance <= kind.reach)
-        {
-            turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
-            if (soldier.shield === 0)
-            {
-                soldier.attack = 0
-            }
-            return
-        }
-        const stop = soldier.wandering ? 0.01 : kind.reach * CLOSE_IN
-        if (distance <= stop)
+        if (Math.hypot(soldier.goalX - soldier.x, soldier.goalZ - soldier.z) <= 0.01)
         {
             soldier.wandering = false
             return
         }
         turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
-        const step = kind.speed * delta
-        const moved = this.walk(soldier, step, stop)
+        const step = soldier.kind.speed * delta
         // a wall in the way ends a walk about
-        if (soldier.wandering && moved < step / 2)
+        if (this.walk(soldier, step, 0.01) < step / 2)
         {
             soldier.wandering = false
         }
+    }
+
+    /**
+     * Walks a soldier after who it saw last, up to a bit within reach
+     *
+     * @param delta     seconds since the last frame
+     */
+    approach(soldier: Soldier, delta: number): void
+    {
+        const stop = soldier.kind.reach * CLOSE_IN
+        if (Math.hypot(soldier.goalX - soldier.x, soldier.goalZ - soldier.z) <= stop)
+        {
+            return
+        }
+        turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
+        this.walk(soldier, soldier.kind.speed * delta, stop)
     }
 
     /**
@@ -376,3 +381,91 @@ export default class SoldierPack extends MonsterPack<Soldier>
         return moved
     }
 }
+
+
+/**
+ * What the soldier tree gets each frame
+ */
+interface SoldierContext
+{
+    pack: SoldierPack
+    /** closest hero in sight */
+    prey: Prey | null
+    /** seconds since the last frame */
+    delta: number
+}
+
+const guard = leaf<Soldier, SoldierContext>("guard", {
+    tick: (soldier, { pack, delta }) =>
+    {
+        pack.guard(soldier, delta)
+        return "running"
+    }
+})
+
+/**
+ * Committed, so it goes through with the swing even when struck
+ */
+const swing = leaf<Soldier, SoldierContext>("swing", {
+    commits: true,
+    start: soldier =>
+    {
+        soldier.attack = 0
+        return true
+    },
+    tick: (soldier, { pack, delta }) =>
+    {
+        pack.swing(soldier, delta)
+        return soldier.attack === null ? "success" : "running"
+    }
+})
+
+/**
+ * Faces who it goes after while the shield comes down
+ */
+const hold = leaf<Soldier, SoldierContext>("hold", {
+    tick: (soldier, { delta }) =>
+    {
+        turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
+        return "running"
+    }
+})
+
+const approach = leaf<Soldier, SoldierContext>("approach", {
+    tick: (soldier, { pack, delta }) =>
+    {
+        pack.approach(soldier, delta)
+        return "running"
+    }
+})
+
+const wander = leaf<Soldier, SoldierContext>("wander", {
+    tick: (soldier, { pack, delta }) =>
+    {
+        pack.wander(soldier, delta)
+        return "running"
+    }
+})
+
+/**
+ * Soldiers guard for a while after each swing and when struck, go after heroes they saw and swing at them once in reach
+ * with the shield down, and wander about otherwise
+ */
+export const SOLDIER_TREE = new Tree<Soldier, SoldierContext>(selector("soldier",
+    sequence("guard", condition("guarding", ({ guarding }) => guarding), guard),
+    sequence("fight",
+        condition("hunting", ({ chase }) => chase > 0),
+        selector("strike or close in",
+            sequence("strike",
+                condition("in reach", ({ x, z, goalX, goalZ, kind }, { prey }) =>
+                    prey !== null && Math.hypot(goalX - x, goalZ - z) <= kind.reach),
+                selector("swing or wait",
+                    sequence("cut", condition("shield down", ({ shield }) => shield === 0), swing),
+                    hold
+                )
+            ),
+            approach
+        )
+    ),
+    wander
+))
