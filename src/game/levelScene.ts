@@ -38,7 +38,7 @@ import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../monster/
 import { BOUNCE, fadeShove } from "../monster/shove"
 import SoldierCrowd from "../monster/SoldierCrowd"
 import SoldierPack from "../monster/soldiers"
-import { planSpawns } from "../monster/spawns"
+import { depthSkill, planSpawns } from "../monster/spawns"
 import BeamCrowd from "../monster/BeamCrowd"
 import WizardCrowd from "../monster/WizardCrowd"
 import FireHazard from "../monster/fireHazard"
@@ -742,7 +742,7 @@ export default class LevelScene
                     soldiers.add(spawn.kind, spawn.face, x, z)
                     break
                 case "wizard":
-                    wizards.add(spawn.kind, spawn.face, x, z)
+                    wizards.add(spawn.kind, spawn.face, x, z, depthSkill(depths, spawn.room))
                     break
             }
         }

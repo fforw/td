@@ -1,7 +1,7 @@
 import Prando from "prando"
 import { assert, describe, it } from "vitest"
 import { BRUTE } from "../../src/monster/brutes"
-import { LIMITED_GROUPS, planSpawns, ROOMS_TAKEN, SPAWN_GROUPS, type SpawnGroup } from "../../src/monster/spawns"
+import { depthSkill, LIMITED_GROUPS, planSpawns, ROOMS_TAKEN, SPAWN_GROUPS, type SpawnGroup } from "../../src/monster/spawns"
 
 const rooms = Array.from({ length: 50 }, (_, i) => [i * 3 + 1, i * 3 + 2, i * 3 + 3])
 
@@ -74,5 +74,13 @@ describe("spawn planner", () => {
 
         const level = { rooms, closed: new Set([3]) }
         assert.deepEqual(planSpawns(level, new Prando(7)), planSpawns(level, new Prando(7)))
+    })
+})
+
+describe("depthSkill", () => {
+    it("grows from the first room to the deepest, and leaves out rooms nobody gets to", () => {
+        const depths = [0, 5, Infinity, 20]
+        assert.deepEqual(depths.map((_, room) => depthSkill(depths, room)), [0, 0.25, 0, 1])
+        assert.strictEqual(depthSkill([0], 0), 0)
     })
 })
