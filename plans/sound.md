@@ -40,6 +40,9 @@ travels along the room graph instead.
 - The smite of the hero in god mode sings a hallelujah on every press,
   whether there is anything in the room to smite or not. It loads with the
   level while `GOD_MODE` is on.
+- Every Freesound sound in use is on the credits page, whatever its
+  license, as thanks; `media/readme.md` keeps the attributions next to
+  the files.
 - Recorded foley sits in `media-src/foley`: each take, its cut pieces and a
   page to sort them. The good pieces go to `media/sounds/` as mp3, with
   several variants of one sound numbered, so a sound that repeats a lot

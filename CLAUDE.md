@@ -48,7 +48,7 @@ headless Chrome mean nothing, as it renders in software.
   exists, in the present tense with the reason, and what isn't built under `## Planned`, with a line in the roadmap.
   Leave out history, unless a rejected approach would be tried again, and tuning values, unless they are the design.
   `plans/design.md` holds the principles, without file names or numbers.
-- `*.html` in the root: `index.html` is the game, the others are test pages for single parts (`src/*Test.ts`)
+- `*.html` in the root: `index.html` is the game, `credits.html` its credits from the title, the others are test pages for single parts (`src/*Test.ts`)
 - `docs/` is ignored build output, don't search it
 
 ## Code style

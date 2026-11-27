@@ -1,0 +1,187 @@
+body
+{
+    margin: 0;
+    background: #16161d;
+    color: #d9ccb2;
+    font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    line-height: 1.45;
+}
+
+#credits
+{
+    max-width: 44rem;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+}
+
+#credits header
+{
+    text-align: center;
+}
+
+#credits header img
+{
+    width: min(100%, 26rem);
+    border-radius: 0.25rem;
+    box-shadow: 0 0 2rem #000;
+}
+
+#credits h1
+{
+    margin: 1.5rem 0 0.25rem;
+    font-style: italic;
+    font-weight: normal;
+    font-size: 2.6rem;
+    color: #f2e8d5;
+    text-shadow: 0 0 0.3em #000;
+}
+
+#credits .lead
+{
+    margin: 0;
+    font-style: italic;
+    color: #a3967f;
+}
+
+#credits h2
+{
+    margin: 2.5rem 0 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid rgba(232, 224, 212, 0.15);
+    font-weight: normal;
+    font-size: 1.35rem;
+    color: #e8d9b8;
+}
+
+#credits a
+{
+    color: #f2e8d5;
+    text-decoration-color: rgba(192, 36, 78, 0.7);
+    text-underline-offset: 0.15em;
+}
+
+#credits a:hover
+{
+    text-decoration-color: #c0244e;
+}
+
+#credits ul
+{
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#credits .sounds li
+{
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.9rem;
+    align-items: center;
+    padding: 0.6rem 0.4rem;
+    border-bottom: 1px solid rgba(232, 224, 212, 0.07);
+}
+
+#credits .plain li
+{
+    padding: 0.35rem 0.4rem;
+}
+
+#credits .by,
+#credits .use
+{
+    display: block;
+    font-size: 0.9rem;
+}
+
+#credits .by
+{
+    color: #a3967f;
+}
+
+#credits .use
+{
+    font-style: italic;
+    color: #8a7f6c;
+}
+
+#credits .plain .use
+{
+    display: inline;
+}
+
+#credits .plain .use::before
+{
+    content: " \2014  ";
+}
+
+#credits .license
+{
+    font-size: 0.8rem;
+    white-space: nowrap;
+    color: #a3967f;
+}
+
+#credits .note
+{
+    margin: 0.5rem 0.4rem 0;
+    font-size: 0.9rem;
+    color: #a3967f;
+}
+
+#credits button
+{
+    border: none;
+    border-radius: 0.25rem;
+    background: rgba(232, 224, 212, 0.12);
+    color: #f2e8d5;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#credits button:hover,
+#credits button:focus-visible
+{
+    background: rgba(232, 224, 212, 0.22);
+}
+
+#credits .listen
+{
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    font-size: 0.85rem;
+}
+
+#credits nav
+{
+    margin-top: 3rem;
+    text-align: center;
+}
+
+#credits .back
+{
+    padding: 0.4em 1.2em;
+    background: rgba(192, 36, 78, 0.3);
+    font-style: italic;
+    font-size: 1.2rem;
+}
+
+#credits .back:hover,
+#credits .back:focus-visible
+{
+    background: rgba(192, 36, 78, 0.45);
+}
+
+@media (max-width: 30rem)
+{
+    #credits .sounds li
+    {
+        grid-template-columns: auto 1fr;
+    }
+
+    #credits .license
+    {
+        grid-column: 2;
+    }
+}

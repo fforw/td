@@ -61,6 +61,9 @@ else
 
 startButton.addEventListener("click", () => play(current))
 title.querySelector(".new")!.addEventListener("click", () => show(createCampaign(randomSeed()), false))
+title.querySelector(".credits")!.addEventListener("click", () => {
+    location.href = import.meta.env.BASE_URL + "credits.html"
+})
 
 const music = document.querySelector<HTMLAudioElement>("audio")!
 
