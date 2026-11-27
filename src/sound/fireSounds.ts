@@ -25,10 +25,18 @@ const STRIKE_RATE_MIN = 0.8
 const STRIKE_RATE_MAX = 1.25
 
 /**
- * Strikes that may sound at once, as a ring of them would be a roar otherwise, and seconds one sounds for this
+ * Seconds at least between the starts of two strikes, and strikes that may sound at once, with the seconds one counts
+ * as sounding. The lines of a fire room strike one spot after another faster than that, so every second or third
+ * sounds, all along the line, and a ring of them doesn't roar.
  */
-const STRIKE_VOICES = 4
-const STRIKE_TIME = 0.6
+const STRIKE_GAP = 0.08
+const STRIKE_VOICES = 5
+const STRIKE_TIME = 0.4
+
+/**
+ * Most a strike gets louder for the drops that strike with it, which it stands for, by the square root of their count
+ */
+const CROWD_MAX = 1.6
 
 /**
  * Seconds after its strike a drop still sounds, for one that wasn't seen before, so old fire doesn't go off again
@@ -41,7 +49,7 @@ const STRIKE_LATE = 0.1
 export default class FireSounds
 {
     /**
-     * Drops with the sound and rate they strike with, or null once it played
+     * Drops with the sound and rate they strike with, or null once it is due
      */
     private readonly strikes = new WeakMap<FireDrop, { sound: StrikeSound, rate: number } | null>()
 
@@ -59,7 +67,7 @@ export default class FireSounds
     }
 
     /**
-     * Plays the strikes that are due by now
+     * Plays a strike for the drops that are due by now, if there is room for it
      *
      * @param drops     all fire of the level
      */
@@ -67,6 +75,8 @@ export default class FireSounds
     {
         const now = performance.now() / 1000
         this.starts = this.starts.filter(start => now - start < STRIKE_TIME)
+        let first: { name: string, rate: number, skip: number } | null = null
+        let due = 0
         for (const drop of drops)
         {
             let strike = this.strikes.get(drop)
@@ -86,14 +96,19 @@ export default class FireSounds
             if (drop.age >= -impact / rate)
             {
                 this.strikes.set(drop, null)
-                if (drop.age < STRIKE_LATE && this.starts.length < STRIKE_VOICES)
+                if (drop.age < STRIKE_LATE)
                 {
-                    this.starts.push(now)
+                    due++
                     // late for a frame that took long, so the impact still comes with the strike
-                    const late = Math.max(0, drop.age + impact / rate) * rate
-                    playEffect(name, rate, STRIKE_VOLUME, Math.min(late, impact))
+                    first ??= { name, rate, skip: Math.min(impact, Math.max(0, drop.age + impact / rate) * rate) }
                 }
             }
+        }
+        const last = this.starts.length > 0 ? this.starts[this.starts.length - 1] : -Infinity
+        if (first && this.starts.length < STRIKE_VOICES && now - last >= STRIKE_GAP)
+        {
+            this.starts.push(now)
+            playEffect(first.name, first.rate, STRIKE_VOLUME * Math.min(CROWD_MAX, Math.sqrt(due)), first.skip)
         }
     }
 }

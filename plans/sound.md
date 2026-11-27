@@ -80,7 +80,13 @@ travels along the room graph instead.
   the drop strikes. A drop is only sure to strike once it falls, which
   leaves time for a whoosh before. There are only two recordings, so
   each strike also plays at a random rate, lower ones bigger and higher
-  ones smaller. Only a few sound at once, as a ring of them would roar.
+  ones smaller.
+- Strikes keep a short gap between them, and only a few sound at once.
+  The lines of a fire room strike faster than that, so every second or
+  third strike sounds, all along the line, where a cap on voices alone
+  sounded the start of a line and left the rest silent. Drops striking
+  at the same moment, like a ring, play as one strike, louder the more
+  of them there are.
 - A sigil (`sound/sigilSounds.ts`) swishes for each line of its star
   and for the circle around it (`sigil-stroke`), played quicker for the
   short lines and a bit slower for the long circle, each loudest as its
