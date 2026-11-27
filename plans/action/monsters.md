@@ -161,8 +161,8 @@ at a distance (`CAST_RANGE`).
   threatened but not for long, and has to see the next blow coming
   anew after lowering it, which leaves a gap. It doesn't cast with the
   staff up.
-- From `BACK_OFF_SKILL` up it backs off from a hero that comes well
-  within the distance it keeps, walking backwards while facing them,
+- From `BACK_OFF_SKILL` up blue and red ones back off from a hero that
+  comes well within the distance it keeps, walking backwards while facing them,
   until it is that far again. Backing off isn't committed, so it can
   still block on the way.
 
@@ -177,7 +177,9 @@ who come in groups and are living obstacles.
 - The beam goes from the staff to the first wall or hero and passes over
   monsters. It hurts that hero unless they dodge or hold a shield against
   it.
-- A blow ends it. Between turns they walk like other wizards.
+- A blow ends it. Between turns they walk like other wizards, but they
+  don't back off from heroes, as obstacles that give way wouldn't be in
+  the way.
 - Only a few beams of a level light up what is around them (`BeamCrowd`).
 
 ## Sigil

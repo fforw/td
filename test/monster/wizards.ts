@@ -280,11 +280,11 @@ describe("WizardPack", () => {
         assert.isTrue(raisedAgain)
     })
 
-    it("backs off from a hero too close once skilled enough, facing them", () => {
-        for (const [skill, backs] of [[0.6, true], [0, false]] as const)
+    it("backs off from a hero too close once skilled enough, facing them, unless purple", () => {
+        for (const [kind, skill, backs] of [[BLUE_WIZARD, 0.6, true], [RED_WIZARD, 0.6, true], [BLUE_WIZARD, 0, false], [PURPLE_WIZARD, 1, false]] as const)
         {
             const pack = new WizardPack(openFloor())
-            const wizard = pack.add(BLUE_WIZARD, 0, 0, 0, skill)
+            const wizard = pack.add(kind, 0, 0, 0, skill)
             wizard.castWait = Infinity
             // facing away, so it doesn't block
             const hero = { ...prey(WIZARD.keepAway * 0.4, 0), facing: Math.PI / 2 }

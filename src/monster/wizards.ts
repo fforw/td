@@ -774,6 +774,8 @@ export const WIZARD_TREE = new Tree<Wizard, WizardContext>(selector("wizard",
             sequence("spell", condition("ready", ({ castWait }, { prey }) => castWait === 0 && prey !== null), cast),
             sequence("distance",
                 skilled(BACK_OFF_SKILL),
+                // purple ones are obstacles that stand their ground
+                condition("keeps away", ({ kind }) => kind.robe !== "purple"),
                 condition("too close", ({ x, z, kind, backing }, { prey }) =>
                     prey !== null && Math.hypot(prey.x - x, prey.z - z) < kind.keepAway * (backing ? 1 : TOO_CLOSE)),
                 backOff
