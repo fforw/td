@@ -22,8 +22,8 @@ const LINGER = 0.5
 
 interface Shown
 {
-    beam: Beam
-    state: BeamState | null
+    mesh: Beam
+    beam: BeamState | null
     /** where it started last */
     from: Vector3
     /** where it hit last */
@@ -45,7 +45,7 @@ export default class BeamCrowd
     /** whether any of them shows */
     get visible(): boolean
     {
-        return this.shown.some(({ state, over }) => state || over < LINGER)
+        return this.shown.some(({ beam, over }) => beam || over < LINGER)
     }
 
     /**
@@ -56,10 +56,10 @@ export default class BeamCrowd
     {
         this.shown = Array.from({ length: count }, (_, i) =>
         {
-            const beam = new Beam(new Color(ROBE_COLORS.purple), BEAM_WIDTH * LEVEL_MEEPLE_SCALE, i < MOST_LIT)
-            beam.visible = false
-            this.group.add(beam.group)
-            return { beam, state: null, from: new Vector3(), to: new Vector3(), over: LINGER }
+            const mesh = new Beam(new Color(ROBE_COLORS.purple), BEAM_WIDTH * LEVEL_MEEPLE_SCALE, i < MOST_LIT)
+            mesh.visible = false
+            this.group.add(mesh.group)
+            return { mesh, beam: null, from: new Vector3(), to: new Vector3(), over: LINGER }
         })
     }
 
@@ -72,40 +72,40 @@ export default class BeamCrowd
     update(beams: readonly BeamState[], findTip: (wizard: Wizard, out: Vector3) => boolean, time: number, delta: number): void
     {
         const { shown } = this
-        for (const state of beams)
+        for (const beam of beams)
         {
-            if (!shown.some(slot => slot.state === state))
+            if (!shown.some(slot => slot.beam === beam))
             {
                 // the first ones are lit
-                const slot = shown.find(slot => !slot.state && slot.over >= LINGER)
+                const slot = shown.find(slot => !slot.beam && slot.over >= LINGER)
                 if (slot)
                 {
-                    slot.state = state
+                    slot.beam = beam
                 }
             }
         }
         for (const slot of shown)
         {
-            const { beam, from, state } = slot
-            if (state && !beams.includes(state))
+            const { mesh, from, beam } = slot
+            if (beam && !beams.includes(beam))
             {
-                slot.state = null
+                slot.beam = null
                 slot.over = 0
             }
-            if (slot.state)
+            if (slot.beam)
             {
-                const { age, until, x, z, yaw, reach } = slot.state
-                findTip(slot.state.caster, from)
+                const { age, until, x, z, yaw, reach } = slot.beam
+                findTip(slot.beam.caster, from)
                 slot.to.set(x + Math.sin(yaw) * reach, from.y, z + Math.cos(yaw) * reach)
                 const { charge, strength } = beamPhase(age, until)
-                beam.visible = true
-                beam.update(from, slot.to, charge, strength, time, delta)
+                mesh.visible = true
+                mesh.update(from, slot.to, charge, strength, time, delta)
             }
             else if (slot.over < LINGER)
             {
                 slot.over += delta
-                beam.update(from, slot.to, 0, 0, time, delta)
-                beam.visible = slot.over < LINGER
+                mesh.update(from, slot.to, 0, 0, time, delta)
+                mesh.visible = slot.over < LINGER
             }
         }
     }
