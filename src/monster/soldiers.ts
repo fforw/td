@@ -1,8 +1,8 @@
 import { rng } from "../math/random"
 import { FIGURE_SCALE } from "../meeple/figureScale"
 import { BLOCK_ANGLE } from "./eyes"
-import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, turnBetween, turnTo } from "./monsters"
-import { condition, leaf, memory, type Memory, selector, sequence, Tree } from "./behavior"
+import { CHASE_TIME, HERO_RADIUS, type Monster, type MonsterKind, MonsterPack, type Prey, THREAT_RANGE, turnBetween, turnTo } from "./monsters"
+import { condition, leaf, memory, type Memory, selector, sequence, skilled, Tree } from "./behavior"
 
 const TAU = Math.PI * 2
 
@@ -68,6 +68,25 @@ const WANDER_LENGTH = 0.6 * FIGURE_SCALE
 const CLOSE_IN = 0.8
 
 
+/**
+ * Skill a soldier needs to flank a hero with others and swing together with them
+ */
+export const FLANK_SKILL = 0.3
+
+/**
+ * How far off its slot around a hero a soldier counts as in place, in radians, how far round it goes at a time while
+ * circling, and the distance beyond its radius it circles at, out of reach of a sword
+ */
+export const SLOT_ANGLE_TOLERANCE = 0.35
+const CIRCLE_ANGLE_STEP = 0.6
+const CIRCLE_DISTANCE = THREAT_RANGE
+
+/**
+ * Seconds a soldier in place waits for the others to get there before it swings anyway, about as long as a quarter circle
+ * around a hero takes
+ */
+export const CUE_WAIT_TIME = 3
+
 export interface SoldierKind extends MonsterKind
 {
     /** hit points the sword takes */
@@ -126,6 +145,16 @@ export interface Soldier extends Monster
     guardLeft: number
     /** how far up the shield is, from 0 down to 1 all the way up */
     shield: number
+    /** hero it goes after, null with nobody */
+    target: Prey | null
+    /** angle around its target it flanks them from, as a meeple facing from them, null if it doesn't flank */
+    slotAngle: number | null
+    /** at its slot and in reach */
+    inPlace: boolean
+    /** seconds it has been in place */
+    inPlaceTime: number
+    /** may swing, as all who flank its target with it are in place, or it waited long enough */
+    onCue: boolean
 }
 
 
@@ -161,6 +190,11 @@ export default class SoldierPack extends MonsterPack<Soldier>
             guarding: false,
             guardLeft: 0,
             shield: 0,
+            target: null,
+            slotAngle: null,
+            inPlace: false,
+            inPlaceTime: 0,
+            onCue: false,
             flash: 0,
             shoveX: 0,
             shoveZ: 0
@@ -171,7 +205,8 @@ export default class SoldierPack extends MonsterPack<Soldier>
 
     update(delta: number, heroes: readonly Prey[]): void
     {
-        for (const soldier of this.members)
+        const { members } = this
+        const seen = members.map(soldier =>
         {
             soldier.flash = Math.max(0, soldier.flash - delta)
             soldier.chase = Math.max(0, soldier.chase - delta)
@@ -185,8 +220,20 @@ export default class SoldierPack extends MonsterPack<Soldier>
                 soldier.goalX = prey.x
                 soldier.goalZ = prey.z
                 soldier.wandering = false
+                soldier.target = prey
             }
-            SOLDIER_TREE.tick(soldier, { pack: this, prey, delta })
+            else if (soldier.chase === 0)
+            {
+                soldier.target = null
+            }
+            return prey
+        })
+        this.assignSlots(heroes, delta)
+
+        for (let i = 0; i < members.length; i++)
+        {
+            const soldier = members[i]
+            SOLDIER_TREE.tick(soldier, { pack: this, prey: seen[i], delta })
 
             soldier.shield = soldier.guarding
                 ? Math.min(1, soldier.shield + delta / RAISE_TIME)
@@ -254,6 +301,59 @@ export default class SoldierPack extends MonsterPack<Soldier>
         return hero.blocking && (distance < 1e-6 || dx * Math.sin(hero.facing) + dz * Math.cos(hero.facing) >= Math.cos(BLOCK_ANGLE) * distance)
     }
 
+    /**
+     * Spreads the skilled soldiers that go after the same hero evenly around them, opposite each other for two. They take
+     * the slots in the order they are around the hero, so nobody crosses over, and the slots are turned so that they all go
+     * about as far. They get their cue to swing once all are in place, or after waiting a while.
+     *
+     * @param delta     seconds since the last frame
+     */
+    private assignSlots(heroes: readonly Prey[], delta: number): void
+    {
+        for (const soldier of this.members)
+        {
+            soldier.slotAngle = null
+        }
+        for (const hero of heroes)
+        {
+            const flankers = this.members.filter(({ target, chase, skill }) => target === hero && chase > 0 && skill >= FLANK_SKILL)
+            if (flankers.length < 2)
+            {
+                continue
+            }
+            const angleOf = ({ x, z, goalX, goalZ }: Soldier) => Math.atan2(x - goalX, z - goalZ)
+            const first = angleOf(flankers[0])
+            const around = (soldier: Soldier) => (angleOf(soldier) - first + 2 * TAU) % TAU
+            flankers.sort((a, b) => around(a) - around(b))
+            const slotStep = TAU / flankers.length
+            // the mean of where each is against its slot
+            let sin = 0, cos = 0
+            flankers.forEach((soldier, i) =>
+            {
+                sin += Math.sin(angleOf(soldier) - i * slotStep)
+                cos += Math.cos(angleOf(soldier) - i * slotStep)
+            })
+            const base = Math.atan2(sin, cos)
+            flankers.forEach((soldier, i) =>
+            {
+                soldier.slotAngle = base + i * slotStep
+            })
+        }
+        for (const soldier of this.members)
+        {
+            const { slotAngle, x, z, goalX, goalZ, kind } = soldier
+            soldier.inPlace = slotAngle !== null && Math.hypot(goalX - x, goalZ - z) <= kind.reach &&
+                Math.abs(turnBetween(Math.atan2(x - goalX, z - goalZ), slotAngle)) <= SLOT_ANGLE_TOLERANCE
+            soldier.inPlaceTime = soldier.inPlace ? soldier.inPlaceTime + delta : 0
+        }
+        for (const soldier of this.members)
+        {
+            const { target, slotAngle, inPlaceTime } = soldier
+            soldier.onCue = slotAngle === null || inPlaceTime >= CUE_WAIT_TIME ||
+                this.members.every(other => other.target !== target || other.slotAngle === null || other.inPlace)
+        }
+    }
+
     raiseGuard(soldier: Soldier): void
     {
         soldier.guarding = true
@@ -301,7 +401,7 @@ export default class SoldierPack extends MonsterPack<Soldier>
         if (soldier.chase > 0)
         {
             turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
-            this.walk(soldier, soldier.kind.speed * GUARD_PACE * delta, soldier.kind.reach * CLOSE_IN)
+            this.walk(soldier, soldier.goalX, soldier.goalZ, soldier.kind.speed * GUARD_PACE * delta, soldier.kind.reach * CLOSE_IN)
         }
     }
 
@@ -337,7 +437,7 @@ export default class SoldierPack extends MonsterPack<Soldier>
         turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
         const step = soldier.kind.speed * delta
         // a wall in the way ends a walk about
-        if (this.walk(soldier, step, 0.01) < step / 2)
+        if (this.walk(soldier, soldier.goalX, soldier.goalZ, step, 0.01) < step / 2)
         {
             soldier.wandering = false
         }
@@ -350,32 +450,57 @@ export default class SoldierPack extends MonsterPack<Soldier>
      */
     approach(soldier: Soldier, delta: number): void
     {
-        const stop = soldier.kind.reach * CLOSE_IN
-        if (Math.hypot(soldier.goalX - soldier.x, soldier.goalZ - soldier.z) <= stop)
+        const stopDistance = soldier.kind.reach * CLOSE_IN
+        if (Math.hypot(soldier.goalX - soldier.x, soldier.goalZ - soldier.z) <= stopDistance)
         {
             return
         }
         turnTo(soldier, soldier.goalX, soldier.goalZ, TURN_RATE * delta)
-        this.walk(soldier, soldier.kind.speed * delta, stop)
+        this.walk(soldier, soldier.goalX, soldier.goalZ, soldier.kind.speed * delta, stopDistance)
     }
 
     /**
-     * Walks a soldier towards its goal by at most the given step, stopping the given distance short of it
+     * Has a soldier circle the hero it goes after, facing them, out of reach of their sword until it is about at its slot,
+     * and then step in to it
+     *
+     * @param delta     seconds since the last frame
+     */
+    flank(soldier: Soldier, delta: number): void
+    {
+        const { goalX, goalZ, kind } = soldier
+        const slotAngle = soldier.slotAngle!
+        turnTo(soldier, goalX, goalZ, TURN_RATE * delta)
+        const angle = Math.atan2(soldier.x - goalX, soldier.z - goalZ)
+        const turn = turnBetween(angle, slotAngle)
+        const step = kind.speed * delta
+        if (Math.abs(turn) <= SLOT_ANGLE_TOLERANCE)
+        {
+            const standDistance = kind.reach * CLOSE_IN
+            this.walk(soldier, goalX + Math.sin(slotAngle) * standDistance, goalZ + Math.cos(slotAngle) * standDistance, step, 0)
+            return
+        }
+        const circleDistance = Math.max(Math.hypot(soldier.x - goalX, soldier.z - goalZ), CIRCLE_DISTANCE + kind.radius)
+        const toward = angle + Math.sign(turn) * Math.min(Math.abs(turn), CIRCLE_ANGLE_STEP)
+        this.walk(soldier, goalX + Math.sin(toward) * circleDistance, goalZ + Math.cos(toward) * circleDistance, step, 0)
+    }
+
+    /**
+     * Walks a soldier towards a point by at most the given step, stopping the given distance short of it
      *
      * @return world units it moved
      */
-    private walk(soldier: Soldier, step: number, stop: number): number
+    private walk(soldier: Soldier, x: number, z: number, step: number, stopDistance: number): number
     {
-        const dx = soldier.goalX - soldier.x, dz = soldier.goalZ - soldier.z
+        const dx = x - soldier.x, dz = z - soldier.z
         const distance = Math.hypot(dx, dz)
-        if (distance <= stop)
+        if (distance <= stopDistance)
         {
             return 0
         }
-        const length = Math.min(step, distance - stop)
-        const { x, z } = soldier
+        const length = Math.min(step, distance - stopDistance)
+        const fromX = soldier.x, fromZ = soldier.z
         this.floor.move(soldier, dx / distance * length, dz / distance * length)
-        const moved = Math.hypot(soldier.x - x, soldier.z - z)
+        const moved = Math.hypot(soldier.x - fromX, soldier.z - fromZ)
         soldier.walked += moved
         soldier.moving = moved > 0
         return moved
@@ -431,6 +556,14 @@ const hold = leaf<Soldier, SoldierContext>("hold", {
     }
 })
 
+const flank = leaf<Soldier, SoldierContext>("flank", {
+    tick: (soldier, { pack, delta }) =>
+    {
+        pack.flank(soldier, delta)
+        return "running"
+    }
+})
+
 const approach = leaf<Soldier, SoldierContext>("approach", {
     tick: (soldier, { pack, delta }) =>
     {
@@ -449,7 +582,8 @@ const wander = leaf<Soldier, SoldierContext>("wander", {
 
 /**
  * Soldiers guard for a while after each swing and when struck, go after heroes they saw and swing at them once in reach
- * with the shield down, and wander about otherwise
+ * with the shield down, and wander about otherwise. Skilled ones going after the same hero flank them from all sides and
+ * swing together.
  */
 export const SOLDIER_TREE = new Tree<Soldier, SoldierContext>(selector("soldier",
     sequence("guard", condition("guarding", ({ guarding }) => guarding), guard),
@@ -459,11 +593,17 @@ export const SOLDIER_TREE = new Tree<Soldier, SoldierContext>(selector("soldier"
             sequence("strike",
                 condition("in reach", ({ x, z, goalX, goalZ, kind }, { prey }) =>
                     prey !== null && Math.hypot(goalX - x, goalZ - z) <= kind.reach),
+                condition("in place", ({ slotAngle, inPlace }) => slotAngle === null || inPlace),
                 selector("swing or wait",
-                    sequence("cut", condition("shield down", ({ shield }) => shield === 0), swing),
+                    sequence("cut",
+                        condition("shield down", ({ shield }) => shield === 0),
+                        condition("on cue", ({ onCue }) => onCue),
+                        swing
+                    ),
                     hold
                 )
             ),
+            sequence("flanking", skilled(FLANK_SKILL), condition("has a slot", ({ slotAngle }) => slotAngle !== null), flank),
             approach
         )
     ),

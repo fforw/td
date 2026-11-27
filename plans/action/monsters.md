@@ -15,7 +15,8 @@ placed in is in [spawns](../dungeon/spawns.md).
 ## Behavior trees
 
 `monster/behavior.ts`. Monsters with choices to make decide by a tree,
-the simple ones keep their own code. Wizards are on one so far.
+the simple ones keep their own code. Wizards and soldiers are on one so
+far.
 
 - A tree is shared by all monsters of a kind and holds no state. What a
   monster runs is in its `Memory`, and anything else the tree needs is
@@ -134,6 +135,15 @@ and reach to match.
   The first half of the clip goes up, the second half comes down from as
   far as it got. Swing and block never overlap and start and end at rest,
   so neither fades.
+- From `FLANK_SKILL` up soldiers going after the same hero spread around
+  them, opposite each other for two, as a shield only covers the front.
+  They take the slots in the order they are around the hero, so nobody
+  crosses over, and the slots are turned so that all go about as far.
+  They circle out of reach of the sword, facing the hero, and step in at
+  their slot.
+- They swing together, once all are in place, so the hero can't face
+  them all. One that can't get there doesn't hold the others up for
+  long (`CUE_WAIT_TIME`).
 - The walk splits by bone: the body walks on beneath a guard, while the
   arms give way to swinging and guarding. Each clip has only the bones
   its action moves, or a guard would hold the body still.

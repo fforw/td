@@ -4,12 +4,14 @@ import { BRUTE } from "../../src/monster/brutes"
 import Monsters, { HERO_RADIUS, type MonsterFloor, type Prey } from "../../src/monster/monsters"
 import { blockTime } from "../../src/monster/SoldierCrowd"
 import SoldierPack, {
+    CUE_WAIT_TIME,
     CUT_TIME,
     GUARD_MAX,
     GUARD_MIN,
     LOWER_TIME,
     RAISE_TIME,
     SHIELD_UP,
+    SLOT_ANGLE_TOLERANCE,
     SOLDIER,
     type Soldier,
     SWING_TIME
@@ -207,5 +209,58 @@ describe("Soldiers", () => {
         assert(blockTime({ ...soldier, guarding: false, shield: 0 }, duration) === duration)
         // dropped halfway up, it lowers from halfway down
         assert.closeTo(blockTime({ ...soldier, guarding: false, shield: 0.5 }, duration), 0.75, 1e-9)
+    })
+})
+
+
+describe("Soldiers together", () => {
+
+    /** angle of a soldier around the origin, as a meeple facing from it */
+    const angleOf = ({ x, z }: Soldier) => Math.atan2(x, z)
+
+    /**
+     * Two soldiers of the given skill coming at a hero at the origin from about the same side, each frame until both swing
+     *
+     * @return seconds into the fight each started swinging
+     */
+    function fight(skill: number, kind = SOLDIER): { soldiers: SoldierPack, a: Soldier, b: Soldier, started: number[] }
+    {
+        const soldiers = new SoldierPack(openFloor())
+        const a = soldiers.add(SOLDIER, 0, 0, SOLDIER.reach * 3, skill)
+        const b = soldiers.add(kind, 0, SOLDIER.reach, SOLDIER.reach * 3.5, skill)
+        const hero = prey()
+        const started = [Infinity, Infinity]
+        let t = 0
+        run(soldiers, 12, [hero], () =>
+        {
+            t += FRAME
+            started.forEach((time, i) =>
+            {
+                if (time === Infinity && [a, b][i].attack !== null)
+                {
+                    started[i] = t
+                }
+            })
+        })
+        return { soldiers, a, b, started }
+    }
+
+    it("flank a hero from opposite sides once skilled, and swing together", () => {
+        const { a, b, started } = fight(0.5)
+        assert.isBelow(Math.max(...started), Infinity)
+        assert.isAtMost(Math.abs(started[0] - started[1]), 2 * FRAME)
+        assert.isAtLeast(Math.abs(Math.atan2(Math.sin(angleOf(a) - angleOf(b)), Math.cos(angleOf(a) - angleOf(b)))), Math.PI - 2 * SLOT_ANGLE_TOLERANCE)
+    })
+
+    it("come straight at a hero unless skilled", () => {
+        const { a, b, started } = fight(0)
+        assert.isBelow(Math.max(...started), Infinity)
+        assert.isBelow(Math.abs(angleOf(a) - angleOf(b)), Math.PI / 2)
+    })
+
+    it("swing alone after a while when the other can't get to its place", () => {
+        const { started } = fight(0.5, { ...SOLDIER, speed: 0 })
+        assert.isAtLeast(started[0], CUE_WAIT_TIME)
+        assert.strictEqual(started[1], Infinity)
     })
 })
