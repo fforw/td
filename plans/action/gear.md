@@ -47,6 +47,11 @@ before monsters get more dangerous in groups.
 - A weapon that fell lies on the floor, not in a bubble like loot, as it
   belongs to the hero who threw it, with a glint under it to be found in
   the dark. Only that hero picks it up again, by walking over it.
+- Out of a fight, a hero gets back what of theirs lies on the floor as
+  soon as it landed, so a weapon left behind isn't worth walking back
+  for, or lost in the dark. In a fight, fetching it is the price of a
+  throw. What sticks in a monster stays there, as that monster still has
+  to be killed.
 - What isn't picked up when the hero walks out of the level, or gets
   carried out, is lost. When the level gets built anew, as the view went
   to another one, all of it is back with the hero.

@@ -368,6 +368,28 @@ export default class Shots
     }
 
     /**
+     * Gives a hero back the weapons of theirs on the floor, once they landed, for when the hero is out of a fight. Those
+     * in the air or in monsters stay.
+     *
+     * @return the kinds of the weapons given back
+     */
+    recall(owner: number): Thrown[]
+    {
+        const taken: Thrown[] = []
+        const { lying } = this
+        for (let i = lying.length - 1; i >= 0; i--)
+        {
+            const weapon = lying[i]
+            if (weapon.owner === owner && weapon.age >= FALL_TIME)
+            {
+                lying.splice(i, 1)
+                taken.push(weapon.kind)
+            }
+        }
+        return taken
+    }
+
+    /**
      * Takes all weapons of a hero out of the level, who leaves them behind
      *
      * @return how many of each kind they lose

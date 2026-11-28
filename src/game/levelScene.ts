@@ -1869,7 +1869,13 @@ export default class LevelScene
         }
         for (const [id, { meeple: { position }, hp }] of this.shown)
         {
-            if (hp > 0 && shots.pickUp(id, position.x, position.z).length > 0)
+            if (hp === 0)
+            {
+                continue
+            }
+            // out of a fight, what got left behind comes back
+            const taken = shots.pickUp(id, position.x, position.z).length + (this.inFight(id) ? 0 : shots.recall(id).length)
+            if (taken > 0)
             {
                 if (id === this.focus)
                 {

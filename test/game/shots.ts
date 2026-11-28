@@ -147,6 +147,22 @@ describe("Shots", () => {
         assert.strictEqual(shots.outOf(1, "dagger"), 0)
     })
 
+    it("gives a hero back what of theirs landed on the floor, but not what is in a monster", () => {
+        const shots = new Shots(floor)
+        shots.launch(1, DAGGER, { face: 1, x: 9.9, z: 0 }, 1, 0)
+        shots.launch(2, DAGGER, { face: 1, x: 9.9, z: 0 }, 1, 0)
+        shots.update(FRAME, targets([]))
+        assert.deepEqual(shots.recall(1), [])
+        run(shots, FALL_TIME, targets([]))
+        assert.deepEqual(shots.recall(1), ["dagger"])
+        assert.strictEqual(shots.outOf(1, "dagger"), 0)
+        assert.strictEqual(shots.outOf(2, "dagger"), 1)
+
+        shots.stuck.push({ kind: "axe", owner: 1, monster: monsterAt(2), side: 0 })
+        assert.deepEqual(shots.recall(1), [])
+        assert.strictEqual(shots.outOf(1, "axe"), 1)
+    })
+
     it("bursts balls on what they hit, without anything left", () => {
         const shots = new Shots(floor)
         const monster = monsterAt(2)
