@@ -51,15 +51,21 @@ export type NearSpaces = [number, number]
 export interface LevelSpaces
 {
     rooms: readonly (readonly number[])[]
-    corridors: readonly Pick<Corridor, "faces">[]
+    corridors: readonly Pick<Corridor, "faces" | "fromFace" | "toFace">[]
 }
+
+/**
+ * Most faces of a corridor that shares the space of a room it leads to. A corridor that is just a doorway between two
+ * rooms would else have walls of its own to cut on the way through, and leave those of the room it comes from standing.
+ */
+export const SHORT_CORRIDOR = 2
 
 /**
  * What it takes to tell which walls are near for which space
  */
 export interface NearWalls
 {
-    /** space by global face id, from 1: the rooms in their order, then the corridors */
+    /** space by global face id, from 1: the rooms in their order, then the corridors, see findSpaces() */
     spaceOf: ReadonlyMap<number, number>
     /** returns the space at a place in world units, 0 if there is no floor */
     spaceAt: (x: number, z: number) => number
@@ -69,20 +75,23 @@ export interface NearWalls
 
 
 /**
- * Returns the space of each floor face of a level, from 1: the rooms in their order, then the corridors
+ * Returns the space of each floor face of a level, from 1: the rooms in their order, then the corridors. A short corridor
+ * shares the space of the larger room it leads to, and its own number goes unused, so that the numbers stay the same.
  */
 export function findSpaces({ rooms, corridors }: LevelSpaces): Map<number, number>
 {
     const spaceOf = new Map<number, number>()
     rooms.forEach((faces, room) => faces.forEach(face => spaceOf.set(face, room + 1)))
-    corridors.forEach(({ faces }, corridor) => {
-        for (const face of faces)
-        {
-            if (!spaceOf.has(face))
-            {
-                spaceOf.set(face, rooms.length + corridor + 1)
-            }
-        }
+    const roomOf = new Map(spaceOf)
+    corridors.forEach(({ faces, fromFace, toFace }, corridor) => {
+        const own = faces.filter(face => !spaceOf.has(face))
+        // the rooms at its ends, a corridor it branches off doesn't count, even if it has the space of a room
+        const ends = [fromFace, toFace]
+            .map(face => roomOf.get(face) ?? 0)
+            .filter(space => space)
+            .sort((a, b) => rooms[b - 1].length - rooms[a - 1].length || a - b)
+        const space = own.length <= SHORT_CORRIDOR && ends.length ? ends[0] : rooms.length + corridor + 1
+        own.forEach(face => spaceOf.set(face, space))
     })
     return spaceOf
 }

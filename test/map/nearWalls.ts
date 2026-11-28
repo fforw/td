@@ -51,8 +51,34 @@ describe("findSpaces", () => {
 
     it("numbers the rooms from 1 and the corridors after them", () => {
 
-        const spaces = findSpaces({ rooms: [[1, 2], [3]], corridors: [{ faces: [2, 4, 3] }, { faces: [5] }] })
-        assert.deepEqual([...spaces], [[1, 1], [2, 1], [3, 2], [4, 3], [5, 4]])
+        const spaces = findSpaces({
+            rooms: [[1, 2], [3]],
+            corridors: [{ faces: [4, 5, 6], fromFace: 2, toFace: 3 }, { faces: [7], fromFace: 5, toFace: 8 }]
+        })
+        assert.deepEqual([...spaces], [[1, 1], [2, 1], [3, 2], [4, 3], [5, 3], [6, 3], [7, 4]])
+    })
+
+    it("gives short corridors the space of the larger room they lead to", () => {
+
+        const rooms = [[1], [2, 3], [4]]
+        const spaces = findSpaces({
+            rooms,
+            corridors: [
+                { faces: [5], fromFace: 1, toFace: 2 },
+                { faces: [6, 7], fromFace: 4, toFace: 3 },
+                // branches off the first corridor
+                { faces: [8], fromFace: 5, toFace: 4 },
+                // between rooms of the same size, the first one
+                { faces: [9], fromFace: 4, toFace: 1 }
+            ]
+        })
+        assert.deepEqual([5, 6, 7, 8, 9].map(face => spaces.get(face)), [2, 2, 2, 3, 1])
+    })
+
+    it("keeps the space of a corridor of its own with no room at its ends", () => {
+
+        const spaces = findSpaces({ rooms: [[1]], corridors: [{ faces: [2], fromFace: 3, toFace: 4 }] })
+        assert.equal(spaces.get(2), 2)
     })
 })
 

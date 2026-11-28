@@ -27,6 +27,10 @@
   reaches that deep.
 - Walls only give way for the space the hero is in. Opening the spaces
   close to the hero as well made the wall they walk up to give way.
+- A corridor of a face or two shares the space of the larger room it
+  leads to (`findSpaces()`). Most corridors are that short, just a
+  doorway between rooms, and as spaces of their own they had walls to
+  cut on the way through and left those of the room behind standing.
 - Thick walls are cut about a face deep: each triangle of their ground
   takes the first floor straight behind its middle as the view has it,
   with floor to both sides. Cutting all around the edges of the floor
@@ -113,8 +117,8 @@
 
 ## Planned
 
-- Several small spaces within a few steps keep the walls changing. That
-  could take a delay, or merging small spaces with their neighbors.
+- Several small spaces within a few steps keep the walls changing, now
+  only along longer corridors. That could take a delay.
 - A wireframe with hidden lines as an outline on top of cut walls.
 - Silhouettes for monsters seen behind a wall, which needs attacks to
   stop at walls, in both directions.
