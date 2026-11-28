@@ -42,6 +42,12 @@ const HURT_RATE = 1.12
 const HURT_VOLUME = 0.8
 
 /**
+ * Hit for the hero the player steers getting hurt, on top of the ouch, so it stands out from the others getting hurt
+ */
+const PLAYER_HURT_SOUND = "player-hurt.mp3"
+const PLAYER_HURT_VOLUME = 0.7
+
+/**
  * Cries of the big monsters that die with one, a bit lower than recorded for their size
  */
 const DEATH_SOUNDS = numbered("meeple-death", 2)
@@ -108,7 +114,7 @@ function spread(rate: number): number
 export function loadFightSounds(): void
 {
     const loudest = [...Object.values(HIT_SOUNDS), ...ZIP_SOUNDS].map(({ name }) => name)
-    for (const name of [...loudest, ...MISS_SOUNDS, ...HURT_SOUNDS, ...DEATH_SOUNDS])
+    for (const name of [...loudest, ...MISS_SOUNDS, ...HURT_SOUNDS, ...DEATH_SOUNDS, PLAYER_HURT_SOUND])
     {
         void loadEffect(name)
     }
@@ -135,11 +141,17 @@ export function playBlow(blows: readonly Blow[]): void
 }
 
 /**
- * Plays a hero saying ouch
+ * Plays a hero saying ouch, with a hit on top for the one the player steers
+ *
+ * @param steered   whether it is the hero the player steers
  */
-export function playHurt(): void
+export function playHurt(steered: boolean): void
 {
     playEffect(hurts.next(), spread(HURT_RATE), HURT_VOLUME)
+    if (steered)
+    {
+        playEffect(PLAYER_HURT_SOUND, 1, PLAYER_HURT_VOLUME)
+    }
 }
 
 /**

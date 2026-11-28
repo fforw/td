@@ -1723,7 +1723,7 @@ export default class LevelScene
     private hurtHero(id: number, hero: ShownHero, damage: number): void
     {
         hero.hp = Math.max(0, hero.hp - damage)
-        playHurt()
+        playHurt(id === this.focus)
         if (id === this.focus)
         {
             this.element.animate(HURT_FLASH, HURT_FLASH_TIME)

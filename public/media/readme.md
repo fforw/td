@@ -26,3 +26,5 @@ Gets copied to "docs/media/"
  * sounds/sigil-stroke.mp3: [Sword_Fire01](https://freesound.org/people/SonoFxAudio/sounds/649361/) by SonoFxAudio from Freesound (CC BY 4.0); the original is in media-src/freesound/.
 
  * sounds/sigil-trigger.mp3: [Abstract Siren](https://freesound.org/people/Zeraora/sounds/875686/) by Zeraora from Freesound (CC0), shortened; the original is in media-src/freesound/.
+
+ * sounds/player-hurt.mp3: [8-Bit Hit](https://freesound.org/people/Qvantor/sounds/878322/) by Qvantor from Freesound (CC0); the original is in media-src/freesound/.
