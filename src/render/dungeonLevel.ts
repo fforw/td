@@ -3,22 +3,23 @@ import { findWallSegments } from "../map/dungeonLights"
 import type { DungeonLevel } from "../map/generateDungeon"
 import { FaceType } from "../map/geometry"
 import { LEVEL_PRIORITY } from "../map/marchingSquares"
-import { createCutFinder, createNearWalls, createSpaceGrid, createWallFinder, type NearWalls } from "../map/nearWalls"
+import { createNearWalls, createWallFinder, type NearWalls } from "../map/nearWalls"
 import PatchWorld from "../map/PatchWorld"
 import { applyLightField, createLightField, type LightField } from "./dungeonLighting"
 import {
     createDoorSills,
+    createThickWallCutSides,
     createThickWallGround,
-    createThickWallInsides,
     createThickWalls,
     createThinWallCorners,
     createThinWalls,
+    joinThickWallGrounds,
     WALL_INSIDE_COLOR
 } from "./dungeonMeshes"
 import { createFloorPatterns } from "./floorPatterns"
 import { createGround } from "./patchMeshes"
 import { GROUND_COLORS } from "./scene3d"
-import { applyInsideCut, applyWallCut, createWallCut, type WallCut } from "./wallCut"
+import { applyWallCut, createWallCut, type WallCut } from "./wallCut"
 
 /**
  * Ground colors of a level. The ground under thick walls is as dark as their unlit tops, as it shows through the walls
@@ -88,18 +89,17 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
     const patterns = createFloorPatterns(world, rooms, seed)
     const wallGrounds = slots.map(slot => createThickWallGround(world, slot, near))
     const inThickWall = createWallFinder(wallGrounds)
+    const thickWallGround = joinThickWallGrounds(wallGrounds)
     const walls: Mesh[] = [
-        ...slots.map((slot, i) => createThickWalls(world, slot, near, wallGrounds[i])),
+        createThickWalls(thickWallGround),
         createThinWalls(world, slots, false, near, inThickWall),
         createThinWalls(world, slots, true, near, inThickWall),
         createThinWallCorners(world, slots, near)
     ]
-    // unlit, and without a glass side: what is in front of it fades already
-    const cutAt = createCutFinder(wallGrounds)
-    const insides = wallGrounds.map(ground => createThickWallInsides(ground, near, cutAt))
-    const insideMaterial = (insides[0].material as Material).clone()
-    applyInsideCut(insideMaterial, cut, createSpaceGrid(world, near, inThickWall))
-    insides.forEach(mesh => mesh.material = insideMaterial)
+    // unlit, and without a glass side: they only show where the piece next to them is cut
+    const cutSides = createThickWallCutSides(thickWallGround)
+    cutSides.material = (cutSides.material as Material).clone()
+    applyWallCut(cutSides.material, cut, false)
     // the see-through side of the cut, see WallCut
     const glass = walls.map(mesh => mesh.clone())
     lightMeshes(ground, field)
@@ -116,7 +116,7 @@ export function createLevelMeshes(level: DungeonLevel): LevelMeshes
 
     return {
         world,
-        meshes: [...ground, ...patterns, sills, ...walls, ...insides, ...glass],
+        meshes: [...ground, ...patterns, sills, ...walls, cutSides, ...glass],
         field,
         segments: findWallSegments(world, slots),
         cut,

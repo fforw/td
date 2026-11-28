@@ -1,5 +1,4 @@
 import {
-    BackSide,
     BoxGeometry,
     BufferGeometry,
     Float32BufferAttribute,
@@ -15,12 +14,9 @@ import {
 import { wallGround, type WallGround } from "../map/dungeonWalls"
 import { EdgeType, FaceType } from "../map/geometry"
 import {
-    type CutFinder,
-    isExposed,
-    isFarSide,
     type NearSpaces,
     type NearWalls,
-    thickWallSpaces,
+    thickWallCuts,
     thinWallEndSpaces,
     thinWallSpace
 } from "../map/nearWalls"
@@ -89,16 +85,12 @@ const wallMaterial = new MeshStandardMaterial({ color: "#6e6c72", roughness: 1 }
 const singleWallMaterial = new MeshStandardMaterial({ color: "#423935", roughness: 0.3 })
 
 /**
- * Color of the inside of thick walls, which shows through the walls that are cut. It is that of their unlit tops.
+ * Color of the sides where cut and solid parts of thick walls meet, which show through the walls that are cut. It is that
+ * of their unlit tops, and of the ground under the walls.
  */
 export const WALL_INSIDE_COLOR = "#08080a"
 
-/**
- * Length of the pieces the insides of thick walls come in, in world units. Those that are never seen are left out.
- */
-const WALL_INSIDE_PIECE = 0.2
-
-const wallInsideMaterial = new MeshBasicMaterial({ color: WALL_INSIDE_COLOR, side: BackSide })
+const cutSideMaterial = new MeshBasicMaterial({ color: WALL_INSIDE_COLOR })
 const thinWallGeometry = new BoxGeometry(1, 1, 1)
 
 /**
@@ -121,14 +113,14 @@ const NO_SPACES: NearSpaces = [0, 0]
 
 
 /**
- * Wall ground of a patch with what its corners get cut for
+ * Wall ground with what each of its triangles gets cut for
  */
 export interface ThickWallGround extends WallGround
 {
     /**
-     * Spaces by corner, see thickWallSpaces()
+     * Spaces for each triangle, see thickWallCuts()
      */
-    spaces: Map<string, NearSpaces>
+    cuts: NearSpaces[]
 }
 
 
@@ -138,46 +130,114 @@ export interface ThickWallGround extends WallGround
 export function createThickWallGround(world: PatchWorld, slot: number, near?: NearWalls): ThickWallGround
 {
     const ground = wallGround(world, slot)
-    return { ...ground, spaces: near ? thickWallSpaces(ground.triangles, near) : new Map() }
+    return { ...ground, cuts: near ? thickWallCuts(ground.triangles, near) : ground.triangles.filter((_, i) => i % 6 === 0).map(() => NO_SPACES) }
 }
 
 
 /**
- * Creates the thick walls of the packed patch in the given slot of the world: the wall ground raised to wall height, with
- * sides along its outline. The sides between patches are inside of the wall and never get seen.
- *
- * @param world     world with all patches of the level
- * @param slot      slot of the patch
- * @param near      tells the near walls, which gives each corner the spaces to get cut for, see applyWallCut()
- * @param ground    wall ground of the patch, for those who have it already
+ * Joins the wall grounds of the patches of a level into one, so that the walls don't have sides along the seams between
+ * the patches
  */
-export function createThickWalls(world: PatchWorld, slot: number, near?: NearWalls, ground = createThickWallGround(world, slot, near)): Mesh
+export function joinThickWallGrounds(grounds: readonly ThickWallGround[]): ThickWallGround
+{
+    return {
+        triangles: grounds.flatMap(({ triangles }) => triangles),
+        outline: grounds.flatMap(({ outline }) => outline),
+        cuts: grounds.flatMap(({ cuts }) => cuts)
+    }
+}
+
+
+/**
+ * Sides of thick walls, as [x0, z0, x1, z1] with the outside on the side of (z0 - z1, x1 - x0) like the outline of the
+ * wall ground, and the spaces the triangle they belong to gets cut for
+ */
+interface ThickWallSides
+{
+    /** those facing out of the wall */
+    outer: [number[], NearSpaces][]
+    /** those between triangles that get cut for different spaces */
+    cut: [number[], NearSpaces][]
+}
+
+
+function sameCut([a0, a1]: NearSpaces, [b0, b1]: NearSpaces): boolean
+{
+    return a0 === b0 && a1 === b1 || a0 === b1 && a1 === b0
+}
+
+
+/**
+ * Returns the sides of the thick walls. Triangles that get cut for the same spaces make up closed pieces of the walls, with
+ * sides to the outside and to the pieces next to them.
+ */
+function thickWallSides({ triangles, cuts }: ThickWallGround): ThickWallSides
+{
+    const key = (x0: number, z0: number, x1: number, z1: number) => x0 + "," + z0 + "," + x1 + "," + z1
+    const triangleOf = new Map<string, number>()
+    for (let i = 0; i < triangles.length; i += 6)
+    {
+        for (let j = 0; j < 6; j += 2)
+        {
+            const k = (j + 2) % 6
+            triangleOf.set(key(triangles[i + j], triangles[i + j + 1], triangles[i + k], triangles[i + k + 1]), i / 6)
+        }
+    }
+
+    const sides: ThickWallSides = { outer: [], cut: [] }
+    for (let i = 0; i < triangles.length; i += 6)
+    {
+        const cut = cuts[i / 6]
+        for (let j = 0; j < 6; j += 2)
+        {
+            const k = (j + 2) % 6
+            const x0 = triangles[i + j], z0 = triangles[i + j + 1], x1 = triangles[i + k], z1 = triangles[i + k + 1]
+            const other = triangleOf.get(key(x1, z1, x0, z0))
+            if (other === undefined)
+            {
+                sides.outer.push([[x0, z0, x1, z1], cut])
+            }
+            else if (!sameCut(cut, cuts[other]))
+            {
+                sides.cut.push([[x0, z0, x1, z1], cut])
+            }
+        }
+    }
+    return sides
+}
+
+
+/**
+ * Creates the thick walls: the wall ground raised to wall height, with sides along its outline. Each corner tells the spaces
+ * it gets cut for in its "nearSpace" attribute, see applyWallCut(). The triangles that get cut for the same spaces make up
+ * pieces that are closed by createThickWallCutSides(), so that what shows through a cut is always a wall.
+ *
+ * @param ground    wall ground of a patch, or those of all patches joined
+ */
+export function createThickWalls(ground: ThickWallGround): Mesh
 {
     const positions: number[] = []
     const nearSpace: number[] = []
-    const { triangles, outline, spaces } = ground
-    const spacesAt = (x: number, z: number): NearSpaces => spaces.get(x + "," + z) ?? NO_SPACES
+    const { triangles, cuts } = ground
 
     for (let i = 0; i < triangles.length; i += 2)
     {
         positions.push(triangles[i] * SCALE, THICK_WALL_HEIGHT, triangles[i + 1] * SCALE)
-        nearSpace.push(...spacesAt(triangles[i], triangles[i + 1]))
+        nearSpace.push(...cuts[Math.floor(i / 6)])
     }
 
-    for (const segment of outline)
+    for (const [segment, cut] of thickWallSides(ground).outer)
     {
-        const [x0, z0, x1, z1] = segment
-        const a = spacesAt(x0, z0), b = spacesAt(x1, z1)
         pushSide(positions, segment)
-        nearSpace.push(...a, ...b, ...b, ...a, ...b, ...a)
+        for (let i = 0; i < 6; i++)
+        {
+            nearSpace.push(...cut)
+        }
     }
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
-    if (near)
-    {
-        geometry.setAttribute("nearSpace", new Float32BufferAttribute(nearSpace, 2))
-    }
+    geometry.setAttribute("nearSpace", new Float32BufferAttribute(nearSpace, 2))
     // flat sides would each look like a column bulging out under the light, which changes direction along them
     geometry.setAttribute("normal", new Float32BufferAttribute(smoothNormals(positions, SMOOTH_ANGLE), 3))
     geometry.computeBoundingSphere()
@@ -186,51 +246,30 @@ export function createThickWalls(world: PatchWorld, slot: number, near?: NearWal
 
 
 /**
- * Creates the insides of the sides of the thick walls of a patch, which close the walls behind what is cut of them. They
- * are only seen from within the wall, and make way for what is seen past them, see applyInsideCut().
+ * Creates the sides between the pieces of the thick walls that get cut for different spaces, which close each piece. They
+ * face out of their piece and are unlit, so a solid piece shows a dark side where the one next to it is cut. They belong
+ * to their piece in the "nearSpace" attribute, for applyWallCut() to leave them out when it is cut.
  *
- * @param ground    wall ground of the patch
- * @param near      tells the near walls
- * @param cutAt     tells what gets cut, which leaves out the pieces that are never seen
+ * @param ground    wall ground of a patch, or those of all patches joined
  */
-export function createThickWallInsides({ outline }: WallGround, near: NearWalls, cutAt: CutFinder): Mesh
+export function createThickWallCutSides(ground: ThickWallGround): Mesh
 {
     const positions: number[] = []
-    for (const [x0, z0, x1, z1] of outline)
+    const nearSpace: number[] = []
+    for (const [segment, cut] of thickWallSides(ground).cut)
     {
-        if (!isFarSide(z0 - z1, x1 - x0, near))
+        pushSide(positions, segment)
+        for (let i = 0; i < 6; i++)
         {
-            continue
-        }
-        const columns = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) * SCALE / WALL_INSIDE_PIECE))
-        const dx = (x1 - x0) / columns, dz = (z1 - z0) / columns
-        // pieces next to each other become one
-        let start = -1
-        for (let column = 0; column <= columns; column++)
-        {
-            const exposed = column < columns && isExposed(
-                (x0 + dx * (column + 0.5)) * SCALE,
-                (z0 + dz * (column + 0.5)) * SCALE,
-                THICK_WALL_HEIGHT,
-                cutAt,
-                near
-            )
-            if (exposed && start < 0)
-            {
-                start = column
-            }
-            else if (!exposed && start >= 0)
-            {
-                pushSide(positions, [x0 + dx * start, z0 + dz * start, x0 + dx * column, z0 + dz * column])
-                start = -1
-            }
+            nearSpace.push(...cut)
         }
     }
 
     const geometry = new BufferGeometry()
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geometry.setAttribute("nearSpace", new Float32BufferAttribute(nearSpace, 2))
     geometry.computeBoundingSphere()
-    return new Mesh(geometry, wallInsideMaterial)
+    return new Mesh(geometry, cutSideMaterial)
 }
 
 

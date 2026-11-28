@@ -4,15 +4,11 @@ import { wallGround } from "../../src/map/dungeonWalls"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType } from "../../src/map/geometry"
 import {
-    createCutFinder,
     createNearWalls,
-    createSpaceGrid,
     createWallFinder,
     findSpaces,
-    isExposed,
-    SPACE_CELL,
     THICK_WALL_CUT_DEPTH,
-    thickWallSpaces,
+    thickWallCuts,
     thinWallEndSpaces,
     thinWallSpace,
     VIEW_AWAY
@@ -139,29 +135,35 @@ describe("thinWallEndSpaces", () => {
 })
 
 
-describe("thickWallSpaces", () => {
+describe("thickWallCuts", () => {
 
     it("cuts walls with floor right behind them, about a face deep", () => {
 
         const { dungeon, world, slots } = level()
         const near = createNearWalls(world, dungeon)
         const { triangles } = wallGround(world, slots[0])
-        const spaces = thickWallSpaces(triangles, near)
+        const cuts = thickWallCuts(triangles, near)
+        const cut = cuts.filter(([first]) => first)
 
-        assert.isAbove(spaces.size, 50)
-        assert.isBelow(spaces.size, triangles.length / 2)
+        assert.equal(cuts.length, triangles.length / 6)
+        assert.isAbove(cut.length, 50)
+        assert.isBelow(cut.length, cuts.length / 2)
 
-        for (const [key, [first]] of spaces)
-        {
-            // the first floor straight behind the corner as the view has it, so no other space lies in between
-            const [x, z] = key.split(",").map(Number)
+        cuts.forEach(([first], i) => {
+            if (!first)
+            {
+                return
+            }
+            // the first floor straight behind the middle as the view has it, so no other space lies in between
+            const x = (triangles[i * 6] + triangles[i * 6 + 2] + triangles[i * 6 + 4]) / 3 * SCALE
+            const z = (triangles[i * 6 + 1] + triangles[i * 6 + 3] + triangles[i * 6 + 5]) / 3 * SCALE
             let found = 0
             for (let reach = 0.1; reach <= THICK_WALL_CUT_DEPTH + 0.01 && !found; reach += 0.1)
             {
-                found = near.spaceAt(x * SCALE, z * SCALE - reach)
+                found = near.spaceAt(x, z - reach)
             }
-            assert.equal(found, first, key)
-        }
+            assert.equal(found, first, String(i))
+        })
     })
 
     it("doesn't spread sideways, or through a space to one further behind than the cut is deep", () => {
@@ -169,10 +171,13 @@ describe("thickWallSpaces", () => {
         // two rooms side by side and one far behind the right one, walls in front of them
         const spaceAt = (x: number, z: number) => z >= 0 ? 0 : x < 0 ? 1 : z > -2 ? 2 : 3
         const near = { spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY }
-        const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 2].map(v => v / SCALE)
-        const spaces = thickWallSpaces(triangles, near)
+        const triangles = [
+            -0.4, 0.3, -0.1, 0.3, -0.1, 0.6,
+            0.1, 0.3, 0.4, 0.3, 0.4, 0.6,
+            0.1, 1.4, 0.4, 1.4, 0.4, 1.7
+        ].map(v => v / SCALE)
 
-        assert.deepEqual([...spaces.values()], [[1, 0], [2, 0]])
+        assert.deepEqual(thickWallCuts(triangles, near), [[1, 0], [2, 0], [0, 0]])
     })
 
     it("cuts for the space behind a narrow strip of another one", () => {
@@ -180,21 +185,18 @@ describe("thickWallSpaces", () => {
         // a strip of a room in front of another room, the wall in front hides both
         const spaceAt = (x: number, z: number) => z >= 0 ? 0 : z > -0.3 ? 1 : 2
         const near = { spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY }
-        const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 2].map(v => v / SCALE)
-        const spaces = thickWallSpaces(triangles, near)
+        const triangles = [-0.2, 0.3, 0.2, 0.3, 0.2, 0.6].map(v => v / SCALE)
 
-        assert.deepEqual([...spaces.values()], [[1, 2], [1, 2]])
+        assert.deepEqual(thickWallCuts(triangles, near), [[1, 2]])
     })
 
     it("keeps the sides of walls that run along the view", () => {
 
-        // floor to the right, the wall sticks out a bit over its edge there
+        // floor to the right, the first wall sticks out a bit over its edge there, the second one well over it
         const near = { spaceOf: new Map<number, number>(), spaceAt: (x: number, z: number) => x > 0 && z < 0 ? 1 : 0, away: VIEW_AWAY }
-        const triangles = [0.05, 0.2, 0.5, 0.2, 0.5, 0.4].map(v => v / SCALE)
-        const spaces = thickWallSpaces(triangles, near)
+        const triangles = [-0.1, 0.2, 0.2, 0.2, 0.05, 0.4, 0.2, 0.2, 0.5, 0.2, 0.35, 0.4].map(v => v / SCALE)
 
-        assert.isFalse(spaces.has(triangles[0] + "," + triangles[1]))
-        assert.equal(spaces.size, 2)
+        assert.deepEqual(thickWallCuts(triangles, near), [[0, 0], [1, 0]])
     })
 
     it("cuts nothing without floor", () => {
@@ -202,113 +204,6 @@ describe("thickWallSpaces", () => {
         const { world, slots } = level()
         const near = createNearWalls(world, { rooms: [], corridors: [] })
         const { triangles } = wallGround(world, slots[0])
-        assert.equal(thickWallSpaces(triangles, near).size, 0)
-    })
-})
-
-
-describe("isExposed", () => {
-
-    // wall from z = 0 to 2 toward the camera, only cut for space 7, at the corner of the triangle at x = 2
-    const triangles = [-2, 0, -2, 2, 2, 0].map(v => v / SCALE)
-    const spaces = new Map([[triangles[4] + "," + triangles[5], [7, 0] as [number, number]]])
-    const cutAt = createCutFinder([{ triangles, spaces }])
-    const near = (spaceAt: (x: number, z: number) => number) =>
-        ({ spaceOf: new Map<number, number>(), spaceAt, away: VIEW_AWAY })
-
-    it("finds the spaces the wall gets cut for", () => {
-
-        assert.deepEqual([...cutAt(0, 0.5)], [7])
-        assert.deepEqual([...cutAt(1, 1.5)], [])
-    })
-
-    it("takes floor of another space behind a cut", () => {
-
-        assert.isTrue(isExposed(-1, 0, 0.6, cutAt, near(() => 1)))
-        assert.isTrue(isExposed(-1, 0, 0.6, cutAt, near((_, z) => z > -0.5 ? 7 : 1)))
-    })
-
-    it("leaves out what has only the space behind it that the wall is cut for, no floor, or no cut in front", () => {
-
-        assert.isFalse(isExposed(-1, 0, 0.6, cutAt, near(() => 7)))
-        assert.isFalse(isExposed(-1, 0, 0.6, cutAt, near(() => 0)))
-        assert.isFalse(isExposed(9, 0, 0.6, cutAt, near(() => 1)))
-    })
-})
-
-
-describe("createSpaceGrid", () => {
-
-    it("has the spaces at the middle of its cells", () => {
-
-        const { dungeon, world } = level()
-        const near = createNearWalls(world, dungeon)
-        const { minX, minZ, width, height, cells } = createSpaceGrid(world, near, () => false)
-        assert.equal(cells.length, width * height * 2)
-        for (const [face, space] of near.spaceOf)
-        {
-            // close enough to the middle of the face to be on it
-            const [x, z] = faceCenter(world, face)
-            const column = Math.floor((x - minX) / SPACE_CELL), row = Math.floor((z - minZ) / SPACE_CELL)
-            assert.equal(cells[(row * width + column) * 2], space)
-        }
-    })
-
-    it("tells thick walls from the gap between them and the floor", () => {
-
-        const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, dungeon)
-        const inThickWall = createWallFinder(slots.map(slot => wallGround(world, slot)))
-        const { minX, minZ, width, height, cells } = createSpaceGrid(world, near, inThickWall)
-        let walls = 0, gaps = 0
-        for (let row = 0; row < height; row++)
-        {
-            for (let column = 0; column < width; column++)
-            {
-                const x = minX + (column + 0.5) * SPACE_CELL, z = minZ + (row + 0.5) * SPACE_CELL
-                const value = cells[(row * width + column) * 2]
-                if (value > 0)
-                {
-                    assert.equal(value, near.spaceAt(x, z))
-                }
-                else if (inThickWall(x, z))
-                {
-                    assert.equal(value, -1)
-                    walls++
-                }
-                else
-                {
-                    assert.equal(value, 0)
-                    gaps++
-                }
-            }
-        }
-        assert.isAbove(walls, 0)
-        assert.isAbove(gaps, 0)
-    })
-
-    it("marks the cells along thin walls with the space they are near for", () => {
-
-        const { dungeon, world, slots } = level()
-        const near = createNearWalls(world, dungeon)
-        const { minX, minZ, width, cells } = createSpaceGrid(world, near, () => false)
-        const values = new Set<number>()
-        for (const h of thinWalls(world, slots))
-        {
-            if (near.spaceOf.has(h >> 2))
-            {
-                const { positions, vertex } = world.getPatch(h >> SLOT_SHIFT)
-                const local = h & ((1 << SLOT_SHIFT) - 1)
-                const v0 = vertex[local] * 3, v1 = vertex[next(local)] * 3
-                const column = Math.floor(((positions[v0] + positions[v1]) / 2 * SCALE - minX) / SPACE_CELL)
-                const row = Math.floor(((positions[v0 + 1] + positions[v1 + 1]) / 2 * SCALE - minZ) / SPACE_CELL)
-                // the middle can be right between cells
-                const around = [0, 1, -1].flatMap(dy => [0, 1, -1].map(dx => cells[((row + dy) * width + column + dx) * 2 + 1]))
-                const value = Math.max(...around.filter(v => v !== undefined))
-                assert.isAbove(value, 0)
-                values.add(value)
-            }
-        }
-        assert.isAbove(values.size, 5)
+        assert.isTrue(thickWallCuts(triangles, near).every(([first, second]) => !first && !second))
     })
 })

@@ -2,7 +2,7 @@ import { assert, describe, it } from "vitest"
 import { Matrix4, Vector3 } from "three"
 import { generateDungeon } from "../../src/map/generateDungeon"
 import { EdgeType, FaceType } from "../../src/map/geometry"
-import { createWallFinder } from "../../src/map/nearWalls"
+import { createNearWalls, createWallFinder } from "../../src/map/nearWalls"
 import PatchWorld, { SLOT_SHIFT } from "../../src/map/PatchWorld"
 import { faceOf, next, prev } from "../../src/map/QuadPatch"
 import { FACE_SIZE } from "../../src/map/scale"
@@ -10,6 +10,7 @@ import {
     addFlatCorner,
     addRoundedCorner,
     createDoorSills,
+    createThickWallCutSides,
     createThickWallGround,
     createThickWalls,
     createThinWallCorners,
@@ -19,6 +20,7 @@ import {
     DOOR_SILL_DEPTH,
     DOOR_SILL_HEIGHT,
     findDoorSills,
+    joinThickWallGrounds,
     smoothNormals,
     THICK_WALL_HEIGHT,
     THIN_WALL_HEIGHT,
@@ -51,7 +53,7 @@ describe("createThickWalls", () => {
         let tops = 0, sides = 0
         for (const slot of slots)
         {
-            const position = createThickWalls(world, slot).geometry.getAttribute("position")
+            const position = createThickWalls(createThickWallGround(world, slot)).geometry.getAttribute("position")
             for (let i = 0; i < position.count; i += 3)
             {
                 a.fromBufferAttribute(position, i)
@@ -82,7 +84,7 @@ describe("createThickWalls", () => {
         let bent = 0
         for (const slot of slots)
         {
-            const { geometry } = createThickWalls(world, slot)
+            const { geometry } = createThickWalls(createThickWallGround(world, slot))
             const position = geometry.getAttribute("position"), normals = geometry.getAttribute("normal")
             for (let i = 0; i < position.count; i += 3)
             {
@@ -106,6 +108,46 @@ describe("createThickWalls", () => {
             }
         }
         assert(bent > 0)
+    })
+
+    it("cuts whole triangles, as pieces closed by sides between them", () => {
+        const dungeon = generateDungeon(4711, FACE_SIZE, 2, 2)
+        const world = new PatchWorld()
+        const slots = dungeon.patches.map(patch => world.add(patch))
+        const near = createNearWalls(world, dungeon)
+        const ground = joinThickWallGrounds(slots.map(slot => createThickWallGround(world, slot, near)))
+
+        const spaces = createThickWalls(ground).geometry.getAttribute("nearSpace")
+        let cut = 0
+        for (let i = 0; i < spaces.count; i += 3)
+        {
+            for (let j = 1; j < 3; j++)
+            {
+                assert.equal(spaces.getX(i + j), spaces.getX(i))
+                assert.equal(spaces.getY(i + j), spaces.getY(i))
+            }
+            cut += spaces.getX(i) ? 1 : 0
+        }
+        assert.isAbove(cut, 100)
+
+        // each side between two pieces has one facing back from the other piece, which gets cut for other spaces
+        const sides = createThickWallCutSides(ground).geometry
+        const position = sides.getAttribute("position"), sideSpaces = sides.getAttribute("nearSpace")
+        const bySegment = new Map<string, string>()
+        const key = (a: number, b: number) =>
+            [position.getX(a), position.getZ(a), position.getX(b), position.getZ(b)].join(",")
+        const spacesOf = (i: number) => [sideSpaces.getX(i), sideSpaces.getY(i)].sort().join(",")
+        for (let i = 0; i < position.count; i += 6)
+        {
+            bySegment.set(key(i, i + 1), spacesOf(i))
+        }
+        assert.isAbove(bySegment.size, 50)
+        for (let i = 0; i < position.count; i += 6)
+        {
+            const other = bySegment.get(key(i + 1, i))
+            assert.isDefined(other)
+            assert.notEqual(other, spacesOf(i))
+        }
     })
 })
 

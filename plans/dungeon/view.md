@@ -27,11 +27,11 @@
   reaches that deep.
 - Walls only give way for the space the hero is in. Opening the spaces
   close to the hero as well made the wall they walk up to give way.
-- Thick walls are cut about a face deep: each corner takes the first
-  floor straight behind it as the view has it, with floor to both sides.
-  Cutting all around the edges of the floor spread to walls in front of
-  other spaces, and through thin walls.
-- A corner also takes the next space straight behind the first one
+- Thick walls are cut about a face deep: each triangle of their ground
+  takes the first floor straight behind its middle as the view has it,
+  with floor to both sides. Cutting all around the edges of the floor
+  spread to walls in front of other spaces, and through thin walls.
+- A triangle also takes the next space straight behind the first one
   within that depth. Else a narrow strip of another space between a wall
   and the open space leaves the wall standing in front of the open one.
 - Near walls of the open space turn see-through and stay where they are
@@ -44,29 +44,21 @@
 - The ground under thick walls shows through them and is near black in
   levels.
 
-## Insides of thick walls
+## Pieces of thick walls
 
-- Thick walls are hollow, and their tops and sides only show from
-  outside. Where a cut side met a solid top, the view went under the top
-  and out through the far side into a lit room next door.
-- The insides of the far sides close that off
-  (`createThickWallInsides()`), unlit, in the color of the ground under
-  walls.
-- Which of them make way depends on where the camera is, so each
-  fragment follows its line of sight down to the floor on a grid of the
-  spaces and thin walls (`applyInsideCut()`). It makes way if it comes to
-  an open space with no wall before that, or to floor of another space
-  with an open one straight on within the depth of the cut, which shows
-  through the cut anyway. The gap that thick walls keep from the floor
-  doesn't count as wall, else lines of sight grazing it left slivers.
-  Coming down in that gap counts as the floor right past it. Taken as no
-  floor at all, it made holes where lines of sight met the wall at a
-  slant, with the room behind showing through.
-  Fixed pieces for a view
-  straight on left a third of the leaks, and black shards.
-- Sides with nothing in front that gets cut, or with no other space
-  behind, are left out (`isExposed()`). The convex hull of the spaces
-  can't tell those.
+- The triangles that get cut for the same spaces make up a piece of a
+  thick wall, and each piece is closed (`createThickWalls()`,
+  `createThickWallCutSides()`). Where a piece meets another one, both get
+  a side, unlit and in the color of the ground under walls. A piece that
+  stays solid then shows a dark side where the one next to it is cut, and
+  what shows through a cut is always a wall or the open space.
+- That only depends on the level, not on where the camera is. Hollow
+  walls with insides that made way along each line of sight left holes
+  and slivers wherever a line of sight grazed a corner, case after case.
+- Cutting whole triangles keeps the edge of the cut straight up. Cutting
+  by corners let it fall across triangles at a slant.
+- The thick walls of all patches are one mesh, so they have no sides
+  along the seams between patches.
 - Thin walls end right inside of thick ones, as their lit ends showed
   through a cut.
 
