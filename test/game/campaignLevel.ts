@@ -20,8 +20,8 @@ describe("Campaign level", () => {
         }
     })
 
-    it("takes 800 experience to reach level 3", () => {
-        assert.strictEqual(levelXp(3), 800)
+    it("takes 300 experience to level 2, then 100 more for each level than the one before, from 500 on", () => {
+        assert.deepEqual([2, 3, 4, 5].map(levelXp), [300, 800, 1400, 2100])
         assert.strictEqual(campaignLevel(799), 2)
         assert.strictEqual(campaignLevel(800), 3)
     })

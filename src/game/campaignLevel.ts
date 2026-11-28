@@ -21,16 +21,16 @@ export const DEED_XP: Readonly<Record<Deed, number>> = {
 }
 
 /**
- * Experience it takes in all to reach level 3. Each level takes more than the one before, as the total grows by the
- * power, so levels come slower the further the campaign goes.
+ * Experience it takes to get from level 1 to level 2
  */
-const THIRD_LEVEL_XP = 800
-const LEVEL_XP_POWER = 1.5
+const FIRST_LEVEL_XP = 300
 
 /**
- * Experience it takes to get from level 1 to level 2, which the power makes the total for level 3
+ * Experience it takes to get from level 2 to level 3. Each level after takes the growth more than the one before, so
+ * levels come slower the further the campaign goes.
  */
-const FIRST_LEVEL_XP = THIRD_LEVEL_XP / 2 ** LEVEL_XP_POWER
+const SECOND_LEVEL_XP = 500
+const LEVEL_XP_GROWTH = 100
 
 /**
  * Campaign level at which monsters are halfway to the best they get, which they get ever slower towards
@@ -42,7 +42,13 @@ const HALF_SKILL_LEVEL = 9
  */
 export function levelXp(level: number): number
 {
-    return Math.round(FIRST_LEVEL_XP * (level - 1) ** LEVEL_XP_POWER)
+    if (level <= 1)
+    {
+        return 0
+    }
+    // the steps after the first one, from SECOND_LEVEL_XP on, growing by LEVEL_XP_GROWTH
+    const steps = level - 2
+    return FIRST_LEVEL_XP + steps * SECOND_LEVEL_XP + LEVEL_XP_GROWTH * steps * (steps - 1) / 2
 }
 
 /**
@@ -50,15 +56,10 @@ export function levelXp(level: number): number
  */
 export function campaignLevel(xp: number): number
 {
-    let level = 1 + Math.floor((Math.max(0, xp) / FIRST_LEVEL_XP) ** (1 / LEVEL_XP_POWER))
-    // the power can be off by a bit either way
+    let level = 1
     while (levelXp(level + 1) <= xp)
     {
         level++
-    }
-    while (level > 1 && levelXp(level) > xp)
-    {
-        level--
     }
     return level
 }
