@@ -18,7 +18,8 @@ const ROOT = join(import.meta.dirname, "..")
  * Blender files in media-src, and the folder in public/media their models go to
  */
 const BLENDS: Record<string, string> = {
-    "potions.blend": "treasure"
+    "potions.blend": "treasure",
+    "dagger.blend": "items"
 }
 
 /**

@@ -11,6 +11,8 @@ Gets copied to "docs/media/"
 
  * dungeon/: Stairs from [Mini Dungeon by Kenney](https://www.kenney.nl) (CC0), see dungeon/License.txt.
 
+ * items/axe.glb: Axe from [Survival Kit by Kenney](https://www.kenney.nl) (CC0), with its texture in items/Textures/. The other pictures in items/ are from the Voxel Pack by Kenney (CC0), see items/License.txt.
+
  * patterns/: Floor patterns from [Pattern Pack by Kenney](https://www.kenney.nl) (CC0), see patterns/License.txt.
 
  * sounds/sword-on-*.mp3: Sword hits from Freesound (CC BY 4.0), trimmed and normalized; the originals are in media-src/freesound/.

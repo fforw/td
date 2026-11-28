@@ -67,6 +67,8 @@ export const MODELS = {
     healthPotion: "treasure/health-potion.glb",
     speedPotion: "treasure/speed-potion.glb",
     strengthPotion: "treasure/strength-potion.glb",
+    dagger: "items/dagger.glb",
+    axe: "items/axe.glb",
     stairs: "dungeon/stairs.glb",
     switch: "dungeon/switch.glb",
 }
@@ -76,7 +78,7 @@ export type ModelName = keyof typeof MODELS
 /**
  * Paths of the models from Kenney kits, whose metalness is not to be trusted
  */
-const KIT = /^(castle|town|nature)\/|^treasure\/(chest|coin)\.glb$|^dungeon\/stairs\.glb$/
+const KIT = /^(castle|town|nature)\/|^treasure\/(chest|coin)\.glb$|^dungeon\/stairs\.glb$|^items\/axe\.glb$/
 
 /**
  * Strength of the reflection of the dungeon environment in metal
