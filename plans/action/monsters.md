@@ -3,6 +3,16 @@
 What all of them share is in [combat](combat.md), which rooms they get
 placed in is in [spawns](../dungeon/spawns.md).
 
+## Look
+
+The brute, the soldier and the wizard are rigged models
+(`monster/skinnedFigure.ts`). They are drawn like the meeples, with toon
+bands and dark outlines that turn into rims in the dark, as realistic
+shading made them look like they came from another game. Metal has
+darker bands and a small hard highlight instead of reflections, so it
+still reads as metal. The cuboid, the eye and the construct are
+creatures of a different kind and keep their own look.
+
 ## Placement and reloading
 
 - The spawn planner places monsters from the level seed. They aren't

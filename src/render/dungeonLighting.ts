@@ -777,7 +777,10 @@ export function applyRimLight(material: MeshBasicMaterial, { uniforms }: LightFi
             .replace("#include <common>", `#include <common>\nvarying float vRim;\nvarying vec3 vRimColor;\n${PARS}`)
             .replace("#include <begin_vertex>", /* glsl */`
                 #include <begin_vertex>
-                mat4 rimMatrix = modelMatrix * instanceMatrix;
+                mat4 rimMatrix = modelMatrix;
+                #ifdef USE_INSTANCING
+                rimMatrix = rimMatrix * instanceMatrix;
+                #endif
                 vec2 rimPosition = (rimMatrix * vec4(transformed, 1.0)).xz;
                 vec4 rimField;
                 vec2 rimDirection;

@@ -56,7 +56,12 @@ const HEAD_RAISE = 0.18
 /**
  * Thickness of the inverted hull outlines in meeple units
  */
-const OUTLINE = 0.022
+export const OUTLINE = 0.022
+
+/**
+ * Color of the outlines
+ */
+export const OUTLINE_COLOR = new Color("#1a1420")
 
 /**
  * Distance in head radii an eye is drawn in front of its point on the head. Facing the camera, an eye must clear the
@@ -307,10 +312,15 @@ export function randomTraits(): Pick<Meeple, "name" | "gait">
 }
 
 
-function createGradientMap(): DataTexture
+/**
+ * Creates the gradient map of toon materials
+ *
+ * @param bands     brightness from 0 to 255 from the side away from the light to the side towards it, three hard
+ *                  shading steps like the shadow and body tone of the 2D sprites by default
+ */
+export function createGradientMap(bands: readonly number[] = [90, 180, 255]): DataTexture
 {
-    // three hard shading steps like the shadow and body tone of the 2D sprites
-    const tex = new DataTexture(new Uint8Array([90, 180, 255]), 3, 1, RedFormat)
+    const tex = new DataTexture(new Uint8Array(bands), bands.length, 1, RedFormat)
     tex.minFilter = tex.magFilter = NearestFilter
     tex.needsUpdate = true
     return tex
@@ -567,7 +577,10 @@ function createItemPart(sprite: ItemSprite, gradientMap: DataTexture, capacity: 
 }
 
 
-function createOutlineMaterial(color: Color): MeshBasicMaterial
+/**
+ * Creates the material of an inverted hull outline around a part
+ */
+export function createOutlineMaterial(color: Color = OUTLINE_COLOR): MeshBasicMaterial
 {
     const material = new MeshBasicMaterial({ color, side: BackSide })
     material.onBeforeCompile = shader => {
@@ -869,7 +882,7 @@ export default class MeepleCrowd
 
         if (outline)
         {
-            const hull = new InstancedMesh(geometry, createOutlineMaterial(new Color("#1a1420")), this.capacity)
+            const hull = new InstancedMesh(geometry, createOutlineMaterial(), this.capacity)
             // share the matrices, so the hull always follows its part
             hull.instanceMatrix = mesh.instanceMatrix
             hull.frustumCulled = false
