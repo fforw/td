@@ -98,6 +98,7 @@ export const BIG_CUBOID: CuboidKind = {
     // all of it only when smitten, as it breaks up into small ones otherwise
     burst: CUBOID_BURST,
     material: "flesh",
+    humanoid: false,
     deathCry: false,
     damage: 3,
     hopLength: 0.38 * FIGURE_SCALE,
@@ -117,6 +118,7 @@ export const SMALL_CUBOID: CuboidKind = {
     flying: false,
     burst: CUBOID_BURST,
     material: "flesh",
+    humanoid: false,
     deathCry: false,
     damage: 1,
     hopLength: 0.3 * FIGURE_SCALE,

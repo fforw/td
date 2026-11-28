@@ -154,7 +154,7 @@ describe("Soldiers", () => {
         const hero = prey()
         guarding(soldiers, soldier, hero)
 
-        assert.deepEqual(soldiers.strike(0, 0, 0, REACH, WIDTH, SWORD_DAMAGE), [{ material: "armor", stopped: true }])
+        assert.deepEqual(soldiers.strike(0, 0, 0, REACH, WIDTH, SWORD_DAMAGE), [{ material: "armor", humanoid: true, stopped: true }])
         assert(soldier.hp === SOLDIER.hp && soldier.flash === 0)
     })
 
@@ -166,7 +166,7 @@ describe("Soldiers", () => {
 
         // from beyond the soldier, looking back at it
         const blows = soldiers.strike(0, SOLDIER.reach * 1.6, Math.PI, REACH, WIDTH, SWORD_DAMAGE)
-        assert.deepEqual(blows, [{ material: "armor", stopped: false }])
+        assert.deepEqual(blows, [{ material: "armor", humanoid: true, stopped: false }])
         assert(soldier.hp === SOLDIER.hp - SWORD_DAMAGE)
     })
 

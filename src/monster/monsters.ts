@@ -55,6 +55,8 @@ export type HitMaterial = "flesh" | "metal" | "armor"
 export interface Blow
 {
     material: HitMaterial
+    /** it says ouch when hurt, see MonsterKind.humanoid */
+    humanoid: boolean
     /** its shield stopped the blow, which left it unhurt */
     stopped: boolean
 }
@@ -91,6 +93,8 @@ export interface MonsterKind
     burst: readonly BurstSphere[]
     /** what a sword blow on it sounds like */
     material: HitMaterial
+    /** has a voice like the heroes, so a blow that hurts it makes it say ouch */
+    humanoid: boolean
     /** cries out when it dies, which only a few big ones do, as they are rare enough for it to be dramatic */
     deathCry: boolean
 }
@@ -398,7 +402,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
         monster.goalZ = fromZ
         if (stopped)
         {
-            return { material: monster.kind.material, stopped }
+            return { material: monster.kind.material, humanoid: monster.kind.humanoid, stopped }
         }
         monster.hp -= damage
         if (monster.hp <= 0)
@@ -411,7 +415,7 @@ export abstract class MonsterPack<M extends Monster = Monster>
             monster.flash = FLASH_TIME
             this.struck(monster, dx, dz, distance)
         }
-        return { material: monster.kind.material, stopped }
+        return { material: monster.kind.material, humanoid: monster.kind.humanoid, stopped }
     }
 
     /**

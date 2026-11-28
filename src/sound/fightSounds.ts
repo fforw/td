@@ -48,10 +48,17 @@ const PLAYER_HURT_SOUND = "player-hurt.mp3"
 const PLAYER_HURT_VOLUME = 0.7
 
 /**
- * Cries of the big monsters that die with one, a bit lower than recorded for their size
+ * Ouches of humanoid monsters hurt by a blow, from the same recordings as those of the heroes but higher, for a cartoony
+ * squeak
+ */
+const OUCH_RATE = 1.4
+const OUCH_VOLUME = 0.7
+
+/**
+ * Cries of the big monsters that die with one, higher than recorded for a cartoony moan
  */
 const DEATH_SOUNDS = numbered("meeple-death", 2)
-const DEATH_RATE = 0.9
+const DEATH_RATE = 1.25
 const DEATH_VOLUME = 0.9
 
 /**
@@ -122,7 +129,7 @@ export function loadFightSounds(): void
 
 /**
  * Plays a sword blow as it lands: a swing through the air if it hits nothing, otherwise the sound of each thing it lands
- * on once, whether flesh, metal, armor or a shield
+ * on once, whether flesh, metal, armor or a shield, and an ouch if it hurts a humanoid monster
  *
  * @param blows     what the blow did to each monster, see MonsterPack.strike()
  */
@@ -137,6 +144,10 @@ export function playBlow(blows: readonly Blow[]): void
     for (const { name, impact } of sounds)
     {
         playEffect(name, spread(1), HIT_VOLUME, Math.max(0, impact - HIT_LEAD))
+    }
+    if (blows.some(({ humanoid, stopped }) => humanoid && !stopped))
+    {
+        playEffect(hurts.next(), spread(OUCH_RATE), OUCH_VOLUME)
     }
 }
 

@@ -55,7 +55,7 @@ function targets(monsters: Monster[], stopped = false): ShotTargets
             {
                 monsters.splice(monsters.indexOf(monster), 1)
             }
-            return { monster, x: monster.x, z: 0, material: "flesh", stopped, killed }
+            return { monster, x: monster.x, z: 0, material: "flesh", humanoid: false, stopped, killed }
         },
         has: monster => monsters.includes(monster)
     }

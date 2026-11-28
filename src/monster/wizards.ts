@@ -135,6 +135,7 @@ export const WIZARD: Omit<WizardKind, "robe"> = {
         { x: -0.4, y: 0.6, z: 0.18, rx: 0.04, ry: 0.55, rz: 0.04, colors: ["#5b3a24"] }
     ],
     material: "flesh",
+    humanoid: true,
     deathCry: false,
     speed: 0.45 * FIGURE_SCALE,
     keepAway: 1.5 * FIGURE_SCALE,
