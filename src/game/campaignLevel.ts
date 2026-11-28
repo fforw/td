@@ -1,4 +1,5 @@
 import type { Campaign } from "./campaign"
+import { addGear, baseGear } from "./gear"
 
 /**
  * What the heroes and explorers do that gains the campaign experience. Progress belongs to the campaign rather than to
@@ -73,7 +74,7 @@ export function monsterSkill(level: number): number
 }
 
 /**
- * Has the campaign gain the experience of a deed
+ * Has the campaign gain the experience of a deed. Every hero gets the base gear of each level it reaches.
  *
  * @return the levels it went up by
  */
@@ -81,5 +82,16 @@ export function gainXp(campaign: Campaign, deed: Deed): number
 {
     const before = campaignLevel(campaign.xp)
     campaign.xp += DEED_XP[deed]
-    return campaignLevel(campaign.xp) - before
+    const after = campaignLevel(campaign.xp)
+    for (let level = before + 1; level <= after; level++)
+    {
+        for (const hero of campaign.heroes)
+        {
+            for (const piece of baseGear(level))
+            {
+                addGear(hero.gear, piece)
+            }
+        }
+    }
+    return after - before
 }

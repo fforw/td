@@ -2,7 +2,8 @@ import { patchSeed, withSeed } from "../math/random"
 import { randomCharacter } from "../meeple/character"
 import { meepleNameGenerator } from "../meeple/nameGenerator"
 import { type Campaign, type Hero, type Job, overworld, type PatchKind } from "./campaign"
-import { type Deed, gainXp } from "./campaignLevel"
+import { campaignLevel, type Deed, gainXp } from "./campaignLevel"
+import { baseGearUpTo, type GearKind, spendGear } from "./gear"
 import { reverseWay } from "./journey"
 import { type MissionRoute, travelDays } from "./missions"
 
@@ -28,7 +29,7 @@ export function createHeroes(campaign: Campaign, count: number): Hero[]
             const character = randomCharacter()
             if (character.classes.some(name => name !== "peasant"))
             {
-                heroes.push({ id: campaign.nextId++, name: meepleNameGenerator(4), character })
+                heroes.push({ id: campaign.nextId++, name: meepleNameGenerator(4), character, gear: baseGearUpTo(campaignLevel(campaign.xp)) })
             }
         }
         return heroes
@@ -254,6 +255,28 @@ export function fallenToCarry(campaign: Campaign, target: string): number[]
 {
     const inside = campaign.jobs.filter(j => j.inside && j.target === target)
     return inside.some(j => !hasFallen(j)) ? [] : inside.map(j => j.heroId)
+}
+
+
+/**
+ * Returns the index of the piece of gear a hero uses, which is the first one unless they picked another
+ */
+export function currentGear({ gear, currentGear }: Hero): number
+{
+    return Math.max(0, Math.min(currentGear ?? 0, gear.length - 1))
+}
+
+
+/**
+ * Has a hero lose weapons of a kind, e.g. as they left them behind in a level
+ */
+export function loseGear(hero: Hero, kind: GearKind, count: number): void
+{
+    const index = hero.gear.findIndex(piece => piece.kind === kind)
+    if (index >= 0)
+    {
+        hero.currentGear = spendGear(hero.gear, index, currentGear(hero), count)
+    }
 }
 
 

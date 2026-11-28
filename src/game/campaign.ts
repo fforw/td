@@ -2,6 +2,7 @@ import { withSeed } from "../math/random"
 import { createSubtitle } from "./subtitle"
 import type { Character } from "../meeple/character"
 import type { OpenedChests } from "../treasure/chests"
+import type { Gear } from "./gear"
 import { createHeroes } from "./heroes"
 import { startEdits, startPatches } from "./patchKinds"
 import { arrivals } from "./tavern"
@@ -15,7 +16,7 @@ export const GENERATOR_VERSION = 3
 /**
  * Version of the save format
  */
-export const SAVE_VERSION = 9
+export const SAVE_VERSION = 10
 
 export const START_GOLD = 1000
 
@@ -132,6 +133,10 @@ export interface Hero
     name: string
     /** stats and classes, at least one beyond peasant */
     character: Character
+    /** what they carry to use with R2, see plans/action/gear.md */
+    gear: Gear[]
+    /** index of the piece of gear R2 uses, missing for the first */
+    currentGear?: number
 }
 
 /**

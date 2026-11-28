@@ -1,5 +1,7 @@
 import { type Campaign, GENERATOR_VERSION, overworld, patchKey, SAVE_VERSION, START_HEROES } from "./campaign"
 import { createHeroes } from "./heroes"
+import { campaignLevel } from "./campaignLevel"
+import { baseGearUpTo } from "./gear"
 import { patchSeed, withSeed } from "../math/random"
 import { naturalKind } from "./patchKinds"
 import { randomExplorerDex } from "./tavern"
@@ -76,6 +78,13 @@ const MIGRATIONS: Record<number, (campaign: Campaign) => void> = {
         for (const job of campaign.jobs)
         {
             delete (job as { entered?: boolean }).entered
+        }
+    },
+    // version 10 has heroes carry gear, the base gear of the levels the campaign has reached
+    9: campaign => {
+        for (const hero of campaign.heroes)
+        {
+            hero.gear ??= baseGearUpTo(campaignLevel(campaign.xp))
         }
     }
 }
