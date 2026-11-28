@@ -6,12 +6,16 @@ before monsters get more dangerous in groups.
 
 ## Pieces
 
+- Gear is rare and, as a rule, hits harder than the sword, so it is
+  worth saving for when it counts. Only the wand hits like the sword,
+  as it never runs out.
 - Throwing weapons hit hard but have to be fetched again: daggers fly
   fast and straight, axes slower, spinning, for more damage. A hero has
   a number of each.
 - Wands and scrolls shoot glowing balls of an element, each element with
-  its own color. A wand shoots without end but weakly and with a wait
-  between shots, a scroll hits harder and has a number of uses.
+  its own color. A wand shoots without end, no harder than the sword and
+  with a long wait between shots, a scroll hits hardest and has a few
+  uses.
 - The elements are colors only for now.
 - Pieces of the same kind, and for wands and scrolls the same element,
   go together into one, so there is one entry for daggers with how many
@@ -56,7 +60,7 @@ before monsters get more dangerous in groups.
   reaches it (`baseGear()`), and new heroes get that of all levels up to
   the current one. It starts with daggers and grows with wands, axes and
   scrolls, as the heroes have to get stronger with the monsters.
-- Some chests have a piece in them, which comes out after the coins and
+- Few chests have a piece in them, which comes out after the coins and
   a potion, from random numbers of its own (`GEAR_CHANCE`). It floats in
   a bubble like all loot and goes to whoever picks it up.
 

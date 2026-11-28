@@ -46,9 +46,9 @@ export interface GearUse
 export const GEAR_USES: Readonly<Record<GearKind, GearUse>> = {
     dagger: { damage: 3, speed: 9 * FIGURE_SCALE, range: 6 * FIGURE_SCALE, wait: 0.35 },
     axe: { damage: 5, speed: 6 * FIGURE_SCALE, range: 5 * FIGURE_SCALE, wait: 0.6 },
-    // what goes without end has to be weak and slow to use
-    wand: { damage: 1, speed: 7 * FIGURE_SCALE, range: 4 * FIGURE_SCALE, wait: 0.7 },
-    scroll: { damage: 4, speed: 6 * FIGURE_SCALE, range: 5 * FIGURE_SCALE, wait: 0.6 }
+    // what goes without end hits no harder than the sword, and is slow to use
+    wand: { damage: 2, speed: 7 * FIGURE_SCALE, range: 4 * FIGURE_SCALE, wait: 0.7 },
+    scroll: { damage: 7, speed: 6 * FIGURE_SCALE, range: 5 * FIGURE_SCALE, wait: 0.6 }
 }
 
 /**
@@ -64,12 +64,12 @@ export const ELEMENT_COLORS: Readonly<Record<Element, { core: string, glow: stri
 /**
  * Share of the chests with a piece of gear in them
  */
-export const GEAR_CHANCE = 0.25
+export const GEAR_CHANCE = 0.1
 
 /**
  * Number of weapons or uses a piece found in a chest has
  */
-const FOUND_COUNTS: Readonly<Record<GearKind, number>> = { dagger: 2, axe: 1, wand: 1, scroll: 3 }
+const FOUND_COUNTS: Readonly<Record<GearKind, number>> = { dagger: 1, axe: 1, wand: 1, scroll: 1 }
 
 /**
  * How often each kind gets found in chests, against the others
@@ -151,17 +151,17 @@ export function baseGear(level: number): Gear[]
     switch (level)
     {
         case 1:
-            return [{ kind: "dagger", count: 4 }]
+            return [{ kind: "dagger", count: 2 }]
         case 2:
             return [{ kind: "wand", element: "fire", count: 1 }]
         case 3:
-            return [{ kind: "axe", count: 2 }]
+            return [{ kind: "axe", count: 1 }]
         case 4:
-            return [{ kind: "scroll", element: "frost", count: 3 }]
+            return [{ kind: "scroll", element: "frost", count: 2 }]
         default:
             return level % 2 === 1
-                ? [{ kind: "dagger", count: 2 }, { kind: "axe", count: 1 }]
-                : [{ kind: "scroll", element: ELEMENTS[(level / 2) % ELEMENTS.length], count: 2 }]
+                ? [{ kind: "dagger", count: 1 }]
+                : [{ kind: "scroll", element: ELEMENTS[(level / 2) % ELEMENTS.length], count: 1 }]
     }
 }
 
