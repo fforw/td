@@ -37,7 +37,8 @@ const TAU = Math.PI * 2
 /*
  * Test page for a dungeon level in 3D, e.g. dungeon3d.html?seed=1&width=3&height=2&floor=0.5&labyrinth=5
  *
- * With space=N it looks at that space as the game does, with its near walls cut, see map/nearWalls.ts.
+ * With space=N it looks at that space as the game does, with its near walls cut, see map/nearWalls.ts. With face=F it looks
+ * at that global face the same way, with the walls cut for its space.
  */
 
 /**
@@ -58,10 +59,17 @@ const AMBIENT = 0.2
  */
 const LEVEL_VIEW = new Vector3(0, Math.sin(34 * TAU / 360), Math.cos(34 * TAU / 360)).multiplyScalar(3)
 
+const viewParams = new URLSearchParams(location.search)
+
 /**
- * Space to look at as the game does, 0 for none
+ * Face to look at as the game does, -1 for none
  */
-const viewedSpace = Number(new URLSearchParams(location.search).get("space") ?? 0)
+const viewedFace = Number(viewParams.get("face") ?? -1)
+
+/**
+ * Space to look at as the game does, or that of the viewed face, 0 for none
+ */
+let viewedSpace = Number(viewParams.get("space") ?? 0)
 
 const level = loadLevel(true)
 
@@ -195,7 +203,12 @@ function show(level: DungeonLevel): void
     const size = Math.max(maxX - minX, maxY - minY) * SCALE
     controls.target.set(centerX, 0, centerZ)
     camera.position.set(centerX, size * 1.1, centerZ + size * 0.6)
-    if (viewedSpace)
+    if (viewedFace >= 0)
+    {
+        viewedSpace = near.spaceOf.get(viewedFace) ?? 0
+        lookAt(...faceCenter(world, viewedFace))
+    }
+    else if (viewedSpace)
     {
         lookAtSpace(world, near.spaceOf, viewedSpace)
     }
@@ -317,9 +330,17 @@ function lookAtSpace(world: PatchWorld, spaceOf: ReadonlyMap<number, number>, sp
     }
     const meanX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
     const meanZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
-    const [x, z] = centers.reduce((best, center) =>
+    lookAt(...centers.reduce((best, center) =>
         Math.hypot(center[0] - meanX, center[1] - meanZ) < Math.hypot(best[0] - meanX, best[1] - meanZ) ? center : best
-    )
+    ))
+}
+
+
+/**
+ * Puts the camera where the game has it for a hero at the given place in world units
+ */
+function lookAt(x: number, z: number): void
+{
     controls.target.set(x, 0, z)
     camera.position.set(x, 0, z).add(LEVEL_VIEW)
 }
