@@ -19,6 +19,7 @@ import { faceOf } from "./map/QuadPatch"
 import { randomLook } from "./meeple/look"
 import MeepleCrowd, { type Meeple, MEEPLE_MODELS, MEEPLE_SCALE, randomTraits, walkSpeedMultiplier } from "./meeple/Meeple3D"
 import { createLevelMeshes } from "./render/dungeonLevel"
+import { updateWallCut } from "./render/wallCut"
 import {
     discoLights,
     flickerHeroLight,
@@ -35,6 +36,8 @@ const TAU = Math.PI * 2
 
 /*
  * Test page for a dungeon level in 3D, e.g. dungeon3d.html?seed=1&width=3&height=2&floor=0.5&labyrinth=5
+ *
+ * With space=N it looks at that space as the game does, with its near walls cut, see map/nearWalls.ts.
  */
 
 /**
@@ -48,6 +51,17 @@ const MEEPLES = 40
 const WALK_AHEAD_SPEED = MEEPLE_SCALE * 1.5
 
 const AMBIENT = 0.2
+
+/**
+ * Camera offset from what it looks at for space=N, as the view in levels has it in game/levelScene.ts: 34 degrees above
+ * the ground and 3 world units away
+ */
+const LEVEL_VIEW = new Vector3(0, Math.sin(34 * TAU / 360), Math.cos(34 * TAU / 360)).multiplyScalar(3)
+
+/**
+ * Space to look at as the game does, 0 for none
+ */
+const viewedSpace = Number(new URLSearchParams(location.search).get("space") ?? 0)
 
 const level = loadLevel(true)
 
@@ -162,7 +176,7 @@ function moveWalker(walker: Walker, dt: number): void
 function show(level: DungeonLevel): void
 {
     const { patches, lighting } = level
-    const { world, meshes, field, segments } = createLevelMeshes(level)
+    const { world, meshes, field, segments, cut, near } = createLevelMeshes(level)
     scene.add(...meshes)
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -181,6 +195,10 @@ function show(level: DungeonLevel): void
     const size = Math.max(maxX - minX, maxY - minY) * SCALE
     controls.target.set(centerX, 0, centerZ)
     camera.position.set(centerX, size * 1.1, centerZ + size * 0.6)
+    if (viewedSpace)
+    {
+        lookAtSpace(world, near.spaceOf, viewedSpace)
+    }
 
     const crowd = new MeepleCrowd(MEEPLES)
     const walkers = createWalkers(world, level, crowd)
@@ -256,12 +274,13 @@ function show(level: DungeonLevel): void
                 moveWalker(walker, dt)
             }
         }
-        const hero = walkers[Math.max(followed, 0)]?.meeple
+        // looking at a space as the game does, the hero is where the camera looks
+        const hero = viewedSpace ? controls.target : walkers[Math.max(followed, 0)]?.meeple.position
         if (hero && heroLight.checked)
         {
             heroBurnt += dt
             const burn = heroBurn(heroBurnt)
-            moveHeroLight(field, segments, hero.position.x, hero.position.z)
+            moveHeroLight(field, segments, hero.x, hero.z)
             flickerHeroLight(field, timer.getElapsed(), burn)
             if (burn === 0)
             {
@@ -278,10 +297,31 @@ function show(level: DungeonLevel): void
             discoLights(field, lights, timer.getElapsed())
         }
         updateLightField(renderer, field)
+        updateWallCut(cut, viewedSpace ? [viewedSpace] : [], dt)
         controls.update()
         crowd.update(camera, timer.getElapsed())
         renderer.render(scene, camera)
     })
+}
+
+
+/**
+ * Puts the camera where the game has it for a hero in the middle of the given space
+ */
+function lookAtSpace(world: PatchWorld, spaceOf: ReadonlyMap<number, number>, space: number): void
+{
+    const centers = [...spaceOf].filter(([, of]) => of === space).map(([face]) => faceCenter(world, face))
+    if (!centers.length)
+    {
+        return
+    }
+    const meanX = centers.reduce((sum, [x]) => sum + x, 0) / centers.length
+    const meanZ = centers.reduce((sum, [, z]) => sum + z, 0) / centers.length
+    const [x, z] = centers.reduce((best, center) =>
+        Math.hypot(center[0] - meanX, center[1] - meanZ) < Math.hypot(best[0] - meanX, best[1] - meanZ) ? center : best
+    )
+    controls.target.set(x, 0, z)
+    camera.position.set(x, 0, z).add(LEVEL_VIEW)
 }
 
 
