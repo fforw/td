@@ -7,7 +7,10 @@
   (`game/heroControl.ts`).
 - The left stick moves, sliding along the walls as they got built, not
   the edges of their faces (`moveOnFloor()`). The right stick aims, and
-  the hero looks where it points on the screen.
+  the hero looks where it points on the screen. That direction goes
+  through the view onto the floor like the pointer, since the tilted
+  view squashes depth, and the same angle on the floor would miss
+  whatever lies diagonally.
 - L1 dashes, R1 attacks, L2 blocks. R2 uses the current piece of
   [gear](gear.md), left and right on the cross pick it.
 - A dash goes where the hero moves, or else where they look. Nothing can
