@@ -2,15 +2,19 @@ import LevelScene, { type LevelHero } from "./game/levelScene"
 import { PadTracker, readPad } from "./game/gamepad"
 import { randomLook } from "./meeple/look"
 import SceneBox from "./scene/SceneBox"
+import { addGear, baseGearUpTo, isThrown, spendGear } from "./game/gear"
 
 /*
  * Test page for fighting, looting and talking to the stranger in a level with a controller, e.g.
- * fight.html?seed=1&hp=20&gold=100
+ * fight.html?seed=1&hp=20&gold=100&level=4
+ *
+ * The hero has the base gear of the campaign level given.
  */
 
 const params = new URLSearchParams(location.search)
 const seed = Number(params.get("seed") ?? 1)
 const maxHp = Number(params.get("hp") ?? 20)
+const gear = baseGearUpTo(Number(params.get("level") ?? 4))
 
 const info = document.getElementById("info")!
 
@@ -21,7 +25,10 @@ const concepts = new Set<string>()
 function showHp(hp: number): void
 {
     shownHp = hp
-    info.textContent = "hp " + hp + " / " + maxHp + ", gold " + gold
+    const piece = gear[hero.currentGear]
+    info.textContent = "hp " + hp + " / " + maxHp + ", gold " + gold + (piece
+        ? ", " + piece.kind + (piece.element ? " " + piece.element : "") + " " + (isThrown(piece.kind) ? piece.count - level.gearOut(hero.id, piece.kind) + " of " : "") + piece.count
+        : "")
 }
 
 const hero: LevelHero = {
@@ -33,7 +40,9 @@ const hero: LevelHero = {
     hp: maxHp,
     maxHp,
     item: "sword_silver",
-    leftItem: "shield_silver"
+    leftItem: "shield_silver",
+    gear,
+    currentGear: 0
 }
 
 function startOver(): void
@@ -55,6 +64,23 @@ const level = new LevelScene(seed, () => {}, startOver, (_, hp) => showHp(hp), s
     gold: () => gold,
     pay: (_, paid) => {
         gold -= paid
+        showHp(shownHp)
+    },
+    spendGear: (_, index) => {
+        hero.currentGear = spendGear(gear, index, hero.currentGear)
+        level.setHeroes([hero])
+        showHp(shownHp)
+    },
+    loseGear: (_, kind, count) => {
+        const index = gear.findIndex(piece => piece.kind === kind)
+        hero.currentGear = spendGear(gear, index, hero.currentGear, count)
+    },
+    findGear: (_, found) => {
+        addGear(gear, found)
+        showHp(shownHp)
+    },
+    pickGear: (_, index) => {
+        hero.currentGear = index
         showHp(shownHp)
     }
 }, () => box.show(level.playingScene))

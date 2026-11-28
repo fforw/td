@@ -79,6 +79,10 @@ import ScenePlayer, { type ActorRole, type SceneWorld, type Ware } from "../scen
 import SceneStage, { ACT_TIME } from "../scene/stage"
 import { placeStranger, STRANGER_REACH, type StrangerSpot, TALK_DISTANCE } from "../scene/stranger"
 import { POTION_TIME, traderScript } from "../scene/trader"
+import ShotView from "../items/ShotView"
+import { loadGearSounds, playBallBurst, playCast, playThrow, playWallHit } from "../sound/gearSounds"
+import { type Gear, GEAR_USES, type GearKind, isThrown } from "./gear"
+import Shots from "./shots"
 
 const TAU = Math.PI * 2
 const DEG2RAD_FACTOR = TAU / 360;
@@ -285,6 +289,10 @@ export interface LevelHero extends Pick<Meeple, "item" | "leftItem">
     hp: number
     /** hit points when unhurt */
     maxHp: number
+    /** what they carry to use with R2, as kept by the campaign */
+    gear: readonly Gear[]
+    /** index of the piece of gear in use */
+    currentGear: number
 }
 
 /**
@@ -302,6 +310,14 @@ export interface LevelOutside
     monsterSkill: number
     /** the heroes did something that gains the campaign experience */
     achieve(deed: Deed): void
+    /** a hero used up a use of a scroll, or the like, see spendGear() */
+    spendGear(id: number, index: number): void
+    /** a hero left weapons of a kind behind, which they lose */
+    loseGear(id: number, kind: GearKind, count: number): void
+    /** a hero found a piece of gear */
+    findGear(id: number, gear: Gear): void
+    /** a hero picked another piece of gear to use */
+    pickGear(id: number, index: number): void
 }
 
 interface ShownHero
@@ -329,6 +345,9 @@ interface ShownHero
     speedLeft: number
     /** seconds of level time left on a strength potion */
     strengthLeft: number
+    /** what they carry to use with R2, see LevelHero */
+    gear: readonly Gear[]
+    currentGear: number
 }
 
 /**
@@ -420,6 +439,8 @@ export default class LevelScene
     private solidWalls: FloorWalls | null = null
     private chests: ChestHoard | null = null
     private treasure: TreasureView | null = null
+    private shots: Shots | null = null
+    private shotView: ShotView | null = null
     private exits: LevelExit[] = []
     private sound: LevelSound | null = null
     /** the hero the view is with was close enough to take an exit in the last frame */
@@ -490,6 +511,8 @@ export default class LevelScene
     private steering: PadInput | null = null
     /** TEMP god mode: up on the cross was down in the last frame */
     private godHeld = false
+    /** which way the cross picked gear in the last frame, as it picks once per press */
+    private pickHeld = 0
     /** what keyboard and mouse tell the hero the view is with, which they do in frames without a controller steering */
     readonly keys = new KeySteer()
 
@@ -536,6 +559,7 @@ export default class LevelScene
         }
         void loadEffect(PICK_UP_SOUND)
         loadFightSounds()
+        loadGearSounds()
 
         const canvas = document.createElement("canvas")
         canvas.className = "level-scene"
@@ -564,7 +588,7 @@ export default class LevelScene
 
         Promise.all([
             this.client.buildDungeon(seed, FACE_SIZE, DUNGEON_WIDTH, DUNGEON_HEIGHT, {}, true),
-            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "construct", "brute", "soldier", "wizard", "switch", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs"]),
+            loadModels([...MEEPLE_MODELS, "acidCuboid", "flyingEye", "construct", "brute", "soldier", "wizard", "switch", "chest", "coin", "healthPotion", "speedPotion", "strengthPotion", "stairs", "dagger", "axe"]),
             loadItems(HERO_ITEMS)
         ]).then(
             ([level]) => this.addLevel(level, seed),
@@ -597,6 +621,7 @@ export default class LevelScene
         this.addStranger(level, meshes, seed)
         this.addFireRoom(level, meshes, seed)
         this.addMonsters(level, meshes, seed, chests)
+        this.addShots(level, meshes)
         this.addSound(level, meshes, seed)
 
         this.setHeroes(this.heroes)
@@ -800,6 +825,24 @@ export default class LevelScene
     }
 
     /**
+     * Gets ready for what heroes throw and shoot, which flies over chests like the flying monsters
+     */
+    private addShots({ rooms, corridors }: DungeonLevel, { world, field }: LevelMeshes): void
+    {
+        const seeing = this.floorWalls!
+        const spaces = new Map<number, number>()
+        rooms.forEach((faces, index) => faces.forEach(face => spaces.set(face, index)))
+        corridors.forEach(({ faces }, index) => faces.forEach(face => spaces.set(face, rooms.length + index)))
+        this.shots = new Shots({
+            sees: (x0, z0, x1, z1) => seesAcross(seeing, x0, z0, x1, z1),
+            move: (shot, dx, dz) => moveOnFloor(world, seeing, shot, dx, dz),
+            spaceOf: face => spaces.get(face) ?? -1
+        })
+        this.shotView = new ShotView(field)
+        this.scene.add(this.shotView.group)
+    }
+
+    /**
      * Sets who is in the level. Someone already there goes on from where they are.
      */
     setHeroes(heroes: LevelHero[]): void
@@ -816,11 +859,22 @@ export default class LevelScene
             {
                 crowd.remove(meeple)
                 shown.delete(id)
+                // what they didn't pick up stays behind
+                for (const [kind, count] of this.shots?.lose(id) ?? [])
+                {
+                    this.outside.loseGear(id, kind, count)
+                }
             }
         }
-        for (const { id, look, gait, dex, str, face = this.entrance, hp, maxHp, ...held } of heroes)
+        for (const { id, look, gait, dex, str, face = this.entrance, hp, maxHp, gear, currentGear, ...held } of heroes)
         {
-            if (!shown.has(id))
+            const known = shown.get(id)
+            if (known)
+            {
+                known.gear = gear
+                known.currentGear = currentGear
+            }
+            else
             {
                 const [x, z] = faceCenter(meshes.world, face)
                 const meeple: Meeple = {
@@ -857,7 +911,9 @@ export default class LevelScene
                     visitedFrom: -1,
                     maxHp,
                     speedLeft: 0,
-                    strengthLeft: 0
+                    strengthLeft: 0,
+                    gear,
+                    currentGear
                 })
             }
         }
@@ -897,6 +953,91 @@ export default class LevelScene
             this.godKill()
         }
         this.godHeld = input.godKill
+        if (input.pick !== 0 && input.pick !== this.pickHeld)
+        {
+            this.pickGear(input.pick)
+        }
+        this.pickHeld = input.pick
+    }
+
+    /**
+     * Has the hero the view is with pick the piece of gear before or after the one in use
+     */
+    pickGear(step: -1 | 1): void
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (!hero || hero.gear.length < 2 || this.playing)
+        {
+            return
+        }
+        const count = hero.gear.length
+        hero.currentGear = ((hero.currentGear + step) % count + count) % count
+        this.outside.pickGear(this.focus!, hero.currentGear)
+    }
+
+    /**
+     * Returns how many weapons of a kind the hero with the given id has out of their hands, flying, lying or stuck
+     */
+    gearOut(id: number, kind: GearKind): number
+    {
+        return this.shots?.outOf(id, kind) ?? 0
+    }
+
+    /**
+     * Returns how much of the piece of gear the hero with the given id has in use there is left to use right now: the
+     * weapons in hand, the uses of a scroll, 1 for a wand, 0 for nothing
+     */
+    private gearLeft(id: number): number
+    {
+        const hero = this.shown.get(id)
+        const piece = hero?.gear[hero.currentGear]
+        if (!piece)
+        {
+            return 0
+        }
+        return piece.count - (isThrown(piece.kind) ? this.gearOut(id, piece.kind) : 0)
+    }
+
+    /**
+     * Has a hero throw or shoot their piece of gear in use where they look
+     */
+    private useGear(id: number, hero: ShownHero): void
+    {
+        const { shots } = this
+        const piece = hero.gear[hero.currentGear]
+        if (!shots || !piece || this.gearLeft(id) <= 0)
+        {
+            return
+        }
+        const { meeple, control } = hero
+        const facing = control.turnTo ?? meeple.facing
+        const dirX = Math.sin(facing), dirZ = Math.cos(facing)
+        // from the hand, unless that is in a wall
+        const { x, z } = meeple.position
+        const handX = x + dirX * HERO_RADIUS, handZ = z + dirZ * HERO_RADIUS
+        const inHand = seesAcross(this.floorWalls!, x, z, handX, handZ)
+        spot.face = hero.face
+        spot.x = inHand ? handX : x
+        spot.z = inHand ? handZ : z
+        shots.launch(id, piece, spot, dirX, dirZ)
+        control.used(GEAR_USES[piece.kind].wait)
+        if (isThrown(piece.kind))
+        {
+            playThrow()
+        }
+        else
+        {
+            playCast(piece.element ?? "arcane")
+        }
+        if (piece.kind === "scroll")
+        {
+            this.outside.spendGear(id, hero.currentGear)
+        }
+        else if (isThrown(piece.kind))
+        {
+            // the count of what's in hand changed
+            this.onLoot(id, 0)
+        }
     }
 
     /**
@@ -1256,6 +1397,10 @@ export default class LevelScene
     {
         const { meeple, control } = hero
         const attacks = control.update(given ?? NO_ORDERS, delta, meeple.facing)
+        if (given?.use && control.readyToUse)
+        {
+            this.useGear(id, hero)
+        }
         if (attacks)
         {
             this.crowd!.act(meeple, 0)
@@ -1644,6 +1789,7 @@ export default class LevelScene
                 this.hurtHero(id, hero, damage)
             }
         }
+        this.updateShots(delta)
         this.cuboidCrowd!.update(this.cuboids!.members, time)
         const eyes = this.eyes!
         this.eyeCrowd!.update(eyes.members, eyes.bolts, eyes.sparks, time)
@@ -1674,6 +1820,43 @@ export default class LevelScene
         this.fireCrowd!.update(fire)
         bursts.update(delta)
         this.burstCrowd!.update(bursts.particles)
+    }
+
+    /**
+     * Moves what got thrown and shot on, before the monsters it killed burst, and has the heroes pick their weapons up again
+     */
+    private updateShots(delta: number): void
+    {
+        const { shots, monsters, shotView } = this
+        if (!shots || !monsters)
+        {
+            return
+        }
+        const { hits, walls, flashes } = shots.update(delta, monsters)
+        if (hits.length > 0)
+        {
+            playBlow(hits)
+        }
+        if (walls > 0)
+        {
+            playWallHit()
+        }
+        if (flashes.length > 0)
+        {
+            playBallBurst()
+        }
+        for (const [id, { meeple: { position }, hp }] of this.shown)
+        {
+            if (hp > 0 && shots.pickUp(id, position.x, position.z).length > 0)
+            {
+                if (id === this.focus)
+                {
+                    this.pickUpSound.play(PICK_UP_RATES[Math.floor(Math.random() * PICK_UP_RATES.length)], PICK_UP_VOLUME)
+                }
+                this.onLoot(id, 0)
+            }
+        }
+        shotView!.update(shots, performance.now() / 1000)
     }
 
     /**

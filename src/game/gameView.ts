@@ -14,15 +14,16 @@ import { campaignLevel, gainXp, levelXp, monsterSkill } from "./campaignLevel"
 import { attemptSeed, levelSeed } from "../map/generateDungeon"
 import { heldItems } from "../meeple/character"
 import {
-    carryGold, carryOut, enterJob, enterLevel, fall, fallenToCarry, hasArrived, hasFallen, isAway, jobDays, leaveLevel, returnHome,
-    startJob
+    carryGold, carryOut, currentGear, enterJob, enterLevel, fall, fallenToCarry, hasArrived, hasFallen, isAway, jobDays, leaveLevel,
+    loseGear, returnHome, startJob
 } from "./heroes"
+import { addGear, type Gear, gearName, isThrown, spendGear } from "./gear"
 import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
-import { KEY_HINTS, keyAction } from "./keySteer"
+import { KEY_HINTS, keyAction, keyPick } from "./keySteer"
 import LevelScene, { GOD_MODE, type LevelHero } from "./levelScene"
 import SceneBox from "../scene/SceneBox"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
@@ -143,6 +144,15 @@ function missionResult(campaign: Campaign, mission: Mission): string
     }
     const { kind, q, r } = overworld(campaign).patches[target]
     return explorer.name + " found " + KIND_ICONS[kind] + " " + KIND_NAMES[kind] + " at " + q + "/" + r + passedNote(mission)
+}
+
+
+/**
+ * Returns what using a piece of gear is called
+ */
+function useLabel({ kind }: Gear): string
+{
+    return isThrown(kind) ? "Throw" : "Cast"
 }
 
 
@@ -397,14 +407,18 @@ export default class GameView implements PadTarget
      */
     private steerPrompts(): Prompt[]
     {
-        const { campaign, following } = this
-        const { item, leftItem } = heldItems(campaign.heroes.find(hero => hero.id === following)!.character)
+        const { following } = this
+        const hero = this.heroById(following!)
+        const { item, leftItem } = heldItems(hero.character)
+        const { gear } = hero
         return [
             { glyph: "run", label: "Move" },
             { glyph: "look", label: "Aim" },
             { glyph: "dash", label: "Dash" },
             ...(item ? [{ glyph: "attack", label: "Attack" } as const] : []),
             ...(leftItem ? [{ glyph: "block", label: "Block" } as const] : []),
+            ...(gear.length > 0 ? [{ glyph: "use", label: useLabel(gear[currentGear(hero)]) } as const] : []),
+            ...(gear.length > 1 ? [{ glyph: "pick", label: "Gear" } as const] : []),
             ...(this.level?.nearChest(following!) ? [{ glyph: "confirm", label: "Open" } as const] : []),
             ...(this.level?.nearSwitch(following!) ? [{ glyph: "confirm", label: "Switch off" } as const] : []),
             ...(this.level?.nearStranger(following!) ? [{ glyph: "confirm", label: "Talk" } as const] : []),
@@ -532,6 +546,14 @@ export default class GameView implements PadTarget
         {
             ev.preventDefault()
         }
+        else if (keyPick(code) !== 0)
+        {
+            ev.preventDefault()
+            if (!ev.repeat)
+            {
+                level.pickGear(keyPick(code) as -1 | 1)
+            }
+        }
         else if (action && !ev.repeat)
         {
             ev.preventDefault()
@@ -552,13 +574,17 @@ export default class GameView implements PadTarget
         {
             return
         }
-        const { item, leftItem } = heldItems(campaign.heroes.find(hero => hero.id === following)!.character)
+        const hero = this.heroById(following!)
+        const { item, leftItem } = heldItems(hero.character)
+        const { gear } = hero
         const hints: [string, string][] = [
             [KEY_HINTS.move, "Move"],
             [KEY_HINTS.aim, "Aim"],
             [KEY_HINTS.dash, "Dash"],
             ...(item ? [[KEY_HINTS.attack, "Attack"] as [string, string]] : []),
             ...(leftItem ? [[KEY_HINTS.block, "Block"] as [string, string]] : []),
+            ...(gear.length > 0 ? [[KEY_HINTS.use, useLabel(gear[currentGear(hero)])] as [string, string]] : []),
+            ...(gear.length > 1 ? [[KEY_HINTS.pick, "Gear"] as [string, string]] : []),
             [KEY_HINTS.confirm, "Open / Leave / Talk"],
             [KEY_HINTS.light, "Light"],
             [KEY_HINTS.map, "Map"]
@@ -739,6 +765,11 @@ export default class GameView implements PadTarget
         this.options.waddle = waddle
         saveOptions(this.options)
         this.castle?.setWaddling(waddle)
+    }
+
+    private heroById(id: number): Hero
+    {
+        return this.campaign.heroes.find(hero => hero.id === id)!
     }
 
     private changed(): void
@@ -1052,7 +1083,8 @@ export default class GameView implements PadTarget
     {
         const { campaign } = this
         return campaign.jobs.filter(job => job.inside && job.target === target).map(({ heroId, face, hp }) => {
-            const { character } = campaign.heroes.find(h => h.id === heroId)!
+            const hero = campaign.heroes.find(h => h.id === heroId)!
+            const { character } = hero
             return {
                 id: heroId,
                 look: meepleSitter(campaign.seed, heroId).look,
@@ -1061,6 +1093,8 @@ export default class GameView implements PadTarget
                 str: character.stats.str,
                 hp: hp ?? character.stats.hp,
                 maxHp: character.stats.hp,
+                gear: hero.gear,
+                currentGear: currentGear(hero),
                 ...heldItems(character),
                 ...(face !== undefined ? { face } : {})
             }
@@ -1147,6 +1181,26 @@ export default class GameView implements PadTarget
                     pay: (id, gold) => {
                         const paying = this.campaign.jobs.find(j => j.heroId === id)!
                         paying.gold = (paying.gold ?? 0) - gold
+                        this.changed()
+                    },
+                    spendGear: (id, index) => {
+                        const hero = this.heroById(id)
+                        hero.currentGear = spendGear(hero.gear, index, currentGear(hero))
+                        this.changed()
+                    },
+                    // comes while the view gets rendered, which shows it anyway
+                    loseGear: (id, kind, count) => {
+                        loseGear(this.heroById(id), kind, count)
+                        this.store.save(this.campaign)
+                    },
+                    findGear: (id, gear) => {
+                        const hero = this.heroById(id)
+                        addGear(hero.gear, gear)
+                        this.report(hero.name + " found " + gearName(gear).replace(/^1 /, "a ").toLowerCase())
+                        this.changed()
+                    },
+                    pickGear: (id, index) => {
+                        this.heroById(id).currentGear = index
                         this.changed()
                     }
                 },
