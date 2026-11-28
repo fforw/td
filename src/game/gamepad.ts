@@ -11,7 +11,7 @@ export type PadAction = "confirm" | "back" | "map" | "endDay" | "menu"
 /**
  * What the game can show an icon for
  */
-export type Glyph = PadAction | "move" | "look" | "zoomOut" | "zoomIn" | "run" | "dash" | "attack" | "block"
+export type Glyph = PadAction | "move" | "look" | "zoomOut" | "zoomIn" | "run" | "dash" | "attack" | "block" | "use" | "pick"
 
 export type Direction = "up" | "down" | "left" | "right"
 
@@ -47,6 +47,10 @@ export interface PadInput
     attack: boolean
     /** left trigger */
     block: boolean
+    /** right trigger, which uses the current piece of gear */
+    use: boolean
+    /** left or right on the cross, which picks the piece of gear before or after, 0 for neither */
+    pick: -1 | 0 | 1
     /** TEMP god mode: up on the cross kills all monsters in the room of the hero */
     godKill: boolean
 }
@@ -120,7 +124,9 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         run: "xbox_stick_l",
         dash: "xbox_lb",
         attack: "xbox_rb",
-        block: "xbox_lt"
+        block: "xbox_lt",
+        use: "xbox_rt",
+        pick: "xbox_dpad_horizontal"
     },
     playstation: {
         confirm: "playstation_button_cross",
@@ -135,7 +141,9 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         run: "playstation_stick_l",
         dash: "playstation_trigger_l1",
         attack: "playstation_trigger_r1",
-        block: "playstation_trigger_l2"
+        block: "playstation_trigger_l2",
+        use: "playstation_trigger_r2",
+        pick: "playstation_dpad_horizontal"
     },
     switch: {
         confirm: "switch_button_a",
@@ -150,7 +158,9 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         run: "switch_stick_l",
         dash: "switch_button_l",
         attack: "switch_button_r",
-        block: "switch_button_zl"
+        block: "switch_button_zl",
+        use: "switch_button_zr",
+        pick: "switch_dpad_horizontal"
     },
     steamdeck: {
         confirm: "steamdeck_button_a",
@@ -165,7 +175,9 @@ const GLYPHS: Record<Scheme, Record<Glyph, string>> = {
         run: "steamdeck_stick_l",
         dash: "steamdeck_button_l1",
         attack: "steamdeck_button_r1",
-        block: "steamdeck_button_l2"
+        block: "steamdeck_button_l2",
+        use: "steamdeck_button_r2",
+        pick: "steamdeck_dpad_horizontal"
     }
 }
 
@@ -313,9 +325,11 @@ export function readPad(pad: PadState): PadInput
     const dash = isPressed(pad, LEFT_SHOULDER)
     const attack = isPressed(pad, RIGHT_SHOULDER)
     const block = left >= TRIGGER_PRESS
+    const use = right >= TRIGGER_PRESS
+    const pick = isPressed(pad, DPAD_LEFT) ? -1 : isPressed(pad, DPAD_RIGHT) ? 1 : 0
     return {
         scheme,
-        inUse: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom || !!moveX || !!moveY || dash || attack,
+        inUse: actions.length > 0 || direction !== null || !!lookX || !!lookY || !!zoom || !!moveX || !!moveY || dash || attack || use,
         actions,
         direction,
         lookX,
@@ -328,6 +342,8 @@ export function readPad(pad: PadState): PadInput
         dash,
         attack,
         block,
+        use,
+        pick,
         godKill: isPressed(pad, DPAD_UP)
     }
 }

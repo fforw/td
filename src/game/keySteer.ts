@@ -11,6 +11,8 @@ export interface KeyInput
     dash: boolean
     attack: boolean
     block: boolean
+    /** uses the current piece of gear */
+    use: boolean
     /** where the pointer is in client pixels, null as long as nobody knows */
     pointerX: number | null
     pointerY: number | null
@@ -27,6 +29,16 @@ const MOVE_KEYS: Record<string, readonly [number, number]> = {
 }
 
 const DASH_KEYS: readonly string[] = ["Space", "ShiftLeft"]
+
+const USE_KEY = "KeyQ"
+
+/**
+ * Keys that pick the piece of gear before or after the current one
+ */
+const PICK_KEYS: Record<string, -1 | 1> = {
+    KeyZ: -1,
+    KeyC: 1
+}
 
 /**
  * Keys that do what a button on the face of a controller does in a level
@@ -49,6 +61,8 @@ export const KEY_HINTS = {
     dash: "Space",
     attack: "Left click",
     block: "Right click",
+    use: "Q",
+    pick: "Z / C",
     confirm: "E",
     light: "F",
     map: "M"
@@ -68,6 +82,15 @@ export function keyAction(code: string): Exclude<PadAction, "menu"> | null
  * Keeps track of the keys and mouse buttons that steer a hero in a level: WASD to go, the pointer to aim at, the mouse
  * buttons to attack and block. Plain state without the page, which feeds it the events.
  */
+/**
+ * Returns which way a key picks the piece of gear, 0 for a key that doesn't
+ */
+export function keyPick(code: string): -1 | 0 | 1
+{
+    return PICK_KEYS[code] ?? 0
+}
+
+
 export default class KeySteer
 {
     private readonly held = new Set<string>()
@@ -82,7 +105,7 @@ export default class KeySteer
      */
     keyDown(code: string): boolean
     {
-        if (code in MOVE_KEYS || DASH_KEYS.includes(code))
+        if (code in MOVE_KEYS || DASH_KEYS.includes(code) || code === USE_KEY)
         {
             this.held.add(code)
             return true
@@ -158,6 +181,7 @@ export default class KeySteer
             dash: DASH_KEYS.some(code => held.has(code)),
             attack: buttons.has(ATTACK_BUTTON),
             block: buttons.has(BLOCK_BUTTON),
+            use: held.has(USE_KEY),
             pointerX,
             pointerY
         }

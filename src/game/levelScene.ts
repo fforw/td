@@ -1339,7 +1339,7 @@ export default class LevelScene
     /**
      * Returns what a controller's input tells a hero to do, with the directions turned from the screen into the world
      */
-    private ordersOf({ moveX, moveY, aimX, aimY, dash, attack, block }: PadInput): HeroOrders
+    private ordersOf({ moveX, moveY, aimX, aimY, dash, attack, block, use }: PadInput): HeroOrders
     {
         this.moveOrders(moveX, moveY)
         const heading = this.controls.getAzimuthalAngle()
@@ -1349,6 +1349,7 @@ export default class LevelScene
         orders.dash = dash
         orders.attack = attack
         orders.block = block
+        orders.use = use
         return orders
     }
 
@@ -1356,7 +1357,7 @@ export default class LevelScene
      * Returns what keyboard and mouse tell a hero to do: to go where the keys point on the screen, and to look at the floor
      * under the pointer
      */
-    private keyOrders({ moveX, moveY, dash, attack, block, pointerX, pointerY }: KeyInput, { meeple }: ShownHero): HeroOrders
+    private keyOrders({ moveX, moveY, dash, attack, block, use, pointerX, pointerY }: KeyInput, { meeple }: ShownHero): HeroOrders
     {
         this.moveOrders(moveX, moveY)
         orders.aimX = 0
@@ -1383,6 +1384,7 @@ export default class LevelScene
         orders.dash = dash
         orders.attack = attack
         orders.block = block
+        orders.use = use
         return orders
     }
 

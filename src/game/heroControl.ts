@@ -42,9 +42,11 @@ export interface HeroOrders
     dash: boolean
     attack: boolean
     block: boolean
+    /** uses the current piece of gear, again and again while held */
+    use: boolean
 }
 
-export const NO_ORDERS: HeroOrders = { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, dash: false, attack: false, block: false }
+export const NO_ORDERS: HeroOrders = { moveX: 0, moveZ: 0, aimX: 0, aimZ: 0, dash: false, attack: false, block: false, use: false }
 
 
 /**
@@ -70,6 +72,7 @@ export default class HeroControl
     private sprintLeft = 0
 
     private attackWait = 0
+    private useWait = 0
     private attackHeld = false
     private attackQueued = false
 
@@ -132,6 +135,7 @@ export default class HeroControl
         this.dodgeLeft = Math.max(0, this.dodgeLeft - delta)
         this.dashWait = Math.max(0, this.dashWait - delta)
         this.attackWait = Math.max(0, this.attackWait - delta)
+        this.useWait = Math.max(0, this.useWait - delta)
 
         const moved = moveX !== 0 || moveZ !== 0
         if (dash && !this.dashHeld && this.dashWait === 0)
@@ -171,6 +175,25 @@ export default class HeroControl
         }
 
         return this.updateAttack(attack)
+    }
+
+    /**
+     * Returns whether the hero can use a piece of gear right now, which they can't behind the shield, while dashing or while
+     * waiting after the last one
+     */
+    get readyToUse(): boolean
+    {
+        return this.useWait === 0 && !this.dashing && !this.blocking
+    }
+
+    /**
+     * Tells that a piece of gear got used, after which the next one waits
+     *
+     * @param wait  seconds until the next one
+     */
+    used(wait: number): void
+    {
+        this.useWait = wait
     }
 
     private updateAttack(attack: boolean): boolean

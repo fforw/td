@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import KeySteer, { keyAction } from "../../src/game/keySteer"
+import KeySteer, { keyAction, keyPick } from "../../src/game/keySteer"
 
 
 describe("KeySteer", () => {
@@ -43,9 +43,21 @@ describe("KeySteer", () => {
     it("leaves other keys alone", () => {
 
         const keys = new KeySteer()
-        assert(!keys.keyDown("KeyQ"))
+        assert(!keys.keyDown("KeyP"))
         assert(!keys.keyDown("Escape"))
         assert.deepInclude(keys.input(), { moveX: 0, moveY: 0, dash: false })
+    })
+
+    it("uses gear while Q is held, and picks it with Z and C", () => {
+
+        const keys = new KeySteer()
+        assert(keys.keyDown("KeyQ"))
+        assert(keys.input().use)
+        keys.keyUp("KeyQ")
+        assert(!keys.input().use)
+        assert.strictEqual(keyPick("KeyZ"), -1)
+        assert.strictEqual(keyPick("KeyC"), 1)
+        assert.strictEqual(keyPick("KeyQ"), 0)
     })
 
     it("dashes on space or shift", () => {
@@ -95,6 +107,7 @@ describe("KeySteer", () => {
             dash: false,
             attack: false,
             block: false,
+            use: false,
             pointerX: 5,
             pointerY: 6
         })

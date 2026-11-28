@@ -138,6 +138,15 @@ describe("Reading a controller", () => {
         assert.isTrue(readPad(pad([6])).block)
         assert.isFalse(readPad(pad([7])).block)
     })
+
+    it("uses gear on R2 and picks it with left and right on the cross only", () => {
+
+        assert.isTrue(readPad(pad([7])).use)
+        assert.isFalse(readPad(pad([6])).use)
+        assert.strictEqual(readPad(pad([14])).pick, -1)
+        assert.strictEqual(readPad(pad([15])).pick, 1)
+        assert.strictEqual(readPad(pad([], [-1, 0])).pick, 0)
+    })
 })
 
 
