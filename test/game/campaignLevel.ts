@@ -20,6 +20,12 @@ describe("Campaign level", () => {
         }
     })
 
+    it("takes 800 experience to reach level 3", () => {
+        assert.strictEqual(levelXp(3), 800)
+        assert.strictEqual(campaignLevel(799), 2)
+        assert.strictEqual(campaignLevel(800), 3)
+    })
+
     it("has monsters get better ever slower, without getting perfect", () => {
         assert.strictEqual(monsterSkill(1), 0)
         for (let level = 2; level < 100; level++)

@@ -21,10 +21,16 @@ export const DEED_XP: Readonly<Record<Deed, number>> = {
 }
 
 /**
- * Experience it takes to get from level 1 to level 2. Each level after takes more, as the total grows by the power.
+ * Experience it takes in all to reach level 3. Each level takes more than the one before, as the total grows by the
+ * power, so levels come slower the further the campaign goes.
  */
-const FIRST_LEVEL_XP = 100
+const THIRD_LEVEL_XP = 800
 const LEVEL_XP_POWER = 1.5
+
+/**
+ * Experience it takes to get from level 1 to level 2, which the power makes the total for level 3
+ */
+const FIRST_LEVEL_XP = THIRD_LEVEL_XP / 2 ** LEVEL_XP_POWER
 
 /**
  * Campaign level at which monsters are halfway to the best they get, which they get ever slower towards
