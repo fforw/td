@@ -793,8 +793,8 @@ export default class GameView implements PadTarget
     }
 
     /**
-     * Returns whether a monster can see a hero in the level. A fight waits for as long as it takes for others to get there, but
-     * the days don't go on around it.
+     * Returns whether a hero in the level is in a fight, see LevelScene.inFight(). A fight waits for as long as it takes
+     * for others to get there, but the days don't go on around it.
      */
     private inFight(): boolean
     {

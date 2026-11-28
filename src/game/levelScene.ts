@@ -268,6 +268,11 @@ const FIRE_OFF = "fireOff"
  */
 const EVERYWHERE = { has: () => true }
 
+/**
+ * Seconds a hero stays in a fight after the last monster lost sight of them, so ducking behind a pillar doesn't end it
+ */
+export const FIGHT_LINGER = 3
+
 const orders: HeroOrders = { ...NO_ORDERS }
 
 /**
@@ -340,6 +345,8 @@ interface ShownHero
     lightBurnt: number
     /** face the floor around got visited from last, -1 before */
     visitedFrom: number
+    /** seconds since a monster last saw the hero, FIGHT_LINGER and more is out of a fight */
+    unseenTime: number
     maxHp: number
     /** seconds of level time left on a speed potion */
     speedLeft: number
@@ -909,6 +916,7 @@ export default class LevelScene
                     lightOn: true,
                     lightBurnt: 0,
                     visitedFrom: -1,
+                    unseenTime: FIGHT_LINGER,
                     maxHp,
                     speedLeft: 0,
                     strengthLeft: 0,
@@ -932,12 +940,13 @@ export default class LevelScene
     }
 
     /**
-     * Returns whether a monster can see the hero with the given id, which keeps the days from going on
+     * Returns whether a monster saw the hero with the given id within the last FIGHT_LINGER seconds, which keeps the days
+     * from going on
      */
     inFight(id: number): boolean
     {
         const hero = this.shown.get(id)
-        return !!hero && hero.hp > 0 && !!this.monsters?.sees(hero.prey)
+        return !!hero && hero.hp > 0 && hero.unseenTime < FIGHT_LINGER
     }
 
     /**
@@ -1729,7 +1738,7 @@ export default class LevelScene
     jumpTo(face: number): boolean
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || hero.hp === 0 || !this.meshes || this.monsters?.sees(hero.prey) || !this.jumpTargets(hero).some(target => target.face === face))
+        if (!hero || hero.hp === 0 || !this.meshes || this.inFight(this.focus!) || !this.jumpTargets(hero).some(target => target.face === face))
         {
             return false
         }
@@ -1800,6 +1809,7 @@ export default class LevelScene
             {
                 this.hurtHero(id, hero, damage)
             }
+            hero.unseenTime = monsters.sees(prey) ? 0 : hero.unseenTime + delta
         }
         this.updateShots(delta)
         this.cuboidCrowd!.update(this.cuboids!.members, time)

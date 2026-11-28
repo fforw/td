@@ -76,8 +76,11 @@ noticing heroes, the sword arc, the hurt cooldown and bumping.
 - A fight only runs while the view is in its level, so the player can go
   to the castle and send others to help. Everything in the level freezes
   meanwhile.
-- The day can't end while a monster can see a hero in the level kept
-  (`LevelScene.inFight()`).
+- A hero is in a fight from when a monster sees them until no monster
+  has seen them for a few seconds (`FIGHT_LINGER`), so stepping out of
+  sight for a moment doesn't count as getting away
+  (`LevelScene.inFight()`). The day can't end while a hero in the level
+  kept is in a fight, and the map, its jumps and scenes wait for it too.
 - Going to the castle takes Escape or the mouse, no controller button,
   which is a risk on purpose.
 
