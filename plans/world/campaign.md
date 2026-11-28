@@ -55,7 +55,10 @@ and goes up in levels, as the player plays all heroes.
   the whole campaign, and each level up is when the world gets harder
   too ([monsters](../action/monsters.md#behavior-trees)).
 - The level shows in the bar at the top, with the experience for the
-  next one in its title, and a report tells of each level up.
+  next one in its title, and a report tells of each level up. In a
+  level it shows in the [HUD](../action/gear.md#hud) as well.
+- Every hero gets the base gear of each level the campaign reaches
+  ([gear](../action/gear.md#getting-them)), the first bonus of a level.
 
 ## Pages
 
@@ -64,8 +67,8 @@ and goes up in levels, as the player plays all heroes.
 
 ## Planned
 
-- Bonuses with each campaign level, for all heroes or for the defenses
-  of the castle, so there is no hero to choose.
+- More bonuses with each campaign level, for all heroes or for the
+  defenses of the castle, so there is no hero to choose.
 - Experience for beating the end boss of a level, once there are bosses
   ([spawns](../dungeon/spawns.md#planned)).
 

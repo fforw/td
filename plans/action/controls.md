@@ -8,7 +8,8 @@
 - The left stick moves, sliding along the walls as they got built, not
   the edges of their faces (`moveOnFloor()`). The right stick aims, and
   the hero looks where it points on the screen.
-- L1 dashes, R1 attacks, L2 blocks. R2 is kept for a secondary attack.
+- L1 dashes, R1 attacks, L2 blocks. R2 uses the current piece of
+  [gear](gear.md), left and right on the cross pick it.
 - A dash goes where the hero moves, or else where they look. Nothing can
   hurt them from its start until a little after it ends (`DODGE_TIME`).
 - A tapped attack waits for what's in its way.
@@ -36,7 +37,7 @@
   as a stick pushed all the way, and the hero looks at the floor under
   the pointer.
 - The left button attacks, the right one blocks, space or left shift
-  dashes. E does what the confirm button does, F toggles the light, M
+  dashes. Q uses the gear, Z and C pick it. E does what the confirm button does, F toggles the light, M
   opens and closes the map of the level.
 - A bar along the bottom names the keys while they steer.
 - Keys and mouse steer in every frame a controller doesn't, so whichever
@@ -53,6 +54,5 @@
 ## Planned
 
 - Something to attack or block with for heroes other than fighters.
-- A secondary attack on R2.
 - Controller buttons for the overworld map and the way back to the
   castle.

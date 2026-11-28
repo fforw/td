@@ -28,6 +28,13 @@
   carried out of a level gets robbed of all they carry, and it goes back
   into the level, which starts anew.
 
+## Gear
+
+- Some chests also have a piece of [gear](../action/gear.md) in them
+  (`GEAR_CHANCE`), which comes out last, from random numbers of its own
+  like the potion. It floats in a bubble like everything else, and goes
+  to the hero who picks it up.
+
 ## Potions
 
 - Some chests also have a potion of healing, speed or strength

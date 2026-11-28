@@ -21,7 +21,7 @@ takes and whom they leave alive comes back later as threats.
 - **Progress belongs to the campaign.** The player plays all heroes, so
   what they find, take and kill gains the campaign experience, not one
   hero, and nobody has to choose whom to make better. Its level is what
-  bonuses come with. *(Bonuses not built yet.)*
+  bonuses come with. *(Only gear so far.)*
 - **Harder the longer you play.** Monsters get better with the level of
   the campaign, across the whole of it rather than within a dungeon,
   and ever slower, like the levels themselves. A level gets hard at its
@@ -79,6 +79,7 @@ yet is under `## Planned` at the end of each, and the
 
 - [Controls](action/controls.md): keyboard, mouse, controller
 - [Combat](action/combat.md): getting hurt, bumping, dying, falling
+- [Gear](action/gear.md): throwing weapons, wands, scrolls, the HUD
 - [Monsters](action/monsters.md): one heading per monster
 
 ### Story
