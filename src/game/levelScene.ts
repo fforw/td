@@ -1878,18 +1878,22 @@ export default class LevelScene
             }
             // counts at once, so a hero who leaves right away has it
             const taken = chests.collect(position.x, position.z, time, id)
-            const coins = taken.filter(({ potion }) => !potion).length
+            const coins = taken.filter(({ potion, gear }) => !potion && !gear).length
             if (coins > 0)
             {
                 this.onLoot(id, coins * COIN_VALUE)
             }
             // drunk at once like a bought one, which tells what it is
-            for (const { potion } of taken)
+            for (const { potion, gear } of taken)
             {
                 if (potion)
                 {
                     this.use(id, hero, potion)
                     this.outside.learn(potion)
+                }
+                if (gear)
+                {
+                    this.outside.findGear(id, gear)
                 }
             }
         }

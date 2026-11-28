@@ -1,4 +1,5 @@
 import Prando from "prando"
+import { GEAR_CHANCE } from "../../src/game/gear"
 import { assert, describe, it } from "vitest"
 
 import ChestHoard, {
@@ -104,7 +105,7 @@ describe("ChestHoard", () => {
     it("has a fitting number of coins, the same every time", () => {
 
         const { coins } = hoard().chests[0]
-        const count = coins.filter(({ potion }) => !potion).length
+        const count = coins.filter(({ potion, gear }) => !potion && !gear).length
         assert(count >= MIN_COINS && count <= MAX_COINS)
         assert.deepEqual(coins, hoard().chests[0].coins)
     })
@@ -113,7 +114,7 @@ describe("ChestHoard", () => {
 
         const spots = Array.from({ length: 20 }, () => SPOT)
         const { chests } = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
-        assert(new Set(chests.map(({ coins }) => coins.filter(({ potion }) => !potion).length)).size > 2)
+        assert(new Set(chests.map(({ coins }) => coins.filter(({ potion, gear }) => !potion && !gear).length)).size > 2)
     })
 
     it("has a potion in some chests, which comes out after the coins", () => {
@@ -122,13 +123,29 @@ describe("ChestHoard", () => {
         const { chests } = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
         const withPotion = chests.filter(({ coins }) => coins.some(({ potion }) => potion))
         assert.closeTo(withPotion.length / chests.length, POTION_CHANCE, 0.06)
-        assert.sameMembers([...new Set(withPotion.map(({ coins }) => coins.at(-1)!.potion))], [...POTIONS])
+        assert.sameMembers([...new Set(withPotion.map(({ coins }) => coins.find(({ potion }) => potion)!.potion))], [...POTIONS])
         for (const { coins } of withPotion)
         {
-            const potion = coins.at(-1)!
+            const potion = coins.find(({ potion }) => potion)!
+            const plain = coins.filter(({ potion, gear }) => !potion && !gear)
             assert.equal(coins.filter(({ potion }) => potion).length, 1)
-            assert.equal(potion.id, coins.length - 1)
-            assert(coins.slice(0, -1).every(({ delay }) => delay < potion.delay))
+            assert.equal(potion.id, plain.length)
+            assert(plain.every(({ delay }) => delay < potion.delay))
+        }
+    })
+
+    it("has gear in some chests, which comes out last, and the same coins and potions as without", () => {
+
+        const spots = Array.from({ length: 400 }, () => SPOT)
+        const { chests } = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
+        const withGear = chests.filter(({ coins }) => coins.some(({ gear }) => gear))
+        assert.closeTo(withGear.length / chests.length, GEAR_CHANCE, 0.06)
+        for (const { coins } of withGear)
+        {
+            const last = coins.at(-1)!
+            assert.isDefined(last.gear)
+            assert.isUndefined(last.potion)
+            assert(coins.slice(0, -1).every(({ delay, gear }) => !gear && delay < last.delay))
         }
     })
 
@@ -136,8 +153,8 @@ describe("ChestHoard", () => {
 
         const spots = Array.from({ length: 40 }, () => SPOT)
         const chests = new ChestHoard(spots, 1, ({ x, z }, dx, dz) => [x + dx, z + dz], {})
-        const chest = chests.chests.find(({ coins }) => coins.at(-1)!.potion)!
-        const potion = chest.coins.at(-1)!
+        const chest = chests.chests.find(({ coins }) => coins.some(({ potion }) => potion))!
+        const potion = chest.coins.find(({ potion }) => potion)!
         chests.open(chest, 0)
         assert.include(chests.collect(potion.x, potion.z, LONG_AFTER), potion)
     })

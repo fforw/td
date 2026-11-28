@@ -2,7 +2,8 @@ import { Box3, DynamicDrawUsage, Group, InstancedMesh, type Mesh, type MeshStand
 import { FIGURE_SCALE } from "../meeple/figureScale"
 import { applyLightField, createBubbleMaterial, type LightField } from "../render/dungeonLighting"
 import { type ModelName, template } from "../render/scene3d"
-import { type Chest, CHEST_HALF_WIDTH, coinPose, type CoinPose, LID_TIME, type Potion, POTIONS } from "./chests"
+import { instancedGear, lookKey } from "../items/gearModels"
+import { type Chest, CHEST_HALF_WIDTH, type Coin, coinPose, type CoinPose, LID_TIME, type Potion, POTIONS } from "./chests"
 
 /**
  * Half the width of the chest model
@@ -73,14 +74,23 @@ interface Items
 
 
 /**
- * Chests and the instanced coins and potions in them, each in a bubble. The models must be loaded first.
+ * Returns the key of what something in a chest looks like
+ */
+function itemKey({ potion, gear }: Coin): string
+{
+    return gear ? lookKey(gear) : potion ?? "coin"
+}
+
+
+/**
+ * Chests and the instanced coins, potions and gear in them, each in a bubble. The models must be loaded first.
  */
 export default class TreasureView
 {
     readonly group = new Group()
 
     private readonly lids: Object3D[] = []
-    private readonly items: Record<"coin" | Potion, Items>
+    private readonly items = new Map<string, Items>()
     private readonly bubbles: InstancedMesh
 
     /**
@@ -115,22 +125,28 @@ export default class TreasureView
         this.group.renderOrder = 1
 
         const all = chests.flatMap(({ coins }) => coins)
-        const most = (potion?: Potion) => all.filter(coin => coin.potion === potion).length
+        const most = (key: string) => all.filter(coin => itemKey(coin) === key).length
         const source = firstMesh(template("coin"))
         const coinMaterial = (source.material as MeshStandardMaterial).clone()
         applyLightField(coinMaterial, field)
         // around its middle, to turn in the air
-        const coins = new InstancedMesh(source.geometry.clone().translate(0, -COIN_MODEL_SIZE / 2, 0), coinMaterial, most())
-        this.items = {
-            coin: { parts: [coins], scale: COIN_SCALE, count: 0 },
-            ...Object.fromEntries(POTIONS.map(potion => [potion, {
-                parts: instancedParts(template(POTION_MODELS[potion]), field, most(potion)),
-                scale: POTION_SCALE,
-                count: 0
-            }])) as Record<Potion, Items>
+        const coins = new InstancedMesh(source.geometry.clone().translate(0, -COIN_MODEL_SIZE / 2, 0), coinMaterial, most("coin"))
+        const { items } = this
+        items.set("coin", { parts: [coins], scale: COIN_SCALE, count: 0 })
+        for (const potion of POTIONS)
+        {
+            items.set(potion, { parts: instancedParts(template(POTION_MODELS[potion]), field, most(potion)), scale: POTION_SCALE, count: 0 })
+        }
+        for (const { gear } of all)
+        {
+            const key = gear && lookKey(gear)
+            if (key && !items.has(key))
+            {
+                items.set(key, { ...instancedGear(gear, field, most(key)), count: 0 })
+            }
         }
         const bubbles = new InstancedMesh(new SphereGeometry(BUBBLE_RADIUS, 24, 16), createBubbleMaterial(field), all.length)
-        for (const mesh of [...Object.values(this.items).flatMap(({ parts }) => parts), bubbles])
+        for (const mesh of [...[...items.values()].flatMap(({ parts }) => parts), bubbles])
         {
             mesh.instanceMatrix.setUsage(DynamicDrawUsage)
             mesh.frustumCulled = false
@@ -146,7 +162,7 @@ export default class TreasureView
     update(time: number, heroAt: (id: number) => { x: number, z: number } | undefined): void
     {
         const { chests, lids, items, bubbles } = this
-        for (const kind of Object.values(items))
+        for (const kind of items.values())
         {
             kind.count = 0
         }
@@ -170,7 +186,7 @@ export default class TreasureView
                 coinPose(coin, chest, time, pose, coin.takenBy !== null ? heroAt(coin.takenBy) : undefined)
                 if (pose.size > 0)
                 {
-                    const kind = items[coin.potion ?? "coin"]
+                    const kind = items.get(itemKey(coin))!
                     dummy.position.set(pose.x, pose.y, pose.z)
                     dummy.rotation.set(pose.tumble, pose.spin, 0, "YXZ")
                     dummy.scale.setScalar(kind.scale * pose.size)
@@ -187,7 +203,7 @@ export default class TreasureView
                 }
             }
         })
-        for (const { parts, count } of Object.values(items))
+        for (const { parts, count } of items.values())
         {
             for (const part of parts)
             {

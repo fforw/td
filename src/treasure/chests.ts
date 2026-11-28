@@ -1,4 +1,5 @@
 import Prando from "prando"
+import { foundGear, type Gear, GEAR_CHANCE } from "../game/gear"
 
 import { type FixtureSpot, outerSpot } from "../map/fixtures"
 import { FIGURE_SCALE } from "../meeple/figureScale"
@@ -54,6 +55,16 @@ const POTION_SEED = 0x9a71
  * Seconds a potion comes out after the last coin
  */
 const POTION_DELAY = 0.15
+
+/**
+ * Seed of the gear of the chests against the one of the level, with numbers of their own like the potions
+ */
+const GEAR_SEED = 0x5e2d
+
+/**
+ * Seconds a piece of gear comes out after the potion
+ */
+const GEAR_DELAY = 0.15
 
 /**
  * Seconds a lid takes to pop open
@@ -139,13 +150,15 @@ export type OpenedChests = Record<number, number[]>
 export type ChestSpot = FixtureSpot
 
 /**
- * Something in a chest, a coin or a potion, which flies out when it opens, floats in a bubble and goes to whoever picks it up
+ * Something in a chest, a coin, a potion or a piece of gear, which flies out when it opens, floats in a bubble and goes to
+ * whoever picks it up
  */
 export interface Coin
 {
     id: number
-    /** what it is, a coin without */
+    /** what it is, a coin without either */
     potion?: Potion
+    gear?: Gear
     /** where it lands */
     x: number
     z: number
@@ -277,6 +290,7 @@ export default class ChestHoard
     {
         const random = new Prando(seed)
         const potionRandom = new Prando(seed + POTION_SEED)
+        const gearRandom = new Prando(seed + GEAR_SEED)
         this.chests = spots.map((spot, index) => {
             const left = opened[index]
             const chest: Chest = {
@@ -304,6 +318,14 @@ export default class ChestHoard
             if (hasPotion)
             {
                 keep({ ...last, potion })
+            }
+            // drawn for every chest as well
+            const hasGear = gearRandom.next() < GEAR_CHANCE
+            const gear = foundGear(gearRandom)
+            const after = spilled(spot, count + 1, last.delay + GEAR_DELAY, land, gearRandom)
+            if (hasGear)
+            {
+                keep({ ...after, gear })
             }
             return chest
         })
