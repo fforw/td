@@ -40,6 +40,11 @@ export const SWORD_SHOVE = 1.2 * FIGURE_SCALE
 
 
 /**
+ * How hard something thrown or shot shoves what it hits, against SWORD_SHOVE
+ */
+export const SHOT_SHOVE = 0.5 * SWORD_SHOVE
+
+/**
  * What a sword blow on a monster sounds like
  */
 export type HitMaterial = "flesh" | "metal" | "armor"
@@ -52,6 +57,19 @@ export interface Blow
     material: HitMaterial
     /** its shield stopped the blow, which left it unhurt */
     stopped: boolean
+}
+
+/**
+ * What something thrown or shot did to the monster it hit
+ */
+export interface Shot extends Blow
+{
+    monster: Monster
+    /** where it hit, in world units */
+    x: number
+    z: number
+    /** the monster died of it */
+    killed: boolean
 }
 
 export interface MonsterKind
@@ -304,34 +322,96 @@ export abstract class MonsterPack<M extends Monster = Monster>
             {
                 // even a shield gets pushed back, right on top of the hero it goes where the blow goes
                 const [awayX, awayZ] = distance > 1e-6 ? [dx / distance, dz / distance] : [Math.sin(facing), Math.cos(facing)]
-                monster.shoveX += awayX * SWORD_SHOVE / monster.kind.mass
-                monster.shoveZ += awayZ * SWORD_SHOVE / monster.kind.mass
-                const stopped = this.stops(monster, dx, dz)
-                blows.push({ material: monster.kind.material, stopped })
-                if (stopped)
-                {
-                    monster.chase = CHASE_TIME
-                    monster.goalX = x
-                    monster.goalZ = z
-                    continue
-                }
-                monster.hp -= damage
-                if (monster.hp <= 0)
-                {
-                    // right on top of the hero, they go where the blow goes
-                    this.die(monster, distance > 1e-6 ? Math.atan2(dx, dz) : facing, false)
-                }
-                else
-                {
-                    monster.flash = FLASH_TIME
-                    monster.chase = CHASE_TIME
-                    monster.goalX = x
-                    monster.goalZ = z
-                    this.struck(monster, dx, dz, distance)
-                }
+                blows.push(this.hit(monster, x, z, awayX, awayZ, SWORD_SHOVE, damage))
             }
         }
         return blows
+    }
+
+    /**
+     * Has something fly along a line, and hit the first monster in its way that it gets to
+     *
+     * @param x0        where it was, in world units
+     * @param z0        where it was, in world units
+     * @param x1        where it gets to, in world units
+     * @param z1        where it gets to, in world units
+     * @param radius    half its width in world units
+     * @param fromX     where the one who threw or shot it is, which the monster goes after, in world units
+     * @param fromZ     where the one who threw or shot it is, in world units
+     * @param damage    hit points it takes
+     *
+     * @return what it hit, null for nothing
+     */
+    shoot(x0: number, z0: number, x1: number, z1: number, radius: number, fromX: number, fromZ: number, damage: number): Shot | null
+    {
+        const found = this.firstOnLine(x0, z0, x1, z1, radius)
+        if (!found)
+        {
+            return null
+        }
+        const [monster, along] = found
+        const length = Math.hypot(x1 - x0, z1 - z0)
+        const [awayX, awayZ] = length > 1e-6 ? [(x1 - x0) / length, (z1 - z0) / length] : [0, 1]
+        const blow = this.hit(monster, fromX, fromZ, awayX, awayZ, SHOT_SHOVE, damage)
+        return { ...blow, monster, x: x0 + (x1 - x0) * along, z: z0 + (z1 - z0) * along, killed: !this.members.includes(monster) }
+    }
+
+    /**
+     * Returns the first monster a line comes to within the given distance, with how far along the line that is from 0 to 1
+     */
+    firstOnLine(x0: number, z0: number, x1: number, z1: number, radius: number): [M, number] | null
+    {
+        const lineX = x1 - x0, lineZ = z1 - z0
+        const squared = lineX * lineX + lineZ * lineZ
+        let first: [M, number] | null = null
+        for (const monster of this.members)
+        {
+            const along = squared > 0 ? Math.max(0, Math.min(1, ((monster.x - x0) * lineX + (monster.z - z0) * lineZ) / squared)) : 0
+            const near = Math.hypot(x0 + lineX * along - monster.x, z0 + lineZ * along - monster.z)
+            if (near <= monster.kind.radius + radius && (!first || along < first[1]))
+            {
+                first = [monster, along]
+            }
+        }
+        return first
+    }
+
+    /**
+     * Has a blow or a shot land on a monster, which shoves it away even if it stops it
+     *
+     * @param fromX     where the one who dealt it is, which the monster goes after, in world units
+     * @param fromZ     where the one who dealt it is, in world units
+     * @param awayX     direction it goes in, length 1
+     * @param awayZ     direction it goes in
+     * @param shove     how hard it shoves, in world units per second against a hero's mass
+     * @param damage    hit points it takes
+     */
+    private hit(monster: M, fromX: number, fromZ: number, awayX: number, awayZ: number, shove: number, damage: number): Blow
+    {
+        monster.shoveX += awayX * shove / monster.kind.mass
+        monster.shoveZ += awayZ * shove / monster.kind.mass
+        const dx = monster.x - fromX, dz = monster.z - fromZ
+        const distance = Math.hypot(dx, dz)
+        const stopped = this.stops(monster, dx, dz)
+        monster.chase = CHASE_TIME
+        monster.goalX = fromX
+        monster.goalZ = fromZ
+        if (stopped)
+        {
+            return { material: monster.kind.material, stopped }
+        }
+        monster.hp -= damage
+        if (monster.hp <= 0)
+        {
+            // right on top of the one who dealt it, they go where the blow goes
+            this.die(monster, distance > 1e-6 ? Math.atan2(dx, dz) : Math.atan2(awayX, awayZ), false)
+        }
+        else
+        {
+            monster.flash = FLASH_TIME
+            this.struck(monster, dx, dz, distance)
+        }
+        return { material: monster.kind.material, stopped }
     }
 
     /**
@@ -442,6 +522,35 @@ export default class Monsters
     strike(x: number, z: number, facing: number, reach: number, width: number, damage: number): Blow[]
     {
         return this.packs.flatMap(pack => pack.strike(x, z, facing, reach, width, damage))
+    }
+
+    /**
+     * Has something fly along a line and hit the first monster in its way, see MonsterPack.shoot()
+     *
+     * @return what it hit, null for nothing
+     */
+    shoot(x0: number, z0: number, x1: number, z1: number, radius: number, fromX: number, fromZ: number, damage: number): Shot | null
+    {
+        let first: MonsterPack | null = null
+        let shortest = Infinity
+        for (const pack of this.packs)
+        {
+            const found = pack.firstOnLine(x0, z0, x1, z1, radius)
+            if (found && found[1] < shortest)
+            {
+                first = pack
+                shortest = found[1]
+            }
+        }
+        return first?.shoot(x0, z0, x1, z1, radius, fromX, fromZ, damage) ?? null
+    }
+
+    /**
+     * Returns whether a monster is still alive in the level
+     */
+    has(monster: Monster): boolean
+    {
+        return this.packs.some(pack => pack.members.includes(monster))
     }
 
     /**
