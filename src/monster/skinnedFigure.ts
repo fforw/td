@@ -1,8 +1,8 @@
-import { type Color, type MeshBasicMaterial, type MeshStandardMaterial, type Object3D, SkinnedMesh } from "three"
+import { type Color, type Group, type MeshBasicMaterial, type MeshStandardMaterial, type Object3D, SkinnedMesh } from "three"
 import { createSilhouetteMaterial, NO_SILHOUETTE, SILHOUETTE_FILL, SILHOUETTE_RIM } from "../meeple/Meeple3D"
 import { applyLightField, type LightField } from "../render/dungeonLighting"
 import { model, type ModelName } from "../render/scene3d"
-import { FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
+import { FIGURE_ORDER, FLASH, PLAIN, SILHOUETTE } from "./MonsterCrowd"
 
 /**
  * A copy of a rigged monster model with materials of its own, for the flash and the light field, and silhouettes
@@ -29,6 +29,9 @@ export interface SkinnedFigure
 export function skinnedFigure(name: ModelName, field: LightField, colors: Readonly<Record<string, Color>> = {}): SkinnedFigure
 {
     const root = model(name)
+    // three draws by the order of the nearest group, and glTF brings groups of its own, which would draw the figure with
+    // the walls. Then it would hide the meeples like a wall does and get no silhouette behind walls itself.
+    root.traverse(obj => (obj as Group).isGroup && (obj.renderOrder = FIGURE_ORDER))
     const rim = createSilhouetteMaterial(1, SILHOUETTE_RIM)
     const fill = createSilhouetteMaterial(SILHOUETTE_FILL, 0)
     const bodies: SkinnedFigure["bodies"] = []

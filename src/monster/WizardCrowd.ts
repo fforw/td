@@ -3,6 +3,7 @@ import { LEVEL_MEEPLE_SCALE } from "../meeple/Meeple3D"
 import type { LightField } from "../render/dungeonLighting"
 import { animations } from "../render/scene3d"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
+import { FIGURE_ORDER } from "./MonsterCrowd"
 import { SIGIL_HUE_RANGE } from "../render/sigil"
 import { beamCastTime } from "../render/beamTiming"
 import { RAISE_TIME, type Robe, type Wizard } from "./wizards"
@@ -72,7 +73,7 @@ export default class WizardCrowd
      */
     constructor(private readonly field: LightField)
     {
-        this.group.renderOrder = 1
+        this.group.renderOrder = FIGURE_ORDER
     }
 
     /**

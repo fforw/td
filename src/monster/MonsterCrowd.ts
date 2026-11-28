@@ -10,6 +10,12 @@ export const PLAIN = new Color(1, 1, 1)
 export const FLASH = new Color(5, 5, 5)
 
 /**
+ * Render order of the groups of monsters, after the walls, so the silhouettes of meeples show behind walls and not
+ * behind monsters, see MeepleCrowd.showSilhouettes()
+ */
+export const FIGURE_ORDER = 1
+
+/**
  * Color of a monster after someone where a wall hides it, those not going after anyone yet are a surprise
  */
 export const SILHOUETTE = new Color("#f0705a")
@@ -74,7 +80,7 @@ export default class MonsterCrowd
             bodies.push(body)
             silhouettes.push(silhouette, fill)
         })
-        this.group.renderOrder = 1
+        this.group.renderOrder = FIGURE_ORDER
     }
 
     /**

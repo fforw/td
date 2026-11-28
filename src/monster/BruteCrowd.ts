@@ -7,6 +7,7 @@ import { type Brute, ATTACK_TIME } from "./brutes"
 import type Bursts from "./bursts"
 import type { Death } from "./bursts"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
+import { FIGURE_ORDER } from "./MonsterCrowd"
 
 /**
  * World units walked in one loop of the walk clip, so that the feet keep up with the ground
@@ -67,7 +68,7 @@ export default class BruteCrowd
      */
     constructor(private readonly field: LightField)
     {
-        this.group.renderOrder = 1
+        this.group.renderOrder = FIGURE_ORDER
     }
 
     /**

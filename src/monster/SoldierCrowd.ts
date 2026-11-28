@@ -3,6 +3,7 @@ import { LEVEL_MEEPLE_SCALE } from "../meeple/Meeple3D"
 import type { LightField } from "../render/dungeonLighting"
 import { animations } from "../render/scene3d"
 import { type SkinnedFigure, skinnedFigure, tintFigure } from "./skinnedFigure"
+import { FIGURE_ORDER } from "./MonsterCrowd"
 import { RAISE_TIME, type Soldier } from "./soldiers"
 
 /**
@@ -70,7 +71,7 @@ export default class SoldierCrowd
      */
     constructor(private readonly field: LightField)
     {
-        this.group.renderOrder = 1
+        this.group.renderOrder = FIGURE_ORDER
     }
 
     /**
