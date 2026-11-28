@@ -61,9 +61,9 @@ travels along the room graph instead.
   counts once the swing is done, so they start just before the blade
   lands and leave most of the whoosh out.
 - A hero who gets hurt says ouch (`meeple-hurt-*`), whatever hurt them.
-  The hero the player steers also gets a short 8-bit hit
-  (`player-hurt`) along with the flash of the screen, so getting hurt
-  oneself stands out from the others getting hurt.
+  The hero the player steers plays a short 8-bit hit (`player-hurt`)
+  instead, along with the flash of the screen, so getting hurt oneself
+  stands out from the others getting hurt.
 - A construct's zip (`construct-zip-*`) is timed for its loudest part to
   come as the construct passes through the hero, late in the zip, as
   that is when it matters. A zip a blow stops before then stays silent.

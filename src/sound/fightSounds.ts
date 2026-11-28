@@ -42,7 +42,7 @@ const HURT_RATE = 1.12
 const HURT_VOLUME = 0.8
 
 /**
- * Hit for the hero the player steers getting hurt, on top of the ouch, so it stands out from the others getting hurt
+ * Hit for the hero the player steers getting hurt instead of the ouch, so it stands out from the others getting hurt
  */
 const PLAYER_HURT_SOUND = "player-hurt.mp3"
 const PLAYER_HURT_VOLUME = 0.7
@@ -141,16 +141,19 @@ export function playBlow(blows: readonly Blow[]): void
 }
 
 /**
- * Plays a hero saying ouch, with a hit on top for the one the player steers
+ * Plays a hero saying ouch, or a hit for the one the player steers
  *
  * @param steered   whether it is the hero the player steers
  */
 export function playHurt(steered: boolean): void
 {
-    playEffect(hurts.next(), spread(HURT_RATE), HURT_VOLUME)
     if (steered)
     {
         playEffect(PLAYER_HURT_SOUND, 1, PLAYER_HURT_VOLUME)
+    }
+    else
+    {
+        playEffect(hurts.next(), spread(HURT_RATE), HURT_VOLUME)
     }
 }
 
