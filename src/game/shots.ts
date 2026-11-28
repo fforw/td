@@ -20,6 +20,12 @@ export const FALL_AFTER = 0.5 * FIGURE_SCALE
 export const FALL_TIME = 0.25
 
 /**
+ * Seconds a weapon lies, counted from when it started to fall, before it comes back to a hero out of a fight, so it
+ * can be seen landing
+ */
+export const RECALL_TIME = 1
+
+/**
  * Share of the weapons that hit a monster which stick in it, and only fall once it dies
  */
 export const STICK_CHANCE = 0.5
@@ -368,7 +374,7 @@ export default class Shots
     }
 
     /**
-     * Gives a hero back the weapons of theirs on the floor, once they landed, for when the hero is out of a fight. Those
+     * Gives a hero back the weapons of theirs that lay on the floor for RECALL_TIME, for when the hero is out of a fight. Those
      * in the air or in monsters stay.
      *
      * @return the kinds of the weapons given back
@@ -380,7 +386,7 @@ export default class Shots
         for (let i = lying.length - 1; i >= 0; i--)
         {
             const weapon = lying[i]
-            if (weapon.owner === owner && weapon.age >= FALL_TIME)
+            if (weapon.owner === owner && weapon.age >= RECALL_TIME)
             {
                 lying.splice(i, 1)
                 taken.push(weapon.kind)

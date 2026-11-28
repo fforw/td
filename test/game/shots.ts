@@ -1,7 +1,7 @@
 import { assert, describe, it } from "vitest"
 
 import { GEAR_USES } from "../../src/game/gear"
-import Shots, { FALL_AFTER, FALL_TIME, type ShotFloor, type ShotTargets } from "../../src/game/shots"
+import Shots, { FALL_AFTER, FALL_TIME, RECALL_TIME, type ShotFloor, type ShotTargets } from "../../src/game/shots"
 import type { Monster, Shot } from "../../src/monster/monsters"
 import { resetRandom } from "../../src/math/random"
 
@@ -147,13 +147,14 @@ describe("Shots", () => {
         assert.strictEqual(shots.outOf(1, "dagger"), 0)
     })
 
-    it("gives a hero back what of theirs landed on the floor, but not what is in a monster", () => {
+    it("gives a hero back what of theirs lay on the floor a while, but not what is in a monster", () => {
         const shots = new Shots(floor)
         shots.launch(1, DAGGER, { face: 1, x: 9.9, z: 0 }, 1, 0)
         shots.launch(2, DAGGER, { face: 1, x: 9.9, z: 0 }, 1, 0)
         shots.update(FRAME, targets([]))
+        run(shots, RECALL_TIME - 2 * FRAME, targets([]))
         assert.deepEqual(shots.recall(1), [])
-        run(shots, FALL_TIME, targets([]))
+        run(shots, 2 * FRAME, targets([]))
         assert.deepEqual(shots.recall(1), ["dagger"])
         assert.strictEqual(shots.outOf(1, "dagger"), 0)
         assert.strictEqual(shots.outOf(2, "dagger"), 1)
