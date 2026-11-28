@@ -51,8 +51,8 @@ const CELL_STRIDE = 1 << 16
 
 /**
  * The spaces a wall is near for, 0 for none. A wall is near for a space if it stands between the camera and floor of the
- * space right behind it. Walls are lower than a face is wide and the view is steep, so nothing further away gets hidden,
- * and it takes no more than looking at what's next to a wall.
+ * space right behind it. At the angle of the view a wall hides about a face of floor behind it, so it takes no more than
+ * looking at what's next to a wall, as deep as THICK_WALL_CUT_DEPTH.
  */
 export type NearSpaces = [number, number]
 

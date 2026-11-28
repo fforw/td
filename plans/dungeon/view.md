@@ -21,8 +21,10 @@
   Rooms and corridors are spaces, and a wall is near for a space if floor
   of it lies right behind the wall as the view has it, and the wall faces
   the view enough. Walls running along the view stay.
-- Walls are low enough that looking at what is next to a wall is all it
-  takes, also for rooms that aren't convex.
+- At the angle of the view, a wall hides about a face of floor behind it,
+  more toward the top of the screen. So looking at what is next to a wall
+  is all it takes, also for rooms that aren't convex, as long as the cut
+  reaches that deep.
 - Walls only give way for the space the hero is in. Opening the spaces
   close to the hero as well made the wall they walk up to give way.
 - Thick walls are cut about a face deep: each corner takes the first
