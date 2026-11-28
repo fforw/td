@@ -966,13 +966,25 @@ export default class LevelScene
     pickGear(step: -1 | 1): void
     {
         const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
-        if (!hero || hero.gear.length < 2 || this.playing)
+        const count = hero?.gear.length ?? 0
+        if (count > 1)
+        {
+            this.chooseGear(((hero!.currentGear + step) % count + count) % count)
+        }
+    }
+
+    /**
+     * Has the hero the view is with use the piece of gear with the given index, if they have it
+     */
+    chooseGear(index: number): void
+    {
+        const hero = this.focus !== null ? this.shown.get(this.focus) : undefined
+        if (!hero || index >= hero.gear.length || index === hero.currentGear || this.playing)
         {
             return
         }
-        const count = hero.gear.length
-        hero.currentGear = ((hero.currentGear + step) % count + count) % count
-        this.outside.pickGear(this.focus!, hero.currentGear)
+        hero.currentGear = index
+        this.outside.pickGear(this.focus!, index)
     }
 
     /**
@@ -1974,7 +1986,7 @@ export default class LevelScene
 
     /**
      * Feeds the mouse to what steers the hero. The buttons only count when they go down on the level itself, and wherever
-     * they come up again.
+     * they come up again, the wheel only over the level.
      */
     private listen(canvas: HTMLCanvasElement): void
     {
@@ -1985,6 +1997,14 @@ export default class LevelScene
         })
         // the right button blocks
         canvas.addEventListener("contextmenu", ev => ev.preventDefault())
+        canvas.addEventListener("wheel", ev => {
+            ev.preventDefault()
+            const step = keys.wheel(ev.deltaY, ev.deltaMode)
+            if (step !== 0)
+            {
+                this.pickGear(step)
+            }
+        }, { passive: false })
 
         const { signal } = this.listening
         window.addEventListener("pointermove", ev => keys.point(ev.clientX, ev.clientY), { signal })

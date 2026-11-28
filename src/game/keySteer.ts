@@ -33,12 +33,21 @@ const DASH_KEYS: readonly string[] = ["Space", "ShiftLeft"]
 const USE_KEY = "KeyQ"
 
 /**
- * Keys that pick the piece of gear before or after the current one
+ * Keys that pick the first ten pieces of gear, in the order of the row over the letters
  */
-const PICK_KEYS: Record<string, -1 | 1> = {
-    KeyZ: -1,
-    KeyC: 1
-}
+const SLOT_KEYS: readonly string[] = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0"]
+
+/**
+ * Pixels the mouse wheel turns for one step through the gear, about one notch of a wheel, so a touchpad's stream of
+ * small turns doesn't race through all of it
+ */
+const WHEEL_STEP = 100
+
+/**
+ * Pixels a line or a page of the wheel counts as, for browsers that tell it in those
+ */
+const WHEEL_LINE = 33
+const WHEEL_PAGE = 800
 
 /**
  * Keys that do what a button on the face of a controller does in a level
@@ -62,7 +71,7 @@ export const KEY_HINTS = {
     attack: "Left click",
     block: "Right click",
     use: "Q",
-    pick: "Z / C",
+    pick: "1-0 / Wheel",
     confirm: "E",
     light: "F",
     map: "M"
@@ -79,24 +88,30 @@ export function keyAction(code: string): Exclude<PadAction, "menu"> | null
 
 
 /**
- * Keeps track of the keys and mouse buttons that steer a hero in a level: WASD to go, the pointer to aim at, the mouse
- * buttons to attack and block. Plain state without the page, which feeds it the events.
+ * Returns the index of the piece of gear a key picks, null for a key that doesn't
  */
-/**
- * Returns which way a key picks the piece of gear, 0 for a key that doesn't
- */
-export function keyPick(code: string): -1 | 0 | 1
+export function keySlot(code: string): number | null
 {
-    return PICK_KEYS[code] ?? 0
+    const index = SLOT_KEYS.indexOf(code)
+    return index >= 0 ? index : null
 }
 
 
+/**
+ * Keeps track of the keys and mouse buttons that steer a hero in a level: WASD to go, the pointer to aim at, the mouse
+ * buttons to attack and block, the wheel to pick gear. Plain state without the page, which feeds it the events.
+ */
 export default class KeySteer
 {
     private readonly held = new Set<string>()
     private readonly buttons = new Set<number>()
     private pointerX: number | null = null
     private pointerY: number | null = null
+
+    /**
+     * Pixels the wheel turned towards the next step through the gear, negative for the one before
+     */
+    private wheelTurned = 0
 
     /**
      * Takes a key going down
@@ -148,6 +163,29 @@ export default class KeySteer
     }
 
     /**
+     * Takes a turn of the mouse wheel, by WheelEvent.deltaY and deltaMode
+     *
+     * @return which way to step through the gear, down for the next piece, 0 for not yet
+     */
+    wheel(deltaY: number, deltaMode: number): -1 | 0 | 1
+    {
+        const pixels = deltaY * (deltaMode === 1 ? WHEEL_LINE : deltaMode === 2 ? WHEEL_PAGE : 1)
+        // turning back starts over, so the first step that way comes as soon as one the other way would
+        if (Math.sign(pixels) !== Math.sign(this.wheelTurned))
+        {
+            this.wheelTurned = 0
+        }
+        this.wheelTurned += pixels
+        if (Math.abs(this.wheelTurned) < WHEEL_STEP)
+        {
+            return 0
+        }
+        const step = this.wheelTurned > 0 ? 1 : -1
+        this.wheelTurned -= step * WHEEL_STEP
+        return step
+    }
+
+    /**
      * Lets go of everything, for when the keys and buttons go elsewhere and their release might never show up. The pointer
      * stays where it is.
      */
@@ -155,6 +193,7 @@ export default class KeySteer
     {
         this.held.clear()
         this.buttons.clear()
+        this.wheelTurned = 0
     }
 
     /**

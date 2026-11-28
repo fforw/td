@@ -24,7 +24,7 @@ import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
 import { dayMarks } from "./journey"
 import LevelMap from "./levelMap"
-import { KEY_HINTS, keyAction, keyPick } from "./keySteer"
+import { KEY_HINTS, keyAction, keySlot } from "./keySteer"
 import LevelScene, { GOD_MODE, type LevelHero } from "./levelScene"
 import SceneBox from "../scene/SceneBox"
 import { type ExploreTarget, mapContent, type MapMarker, type MissionMarker } from "./mapContent"
@@ -549,12 +549,12 @@ export default class GameView implements PadTarget
         {
             ev.preventDefault()
         }
-        else if (keyPick(code) !== 0)
+        else if (keySlot(code) !== null)
         {
             ev.preventDefault()
             if (!ev.repeat)
             {
-                level.pickGear(keyPick(code) as -1 | 1)
+                level.chooseGear(keySlot(code)!)
             }
         }
         else if (action && !ev.repeat)

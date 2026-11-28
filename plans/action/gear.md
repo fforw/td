@@ -26,8 +26,10 @@ before monsters get more dangerous in groups.
 ## Using them
 
 - R2 uses the current piece in the direction the hero looks, Q with the
-  keyboard, toward the pointer. Left and right on the cross pick the
-  current piece, Z and C with the keyboard.
+  keyboard, toward the pointer. Left and right on the cross step through
+  the pieces, as does the mouse wheel, a step per notch so a touchpad
+  doesn't race through them. The number keys 1 to 0 pick the first ten
+  pieces straight away, as stepping gets slow with many.
 - Holding R2 uses the piece again and again, with a wait after each use
   (`GEAR_USES`) that keeps it from firing like a machine gun. Wands have
   the longest, as they have no other limit. Nothing gets used behind the

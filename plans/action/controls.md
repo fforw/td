@@ -37,7 +37,7 @@
   as a stick pushed all the way, and the hero looks at the floor under
   the pointer.
 - The left button attacks, the right one blocks, space or left shift
-  dashes. Q uses the gear, Z and C pick it. E does what the confirm button does, F toggles the light, M
+  dashes. Q uses the gear, the number keys 1 to 0 or the wheel pick it. E does what the confirm button does, F toggles the light, M
   opens and closes the map of the level.
 - A bar along the bottom names the keys while they steer.
 - Keys and mouse steer in every frame a controller doesn't, so whichever

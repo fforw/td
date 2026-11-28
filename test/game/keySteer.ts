@@ -1,6 +1,6 @@
 import { assert, describe, it } from "vitest"
 
-import KeySteer, { keyAction, keyPick } from "../../src/game/keySteer"
+import KeySteer, { keyAction, keySlot } from "../../src/game/keySteer"
 
 
 describe("KeySteer", () => {
@@ -48,16 +48,32 @@ describe("KeySteer", () => {
         assert.deepInclude(keys.input(), { moveX: 0, moveY: 0, dash: false })
     })
 
-    it("uses gear while Q is held, and picks it with Z and C", () => {
+    it("uses gear while Q is held, and picks it with the number keys", () => {
 
         const keys = new KeySteer()
         assert(keys.keyDown("KeyQ"))
         assert(keys.input().use)
         keys.keyUp("KeyQ")
         assert(!keys.input().use)
-        assert.strictEqual(keyPick("KeyZ"), -1)
-        assert.strictEqual(keyPick("KeyC"), 1)
-        assert.strictEqual(keyPick("KeyQ"), 0)
+        assert.strictEqual(keySlot("Digit1"), 0)
+        assert.strictEqual(keySlot("Digit9"), 8)
+        assert.strictEqual(keySlot("Digit0"), 9)
+        assert.isNull(keySlot("KeyQ"))
+    })
+
+    it("steps through gear once per notch of the wheel", () => {
+
+        const keys = new KeySteer()
+        assert.strictEqual(keys.wheel(100, 0), 1)
+        assert.strictEqual(keys.wheel(-100, 0), -1)
+        // a touchpad turns in small bits
+        const steps = Array.from({ length: 10 }, () => keys.wheel(25, 0))
+        assert.strictEqual(steps.filter(step => step === 1).length, 2)
+        assert(steps.every(step => step !== -1))
+        // lines count as pixels, and turning back starts over
+        assert.strictEqual(keys.wheel(-4, 1), -1)
+        keys.release()
+        assert.strictEqual(keys.wheel(50, 0), 0)
     })
 
     it("dashes on space or shift", () => {
