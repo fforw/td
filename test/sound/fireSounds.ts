@@ -1,3 +1,4 @@
+import Prando from "prando"
 import { afterEach, assert, beforeEach, describe, it, vi } from "vitest"
 
 import type { FireDrop } from "../../src/monster/fireRain"
@@ -53,6 +54,10 @@ describe("FireSounds", () => {
 
     beforeEach(() => {
         vi.spyOn(performance, "now").mockImplementation(() => clock)
+        // each drop picks a recording at random, and as they hit at different moments into it, the strikes of a
+        // line come unevenly: the gaps between them would differ from run to run
+        const random = new Prando(1)
+        vi.spyOn(Math, "random").mockImplementation(() => random.next())
         played.length = 0
     })
 
