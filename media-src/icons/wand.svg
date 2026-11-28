@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- the tip takes the color of the element from the CSS -->
+  <path d="M5 28 L21 10" stroke="#1b1b22" stroke-width="4.4" stroke-linecap="round"/>
+  <path d="M5 28 L21 10" stroke="#9a6a40" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="23" cy="8" r="5.2" fill="currentColor" opacity="0.35"/>
+  <circle cx="23" cy="8" r="3.4" fill="currentColor" stroke="#1b1b22" stroke-width="1.1"/>
+  <circle cx="22" cy="7" r="1.1" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- blade pointing up and to the right, the handle down left -->
+  <g transform="rotate(45 16 16)">
+    <path d="M16 2 L19 8 L19 19 L13 19 L13 8 Z" fill="#dfe6f2" stroke="#1b1b22" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M16 4 L16 18" stroke="#9aa6bc" stroke-width="1"/>
+    <rect x="9.5" y="19" width="13" height="2.6" rx="1" fill="#c9a24a" stroke="#1b1b22" stroke-width="1.1"/>
+    <rect x="14.2" y="21.6" width="3.6" height="7" rx="1" fill="#6b4226" stroke="#1b1b22" stroke-width="1.1"/>
+  </g>
+</svg>

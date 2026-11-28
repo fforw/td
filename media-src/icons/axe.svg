@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- handle leaning to the right, the head at the top -->
+  <g transform="rotate(30 16 16)">
+    <rect x="14.5" y="5" width="3" height="25" rx="1.2" fill="#8a5a32" stroke="#1b1b22" stroke-width="1.1"/>
+    <path d="M17 5 L24 2.5 C27.5 6 27.5 12 24 15.5 L17 13 Z" fill="#dfe6f2" stroke="#1b1b22" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M15 6 L11 7 L11 11 L15 12 Z" fill="#9aa6bc" stroke="#1b1b22" stroke-width="1" stroke-linejoin="round"/>
+  </g>
+</svg>

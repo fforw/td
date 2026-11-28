@@ -176,6 +176,152 @@
     background: rgba(42, 29, 20, 0.85);
 }
 
+/* the HUD while the view is with a hero in a level, see gauge.ts */
+#game .gauge
+{
+    --ring: 4.5rem;
+    position: absolute;
+    z-index: 3;
+    left: 1rem;
+    bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    pointer-events: none;
+}
+
+#game .gauge[hidden]
+{
+    display: none;
+}
+
+#game .gauge .level-ring
+{
+    position: relative;
+    width: var(--ring);
+    height: var(--ring);
+    flex: none;
+    overflow: hidden;
+    border: 3px solid #e8c25c;
+    border-radius: 50%;
+    background: rgba(42, 29, 20, 0.85);
+    box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.6);
+    pointer-events: auto;
+}
+
+/* fills from the bottom as far as the next level is */
+#game .gauge .level-fill
+{
+    position: absolute;
+    inset: auto 0 0;
+    height: calc(var(--progress) * 100%);
+    background: linear-gradient(#b7862a, #7a5418);
+}
+
+#game .gauge .level-number
+{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: bold 1.9rem "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    color: #fff4d8;
+    text-shadow: 0 0 3px #000, 0 0 6px #000;
+}
+
+#game .gauge .gauge-rows
+{
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+#game .gauge .hp-bar
+{
+    position: relative;
+    width: 13rem;
+    height: 1.1rem;
+    overflow: hidden;
+    border: 2px solid #1b1b22;
+    border-radius: 0.3rem;
+    background: rgba(42, 29, 20, 0.85);
+    pointer-events: auto;
+}
+
+#game .gauge .hp-fill
+{
+    height: 100%;
+    background: linear-gradient(#e0483a, #9a1f18);
+    transition: width 0.2s;
+}
+
+#game .gauge .hp-text
+{
+    position: absolute;
+    inset: 0;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    line-height: 1.1rem;
+    text-shadow: 0 0 2px #000, 0 0 3px #000;
+}
+
+#game .gauge .gear-row
+{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    max-width: 20rem;
+}
+
+#game .gauge .gear-icon
+{
+    position: relative;
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0.1rem;
+    border: 2px solid transparent;
+    border-radius: 0.25rem;
+    background: rgba(42, 29, 20, 0.7);
+    pointer-events: auto;
+}
+
+#game .gauge .gear-icon.current
+{
+    border-color: #ffd35c;
+    background: rgba(90, 64, 30, 0.9);
+}
+
+#game .gauge .gear-icon.empty svg
+{
+    opacity: 0.35;
+}
+
+#game .gauge .gear-icon svg
+{
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+#game .gauge .gear-count
+{
+    position: absolute;
+    right: 0;
+    bottom: -0.1rem;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #e8e0d4;
+    text-shadow: 0 0 2px #000, 0 0 3px #000;
+}
+
+/* missions and reports go over it */
+#game.gauged .info
+{
+    bottom: 6.5rem;
+}
+
 #game .info[hidden],
 #game .popup[hidden]
 {
@@ -724,6 +870,18 @@
 #game.key-steered .info
 {
     bottom: 3.75rem;
+}
+
+#game.key-steered .gauge,
+body.gamepad #game .gauge
+{
+    bottom: 3.75rem;
+}
+
+#game.key-steered.gauged .info,
+body.gamepad #game.gauged .info
+{
+    bottom: 9.25rem;
 }
 
 /* keeps what's along the bottom out from under the prompts */

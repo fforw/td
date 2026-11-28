@@ -18,6 +18,7 @@ import {
     loseGear, returnHome, startJob
 } from "./heroes"
 import { addGear, type Gear, gearName, isThrown, spendGear } from "./gear"
+import { renderGauge } from "./gauge"
 import CastleScene, { type Walker } from "./castleScene"
 import type { PadAction, PadInput } from "./gamepad"
 import type { PadTarget, Prompt } from "./gamepadControl"
@@ -188,6 +189,8 @@ export default class GameView implements PadTarget
 
     private readonly hud = el("div", { className: "hud" })
     private readonly info = el("div", { className: "info" })
+    /** the HUD in the lower left corner while the view is with a hero in a level */
+    private readonly gauge = el("div", { className: "gauge", hidden: true })
     private readonly notices = el("div", { className: "notices" })
     private readonly popup = el("div", { className: "popup", hidden: true })
     private readonly levelMapPopup = el("div", { className: "popup", hidden: true })
@@ -648,6 +651,7 @@ export default class GameView implements PadTarget
         this.root.replaceChildren(
             ...(castle ? [castle.element, castle.compass] : [el("p", { className: "no-3d" }, "The 3D view needs WebGL.")]),
             this.hud,
+            this.gauge,
             this.info,
             this.notices,
             this.sceneBox.element,
@@ -1253,6 +1257,7 @@ export default class GameView implements PadTarget
         this.castle?.show(this.shownPatches())
         this.castle?.setWalkers(this.walkers())
         this.hud.replaceChildren(...present(this.renderHud()))
+        this.updateGauge()
         this.info.replaceChildren(...present([this.renderMissions(), this.renderReports()]))
         this.info.hidden = this.info.childElementCount === 0
         this.notices.replaceChildren(...present([this.renderFollowed(), ...this.renderArrivals(), ...this.renderNews()]))
@@ -1284,14 +1289,38 @@ export default class GameView implements PadTarget
         document.title = campaign.castleName + ", day " + campaign.day + " - Treasure & Dread"
     }
 
+    /**
+     * Shows the hit points and gear of the hero the view is with in a level, along with the campaign level
+     */
+    private updateGauge(): void
+    {
+        const { campaign, gauge, level } = this
+        const job = this.viewedLevelJob()
+        gauge.hidden = !job
+        this.root.classList.toggle("gauged", !!job)
+        if (!job)
+        {
+            return
+        }
+        const hero = this.heroById(job.heroId)
+        const reached = campaignLevel(campaign.xp)
+        const from = levelXp(reached)
+        gauge.replaceChildren(...renderGauge({
+            level: reached,
+            xpGained: campaign.xp - from,
+            xpNeeded: levelXp(reached + 1) - from,
+            hp: job.hp ?? hero.character.stats.hp,
+            maxHp: hero.character.stats.hp,
+            gear: hero.gear.map(piece => ({ piece, left: piece.count - (isThrown(piece.kind) ? level?.gearOut(hero.id, piece.kind) ?? 0 : 0) })),
+            currentGear: currentGear(hero)
+        }))
+    }
+
     private renderHud(): Child[]
     {
-        const { campaign, following } = this
-        const job = campaign.jobs.find(j => j.heroId === following && j.inside)
-        const maxHp = campaign.heroes.find(hero => hero.id === following)?.character.stats.hp
+        const { campaign } = this
         return [
             el("span", { className: "castle" }, campaign.subtitle),
-            !!job && el("span", { className: "hp", title: "Hit points" }, "❤️ " + (job.hp ?? maxHp) + " / " + maxHp),
             el("span", { className: "day" }, "Day " + campaign.day),
             el("span", { className: "gold", title: "Gold" }, "🪙 " + campaign.gold),
             el("span", {
