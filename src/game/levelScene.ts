@@ -236,10 +236,10 @@ const MAX_DISTANCE = 10 / LEVEL_GROWTH
 const POINTER_AIM_REACH = 0.15 * FIGURE_SCALE
 
 /**
- * How far from the hero on the screen the right stick points, in device coordinates of the height of the view. It only
- * needs to be far enough for a precise direction, and near enough to stay on the floor.
+ * How far from the hero on the screen a direction of a stick or the keys points, in device coordinates of the height of
+ * the view. It only needs to be far enough for a precise direction, and near enough to stay on the floor.
  */
-const STICK_AIM_REACH = 0.1
+const SCREEN_REACH = 0.1
 
 /**
  * Longest time in seconds a single frame moves things for
@@ -250,6 +250,8 @@ const FLOOR = new Plane(new Vector3(0, 1, 0), 0)
 
 const hit = new Vector3()
 const forward = new Vector3()
+/** a direction on the floor, x for x and y for z */
+const way = new Vector2()
 
 /**
  * What heroes can carry into a level
@@ -1513,7 +1515,7 @@ export default class LevelScene
      */
     private ordersOf({ moveX, moveY, aimX, aimY, dash, attack, block, use }: PadInput, { meeple }: ShownHero): HeroOrders
     {
-        this.moveOrders(moveX, moveY)
+        this.moveOrders(moveX, moveY, meeple.position)
         this.stickAim(aimX, aimY, meeple.position)
         orders.dash = dash
         orders.attack = attack
@@ -1528,7 +1530,7 @@ export default class LevelScene
      */
     private keyOrders({ moveX, moveY, dash, attack, block, use, pointerX, pointerY }: KeyInput, { meeple }: ShownHero): HeroOrders
     {
-        this.moveOrders(moveX, moveY)
+        this.moveOrders(moveX, moveY, meeple.position)
         orders.aimX = 0
         orders.aimZ = 0
         if (pointerX !== null && pointerY !== null)
@@ -1558,47 +1560,68 @@ export default class LevelScene
     }
 
     /**
-     * Sets where the orders tell to look, from the right stick pointing the way on the screen: the floor seen in that
-     * direction from the hero, so that what the stick points at on the tilted view is what they aim at
+     * Sets where the orders tell to look, from the right stick pointing the way on the screen
      */
     private stickAim(aimX: number, aimY: number, position: Vector3): void
     {
         orders.aimX = 0
         orders.aimZ = 0
-        const length = Math.hypot(aimX, aimY)
+        if (this.floorWay(aimX, aimY, position))
+        {
+            orders.aimX = way.x
+            orders.aimZ = way.y
+        }
+    }
+
+    /**
+     * Sets where the orders tell to go, from a direction on the screen, as fast as the stick is pushed
+     */
+    private moveOrders(moveX: number, moveY: number, position: Vector3): void
+    {
+        orders.moveX = 0
+        orders.moveZ = 0
+        if (this.floorWay(moveX, moveY, position))
+        {
+            const length = Math.hypot(moveX, moveY)
+            orders.moveX = way.x * length
+            orders.moveZ = way.y * length
+        }
+    }
+
+    /**
+     * Sets `way` to the direction on the floor that a direction on the screen points to from the given place: the floor
+     * seen that way from it. The tilted view squashes depth, so that the same angle on the floor would go beside what
+     * the stick or the keys point at.
+     *
+     * @param x         rightward on the screen
+     * @param y         downward on the screen
+     * @return whether there is a direction, false for none on the screen
+     */
+    private floorWay(x: number, y: number, position: Vector3): boolean
+    {
+        const length = Math.hypot(x, y)
         if (length === 0)
         {
-            return
+            return false
         }
         const { camera } = this
         hit.copy(position).project(camera)
-        const reach = STICK_AIM_REACH / length
-        this.pointer.set(hit.x + aimX * reach / camera.aspect, hit.y - aimY * reach)
+        const reach = SCREEN_REACH / length
+        this.pointer.set(hit.x + x * reach / camera.aspect, hit.y - y * reach)
         this.raycaster.setFromCamera(this.pointer, camera)
         if (this.raycaster.ray.intersectPlane(FLOOR, hit))
         {
-            orders.aimX = hit.x - position.x
-            orders.aimZ = hit.z - position.z
+            way.set(hit.x - position.x, hit.z - position.z)
         }
         else
         {
             // above the horizon, so the way the camera faces will do
             const heading = this.controls.getAzimuthalAngle()
             const cos = Math.cos(heading), sin = Math.sin(heading)
-            orders.aimX = aimX * cos + aimY * sin
-            orders.aimZ = -aimX * sin + aimY * cos
+            way.set(x * cos + y * sin, -x * sin + y * cos)
         }
-    }
-
-    /**
-     * Sets where the orders tell to go, from a direction on the screen
-     */
-    private moveOrders(moveX: number, moveY: number): void
-    {
-        const heading = this.controls.getAzimuthalAngle()
-        const cos = Math.cos(heading), sin = Math.sin(heading)
-        orders.moveX = moveX * cos + moveY * sin
-        orders.moveZ = -moveX * sin + moveY * cos
+        way.normalize()
+        return true
     }
 
     private updateHeroes(time: number, delta: number): void
